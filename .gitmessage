@@ -1,0 +1,81 @@
+# Conventional Commits
+
+# <type>(<scope>): <subject>
+#
+# <body>
+#
+# <footer>
+
+# Type must be one of the following:
+#   feat:     A new feature (triggers MINOR version bump)
+#   fix:      A bug fix (triggers PATCH version bump)
+#   docs:     Documentation only changes
+#   style:    Changes that do not affect the meaning of the code
+#             (white-space, formatting, missing semi-colons, etc)
+#   refactor: A code change that neither fixes a bug nor adds a feature
+#   perf:     A code change that improves performance
+#   test:     Adding missing tests or correcting existing tests
+#   build:    Changes that affect the build system or external dependencies
+#   ci:       Changes to CI configuration files and scripts
+#   chore:    Other changes that don't modify src or test files
+#   revert:   Reverts a previous commit
+
+# Scope is optional and should be one of:
+#   auth:     Authentication-related changes
+#   articles: Article management and display
+#   sources:  News source management
+#   filters:  Article filtering functionality
+#   ui:       UI components and styling
+#   context:  State management and context
+#   utils:    Utility functions
+#   types:    TypeScript type definitions
+#   config:   Configuration files
+
+# Subject line rules:
+#   - Use imperative, present tense: "change" not "changed" nor "changes"
+#   - Don't capitalize first letter
+#   - No period (.) at the end
+#   - Maximum 72 characters
+
+# Body (optional):
+#   - Use imperative, present tense
+#   - Explain the "what" and "why" vs. "how"
+#   - Can include multiple paragraphs
+#   - Wrap at 72 characters
+
+# Footer (optional):
+#   - Reference issues: "Closes #123" or "Fixes #456"
+#   - Breaking changes: "BREAKING CHANGE: description"
+#   - Co-authors: "Co-authored-by: Name <email>"
+
+# Examples:
+
+# feat(articles): add favorite article functionality
+#
+# Users can now mark articles as favorites and filter by favorites.
+# This improves the user experience by allowing users to save
+# articles for later reading.
+
+# fix(auth): resolve session restoration on page reload
+#
+# Session data was not being properly restored when users refreshed
+# the page. This fix ensures that authenticated sessions persist
+# across page reloads.
+#
+# Fixes #42
+
+# refactor(context): simplify article filtering logic
+#
+# Moved filtering logic from component to useMemo hook for better
+# performance and code organization.
+
+# docs: update README with setup instructions
+#
+# Added comprehensive setup instructions including environment
+# variables and dependency installation steps.
+
+# BREAKING CHANGE: rename AppState to ApplicationState
+#
+# The AppState interface has been renamed to ApplicationState to
+# avoid naming conflicts. All references have been updated.
+
