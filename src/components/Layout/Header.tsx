@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
-import { Newspaper, LogOut, Settings, RefreshCw } from 'lucide-react';
+import { Newspaper, LogOut, Settings, RefreshCw, Layers } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { clearSession } from '../../utils/auth';
 import { fetchAllNews } from '../../utils/newsFetcher';
 
 interface HeaderProps {
   onOpenSources: () => void;
+  onOpenFeeds: () => void;
 }
 
-export function Header({ onOpenSources }: HeaderProps) {
+export function Header({ onOpenSources, onOpenFeeds }: HeaderProps) {
   const { state, dispatch } = useApp();
   const [showUserMenu, setShowUserMenu] = useState(false);
 
@@ -93,6 +94,14 @@ export function Header({ onOpenSources }: HeaderProps) {
               <RefreshCw size={18} className={state.ui.isFetching ? 'animate-spin' : ''} />
               <span className="hidden sm:inline">{state.ui.isFetching ? 'Updating...' : 'Update News'}</span>
               <span className="sm:hidden">Update</span>
+            </button>
+
+            <button
+              onClick={onOpenFeeds}
+              className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-stone-800 hover:bg-stone-700 text-stone-300 font-medium rounded-lg transition-all duration-250 text-sm sm:text-base"
+            >
+              <Layers size={18} />
+              <span className="hidden sm:inline">Feeds</span>
             </button>
 
             <button
