@@ -122,8 +122,14 @@ async function followRedirects(url: string, maxRedirects: number = 10): Promise<
         return currentUrl;
       }
     } catch (error) {
-      // If fetch fails, return the current URL we have
-      console.warn(`Error following redirect for ${url}:`, error);
+      // If this is a connect timeout (UND_ERR_CONNECT_TIMEOUT), it's likely a
+      // transient network/CDN issue. Swallow it quietly to avoid noisy stack
+      // traces for every article; just fall back to the last known URL.
+      const msg = error instanceof Error ? error.message : String(error);
+      if (!msg.includes('UND_ERR_CONNECT_TIMEOUT') && !msg.includes('Connect Timeout Error')) {
+        console.warn(`Error following redirect for ${url}:`, error);
+      }
+
       return currentUrl;
     }
   }
