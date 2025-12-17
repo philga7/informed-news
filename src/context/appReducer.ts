@@ -8,6 +8,7 @@ export const initialState: AppState = {
   },
   articles: [],
   sources: [],
+  collections: [],
   filters: {
     searchQuery: '',
     sourceId: null,
@@ -101,6 +102,28 @@ export function appReducer(state: AppState, action: AppAction): AppState {
         sources: state.sources.filter(source => source.id !== action.payload),
       };
 
+    case 'ADD_COLLECTION':
+      return {
+        ...state,
+        collections: [...state.collections, action.payload],
+      };
+
+    case 'UPDATE_COLLECTION':
+      return {
+        ...state,
+        collections: state.collections.map(collection =>
+          collection.id === action.payload.id
+            ? { ...collection, ...action.payload.updates, updatedAt: new Date() }
+            : collection
+        ),
+      };
+
+    case 'DELETE_COLLECTION':
+      return {
+        ...state,
+        collections: state.collections.filter(collection => collection.id !== action.payload),
+      };
+
     case 'SET_FILTER':
       return {
         ...state,
@@ -138,7 +161,12 @@ export function appReducer(state: AppState, action: AppAction): AppState {
       };
 
     case 'LOAD_STATE':
-      return action.payload;
+      // Ensure backward compatibility - merge with defaults for new fields
+      return {
+        ...initialState,
+        ...action.payload,
+        collections: action.payload.collections ?? [],
+      };
 
     default:
       return state;

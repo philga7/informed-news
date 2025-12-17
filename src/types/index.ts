@@ -49,6 +49,22 @@ export interface NewsSource {
   errorMessage?: string;
 }
 
+export interface FeedSourceConfig {
+  sourceId: string;
+  count: number;
+  sortBy: 'date' | 'title';
+  ascending: boolean;
+}
+
+export interface FeedCollection {
+  id: string;
+  name: string;
+  description?: string;
+  sources: FeedSourceConfig[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface AppState {
   authentication: {
     user: User | null;
@@ -57,6 +73,7 @@ export interface AppState {
   };
   articles: NewsArticle[];
   sources: NewsSource[];
+  collections: FeedCollection[];
   filters: {
     searchQuery: string;
     sourceId: string | null;
@@ -81,6 +98,9 @@ export type AppAction =
   | { type: 'ADD_SOURCE'; payload: NewsSource }
   | { type: 'UPDATE_SOURCE'; payload: { id: string; updates: Partial<NewsSource> } }
   | { type: 'DELETE_SOURCE'; payload: string }
+  | { type: 'ADD_COLLECTION'; payload: FeedCollection }
+  | { type: 'UPDATE_COLLECTION'; payload: { id: string; updates: Partial<FeedCollection> } }
+  | { type: 'DELETE_COLLECTION'; payload: string }
   | { type: 'SET_FILTER'; payload: Partial<AppState['filters']> }
   | { type: 'SET_FETCHING'; payload: boolean }
   | { type: 'SET_ERROR'; payload: string | null }
