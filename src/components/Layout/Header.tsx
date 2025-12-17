@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { Newspaper, LogOut, Settings, RefreshCw, Layers } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { clearSession } from '../../utils/auth';
-import { fetchAllNews } from '../../utils/newsFetcher';
+import { feedsApi } from '../../utils/apiClient';
+import type { NewsArticle } from '../../types';
 
 interface HeaderProps {
   onOpenSources: () => void;
@@ -31,7 +32,27 @@ export function Header({ onOpenSources, onOpenFeeds }: HeaderProps) {
     dispatch({ type: 'SET_ERROR', payload: null });
 
     try {
-      const { articles, errors } = await fetchAllNews(state.sources);
+      // Convert sources to API format (Date to string)
+      const sourcesForApi = state.sources.map(source => ({
+        id: source.id,
+        name: source.name,
+        type: source.type,
+        url: source.url,
+        enabled: source.enabled,
+        createdAt: source.createdAt.toISOString(),
+        scrapeExternalUrl: source.scrapeExternalUrl,
+      }));
+
+      const result = await feedsApi.fetchAll(sourcesForApi);
+      
+      // Convert API response articles back to frontend format (string to Date)
+      const articles: NewsArticle[] = result.articles.map((article: any) => ({
+        ...article,
+        publishedAt: new Date(article.publishedAt),
+        fetchedAt: new Date(article.fetchedAt),
+      }));
+
+      const errors = result.errors || [];
 
       if (articles.length > 0) {
         dispatch({ type: 'ADD_ARTICLES', payload: articles });
@@ -55,9 +76,12 @@ export function Header({ onOpenSources, onOpenFeeds }: HeaderProps) {
         });
       }
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred while fetching news.';
       dispatch({
         type: 'SET_ERROR',
-        payload: 'An unexpected error occurred while fetching news.',
+        payload: errorMessage.includes('fetch') 
+          ? 'Unable to connect to backend service. Please ensure the backend is running.'
+          : errorMessage,
       });
     } finally {
       dispatch({ type: 'SET_FETCHING', payload: false });

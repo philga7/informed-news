@@ -8,6 +8,7 @@ export function AddSourceForm() {
   const [name, setName] = useState('');
   const [url, setUrl] = useState('');
   const [type, setType] = useState<SourceType>('rss');
+  const [scrapeExternalUrl, setScrapeExternalUrl] = useState(false);
   const [error, setError] = useState('');
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -34,6 +35,7 @@ export function AddSourceForm() {
       url: url.trim(),
       enabled: true,
       createdAt: new Date(),
+      scrapeExternalUrl: type === 'rss' ? scrapeExternalUrl : undefined,
     };
 
     dispatch({ type: 'ADD_SOURCE', payload: newSource });
@@ -41,6 +43,7 @@ export function AddSourceForm() {
     setName('');
     setUrl('');
     setType('rss');
+    setScrapeExternalUrl(false);
     setIsExpanded(false);
   };
 
@@ -112,6 +115,24 @@ export function AddSourceForm() {
           />
         </div>
 
+        {type === 'rss' && (
+          <div className="flex items-center gap-3">
+            <input
+              id="scrapeExternalUrl"
+              type="checkbox"
+              checked={scrapeExternalUrl}
+              onChange={(e) => setScrapeExternalUrl(e.target.checked)}
+              className="w-4 h-4 text-accent bg-stone-800 border-stone-700 rounded focus:ring-accent focus:ring-2"
+            />
+            <label htmlFor="scrapeExternalUrl" className="text-sm text-stone-300 cursor-pointer">
+              Scrape external URLs from article pages
+              <span className="block text-xs text-stone-500 mt-1">
+                For sources like Citizen Free Press that link to external articles
+              </span>
+            </label>
+          </div>
+        )}
+
         <div className="flex gap-3">
           <button
             type="submit"
@@ -125,6 +146,8 @@ export function AddSourceForm() {
               setIsExpanded(false);
               setName('');
               setUrl('');
+              setType('rss');
+              setScrapeExternalUrl(false);
               setError('');
             }}
             className="px-4 py-2 bg-stone-800 hover:bg-stone-700 text-stone-300 font-medium rounded-lg transition-all duration-250"
