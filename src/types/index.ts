@@ -47,6 +47,7 @@ export interface NewsSource {
   createdAt: Date;
   lastFetched?: Date;
   errorMessage?: string;
+  scrapeExternalUrl?: boolean;
 }
 
 export interface FeedSourceConfig {
