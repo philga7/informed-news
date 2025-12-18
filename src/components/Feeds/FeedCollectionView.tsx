@@ -79,9 +79,9 @@ export function FeedCollectionView({ collection, onBack, onEdit }: FeedCollectio
                   No articles from this source yet
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="space-y-4">
                   {section.articles.map((article) => (
-                    <ArticleCard key={article.id} article={article} />
+                    <ArticleCard key={article.id} article={article} feedName={collection.name} />
                   ))}
                 </div>
               )}
