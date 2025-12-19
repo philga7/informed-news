@@ -30,7 +30,7 @@ function preprocessXML(xmlText: string): string {
  * @returns Resolved original article URL or original URL if scraping fails
  */
 async function scrapeOriginalURL(pageURL: string, sourceDomain: string, retryCount: number = 0): Promise<string> {
-  const maxRetries = 1; // Retry once on timeout
+  const maxRetries = 1; // Retry once on transient network errors
   const timeout = 15000; // 15 seconds timeout (increased from 5 seconds)
 
   try {
@@ -61,16 +61,18 @@ async function scrapeOriginalURL(pageURL: string, sourceDomain: string, retryCou
 
     return pageURL; // Fallback to original link if no external link found
   } catch (error) {
-    // Retry on timeout errors if we haven't exceeded max retries
-    if (axios.isAxiosError(error) && error.code === 'ECONNABORTED' && retryCount < maxRetries) {
-      console.warn(`Timeout while scraping ${pageURL}, retrying (attempt ${retryCount + 1}/${maxRetries + 1})...`);
+    // Retry on transient network errors (timeout, socket hang up, connection reset) if we haven't exceeded max retries
+    const retryableErrorCodes = ['ECONNABORTED', 'ECONNRESET', 'ETIMEDOUT'];
+    if (axios.isAxiosError(error) && error.code && retryableErrorCodes.includes(error.code) && retryCount < maxRetries) {
+      console.warn(`Network error (${error.code}) while scraping ${pageURL}, retrying (attempt ${retryCount + 1}/${maxRetries + 1})...`);
       return scrapeOriginalURL(pageURL, sourceDomain, retryCount + 1);
     }
 
     // Log other errors but don't retry
     if (axios.isAxiosError(error)) {
-      // Only log non-timeout errors to reduce noise (timeouts are expected for some slow pages)
-      if (error.code !== 'ECONNABORTED') {
+      // Only log non-retryable errors to reduce noise (transient network errors are expected and will be retried)
+      const retryableErrorCodes = ['ECONNABORTED', 'ECONNRESET', 'ETIMEDOUT'];
+      if (!error.code || !retryableErrorCodes.includes(error.code)) {
         console.error(`Axios Error while scraping ${pageURL}:`, error.message);
       }
     } else if (error instanceof AggregateError) {
