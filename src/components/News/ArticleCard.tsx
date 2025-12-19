@@ -125,22 +125,17 @@ export function ArticleCard({ article, feedName }: ArticleCardProps) {
             </button>
           </div>
         </div>
-
-        {article.description && (
-          <p className="text-stone-400 text-sm mb-2 line-clamp-3">{article.description}</p>
-        )}
       </div>
 
-      {showTooltip && (
-        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 z-10 bg-stone-900 border border-stone-800 rounded-lg p-3 shadow-lg min-w-[200px] transition-opacity duration-250">
-          <div className="space-y-1 text-sm">
+      {showTooltip && (feedName || article.description) && (
+        <div className="absolute top-full left-0 right-0 mt-2 z-10 bg-stone-900 border border-stone-600 rounded-lg p-4 shadow-xl transition-opacity duration-250">
+          <div className="space-y-3">
             {feedName && (
-              <div className="text-stone-300 font-medium">{feedName}</div>
+              <div className="text-stone-300 font-medium text-sm">{feedName}</div>
             )}
-            <div className="text-stone-400">{article.source}</div>
-          </div>
-          <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
-            <div className="w-2 h-2 bg-stone-900 border-r border-b border-stone-800 transform rotate-45"></div>
+            {article.description && (
+              <p className="text-stone-400 text-sm leading-relaxed">{article.description}</p>
+            )}
           </div>
         </div>
       )}
