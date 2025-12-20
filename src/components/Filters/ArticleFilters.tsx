@@ -1,4 +1,3 @@
-import React from 'react';
 import { Search, Star, CheckCircle } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 

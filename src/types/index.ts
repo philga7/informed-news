@@ -66,6 +66,19 @@ export interface FeedCollection {
   updatedAt: Date;
 }
 
+export type TopicTag = string;
+
+export interface Topic {
+  id: string;
+  name: string;
+  keywords: string[];
+  articleIds: string[];
+  followed: boolean;
+  tags: TopicTag[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface AppState {
   authentication: {
     user: User | null;
@@ -75,6 +88,7 @@ export interface AppState {
   articles: NewsArticle[];
   sources: NewsSource[];
   collections: FeedCollection[];
+  topics: Topic[];
   filters: {
     searchQuery: string;
     sourceId: string | null;
@@ -102,6 +116,13 @@ export type AppAction =
   | { type: 'ADD_COLLECTION'; payload: FeedCollection }
   | { type: 'UPDATE_COLLECTION'; payload: { id: string; updates: Partial<FeedCollection> } }
   | { type: 'DELETE_COLLECTION'; payload: string }
+  | { type: 'ADD_TOPIC'; payload: Topic }
+  | { type: 'UPDATE_TOPIC'; payload: { id: string; updates: Partial<Topic> } }
+  | { type: 'DELETE_TOPIC'; payload: string }
+  | { type: 'ADD_ARTICLES_TO_TOPIC'; payload: { topicId: string; articleIds: string[] } }
+  | { type: 'FOLLOW_TOPIC'; payload: { topicId: string; followed: boolean } }
+  | { type: 'TAG_TOPIC'; payload: { topicId: string; tags: TopicTag[] } }
+  | { type: 'SET_TOPICS'; payload: Topic[] }
   | { type: 'SET_FILTER'; payload: Partial<AppState['filters']> }
   | { type: 'SET_FETCHING'; payload: boolean }
   | { type: 'SET_ERROR'; payload: string | null }

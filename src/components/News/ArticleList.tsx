@@ -1,4 +1,3 @@
-import React from 'react';
 import type { NewsArticle } from '../../types';
 import { ArticleCard } from './ArticleCard';
 import { EmptyState } from '../UI/EmptyState';

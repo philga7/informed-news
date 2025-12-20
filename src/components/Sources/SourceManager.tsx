@@ -1,6 +1,4 @@
-import React from 'react';
 import { Trash2, ToggleLeft, ToggleRight } from 'lucide-react';
-import type { NewsSource } from '../../types';
 import { useApp } from '../../context/AppContext';
 import { EmptyState } from '../UI/EmptyState';
 
