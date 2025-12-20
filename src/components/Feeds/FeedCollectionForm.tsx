@@ -99,10 +99,6 @@ export function FeedCollectionForm({ collection, onBack, onSave }: FeedCollectio
     onSave();
   };
 
-  const getSourceName = (sourceId: string) => {
-    return state.sources.find((s) => s.id === sourceId)?.name || 'Unknown Source';
-  };
-
   return (
     <div className="max-w-4xl">
       <button

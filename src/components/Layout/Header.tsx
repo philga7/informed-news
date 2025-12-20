@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { Newspaper, LogOut, Settings, RefreshCw, Layers } from 'lucide-react';
+import { useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import { Newspaper, LogOut, Settings, RefreshCw, Layers, TrendingUp } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { clearSession } from '../../utils/auth';
 import { feedsApi } from '../../utils/apiClient';
@@ -7,11 +8,11 @@ import type { NewsArticle } from '../../types';
 
 interface HeaderProps {
   onOpenSources: () => void;
-  onOpenFeeds: () => void;
 }
 
-export function Header({ onOpenSources, onOpenFeeds }: HeaderProps) {
+export function Header({ onOpenSources }: HeaderProps) {
   const { state, dispatch } = useApp();
+  const location = useLocation();
   const [showUserMenu, setShowUserMenu] = useState(false);
 
   const handleLogout = () => {
@@ -59,7 +60,7 @@ export function Header({ onOpenSources, onOpenFeeds }: HeaderProps) {
         dispatch({ type: 'SET_LAST_UPDATE', payload: new Date() });
       }
 
-      errors.forEach((error) => {
+      errors.forEach((error: { sourceId: string; message: string }) => {
         dispatch({
           type: 'UPDATE_SOURCE',
           payload: {
@@ -120,13 +121,41 @@ export function Header({ onOpenSources, onOpenFeeds }: HeaderProps) {
               <span className="sm:hidden">Update</span>
             </button>
 
-            <button
-              onClick={onOpenFeeds}
-              className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-stone-800 hover:bg-stone-700 text-stone-300 font-medium rounded-lg transition-all duration-250 text-sm sm:text-base"
+            <Link
+              to="/"
+              className={`flex items-center gap-2 px-3 sm:px-4 py-2 font-medium rounded-lg transition-all duration-250 text-sm sm:text-base ${
+                location.pathname === '/'
+                  ? 'bg-stone-700 text-stone-200'
+                  : 'bg-stone-800 hover:bg-stone-700 text-stone-300'
+              }`}
+            >
+              <Newspaper size={18} />
+              <span className="hidden sm:inline">Articles</span>
+            </Link>
+
+            <Link
+              to="/dashboard"
+              className={`flex items-center gap-2 px-3 sm:px-4 py-2 font-medium rounded-lg transition-all duration-250 text-sm sm:text-base ${
+                location.pathname === '/dashboard' || location.pathname.startsWith('/topic/')
+                  ? 'bg-stone-700 text-stone-200'
+                  : 'bg-stone-800 hover:bg-stone-700 text-stone-300'
+              }`}
+            >
+              <TrendingUp size={18} />
+              <span className="hidden sm:inline">Dashboard</span>
+            </Link>
+
+            <Link
+              to="/feeds"
+              className={`flex items-center gap-2 px-3 sm:px-4 py-2 font-medium rounded-lg transition-all duration-250 text-sm sm:text-base ${
+                location.pathname === '/feeds'
+                  ? 'bg-stone-700 text-stone-200'
+                  : 'bg-stone-800 hover:bg-stone-700 text-stone-300'
+              }`}
             >
               <Layers size={18} />
               <span className="hidden sm:inline">Feeds</span>
-            </button>
+            </Link>
 
             <button
               onClick={onOpenSources}

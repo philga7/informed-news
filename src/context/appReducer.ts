@@ -9,6 +9,7 @@ export const initialState: AppState = {
   articles: [],
   sources: [],
   collections: [],
+  topics: [],
   filters: {
     searchQuery: '',
     sourceId: null,
@@ -124,6 +125,66 @@ export function appReducer(state: AppState, action: AppAction): AppState {
         collections: state.collections.filter(collection => collection.id !== action.payload),
       };
 
+    case 'ADD_TOPIC':
+      return {
+        ...state,
+        topics: [...state.topics, action.payload],
+      };
+
+    case 'UPDATE_TOPIC':
+      return {
+        ...state,
+        topics: state.topics.map(topic =>
+          topic.id === action.payload.id
+            ? { ...topic, ...action.payload.updates, updatedAt: new Date() }
+            : topic
+        ),
+      };
+
+    case 'DELETE_TOPIC':
+      return {
+        ...state,
+        topics: state.topics.filter(topic => topic.id !== action.payload),
+      };
+
+    case 'ADD_ARTICLES_TO_TOPIC':
+      return {
+        ...state,
+        topics: state.topics.map(topic => {
+          if (topic.id === action.payload.topicId) {
+            const newArticleIds = [...new Set([...topic.articleIds, ...action.payload.articleIds])];
+            return { ...topic, articleIds: newArticleIds, updatedAt: new Date() };
+          }
+          return topic;
+        }),
+      };
+
+    case 'FOLLOW_TOPIC':
+      return {
+        ...state,
+        topics: state.topics.map(topic =>
+          topic.id === action.payload.topicId
+            ? { ...topic, followed: action.payload.followed, updatedAt: new Date() }
+            : topic
+        ),
+      };
+
+    case 'TAG_TOPIC':
+      return {
+        ...state,
+        topics: state.topics.map(topic =>
+          topic.id === action.payload.topicId
+            ? { ...topic, tags: action.payload.tags, updatedAt: new Date() }
+            : topic
+        ),
+      };
+
+    case 'SET_TOPICS':
+      return {
+        ...state,
+        topics: action.payload,
+      };
+
     case 'SET_FILTER':
       return {
         ...state,
@@ -166,6 +227,7 @@ export function appReducer(state: AppState, action: AppAction): AppState {
         ...initialState,
         ...action.payload,
         collections: action.payload.collections ?? [],
+        topics: action.payload.topics ?? [],
       };
 
     default:

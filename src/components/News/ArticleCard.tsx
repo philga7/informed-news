@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Star, Check, Trash2 } from 'lucide-react';
 import type { NewsArticle } from '../../types';
 import { useApp } from '../../context/AppContext';
