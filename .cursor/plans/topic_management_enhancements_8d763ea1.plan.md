@@ -180,4 +180,3 @@ All new state (ignoredTopics, topic status fields) must:
 2. Update reducer with new actions
 3. Implement keyword deduplication in topicExtractor
 4. Add card actions to DashboardPage
-5. Create IgnoredTopicsModal
