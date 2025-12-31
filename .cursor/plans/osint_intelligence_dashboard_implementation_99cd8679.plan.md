@@ -134,4 +134,3 @@ Create `src/components/Intelligence/TopicTimeline.tsx`:
 
 - Keep MVP simple: Basic keyword extraction and similarity matching
 - Topics are derived from existing articles (no AI initially)
-- Location extraction is placeholder - map will render but may be empty initially
