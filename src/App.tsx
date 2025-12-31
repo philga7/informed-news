@@ -8,6 +8,7 @@ import { SourcesModal } from './components/Sources/SourcesModal';
 import { FeedManagementPage } from './components/Feeds/FeedManagementPage';
 import { DashboardPage } from './components/Intelligence/DashboardPage';
 import { TopicDetailPage } from './components/Intelligence/TopicDetailPage';
+import { HistoryPage } from './components/Intelligence/HistoryPage';
 
 function App() {
   const { state } = useApp();
@@ -27,6 +28,7 @@ function App() {
         <Route path="/" element={<ArticlesPage />} />
         <Route path="/feeds" element={<FeedManagementPage />} />
         <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/history" element={<HistoryPage />} />
         <Route path="/topic/:id" element={<TopicDetailPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

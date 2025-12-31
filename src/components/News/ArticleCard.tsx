@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Star, Check, Trash2 } from 'lucide-react';
 import type { NewsArticle } from '../../types';
 import { useApp } from '../../context/AppContext';
+import { articlesService } from '../../services';
 
 interface ArticleCardProps {
   article: NewsArticle;
@@ -12,29 +13,75 @@ export function ArticleCard({ article, feedName }: ArticleCardProps) {
   const { dispatch } = useApp();
   const [showTooltip, setShowTooltip] = useState(false);
 
-  const toggleFavorite = () => {
-    dispatch({
-      type: 'UPDATE_ARTICLE',
-      payload: {
-        id: article.id,
-        updates: { isFavorite: !article.isFavorite },
-      },
-    });
+  const toggleFavorite = async () => {
+    try {
+      // Optimistically update UI
+      dispatch({
+        type: 'UPDATE_ARTICLE',
+        payload: {
+          id: article.id,
+          updates: { isFavorite: !article.isFavorite },
+        },
+      });
+
+      // Persist to Supabase
+      await articlesService.toggleFavorite(article.id, !article.isFavorite);
+    } catch (error) {
+      console.error('Failed to toggle favorite:', error);
+      // Revert on error
+      dispatch({
+        type: 'UPDATE_ARTICLE',
+        payload: {
+          id: article.id,
+          updates: { isFavorite: article.isFavorite },
+        },
+      });
+    }
   };
 
-  const toggleRead = () => {
-    dispatch({
-      type: 'UPDATE_ARTICLE',
-      payload: {
-        id: article.id,
-        updates: { isRead: !article.isRead },
-      },
-    });
+  const toggleRead = async () => {
+    try {
+      // Optimistically update UI
+      dispatch({
+        type: 'UPDATE_ARTICLE',
+        payload: {
+          id: article.id,
+          updates: { isRead: !article.isRead },
+        },
+      });
+
+      // Persist to Supabase
+      await articlesService.markRead(article.id, !article.isRead);
+    } catch (error) {
+      console.error('Failed to toggle read status:', error);
+      // Revert on error
+      dispatch({
+        type: 'UPDATE_ARTICLE',
+        payload: {
+          id: article.id,
+          updates: { isRead: article.isRead },
+        },
+      });
+    }
   };
 
-  const deleteArticle = () => {
-    if (confirm('Are you sure you want to delete this article?')) {
+  const deleteArticle = async () => {
+    if (!confirm('Are you sure you want to delete this article?')) {
+      return;
+    }
+
+    try {
+      // Delete from Supabase
+      await articlesService.delete(article.id);
+      
+      // Update local state
       dispatch({ type: 'DELETE_ARTICLE', payload: article.id });
+    } catch (error) {
+      console.error('Failed to delete article:', error);
+      dispatch({
+        type: 'SET_ERROR',
+        payload: 'Failed to delete article. Please try again.',
+      });
     }
   };
 

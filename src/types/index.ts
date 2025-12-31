@@ -67,6 +67,7 @@ export interface FeedCollection {
 }
 
 export type TopicTag = string;
+export type TopicStatus = 'active' | 'archived' | 'ignored';
 
 export interface Topic {
   id: string;
@@ -75,8 +76,22 @@ export interface Topic {
   articleIds: string[];
   followed: boolean;
   tags: TopicTag[];
+  status: TopicStatus;
+  potentialRelevanceScore?: number;
+  expiryDate?: Date;
+  archivedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface IgnoredTopic {
+  id: string;
+  name: string;
+  keywords: string[];
+  articleIds: string[];
+  tags: TopicTag[];
+  deletedAt: Date;
+  originalTopicId: string;
 }
 
 export interface AppState {
@@ -89,6 +104,7 @@ export interface AppState {
   sources: NewsSource[];
   collections: FeedCollection[];
   topics: Topic[];
+  ignoredTopics: IgnoredTopic[];
   filters: {
     searchQuery: string;
     sourceId: string | null;
@@ -99,6 +115,8 @@ export interface AppState {
     isFetching: boolean;
     error: string | null;
     lastUpdate: Date | null;
+    isLoadingData: boolean;
+    dataLoadError: string | null;
   };
 }
 
@@ -110,12 +128,15 @@ export type AppAction =
   | { type: 'UPDATE_ARTICLE'; payload: { id: string; updates: Partial<NewsArticle> } }
   | { type: 'DELETE_ARTICLE'; payload: string }
   | { type: 'CLEAR_ARTICLES' }
+  | { type: 'SET_ARTICLES'; payload: NewsArticle[] }
   | { type: 'ADD_SOURCE'; payload: NewsSource }
   | { type: 'UPDATE_SOURCE'; payload: { id: string; updates: Partial<NewsSource> } }
   | { type: 'DELETE_SOURCE'; payload: string }
+  | { type: 'SET_SOURCES'; payload: NewsSource[] }
   | { type: 'ADD_COLLECTION'; payload: FeedCollection }
   | { type: 'UPDATE_COLLECTION'; payload: { id: string; updates: Partial<FeedCollection> } }
   | { type: 'DELETE_COLLECTION'; payload: string }
+  | { type: 'SET_COLLECTIONS'; payload: FeedCollection[] }
   | { type: 'ADD_TOPIC'; payload: Topic }
   | { type: 'UPDATE_TOPIC'; payload: { id: string; updates: Partial<Topic> } }
   | { type: 'DELETE_TOPIC'; payload: string }
@@ -123,10 +144,18 @@ export type AppAction =
   | { type: 'FOLLOW_TOPIC'; payload: { topicId: string; followed: boolean } }
   | { type: 'TAG_TOPIC'; payload: { topicId: string; tags: TopicTag[] } }
   | { type: 'SET_TOPICS'; payload: Topic[] }
+  | { type: 'ARCHIVE_TOPIC'; payload: { topicId: string; potentialRelevanceScore?: number; expiryDate?: Date } }
+  | { type: 'DELETE_TOPIC_WITH_ARTICLES'; payload: string }
+  | { type: 'ADD_IGNORED_TOPIC'; payload: IgnoredTopic }
+  | { type: 'REMOVE_IGNORED_TOPIC'; payload: string }
+  | { type: 'RESTORE_IGNORED_TOPIC'; payload: string }
+  | { type: 'UPDATE_TOPIC_STATUS'; payload: { topicId: string; status?: TopicStatus; potentialRelevanceScore?: number; expiryDate?: Date } }
   | { type: 'SET_FILTER'; payload: Partial<AppState['filters']> }
   | { type: 'SET_FETCHING'; payload: boolean }
   | { type: 'SET_ERROR'; payload: string | null }
   | { type: 'SET_LAST_UPDATE'; payload: Date }
+  | { type: 'SET_LOADING_DATA'; payload: boolean }
+  | { type: 'SET_DATA_LOAD_ERROR'; payload: string | null }
   | { type: 'LOAD_STATE'; payload: AppState };
 
 export interface RSSFeedItem {

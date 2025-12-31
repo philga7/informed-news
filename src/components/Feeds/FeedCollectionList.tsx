@@ -1,5 +1,6 @@
 import { Eye, Edit2, Trash2, Layers } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { collectionsService } from '../../services';
 import { EmptyState } from '../UI/EmptyState';
 import type { FeedCollection } from '../../types';
 
@@ -12,9 +13,23 @@ interface FeedCollectionListProps {
 export function FeedCollectionList({ collections, onEdit, onView }: FeedCollectionListProps) {
   const { dispatch } = useApp();
 
-  const handleDelete = (collection: FeedCollection) => {
-    if (confirm(`Are you sure you want to delete "${collection.name}"?`)) {
+  const handleDelete = async (collection: FeedCollection) => {
+    if (!confirm(`Are you sure you want to delete "${collection.name}"?`)) {
+      return;
+    }
+
+    try {
+      // Delete from Supabase
+      await collectionsService.delete(collection.id);
+      
+      // Update local state
       dispatch({ type: 'DELETE_COLLECTION', payload: collection.id });
+    } catch (error: any) {
+      console.error('Failed to delete collection:', error);
+      dispatch({
+        type: 'SET_ERROR',
+        payload: 'Failed to delete collection. Please try again.',
+      });
     }
   };
 

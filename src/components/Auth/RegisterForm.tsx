@@ -1,24 +1,24 @@
 import React, { useState } from 'react';
 import { UserPlus } from 'lucide-react';
-import { registerUser, createSession } from '../../utils/auth';
-import { useApp } from '../../context/AppContext';
+import { authService } from '../../services/auth.service';
 
 interface RegisterFormProps {
   onSwitchToLogin: () => void;
 }
 
 export function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
-  const { dispatch } = useApp();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setSuccess(false);
 
     if (password !== confirmPassword) {
       setError('Passwords do not match');
@@ -33,15 +33,13 @@ export function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
     setIsLoading(true);
 
     try {
-      const result = await registerUser(email, password, name);
-      if (result.success && result.user) {
-        createSession(result.user);
-        dispatch({ type: 'LOGIN', payload: result.user });
-      } else {
-        setError(result.error || 'Registration failed');
-      }
-    } catch (err) {
-      setError('An unexpected error occurred');
+      await authService.signUp({ email, password, name });
+      setSuccess(true);
+      // User is automatically logged in by Supabase
+      // The useAuth hook in AppContext will detect the session change
+    } catch (err: any) {
+      console.error('Signup error:', err);
+      setError(err.message || 'Registration failed. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -58,6 +56,12 @@ export function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
         {error && (
           <div className="bg-red-900/20 border border-red-700 rounded-lg p-3 text-red-300 text-sm">
             {error}
+          </div>
+        )}
+
+        {success && (
+          <div className="bg-green-900/20 border border-green-700 rounded-lg p-3 text-green-300 text-sm">
+            Account created successfully! Logging you in...
           </div>
         )}
 

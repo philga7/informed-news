@@ -1,8 +1,8 @@
-import React, { createContext, useContext, useReducer, useEffect, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, useRef } from 'react';
 import type { AppState, AppAction, User } from '../types';
 import { appReducer, initialState } from './appReducer';
-import { saveToStorage, loadFromStorage } from '../utils/storage';
-import { getSession, setupActivityTracking, findUserByEmail } from '../utils/auth';
+import { useAuth } from '../hooks/useAuth';
+import { useDataLoader } from '../hooks/useDataLoader';
 
 interface AppContextType {
   state: AppState;
@@ -13,61 +13,43 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(appReducer, initialState);
-  const saveTimeoutRef = useRef<NodeJS.Timeout>();
+  const { user: supabaseUser, loading: authLoading } = useAuth();
+  const { loadAllData } = useDataLoader(dispatch);
+  const hasLoadedDataRef = useRef(false);
 
-  const debouncedSave = useCallback(() => {
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-    }
-
-    saveTimeoutRef.current = setTimeout(() => {
-      const userId = state.authentication.user?.id;
-      if (userId) {
-        try {
-          saveToStorage(state, userId);
-        } catch (error) {
-          console.error('Failed to save state:', error);
-        }
-      }
-    }, 500);
-  }, [state]);
-
+  // Handle Supabase auth state changes
   useEffect(() => {
-    const session = getSession();
-    if (session) {
-      const storedUser = findUserByEmail(session.email);
-      if (storedUser) {
-        const user: User = {
-          id: storedUser.id,
-          email: storedUser.email,
-          name: storedUser.name,
-          createdAt: storedUser.createdAt,
-        };
+    if (authLoading) return;
 
-        const savedState = loadFromStorage(user.id);
-        if (savedState) {
-          dispatch({ type: 'LOAD_STATE', payload: savedState });
-        } else {
-          dispatch({ type: 'RESTORE_AUTH', payload: user });
-        }
+    if (supabaseUser) {
+      // User is authenticated with Supabase
+      const user: User = {
+        id: supabaseUser.id,
+        email: supabaseUser.email!,
+        name: supabaseUser.user_metadata?.name || supabaseUser.email!,
+        createdAt: supabaseUser.created_at,
+      };
+
+      // Set auth state
+      dispatch({ type: 'RESTORE_AUTH', payload: user });
+
+      // Load all user data from Supabase (only once)
+      if (!hasLoadedDataRef.current) {
+        hasLoadedDataRef.current = true;
+        loadAllData(user.id).then((result) => {
+          if (result.success) {
+            console.log('✅ Data loaded from Supabase');
+          } else {
+            console.error('❌ Failed to load data:', result.error);
+          }
+        });
       }
+    } else {
+      // User is logged out
+      dispatch({ type: 'LOGOUT' });
+      hasLoadedDataRef.current = false;
     }
-
-    const cleanup = setupActivityTracking();
-    return cleanup;
-  }, []);
-
-  useEffect(() => {
-    if (state.authentication.isAuthenticated) {
-      debouncedSave();
-    }
-
-    return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-    };
-  }, [state, debouncedSave]);
+  }, [supabaseUser, authLoading, loadAllData]);
 
   return (
     <AppContext.Provider value={{ state, dispatch }}>

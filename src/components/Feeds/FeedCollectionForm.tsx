@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Plus, Trash2, MoveUp, MoveDown } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, MoveUp, MoveDown, Loader } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { collectionsService } from '../../services';
 import type { FeedCollection, FeedSourceConfig } from '../../types';
 
 interface FeedCollectionFormProps {
@@ -14,6 +15,8 @@ export function FeedCollectionForm({ collection, onBack, onSave }: FeedCollectio
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [sources, setSources] = useState<FeedSourceConfig[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     if (collection) {
@@ -64,39 +67,57 @@ export function FeedCollectionForm({ collection, onBack, onSave }: FeedCollectio
     setSources(newSources);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
 
     if (!name.trim()) {
-      alert('Please enter a collection name');
+      setError('Please enter a collection name');
       return;
     }
 
     if (sources.length === 0) {
-      alert('Please add at least one source');
+      setError('Please add at least one source');
       return;
     }
 
-    const now = new Date();
-    const collectionData: FeedCollection = {
-      id: collection?.id || `collection_${Date.now()}`,
-      name: name.trim(),
-      description: description.trim() || undefined,
-      sources,
-      createdAt: collection?.createdAt || now,
-      updatedAt: now,
-    };
-
-    if (collection) {
-      dispatch({
-        type: 'UPDATE_COLLECTION',
-        payload: { id: collection.id, updates: collectionData },
-      });
-    } else {
-      dispatch({ type: 'ADD_COLLECTION', payload: collectionData });
+    const userId = state.authentication.user?.id;
+    if (!userId) {
+      setError('You must be logged in to save collections');
+      return;
     }
 
-    onSave();
+    setIsSubmitting(true);
+
+    try {
+      const collectionData = {
+        name: name.trim(),
+        description: description.trim() || undefined,
+        sources,
+      };
+
+      let savedCollection: FeedCollection;
+
+      if (collection) {
+        // Update existing collection
+        savedCollection = await collectionsService.update(collection.id, collectionData);
+        dispatch({
+          type: 'UPDATE_COLLECTION',
+          payload: { id: collection.id, updates: savedCollection },
+        });
+      } else {
+        // Create new collection
+        savedCollection = await collectionsService.create(userId, collectionData);
+        dispatch({ type: 'ADD_COLLECTION', payload: savedCollection });
+      }
+
+      onSave();
+    } catch (error: any) {
+      console.error('Failed to save collection:', error);
+      setError(error.message || 'Failed to save collection. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -115,6 +136,12 @@ export function FeedCollectionForm({ collection, onBack, onSave }: FeedCollectio
         </h2>
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {error && (
+            <div className="bg-red-900/20 border border-red-700 rounded-lg p-3 text-red-300 text-sm">
+              {error}
+            </div>
+          )}
+
           <div>
             <label htmlFor="name" className="block text-sm font-medium text-stone-300 mb-2">
               Collection Name *
@@ -272,14 +299,23 @@ export function FeedCollectionForm({ collection, onBack, onSave }: FeedCollectio
           <div className="flex items-center gap-3 pt-4">
             <button
               type="submit"
-              className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-250"
+              disabled={isSubmitting}
+              className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-250 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
-              {collection ? 'Update Collection' : 'Create Collection'}
+              {isSubmitting ? (
+                <>
+                  <Loader className="w-4 h-4 animate-spin" />
+                  {collection ? 'Updating...' : 'Creating...'}
+                </>
+              ) : (
+                collection ? 'Update Collection' : 'Create Collection'
+              )}
             </button>
             <button
               type="button"
               onClick={onBack}
-              className="px-6 py-2 bg-stone-800 hover:bg-stone-750 text-stone-300 rounded-lg transition-colors duration-250"
+              disabled={isSubmitting}
+              className="px-6 py-2 bg-stone-800 hover:bg-stone-750 text-stone-300 rounded-lg transition-colors duration-250 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Cancel
             </button>
