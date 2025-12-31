@@ -1,24 +1,51 @@
 import { Trash2, ToggleLeft, ToggleRight } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { sourcesService } from '../../services';
 import { EmptyState } from '../UI/EmptyState';
 
 export function SourceManager() {
   const { state, dispatch } = useApp();
   const { sources } = state;
 
-  const toggleSource = (sourceId: string, enabled: boolean) => {
-    dispatch({
-      type: 'UPDATE_SOURCE',
-      payload: {
-        id: sourceId,
-        updates: { enabled: !enabled },
-      },
-    });
+  const toggleSource = async (sourceId: string, enabled: boolean) => {
+    try {
+      // Update in Supabase
+      const updatedSource = await sourcesService.toggleEnabled(sourceId, !enabled);
+      
+      // Update local state
+      dispatch({
+        type: 'UPDATE_SOURCE',
+        payload: {
+          id: sourceId,
+          updates: { enabled: updatedSource.enabled },
+        },
+      });
+    } catch (error) {
+      console.error('Failed to toggle source:', error);
+      dispatch({
+        type: 'SET_ERROR',
+        payload: 'Failed to update source. Please try again.',
+      });
+    }
   };
 
-  const deleteSource = (sourceId: string, sourceName: string) => {
-    if (confirm(`Are you sure you want to delete "${sourceName}"?`)) {
+  const deleteSource = async (sourceId: string, sourceName: string) => {
+    if (!confirm(`Are you sure you want to delete "${sourceName}"?`)) {
+      return;
+    }
+
+    try {
+      // Delete from Supabase
+      await sourcesService.delete(sourceId);
+      
+      // Update local state
       dispatch({ type: 'DELETE_SOURCE', payload: sourceId });
+    } catch (error) {
+      console.error('Failed to delete source:', error);
+      dispatch({
+        type: 'SET_ERROR',
+        payload: 'Failed to delete source. Please try again.',
+      });
     }
   };
 

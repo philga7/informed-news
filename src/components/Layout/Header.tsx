@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Newspaper, LogOut, Settings, RefreshCw, Layers, TrendingUp } from 'lucide-react';
+import { Newspaper, LogOut, Settings, RefreshCw, Layers, TrendingUp, Clock } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
-import { clearSession } from '../../utils/auth';
+import { authService, articlesService } from '../../services';
 import { feedsApi } from '../../utils/apiClient';
 import type { NewsArticle } from '../../types';
 
@@ -15,9 +15,15 @@ export function Header({ onOpenSources }: HeaderProps) {
   const location = useLocation();
   const [showUserMenu, setShowUserMenu] = useState(false);
 
-  const handleLogout = () => {
-    clearSession();
-    dispatch({ type: 'LOGOUT' });
+  const handleLogout = async () => {
+    try {
+      await authService.signOut();
+      // User state will be automatically cleared by useAuth hook
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Still dispatch logout to clear local state
+      dispatch({ type: 'LOGOUT' });
+    }
   };
 
   const handleUpdateNews = async () => {
@@ -56,7 +62,37 @@ export function Header({ onOpenSources }: HeaderProps) {
       const errors = result.errors || [];
 
       if (articles.length > 0) {
-        dispatch({ type: 'ADD_ARTICLES', payload: articles });
+        const userId = state.authentication.user?.id;
+        let articlesToAdd = articles;
+
+        if (userId) {
+          try {
+            // Deduplicate articles by URL before saving (keep first occurrence)
+            const uniqueArticles = Array.from(
+              new Map(articles.map(article => [article.url, article])).values()
+            );
+            
+            console.log(`Fetched ${articles.length} articles, ${uniqueArticles.length} unique`);
+            
+            // Save fetched articles to Supabase and get back articles with REAL UUIDs
+            const savedArticles = await articlesService.bulkInsert(userId, uniqueArticles);
+            console.log(`✅ Saved ${savedArticles.length} articles to Supabase`);
+            
+            // Use the saved articles (with real UUIDs) instead of the original ones
+            if (savedArticles.length > 0) {
+              // Map source names from our sources state
+              articlesToAdd = savedArticles.map(article => ({
+                ...article,
+                source: state.sources.find(s => s.id === article.sourceId)?.name || 'Unknown',
+              }));
+            }
+          } catch (error) {
+            console.error('Failed to save articles to Supabase:', error);
+            // Continue anyway - use original articles with fake IDs as fallback
+          }
+        }
+
+        dispatch({ type: 'ADD_ARTICLES', payload: articlesToAdd });
         dispatch({ type: 'SET_LAST_UPDATE', payload: new Date() });
       }
 
@@ -155,6 +191,18 @@ export function Header({ onOpenSources }: HeaderProps) {
             >
               <Layers size={18} />
               <span className="hidden sm:inline">Feeds</span>
+            </Link>
+
+            <Link
+              to="/history"
+              className={`flex items-center gap-2 px-3 sm:px-4 py-2 font-medium rounded-lg transition-all duration-250 text-sm sm:text-base ${
+                location.pathname === '/history'
+                  ? 'bg-stone-700 text-stone-200'
+                  : 'bg-stone-800 hover:bg-stone-700 text-stone-300'
+              }`}
+            >
+              <Clock size={18} />
+              <span className="hidden sm:inline">History</span>
             </Link>
 
             <button

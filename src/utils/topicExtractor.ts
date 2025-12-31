@@ -164,6 +164,7 @@ function groupArticlesBySimilarity(articles: NewsArticle[], similarityThreshold:
 }
 
 // Generate topic name from article group
+// TODO: Future enhancement - replace with genAI to create more meaningful titles from associated topics
 function generateTopicName(articles: NewsArticle[]): { name: string; keywords: string[] } {
   // Find the most common phrase or use top keywords
   const keywordCounts = new Map<string, number>();
@@ -205,12 +206,17 @@ function generateTopicName(articles: NewsArticle[]): { name: string; keywords: s
   return { name, keywords: sortedKeywords.slice(0, 10) };
 }
 
-// Extract topics from articles
+// Extract topics from articles with keyword deduplication across topics
 export function extractTopics(articles: NewsArticle[], existingTopics: Topic[] = []): Topic[] {
   if (articles.length === 0) return [];
 
   // Collect article IDs that are already in existing topics
   const existingArticleIds = new Set(existingTopics.flatMap(topic => topic.articleIds));
+  
+  // Track keywords already assigned to topics (for deduplication)
+  const usedKeywords = new Set<string>(
+    existingTopics.flatMap(topic => topic.keywords.map(kw => kw.toLowerCase()))
+  );
   
   // NEW APPROACH: Process ALL articles, but track which are new
   // This allows new articles to either:
@@ -223,6 +229,7 @@ export function extractTopics(articles: NewsArticle[], existingTopics: Topic[] =
   
   // Filter out groups that are too small (less than 2 articles)
   const significantGroups = groups.filter(g => g.length >= 2);
+  
   // Process groups and decide: merge into existing topic OR create new topic
   const topics: Topic[] = significantGroups.map((group) => {
     const { name, keywords } = generateTopicName(group);
@@ -254,11 +261,16 @@ export function extractTopics(articles: NewsArticle[], existingTopics: Topic[] =
     // Merge if we have a good match (shared articles AND decent similarity)
     if (bestMatch && bestMatch.score > 0.2) {
       // Merge with existing topic - add ALL articles (both old and new) and keywords
-      const mergedArticleIds = [...new Set([...existingTopic.articleIds, ...articleIds])];
-      const mergedKeywords = [...new Set([...existingTopic.keywords, ...keywords])].slice(0, 15);
+      const mergedArticleIds = [...new Set([...bestMatch.topic.articleIds, ...articleIds])];
+      // Keep existing keywords and add new ones that aren't already used
+      const newKeywords = keywords.filter(kw => !usedKeywords.has(kw.toLowerCase()));
+      const mergedKeywords = [...bestMatch.topic.keywords, ...newKeywords].slice(0, 15);
+      
+      // Update used keywords set for this topic
+      mergedKeywords.forEach(kw => usedKeywords.add(kw.toLowerCase()));
       
       return {
-        ...existingTopic,
+        ...bestMatch.topic,
         articleIds: mergedArticleIds,
         keywords: mergedKeywords,
         updatedAt: new Date(),
@@ -271,14 +283,26 @@ export function extractTopics(articles: NewsArticle[], existingTopics: Topic[] =
       return null;
     }
 
+    // Filter keywords to exclude those already used in other topics
+    const deduplicatedKeywords = keywords.filter(kw => !usedKeywords.has(kw.toLowerCase()));
+    
+    // If all keywords were filtered out, use the original keywords anyway (better than empty)
+    const finalKeywords = deduplicatedKeywords.length > 0 
+      ? deduplicatedKeywords.slice(0, 10)
+      : keywords.slice(0, 10);
+    
+    // Mark these keywords as used
+    finalKeywords.forEach(kw => usedKeywords.add(kw.toLowerCase()));
+
     // Create new topic - includes both old and new articles in the group
     return {
       id: `topic_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       name,
-      keywords,
+      keywords: finalKeywords,
       articleIds,
       followed: false,
       tags: [],
+      status: 'active',
       createdAt: new Date(),
       updatedAt: new Date(),
     };

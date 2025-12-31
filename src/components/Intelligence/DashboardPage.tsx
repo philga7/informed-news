@@ -1,16 +1,23 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { RefreshCw, TrendingUp, Tag, Star } from 'lucide-react';
+import { RefreshCw, TrendingUp, Tag, Star, Check, Trash2 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { useAuth } from '../../hooks/useAuth';
 import { extractTopics } from '../../utils/topicExtractor';
+import { topicsService, articlesService } from '../../services';
 import type { Topic } from '../../types';
+import { IgnoredTopicsModal } from './IgnoredTopicsModal';
 
 export function DashboardPage() {
   const { state, dispatch } = useApp();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [isExtracting, setIsExtracting] = useState(false);
   const [filterFollowed, setFilterFollowed] = useState(false);
   const [filterTagged, setFilterTagged] = useState(false);
+  const [showIgnoredModal, setShowIgnoredModal] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleRefreshTopics = () => {
     setIsExtracting(true);
@@ -25,14 +32,22 @@ export function DashboardPage() {
     };
     
     scheduleWork(() => {
-      const topics = extractTopics(state.articles, state.topics);
-      dispatch({ type: 'SET_TOPICS', payload: topics });
-      setIsExtracting(false);
+      try {
+        const topics = extractTopics(state.articles, state.topics);
+        dispatch({ type: 'SET_TOPICS', payload: topics });
+        setIsExtracting(false);
+      } catch (error) {
+        setIsExtracting(false);
+        console.error('Error extracting topics:', error);
+      }
     });
   };
 
   const filteredTopics = useMemo(() => {
     let filtered = state.topics;
+
+    // Filter out archived and ignored topics (only show active topics on Dashboard)
+    filtered = filtered.filter(topic => topic.status === 'active');
 
     if (filterFollowed) {
       filtered = filtered.filter(topic => topic.followed);
@@ -43,21 +58,143 @@ export function DashboardPage() {
     }
 
     // Sort by most recent activity (updatedAt)
-    return filtered.sort((a, b) => {
+    filtered = filtered.sort((a, b) => {
       return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
     });
+
+    // Apply max topic limit (top 50 by recency)
+    return filtered.slice(0, 50);
   }, [state.topics, filterFollowed, filterTagged]);
 
   const handleTopicClick = (topicId: string) => {
     navigate(`/topic/${topicId}`);
   };
 
-  const handleToggleFollow = (e: React.MouseEvent, topic: Topic) => {
+  const handleToggleFollow = async (e: React.MouseEvent, topic: Topic) => {
     e.stopPropagation();
+    if (!user?.id) return;
+
+    const newFollowedState = !topic.followed;
+    
+    // Optimistic update
     dispatch({
       type: 'FOLLOW_TOPIC',
-      payload: { topicId: topic.id, followed: !topic.followed },
+      payload: { topicId: topic.id, followed: newFollowedState },
     });
+
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      // Persist to Supabase
+      await topicsService.upsert(user.id, {
+        id: topic.id,
+        name: topic.name,
+        keywords: topic.keywords,
+        followed: newFollowedState,
+        tags: topic.tags,
+        status: !newFollowedState && topic.followed && topic.status === 'active' ? 'archived' : topic.status,
+      });
+    } catch (err) {
+      console.error('Failed to toggle follow:', err);
+      setError('Failed to update topic. Please try again.');
+      
+      // Revert on error
+      dispatch({
+        type: 'FOLLOW_TOPIC',
+        payload: { topicId: topic.id, followed: topic.followed },
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleArchiveTopic = async (e: React.MouseEvent, topic: Topic) => {
+    e.stopPropagation();
+    if (!user?.id) return;
+    
+    if (!confirm('Archive this topic? All articles will be marked as read.')) return;
+
+    // Optimistic update
+    dispatch({
+      type: 'ARCHIVE_TOPIC',
+      payload: { topicId: topic.id },
+    });
+
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      // Update topic status in Supabase
+      await topicsService.upsert(user.id, {
+        id: topic.id,
+        name: topic.name,
+        keywords: topic.keywords,
+        followed: topic.followed,
+        tags: topic.tags,
+        status: 'archived',
+      });
+
+      // Mark all articles as read
+      const articlesToUpdate = state.articles.filter(article => 
+        topic.articleIds.includes(article.id)
+      );
+
+      await Promise.all(
+        articlesToUpdate.map(article =>
+          articlesService.update(article.id, { isRead: true })
+        )
+      );
+    } catch (err) {
+      console.error('Failed to archive topic:', err);
+      setError('Failed to archive topic. Please try again.');
+      
+      // Revert on error
+      dispatch({
+        type: 'UPDATE_TOPIC_STATUS',
+        payload: { topicId: topic.id, status: topic.status },
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDeleteTopic = async (e: React.MouseEvent, topic: Topic) => {
+    e.stopPropagation();
+    if (!user?.id) return;
+    
+    if (!confirm('Delete this topic and all its articles? This action cannot be undone, but you can restore it from the ignored topics list.')) return;
+
+    // Optimistic update
+    dispatch({
+      type: 'DELETE_TOPIC_WITH_ARTICLES',
+      payload: topic.id,
+    });
+
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      // Add to ignored topics in Supabase
+      await topicsService.ignore(user.id, topic.id);
+
+      // Delete the topic from Supabase
+      await topicsService.delete(topic.id);
+
+      // Delete all articles associated with the topic
+      await Promise.all(
+        topic.articleIds.map(articleId =>
+          articlesService.delete(articleId)
+        )
+      );
+    } catch (err) {
+      console.error('Failed to delete topic:', err);
+      setError('Failed to delete topic. Please try again.');
+      
+      // TODO: Revert deletion on error (need to restore from ignoredTopic)
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const formatDate = (date: Date) => {
@@ -85,6 +222,12 @@ export function DashboardPage() {
   return (
     <div className="min-h-screen bg-stone-950">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {error && (
+          <div className="mb-4 p-4 bg-red-900/30 border border-red-800 rounded-lg text-red-200">
+            {error}
+          </div>
+        )}
+        
         <div className="mb-8">
           <div className="flex items-center justify-between">
             <div>
@@ -96,14 +239,25 @@ export function DashboardPage() {
                 Track topics and patterns across your news sources
               </p>
             </div>
-            <button
-              onClick={handleRefreshTopics}
-              disabled={isExtracting || state.articles.length === 0}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-250 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <RefreshCw size={18} className={isExtracting ? 'animate-spin' : ''} />
-              Refresh Topics
-            </button>
+            <div className="flex items-center gap-2">
+              {state.ignoredTopics.length > 0 && (
+                <button
+                  onClick={() => setShowIgnoredModal(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-stone-800 hover:bg-stone-700 text-stone-300 rounded-lg transition-colors duration-250"
+                >
+                  <Trash2 size={18} />
+                  Ignored ({state.ignoredTopics.length})
+                </button>
+              )}
+              <button
+                onClick={handleRefreshTopics}
+                disabled={isExtracting || state.articles.length === 0}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-250 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <RefreshCw size={18} className={isExtracting ? 'animate-spin' : ''} />
+                Refresh Topics
+              </button>
+            </div>
           </div>
         </div>
 
@@ -202,17 +356,33 @@ export function DashboardPage() {
                       </div>
                     </div>
 
-                    <button
-                      onClick={(e) => handleToggleFollow(e, topic)}
-                      className={`flex-shrink-0 p-2 rounded-lg transition-colors duration-250 ${
-                        topic.followed
-                          ? 'text-amber-500 hover:text-amber-400'
-                          : 'text-stone-500 hover:text-stone-400'
-                      }`}
-                      title={topic.followed ? 'Unfollow topic' : 'Follow topic'}
-                    >
-                      <Star size={20} fill={topic.followed ? 'currentColor' : 'none'} />
-                    </button>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <button
+                        onClick={(e) => handleArchiveTopic(e, topic)}
+                        className="px-3 py-2 bg-stone-800 text-stone-400 hover:bg-stone-700 hover:text-stone-300 rounded-lg transition-all duration-250"
+                        title="Archive topic (mark articles as read)"
+                      >
+                        <Check size={18} />
+                      </button>
+                      <button
+                        onClick={(e) => handleDeleteTopic(e, topic)}
+                        className="px-3 py-2 bg-stone-800 text-stone-400 hover:bg-stone-700 hover:text-red-400 rounded-lg transition-all duration-250"
+                        title="Delete topic and articles"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                      <button
+                        onClick={(e) => handleToggleFollow(e, topic)}
+                        className={`transition-colors duration-250 ${
+                          topic.followed
+                            ? 'text-amber-500 hover:text-amber-400'
+                            : 'text-stone-500 hover:text-stone-400'
+                        }`}
+                        title={topic.followed ? 'Unfollow topic' : 'Follow topic'}
+                      >
+                        <Star size={20} fill={topic.followed ? 'currentColor' : 'none'} />
+                      </button>
+                    </div>
                   </div>
                 </div>
               );
@@ -220,6 +390,11 @@ export function DashboardPage() {
           </div>
         )}
       </div>
+
+      <IgnoredTopicsModal
+        isOpen={showIgnoredModal}
+        onClose={() => setShowIgnoredModal(false)}
+      />
     </div>
   );
 }

@@ -1,14 +1,12 @@
 import React, { useState } from 'react';
 import { LogIn } from 'lucide-react';
-import { loginUser, createSession } from '../../utils/auth';
-import { useApp } from '../../context/AppContext';
+import { authService } from '../../services/auth.service';
 
 interface LoginFormProps {
   onSwitchToRegister: () => void;
 }
 
 export function LoginForm({ onSwitchToRegister }: LoginFormProps) {
-  const { dispatch } = useApp();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -20,15 +18,12 @@ export function LoginForm({ onSwitchToRegister }: LoginFormProps) {
     setIsLoading(true);
 
     try {
-      const result = await loginUser(email, password);
-      if (result.success && result.user) {
-        createSession(result.user);
-        dispatch({ type: 'LOGIN', payload: result.user });
-      } else {
-        setError(result.error || 'Login failed');
-      }
-    } catch (err) {
-      setError('An unexpected error occurred');
+      await authService.signIn({ email, password });
+      // User is automatically logged in by Supabase
+      // The useAuth hook in AppContext will detect the session change
+    } catch (err: any) {
+      console.error('Login error:', err);
+      setError(err.message || 'Invalid email or password');
     } finally {
       setIsLoading(false);
     }

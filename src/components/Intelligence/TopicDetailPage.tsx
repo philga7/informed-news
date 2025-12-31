@@ -2,6 +2,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Star, Tag, Plus } from 'lucide-react';
 import { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { useAuth } from '../../hooks/useAuth';
+import { topicsService } from '../../services';
 import { TopicTimeline } from './TopicTimeline';
 import { TopicMap } from './TopicMap';
 import { ArticleList } from '../News/ArticleList';
@@ -11,8 +13,11 @@ export function TopicDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { state, dispatch } = useApp();
+  const { user } = useAuth();
   const [newTagInput, setNewTagInput] = useState('');
   const [showTagInput, setShowTagInput] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const topic = state.topics.find(t => t.id === id);
 
@@ -37,32 +42,123 @@ export function TopicDetailPage() {
 
   const topicArticles = state.articles.filter(article => topic.articleIds.includes(article.id));
 
-  const handleToggleFollow = () => {
+  const handleToggleFollow = async () => {
+    if (!user?.id || !topic) return;
+
+    const newFollowedState = !topic.followed;
+    
+    // Optimistic update
     dispatch({
       type: 'FOLLOW_TOPIC',
-      payload: { topicId: topic.id, followed: !topic.followed },
+      payload: { topicId: topic.id, followed: newFollowedState },
     });
-  };
 
-  const handleAddTag = () => {
-    const tag = newTagInput.trim();
-    if (tag && !topic.tags.includes(tag)) {
-      const newTags = [...topic.tags, tag];
-      dispatch({
-        type: 'TAG_TOPIC',
-        payload: { topicId: topic.id, tags: newTags },
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      // Persist to Supabase
+      await topicsService.upsert(user.id, {
+        id: topic.id,
+        name: topic.name,
+        keywords: topic.keywords,
+        followed: newFollowedState,
+        tags: topic.tags,
+        status: !newFollowedState && topic.followed && topic.status === 'active' ? 'archived' : topic.status,
       });
-      setNewTagInput('');
-      setShowTagInput(false);
+    } catch (err) {
+      console.error('Failed to toggle follow:', err);
+      setError('Failed to update topic. Please try again.');
+      
+      // Revert on error
+      dispatch({
+        type: 'FOLLOW_TOPIC',
+        payload: { topicId: topic.id, followed: topic.followed },
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleRemoveTag = (tagToRemove: TopicTag) => {
-    const newTags = topic.tags.filter(tag => tag !== tagToRemove);
+  const handleAddTag = async () => {
+    if (!user?.id || !topic) return;
+    
+    const tag = newTagInput.trim();
+    if (!tag || topic.tags.includes(tag)) return;
+
+    const newTags = [...topic.tags, tag];
+    
+    // Optimistic update
     dispatch({
       type: 'TAG_TOPIC',
       payload: { topicId: topic.id, tags: newTags },
     });
+    setNewTagInput('');
+    setShowTagInput(false);
+
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      // Persist to Supabase
+      await topicsService.upsert(user.id, {
+        id: topic.id,
+        name: topic.name,
+        keywords: topic.keywords,
+        followed: topic.followed,
+        tags: newTags,
+        status: topic.status,
+      });
+    } catch (err) {
+      console.error('Failed to add tag:', err);
+      setError('Failed to add tag. Please try again.');
+      
+      // Revert on error
+      dispatch({
+        type: 'TAG_TOPIC',
+        payload: { topicId: topic.id, tags: topic.tags },
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleRemoveTag = async (tagToRemove: TopicTag) => {
+    if (!user?.id || !topic) return;
+    
+    const newTags = topic.tags.filter(tag => tag !== tagToRemove);
+    
+    // Optimistic update
+    dispatch({
+      type: 'TAG_TOPIC',
+      payload: { topicId: topic.id, tags: newTags },
+    });
+
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      // Persist to Supabase
+      await topicsService.upsert(user.id, {
+        id: topic.id,
+        name: topic.name,
+        keywords: topic.keywords,
+        followed: topic.followed,
+        tags: newTags,
+        status: topic.status,
+      });
+    } catch (err) {
+      console.error('Failed to remove tag:', err);
+      setError('Failed to remove tag. Please try again.');
+      
+      // Revert on error
+      dispatch({
+        type: 'TAG_TOPIC',
+        payload: { topicId: topic.id, tags: topic.tags },
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const formatDate = (date: Date) => {
@@ -76,6 +172,12 @@ export function TopicDetailPage() {
   return (
     <div className="min-h-screen bg-stone-950">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {error && (
+          <div className="mb-4 p-4 bg-red-900/30 border border-red-800 rounded-lg text-red-200">
+            {error}
+          </div>
+        )}
+        
         {/* Header */}
         <div className="mb-6">
           <button

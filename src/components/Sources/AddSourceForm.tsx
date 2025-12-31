@@ -1,18 +1,20 @@
 import React, { useState } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, Loader } from 'lucide-react';
 import type { NewsSource, SourceType } from '../../types';
 import { useApp } from '../../context/AppContext';
+import { sourcesService } from '../../services';
 
 export function AddSourceForm() {
-  const { dispatch } = useApp();
+  const { state, dispatch } = useApp();
   const [name, setName] = useState('');
   const [url, setUrl] = useState('');
   const [type, setType] = useState<SourceType>('rss');
   const [scrapeExternalUrl, setScrapeExternalUrl] = useState(false);
   const [error, setError] = useState('');
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
@@ -28,23 +30,39 @@ export function AddSourceForm() {
       return;
     }
 
-    const newSource: NewsSource = {
-      id: `source_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      name: name.trim(),
-      type,
-      url: url.trim(),
-      enabled: true,
-      createdAt: new Date(),
-      scrapeExternalUrl: type === 'rss' ? scrapeExternalUrl : undefined,
-    };
+    const userId = state.authentication.user?.id;
+    if (!userId) {
+      setError('You must be logged in to add a source');
+      return;
+    }
 
-    dispatch({ type: 'ADD_SOURCE', payload: newSource });
+    setIsSubmitting(true);
 
-    setName('');
-    setUrl('');
-    setType('rss');
-    setScrapeExternalUrl(false);
-    setIsExpanded(false);
+    try {
+      // Save to Supabase
+      const newSource = await sourcesService.create(userId, {
+        name: name.trim(),
+        type,
+        url: url.trim(),
+        enabled: true,
+        scrapeExternalUrl: type === 'rss' ? scrapeExternalUrl : undefined,
+      });
+
+      // Update local state
+      dispatch({ type: 'ADD_SOURCE', payload: newSource });
+
+      // Reset form
+      setName('');
+      setUrl('');
+      setType('rss');
+      setScrapeExternalUrl(false);
+      setIsExpanded(false);
+    } catch (error: any) {
+      console.error('Failed to create source:', error);
+      setError(error.message || 'Failed to create source. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (!isExpanded) {
@@ -136,12 +154,21 @@ export function AddSourceForm() {
         <div className="flex gap-3">
           <button
             type="submit"
-            className="flex-1 px-4 py-2 bg-accent hover:bg-accent-hover text-white font-medium rounded-lg transition-all duration-250"
+            disabled={isSubmitting}
+            className="flex-1 px-4 py-2 bg-accent hover:bg-accent-hover text-white font-medium rounded-lg transition-all duration-250 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
-            Add Source
+            {isSubmitting ? (
+              <>
+                <Loader className="w-4 h-4 animate-spin" />
+                Adding...
+              </>
+            ) : (
+              'Add Source'
+            )}
           </button>
           <button
             type="button"
+            disabled={isSubmitting}
             onClick={() => {
               setIsExpanded(false);
               setName('');
@@ -150,7 +177,7 @@ export function AddSourceForm() {
               setScrapeExternalUrl(false);
               setError('');
             }}
-            className="px-4 py-2 bg-stone-800 hover:bg-stone-700 text-stone-300 font-medium rounded-lg transition-all duration-250"
+            className="px-4 py-2 bg-stone-800 hover:bg-stone-700 text-stone-300 font-medium rounded-lg transition-all duration-250 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Cancel
           </button>
