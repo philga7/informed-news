@@ -1,171 +1,53 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+/**
+ * Supabase Client for Backend Services
+ * 
+ * Provides server-side Supabase client with service role key
+ * for ingestion operations and database access.
+ */
 
-// Lazy-load Supabase client to allow dotenv to load first
-let _supabaseAdmin: SupabaseClient | null = null;
+import { createClient } from '@supabase/supabase-js';
+import type { Database } from '../../../src/types/database';
 
-function getSupabaseAdmin(): SupabaseClient {
-  if (_supabaseAdmin) return _supabaseAdmin;
-  
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+// Environment variables
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
-  if (!supabaseUrl || !supabaseServiceKey) {
-    throw new Error('Missing Supabase environment variables. Check backend/.env file.');
-  }
+if (!SUPABASE_URL) {
+  throw new Error('Missing SUPABASE_URL environment variable');
+}
 
-  // Create Supabase client for backend (uses SERVICE_ROLE key, bypasses RLS)
-  _supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+if (!SUPABASE_SERVICE_ROLE_KEY) {
+  console.warn('⚠️  SUPABASE_SERVICE_ROLE_KEY not set. Using anon key (limited permissions)');
+}
+
+/**
+ * Backend Supabase client with service role permissions
+ * Use this for server-side operations that bypass RLS
+ */
+export const supabase = createClient<Database>(
+  SUPABASE_URL,
+  SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || '',
+  {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
     },
-  });
-  
-  return _supabaseAdmin;
-}
+  }
+);
 
-// Export lazy-loaded client
-export const supabaseAdmin = new Proxy({} as SupabaseClient, {
-  get(_, prop) {
-    return (getSupabaseAdmin() as any)[prop];
-  },
-});
-
-// Helper function to test backend connection
-export async function testConnection(): Promise<{
-  success: boolean;
-  message: string;
-  details?: {
-    url: string;
-    tablesExist: boolean;
-    tableCount?: number;
-    tables?: string[];
-  };
-}> {
+/**
+ * Test database connection
+ */
+export async function testConnection(): Promise<boolean> {
   try {
-    // Test connection by attempting to query a table
-    // If tables don't exist, we'll get a specific error
-    const { data, error } = await supabaseAdmin
-      .from('profiles')
-      .select('count')
-      .limit(1);
-    
+    const { error } = await supabase.from('organizations').select('id').limit(1);
     if (error) {
-      // Check if error is because table doesn't exist
-      if (error.message.includes('relation') || 
-          error.message.includes('does not exist') ||
-          error.message.includes('schema cache') ||
-          error.message.includes('Could not find') ||
-          error.code === 'PGRST204' ||
-          error.code === '42P01') {
-        return {
-          success: true,
-          message: 'Backend connection successful! Tables not yet created. Run migrations in Supabase Dashboard.',
-          details: {
-            url: process.env.SUPABASE_URL || '',
-            tablesExist: false,
-            tableCount: 0,
-          },
-        };
-      }
-      
-      return {
-        success: false,
-        message: `Connection error: ${error.message}`,
-      };
+      console.error('Supabase connection test failed:', error.message);
+      return false;
     }
-    
-    // Table exists, now count all our tables using raw SQL query
-    try {
-      const { data: tablesData, error: tablesError } = await getSupabaseAdmin()
-        .rpc('exec_sql', {
-          query: `
-            SELECT table_name 
-            FROM information_schema.tables 
-            WHERE table_schema = 'public' 
-            AND table_type = 'BASE TABLE'
-            ORDER BY table_name
-          `
-        });
-      
-      // If RPC doesn't exist, try direct query with admin client
-      // Use a simpler approach - just check our known tables
-      const ourTables = [
-        'profiles',
-        'news_sources', 
-        'news_articles',
-        'feed_collections',
-        'feed_source_configs',
-        'topics',
-        'topic_articles',
-        'ignored_topics',
-        'ignored_topic_articles'
-      ];
-      
-      let existingTables: string[] = [];
-      
-      // Check each table individually
-      for (const tableName of ourTables) {
-        const { error: checkError } = await getSupabaseAdmin()
-          .from(tableName)
-          .select('count')
-          .limit(0);
-        
-        if (!checkError) {
-          existingTables.push(tableName);
-        }
-      }
-      
-      return {
-        success: true,
-        message: `Backend connection successful! Database schema deployed with ${existingTables.length} tables.`,
-        details: {
-          url: process.env.SUPABASE_URL || '',
-          tablesExist: true,
-          tableCount: existingTables.length,
-          tables: existingTables,
-        },
-      };
-    } catch (countError) {
-      // Fallback if counting fails - at least we know profiles exists
-      return {
-        success: true,
-        message: 'Backend connection successful! Database tables exist.',
-        details: {
-          url: process.env.SUPABASE_URL || '',
-          tablesExist: true,
-          tableCount: 1,
-        },
-      };
-    }
-  } catch (error) {
-    return {
-      success: false,
-      message: `Connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-    };
+    return true;
+  } catch (err) {
+    console.error('Supabase connection test error:', err);
+    return false;
   }
 }
-
-// Helper to get all profiles (admin operation)
-export async function getAllProfiles() {
-  const { data, error } = await supabaseAdmin
-    .from('profiles')
-    .select('*')
-    .limit(100);
-  
-  if (error) throw error;
-  return data;
-}
-
-// Helper to get user by ID (admin operation)
-export async function getUserById(userId: string) {
-  const { data, error } = await supabaseAdmin
-    .from('profiles')
-    .select('*')
-    .eq('id', userId)
-    .single();
-  
-  if (error) throw error;
-  return data;
-}
-

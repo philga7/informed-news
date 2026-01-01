@@ -321,8 +321,10 @@ export async function fetchFromManualUrl(url: string): Promise<Partial<NewsArtic
 
 /**
  * Fetch news articles from a single source
+ * @deprecated Use RssIngestionService with IngestionController instead
  */
 export async function fetchNewsFromSource(source: NewsSource): Promise<NewsArticle[]> {
+  console.warn('⚠️  DEPRECATED: fetchNewsFromSource() is deprecated. Use RssIngestionService with IngestionController instead.');
   const articles: NewsArticle[] = [];
 
   try {
@@ -374,11 +376,13 @@ export async function fetchNewsFromSource(source: NewsSource): Promise<NewsArtic
 
 /**
  * Fetch news from all enabled sources
+ * @deprecated Use RssIngestionService with IngestionController instead
  */
 export async function fetchAllNews(sources: NewsSource[]): Promise<{
   articles: NewsArticle[];
   errors: { sourceId: string; message: string }[];
 }> {
+  console.warn('⚠️  DEPRECATED: fetchAllNews() is deprecated. Use RssIngestionService with IngestionController instead.');
   const enabledSources = sources.filter((s) => s.enabled);
   const articles: NewsArticle[] = [];
   const errors: { sourceId: string; message: string }[] = [];

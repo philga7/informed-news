@@ -1,8 +1,10 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import feedsRouter from './routes/feeds.js';
 import sourcesRouter from './routes/sources.js';
 import schedulerRouter from './routes/scheduler.js';
+import ingestRouter from './routes/ingest.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -20,6 +22,7 @@ app.get('/health', (_req, res) => {
 app.use('/api/feeds', feedsRouter);
 app.use('/api/sources', sourcesRouter);
 app.use('/api/scheduler', schedulerRouter);
+app.use('/api/ingest', ingestRouter);
 
 // Error handling middleware
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

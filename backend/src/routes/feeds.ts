@@ -9,8 +9,10 @@ const router = Router();
 /**
  * POST /api/feeds/fetch
  * Fetch news from all enabled sources
+ * @deprecated Use POST /api/ingest/rss instead
  */
 router.post('/fetch', async (req: Request, res: Response) => {
+  console.warn('⚠️  DEPRECATED: POST /api/feeds/fetch is deprecated. Use POST /api/ingest/rss instead.');
   try {
     const { sources } = req.body as { sources: NewsSource[] };
 
@@ -37,8 +39,10 @@ router.post('/fetch', async (req: Request, res: Response) => {
 /**
  * POST /api/feeds/fetch/:sourceId
  * Fetch news from a specific source
+ * @deprecated Use POST /api/ingest/rss instead
  */
 router.post('/fetch/:sourceId', async (req: Request, res: Response) => {
+  console.warn('⚠️  DEPRECATED: POST /api/feeds/fetch/:sourceId is deprecated. Use POST /api/ingest/rss instead.');
   try {
     const { sourceId } = req.params;
     const { source } = req.body as { source: NewsSource };
