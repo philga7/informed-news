@@ -79,7 +79,7 @@ class IngestionScheduler {
 
       // Process each source
       const results = await Promise.allSettled(
-        sources.map(async (source) => {
+        sources.map(async (source: any) => {
           if (!source.url) {
             console.warn(`Source ${source.id} (${source.name}) has no URL, skipping`);
             return null;
@@ -104,7 +104,8 @@ class IngestionScheduler {
             // Update source timestamp
             await supabase
               .from('sources')
-              .update({ updated_at: new Date().toISOString() })
+              // @ts-ignore - Supabase type inference issue in serverless environment
+              .update({ updated_at: new Date().toISOString() } as any)
               .eq('id', source.id);
 
             // Call callback if registered

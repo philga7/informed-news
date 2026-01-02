@@ -2,9 +2,7 @@ import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Newspaper, LogOut, RefreshCw, Target, FileText, Database } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
-import { authService, articlesService } from '../../services';
-import { feedsApi } from '../../utils/apiClient';
-import type { NewsArticle } from '../../types';
+import { authService } from '../../services';
 
 export function Header() {
   const { state, dispatch } = useApp();
@@ -23,96 +21,47 @@ export function Header() {
   };
 
   const handleUpdateNews = async () => {
-    if (state.sources.length === 0) {
-      dispatch({
-        type: 'SET_ERROR',
-        payload: 'No news sources configured. Please add sources first.',
-      });
-      return;
-    }
-
     dispatch({ type: 'SET_FETCHING', payload: true });
     dispatch({ type: 'SET_ERROR', payload: null });
 
     try {
-      // Convert sources to API format (Date to string)
-      const sourcesForApi = state.sources.map(source => ({
-        id: source.id,
-        name: source.name,
-        type: source.type,
-        url: source.url,
-        enabled: source.enabled,
-        createdAt: source.createdAt.toISOString(),
-        scrapeExternalUrl: source.scrapeExternalUrl,
-      }));
-
-      const result = await feedsApi.fetchAll(sourcesForApi);
+      // Use hardcoded organization ID (same as SourcesPage)
+      const organizationId = '00000000-0000-0000-0000-000000009997';
       
-      // Convert API response articles back to frontend format (string to Date)
-      const articles: NewsArticle[] = result.articles.map((article: any) => ({
-        ...article,
-        publishedAt: new Date(article.publishedAt),
-        fetchedAt: new Date(article.fetchedAt),
-      }));
+      // Use relative URL in production (Vercel), localhost in development
+      const API_BASE = import.meta.env.PROD 
+        ? (import.meta.env.VITE_API_URL || '')
+        : (import.meta.env.VITE_API_URL || 'http://localhost:3001');
 
-      const errors = result.errors || [];
-
-      if (articles.length > 0) {
-        const userId = state.authentication.user?.id;
-        let articlesToAdd = articles;
-
-        if (userId) {
-          try {
-            // Deduplicate articles by URL before saving (keep first occurrence)
-            const uniqueArticles = Array.from(
-              new Map(articles.map(article => [article.url, article])).values()
-            );
-            
-            console.log(`Fetched ${articles.length} articles, ${uniqueArticles.length} unique`);
-            
-            // Save fetched articles to Supabase and get back articles with REAL UUIDs
-            const savedArticles = await articlesService.bulkInsert(userId, uniqueArticles);
-            console.log(`✅ Saved ${savedArticles.length} articles to Supabase`);
-            
-            // Use the saved articles (with real UUIDs) instead of the original ones
-            if (savedArticles.length > 0) {
-              // Map source names from our sources state
-              articlesToAdd = savedArticles.map(article => ({
-                ...article,
-                source: state.sources.find(s => s.id === article.sourceId)?.name || 'Unknown',
-              }));
-            }
-          } catch (error) {
-            console.error('Failed to save articles to Supabase:', error);
-            // Continue anyway - use original articles with fake IDs as fallback
-          }
-        }
-
-        dispatch({ type: 'ADD_ARTICLES', payload: articlesToAdd });
-        dispatch({ type: 'SET_LAST_UPDATE', payload: new Date() });
-      }
-
-      errors.forEach((error: { sourceId: string; message: string }) => {
-        dispatch({
-          type: 'UPDATE_SOURCE',
-          payload: {
-            id: error.sourceId,
-            updates: { errorMessage: error.message, lastFetched: new Date() },
-          },
-        });
+      // Trigger RSS ingestion for the organization
+      const response = await fetch(`${API_BASE}/api/ingest/rss`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ organization_id: organizationId }),
       });
 
-      if (articles.length === 0 && errors.length > 0) {
-        dispatch({
-          type: 'SET_ERROR',
-          payload: 'Failed to fetch articles from all sources. Check source configurations.',
-        });
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(error.error || `Failed to trigger ingestion: ${response.statusText}`);
       }
+
+      const result = await response.json();
+      
+      console.log('✅ OSINT Ingestion triggered:', result);
+      
+      dispatch({ type: 'SET_LAST_UPDATE', payload: new Date() });
+      
+      // Clear any previous errors
+      dispatch({ type: 'SET_ERROR', payload: null });
+      
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred while fetching news.';
+      console.error('Failed to trigger ingestion:', error);
       dispatch({
         type: 'SET_ERROR',
-        payload: errorMessage.includes('fetch') 
+        payload: errorMessage.includes('fetch') || errorMessage.includes('Failed to fetch')
           ? 'Unable to connect to backend service. Please ensure the backend is running.'
           : errorMessage,
       });
