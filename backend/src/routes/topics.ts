@@ -538,6 +538,267 @@ router.delete('/:topicId/links/:linkId', async (req: Request, res: Response) => 
   }
 });
 
+/**
+ * GET /api/topics/:id/related
+ * Get related topics based on shared source records (co-occurrence analysis)
+ */
+router.get('/:id/related', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    // Fetch all source record IDs linked to this topic
+    const { data: thisTopicLinks, error: linksError } = await supabase
+      .from('topic_source_links')
+      .select('source_record_id')
+      .eq('topic_id', id);
+
+    if (linksError) throw linksError;
+
+    if (!thisTopicLinks || thisTopicLinks.length === 0) {
+      return res.json({
+        success: true,
+        topic_id: id,
+        related_topics: [],
+      });
+    }
+
+    const thisTopicRecordIds = new Set(
+      thisTopicLinks.map((link: any) => link.source_record_id)
+    );
+
+    // Fetch the organization_id for this topic
+    const { data: topic, error: topicError } = await supabase
+      .from('osint_topics')
+      .select('organization_id')
+      .eq('id', id)
+      .single();
+
+    if (topicError) throw topicError;
+
+    // Fetch all other topics in the same organization
+    const { data: allTopics, error: allTopicsError } = await supabase
+      .from('osint_topics')
+      .select(`
+        id,
+        name,
+        topic_source_links (
+          source_record_id
+        )
+      `)
+      .eq('organization_id', topic.organization_id)
+      .neq('id', id);
+
+    if (allTopicsError) throw allTopicsError;
+
+    // Calculate Jaccard similarity for each topic
+    const relatedTopics = allTopics
+      ?.map((otherTopic: any) => {
+        const otherTopicRecordIds = new Set(
+          otherTopic.topic_source_links.map((link: any) => link.source_record_id)
+        );
+
+        // Calculate intersection
+        const intersection = new Set(
+          [...thisTopicRecordIds].filter(id => otherTopicRecordIds.has(id))
+        );
+
+        // Calculate union
+        const union = new Set([...thisTopicRecordIds, ...otherTopicRecordIds]);
+
+        // Jaccard similarity: |A ∩ B| / |A ∪ B|
+        const similarityScore = union.size > 0 
+          ? intersection.size / union.size 
+          : 0;
+
+        return {
+          topic_id: otherTopic.id,
+          name: otherTopic.name,
+          shared_records: intersection.size,
+          similarity_score: parseFloat(similarityScore.toFixed(3)),
+        };
+      })
+      .filter((topic: any) => topic.shared_records > 0) // Only include topics with shared records
+      .sort((a: any, b: any) => b.similarity_score - a.similarity_score) // Sort by similarity
+      || [];
+
+    res.json({
+      success: true,
+      topic_id: id,
+      related_topics: relatedTopics,
+    });
+  } catch (error) {
+    console.error('Error fetching related topics:', error);
+    res.status(500).json({
+      error: 'Failed to fetch related topics',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+/**
+ * GET /api/topics/:id/narrative-timeline
+ * Get narrative evolution timeline with key phrases per time bucket
+ */
+router.get('/:id/narrative-timeline', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { bucket = 'day', start_date, end_date } = req.query;
+
+    // Validate bucket parameter
+    if (!['day', 'week', 'month'].includes(bucket as string)) {
+      return res.status(400).json({ 
+        error: 'Invalid bucket parameter. Must be day, week, or month' 
+      });
+    }
+
+    // Fetch source records linked to this topic
+    const { data: links, error: linksError } = await supabase
+      .from('topic_source_links')
+      .select(`
+        id,
+        source_records!inner (
+          id,
+          title,
+          published_at,
+          ingested_at
+        )
+      `)
+      .eq('topic_id', id);
+
+    if (linksError) throw linksError;
+
+    // Extract records
+    const records = links?.map((link: any) => ({
+      title: link.source_records.title,
+      date: link.source_records.published_at || link.source_records.ingested_at,
+    })) || [];
+
+    // Filter by date range
+    const filteredRecords = records.filter((record: any) => {
+      const recordDate = new Date(record.date);
+      if (start_date && recordDate < new Date(start_date as string)) return false;
+      if (end_date && recordDate > new Date(end_date as string)) return false;
+      return true;
+    });
+
+    // Group by time bucket
+    const bucketMap = new Map<string, any[]>();
+    filteredRecords.forEach((record: any) => {
+      const date = new Date(record.date);
+      let bucketKey: string;
+
+      if (bucket === 'day') {
+        bucketKey = date.toISOString().split('T')[0];
+      } else if (bucket === 'week') {
+        const startOfWeek = new Date(date);
+        startOfWeek.setDate(date.getDate() - date.getDay());
+        bucketKey = startOfWeek.toISOString().split('T')[0];
+      } else {
+        bucketKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-01`;
+      }
+
+      if (!bucketMap.has(bucketKey)) {
+        bucketMap.set(bucketKey, []);
+      }
+      bucketMap.get(bucketKey)!.push(record.title);
+    });
+
+    // Extract key phrases for each bucket
+    const buckets = Array.from(bucketMap.entries())
+      .map(([date, titles]) => {
+        // Simple phrase extraction: most common 2-3 word sequences
+        const phrases = extractKeyPhrases(titles);
+        return {
+          date,
+          record_count: titles.length,
+          key_phrases: phrases.slice(0, 5), // Top 5 phrases
+        };
+      })
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    res.json({
+      success: true,
+      topic_id: id,
+      buckets,
+    });
+  } catch (error) {
+    console.error('Error fetching narrative timeline:', error);
+    res.status(500).json({
+      error: 'Failed to fetch narrative timeline',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+/**
+ * Helper function to extract key phrases from titles
+ */
+function extractKeyPhrases(titles: string[]): string[] {
+  const phraseCount = new Map<string, number>();
+
+  titles.forEach(title => {
+    // Normalize: lowercase, remove punctuation
+    const normalized = title
+      .toLowerCase()
+      .replace(/[^\w\s]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    const words = normalized.split(' ');
+
+    // Extract 2-word and 3-word phrases
+    for (let i = 0; i < words.length - 1; i++) {
+      // 2-word phrases
+      const phrase2 = `${words[i]} ${words[i + 1]}`;
+      if (isSignificantPhrase(phrase2)) {
+        phraseCount.set(phrase2, (phraseCount.get(phrase2) || 0) + 1);
+      }
+
+      // 3-word phrases
+      if (i < words.length - 2) {
+        const phrase3 = `${words[i]} ${words[i + 1]} ${words[i + 2]}`;
+        if (isSignificantPhrase(phrase3)) {
+          phraseCount.set(phrase3, (phraseCount.get(phrase3) || 0) + 1);
+        }
+      }
+    }
+  });
+
+  // Filter phrases that appear more than once, and sort by frequency
+  return Array.from(phraseCount.entries())
+    .filter(([phrase, count]) => count > 1)
+    .sort((a, b) => b[1] - a[1])
+    .map(([phrase]) => phrase);
+}
+
+/**
+ * Helper to filter out common stop words and insignificant phrases
+ */
+function isSignificantPhrase(phrase: string): boolean {
+  const stopWords = new Set([
+    'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
+    'of', 'with', 'by', 'from', 'as', 'is', 'was', 'are', 'were', 'be',
+    'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will',
+    'would', 'should', 'could', 'may', 'might', 'must', 'can', 'this',
+    'that', 'these', 'those', 'it', 'its', 'which', 'who', 'what', 'when',
+    'where', 'why', 'how', 'said', 'says', 'new', 'more', 'after', 'about',
+  ]);
+
+  const words = phrase.split(' ');
+  
+  // Filter out phrases starting or ending with stop words
+  if (stopWords.has(words[0]) || stopWords.has(words[words.length - 1])) {
+    return false;
+  }
+
+  // Filter out very short words
+  if (words.some(word => word.length < 3)) {
+    return false;
+  }
+
+  return true;
+}
+
 export default router;
 
 

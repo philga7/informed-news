@@ -160,3 +160,36 @@ export interface TopicTimeline {
   };
 }
 
+// ============================================================================
+// CORRELATION & COORDINATION TYPES
+// ============================================================================
+
+export interface RelatedTopic {
+  topic_id: string;
+  name: string;
+  shared_records: number;
+  similarity_score: number;
+}
+
+export interface DuplicateRecord {
+  id: string;
+  title: string;
+  source_name: string;
+  source_id: string;
+  published_at: string;
+}
+
+export interface DuplicateGroup {
+  representative_id: string;
+  group_hash: string;
+  records: DuplicateRecord[];
+  similarity: number;
+  tight_window: boolean;
+}
+
+export interface NarrativeBucket {
+  date: string;
+  record_count: number;
+  key_phrases: string[];
+}
+
