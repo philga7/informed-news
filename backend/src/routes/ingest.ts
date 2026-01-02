@@ -41,7 +41,7 @@ router.post('/rss', async (req: Request, res: Response) => {
       .select('*')
       .eq('id', source_id)
       .eq('organization_id', organization_id)
-      .single();
+      .single() as any;
 
     if (sourceError || !source) {
       return res.status(404).json({
@@ -84,7 +84,7 @@ router.post('/rss', async (req: Request, res: Response) => {
     // Update source updated_at timestamp
     await supabase
       .from('sources')
-      .update({ updated_at: new Date().toISOString() })
+      .update({ updated_at: new Date().toISOString() } as any)
       .eq('id', source_id);
 
     res.json({
