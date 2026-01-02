@@ -70,14 +70,15 @@ export class ContentExtractor {
         return null;
       }
 
+      // Handle potentially null/undefined values from Readability
       return {
-        title: article.title,
-        textContent: article.textContent.trim(),
-        htmlContent: article.content,
-        excerpt: article.excerpt,
+        title: article.title || '',
+        textContent: (article.textContent || '').trim(),
+        htmlContent: article.content || '',
+        excerpt: article.excerpt || '',
         byline: article.byline || undefined,
         siteName: article.siteName || undefined,
-        length: article.length,
+        length: article.length || 0,
       };
     } catch (error) {
       console.warn(`HTML parsing error for ${url}:`, error);

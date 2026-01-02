@@ -40,8 +40,7 @@ export class ManualInputService implements IngestionService {
       .eq('organization_id', this.config.organizationId)
       .eq('source_type', 'manual')
       .eq('name', sourceName)
-      .limit(1)
-      .single();
+      .maybeSingle();
 
     if (existing && !findError) {
       return existing.id;
