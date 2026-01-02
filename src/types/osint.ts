@@ -22,6 +22,24 @@ export type ArtifactType =
   | 'network_graph';
 export type OrgMemberRole = 'owner' | 'admin' | 'analyst' | 'member';
 
+// Workflow & QA types
+export type TopicStatus = 'active' | 'monitoring' | 'archived';
+export type LinkReviewStatus = 'pending' | 'reviewed' | 'disputed';
+export type AuditAction =
+  | 'topic_created'
+  | 'topic_updated'
+  | 'topic_deleted'
+  | 'link_added'
+  | 'link_updated'
+  | 'link_removed'
+  | 'confidence_changed'
+  | 'artifact_created'
+  | 'artifact_reviewed'
+  | 'artifact_deleted'
+  | 'source_updated'
+  | 'source_rated';
+export type EntityType = 'topic' | 'source_record' | 'link' | 'artifact' | 'source';
+
 // ============================================================================
 // ORGANIZATION TYPES
 // ============================================================================
@@ -53,6 +71,7 @@ export interface Source {
   name: string;
   url: string | null;
   reliabilityRating: ReliabilityRating;
+  valueRating: number | null; // 1-5 star rating for analyst usefulness
   notes: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -83,6 +102,7 @@ export interface OsintTopic {
   description: string | null;
   keywords: string[];
   relatedTopics: string[]; // Array of topic IDs
+  status: TopicStatus; // Workflow status
   createdAt: Date;
   updatedAt: Date;
 }
@@ -95,6 +115,7 @@ export interface TopicSourceLink {
   confidenceLevel: ConfidenceLevel | null;
   assumptions: string | null;
   analystNotes: string | null;
+  reviewStatus: LinkReviewStatus; // QA review status
   linkedByUserId: string | null;
   linkedAt: Date;
 }
@@ -191,5 +212,64 @@ export interface NarrativeBucket {
   date: string;
   record_count: number;
   key_phrases: string[];
+}
+
+// ============================================================================
+// AUDIT & QA TYPES
+// ============================================================================
+
+export interface AuditLogEntry {
+  id: string;
+  userId: string | null;
+  action: AuditAction;
+  entityType: EntityType;
+  entityId: string;
+  beforeState: Record<string, unknown> | null;
+  afterState: Record<string, unknown> | null;
+  metadata: Record<string, unknown> | null;
+  timestamp: Date;
+}
+
+export interface QACompleteness {
+  topicId: string;
+  checks: {
+    hasDescription: boolean;
+    hasKeywords: boolean;
+    allLinksHaveConfidence: boolean;
+    allLinksReviewed: boolean;
+    allArtifactsReviewed: boolean;
+  };
+  missingConfidenceLinks: string[];
+  pendingReviewLinks: string[];
+  unreviewedArtifacts: string[];
+  completenessScore: number; // 0.0 to 1.0
+  summary: {
+    totalLinks: number;
+    totalArtifacts: number;
+    linksWithoutConfidence: number;
+    linksPendingReview: number;
+    artifactsUnreviewed: number;
+  };
+}
+
+export interface SourceValueReport {
+  organizationId: string;
+  sources: Array<{
+    id: string;
+    name: string;
+    sourceType: OsintSourceType;
+    reliabilityRating: ReliabilityRating;
+    valueRating: number;
+    recordCount: number;
+  }>;
+  statistics: {
+    totalRatedSources: number;
+    averageRating: number;
+    highestRated: {
+      id: string;
+      name: string;
+      valueRating: number;
+    } | null;
+  };
 }
 

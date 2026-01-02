@@ -15,6 +15,9 @@ import { ConfidenceStats } from './ConfidenceStats';
 import { RelatedTopicsWidget } from './RelatedTopicsWidget';
 import { CoordinationSection } from './CoordinationSection';
 import { NarrativeEvolutionTimeline } from './NarrativeEvolutionTimeline';
+import { TopicStatusBadge } from './TopicStatusBadge';
+import { AuditHistoryTab } from './AuditHistoryTab';
+import { QAChecklist } from './QAChecklist';
 import type { TopicTimeline } from '../../types/osint';
 
 export function TopicDetailPage() {
@@ -30,6 +33,7 @@ export function TopicDetailPage() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [editingLinkId, setEditingLinkId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'overview' | 'history' | 'qa'>('overview');
 
   const organizationId = '00000000-0000-0000-0000-000000009997';
 
@@ -192,7 +196,16 @@ export function TopicDetailPage() {
         <div className="bg-stone-900 border border-stone-800 rounded-lg p-6 mb-6">
           <div className="flex items-start justify-between mb-4">
             <div className="flex-1">
-              <h1 className="text-3xl font-bold text-stone-100 mb-2">{topic.name}</h1>
+              <div className="flex items-center gap-3 mb-2">
+                <h1 className="text-3xl font-bold text-stone-100">{topic.name}</h1>
+                {id && (
+                  <TopicStatusBadge
+                    topicId={id}
+                    currentStatus={topic.status || 'active'}
+                    onStatusChange={() => loadTopic()}
+                  />
+                )}
+              </div>
               {topic.description && (
                 <p className="text-stone-400 mb-4">{topic.description}</p>
               )}
@@ -241,7 +254,62 @@ export function TopicDetailPage() {
           </div>
         )}
 
-        {/* Timeline Section */}
+        {/* Tabs Navigation */}
+        <div className="bg-stone-900 border border-stone-800 rounded-lg mb-6">
+          <div className="flex border-b border-stone-800">
+            <button
+              onClick={() => setActiveTab('overview')}
+              className={`px-6 py-3 font-medium transition-colors duration-200 ${
+                activeTab === 'overview'
+                  ? 'text-stone-100 border-b-2 border-accent'
+                  : 'text-stone-400 hover:text-stone-300'
+              }`}
+            >
+              Overview
+            </button>
+            <button
+              onClick={() => setActiveTab('history')}
+              className={`px-6 py-3 font-medium transition-colors duration-200 ${
+                activeTab === 'history'
+                  ? 'text-stone-100 border-b-2 border-accent'
+                  : 'text-stone-400 hover:text-stone-300'
+              }`}
+            >
+              History
+            </button>
+            <button
+              onClick={() => setActiveTab('qa')}
+              className={`px-6 py-3 font-medium transition-colors duration-200 ${
+                activeTab === 'qa'
+                  ? 'text-stone-100 border-b-2 border-accent'
+                  : 'text-stone-400 hover:text-stone-300'
+              }`}
+            >
+              Quality Assurance
+            </button>
+          </div>
+
+          {/* Tab Content */}
+          <div className="p-6">
+            {activeTab === 'overview' && (
+              <div>
+                {/* Overview content will go here */}
+              </div>
+            )}
+
+            {activeTab === 'history' && id && (
+              <AuditHistoryTab entityType="topic" entityId={id} />
+            )}
+
+            {activeTab === 'qa' && id && (
+              <QAChecklist topicId={id} />
+            )}
+          </div>
+        </div>
+
+        {/* Timeline Section - Only show in Overview tab */}
+        {activeTab === 'overview' && (
+          <>
         <div className="mb-6">
           <h2 className="text-2xl font-semibold text-stone-200 mb-4">Temporal Analysis</h2>
           
@@ -326,6 +394,8 @@ export function TopicDetailPage() {
             />
           )}
         </div>
+        </>
+        )}
       </div>
 
       {/* Edit Modal */}

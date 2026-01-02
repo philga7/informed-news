@@ -1,12 +1,14 @@
 import { ExternalLink, Trash2, TrendingUp, Edit2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { ConfidenceBadge } from '../UI/ConfidenceBadge';
+import { LinkReviewStatusBadge } from './LinkReviewStatusBadge';
 
 interface LinkedRecordsTableProps {
   links: Array<{
     id: string;
     relevanceScore: number | null;
     confidenceLevel: string | null;
+    reviewStatus?: string;
     assumptions: string | null;
     analystNotes: string | null;
     linkedAt: Date;
@@ -70,6 +72,7 @@ export function LinkedRecordsTable({ links, onUnlink, onEdit }: LinkedRecordsTab
             <th className="text-left py-3 px-4 text-stone-400 text-sm font-medium">Source</th>
             <th className="text-left py-3 px-4 text-stone-400 text-sm font-medium">Published</th>
             <th className="text-left py-3 px-4 text-stone-400 text-sm font-medium">Confidence</th>
+            <th className="text-left py-3 px-4 text-stone-400 text-sm font-medium">Review</th>
             <th className="text-center py-3 px-4 text-stone-400 text-sm font-medium">Actions</th>
           </tr>
         </thead>
@@ -134,6 +137,12 @@ export function LinkedRecordsTable({ links, onUnlink, onEdit }: LinkedRecordsTab
                     </div>
                   )}
                 </div>
+              </td>
+              <td className="py-4 px-4">
+                <LinkReviewStatusBadge 
+                  status={(link.reviewStatus as any) || 'pending'} 
+                  size="sm" 
+                />
               </td>
               <td className="py-4 px-4">
                 <div className="flex items-center justify-center gap-2">

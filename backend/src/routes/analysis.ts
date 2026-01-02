@@ -2,6 +2,7 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { supabase } from '../utils/supabase.js';
 import { ollamaService } from '../services/ollamaService.js';
+import { auditService } from '../services/auditService.js';
 
 const router = Router();
 
@@ -67,6 +68,9 @@ router.post('/source-records/:id/summarize', async (req: Request, res: Response)
       .single();
 
     if (insertError) throw insertError;
+
+    // Audit log: artifact created
+    await auditService.logArtifactCreated(artifact.id, artifact);
 
     res.json({
       success: true,
@@ -144,6 +148,9 @@ router.post('/source-records/:id/entities', async (req: Request, res: Response) 
 
     if (insertError) throw insertError;
 
+    // Audit log: artifact created
+    await auditService.logArtifactCreated(artifact.id, artifact);
+
     res.json({
       success: true,
       artifact,
@@ -220,6 +227,9 @@ router.post('/source-records/:id/tone', async (req: Request, res: Response) => {
 
     if (insertError) throw insertError;
 
+    // Audit log: artifact created
+    await auditService.logArtifactCreated(artifact.id, artifact);
+
     res.json({
       success: true,
       artifact,
@@ -291,6 +301,11 @@ router.patch('/artifacts/:id', async (req: Request, res: Response) => {
         return res.status(404).json({ error: 'Artifact not found' });
       }
       throw error;
+    }
+
+    // Audit log: artifact reviewed (only when marking as reviewed)
+    if (reviewed) {
+      await auditService.logArtifactReviewed(id, artifact);
     }
 
     res.json({
