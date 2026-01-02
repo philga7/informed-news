@@ -5,7 +5,9 @@
  * for feed fetching, source management, and other operations.
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+// Use relative URL in production (Vercel), localhost in development
+const API_BASE_URL = import.meta.env.VITE_API_URL || 
+  (import.meta.env.PROD ? '' : 'http://localhost:3001');
 
 interface FetchOptions extends RequestInit {
   params?: Record<string, string>;
