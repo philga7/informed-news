@@ -574,6 +574,9 @@ router.get('/:id/related', async (req: Request, res: Response) => {
       .single();
 
     if (topicError) throw topicError;
+    if (!topic) {
+      return res.status(404).json({ error: 'Topic not found' });
+    }
 
     // Fetch all other topics in the same organization
     const { data: allTopics, error: allTopicsError } = await supabase
