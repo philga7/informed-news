@@ -33,7 +33,7 @@ router.post('/source-records/:id/summarize', async (req: Request, res: Response)
         )
       `)
       .eq('id', id)
-      .single();
+      .single() as any;
 
     if (fetchError || !record) {
       return res.status(404).json({ error: 'Source record not found' });
@@ -58,11 +58,11 @@ router.post('/source-records/:id/summarize', async (req: Request, res: Response)
         source_record_id: id,
         organization_id: record.sources.organization_id,
         type: 'summary',
-        payload: summaryResult,
+        payload: summaryResult as any,
         model_name: ollamaService.getModelName(),
         created_by: 'system:ollama',
         reviewed: false,
-      })
+      } as any)
       .select()
       .single();
 
@@ -109,7 +109,7 @@ router.post('/source-records/:id/entities', async (req: Request, res: Response) 
         )
       `)
       .eq('id', id)
-      .single();
+      .single() as any;
 
     if (fetchError || !record) {
       return res.status(404).json({ error: 'Source record not found' });
@@ -134,11 +134,11 @@ router.post('/source-records/:id/entities', async (req: Request, res: Response) 
         source_record_id: id,
         organization_id: record.sources.organization_id,
         type: 'entity_extraction',
-        payload: entitiesResult,
+        payload: entitiesResult as any,
         model_name: ollamaService.getModelName(),
         created_by: 'system:ollama',
         reviewed: false,
-      })
+      } as any)
       .select()
       .single();
 
@@ -185,7 +185,7 @@ router.post('/source-records/:id/tone', async (req: Request, res: Response) => {
         )
       `)
       .eq('id', id)
-      .single();
+      .single() as any;
 
     if (fetchError || !record) {
       return res.status(404).json({ error: 'Source record not found' });
@@ -210,11 +210,11 @@ router.post('/source-records/:id/tone', async (req: Request, res: Response) => {
         source_record_id: id,
         organization_id: record.sources.organization_id,
         type: 'tone_analysis',
-        payload: toneResult,
+        payload: toneResult as any,
         model_name: ollamaService.getModelName(),
         created_by: 'system:ollama',
         reviewed: false,
-      })
+      } as any)
       .select()
       .single();
 
@@ -280,7 +280,7 @@ router.patch('/artifacts/:id', async (req: Request, res: Response) => {
 
     const { data: artifact, error } = await supabase
       .from('analytic_artifacts')
-      .update({ reviewed })
+      .update({ reviewed } as any)
       .eq('id', id)
       .select()
       .single();
