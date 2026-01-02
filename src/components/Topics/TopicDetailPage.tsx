@@ -12,6 +12,9 @@ import { TopicForm } from './TopicForm';
 import { TopicTimelineChart } from './TopicTimelineChart';
 import { TimelineStats } from './TimelineStats';
 import { ConfidenceStats } from './ConfidenceStats';
+import { RelatedTopicsWidget } from './RelatedTopicsWidget';
+import { CoordinationSection } from './CoordinationSection';
+import { NarrativeEvolutionTimeline } from './NarrativeEvolutionTimeline';
 import type { TopicTimeline } from '../../types/osint';
 
 export function TopicDetailPage() {
@@ -205,7 +208,7 @@ export function TopicDetailPage() {
 
           {/* Keywords */}
           {topic.keywords && topic.keywords.length > 0 && (
-            <div>
+            <div className="mb-4">
               <h3 className="text-sm font-medium text-stone-400 mb-2">Keywords</h3>
               <div className="flex flex-wrap gap-2">
                 {topic.keywords.map((keyword: string, index: number) => (
@@ -231,6 +234,13 @@ export function TopicDetailPage() {
           </div>
         </div>
 
+        {/* Related Topics Section */}
+        {id && (
+          <div className="mb-6">
+            <RelatedTopicsWidget topicId={id} />
+          </div>
+        )}
+
         {/* Timeline Section */}
         <div className="mb-6">
           <h2 className="text-2xl font-semibold text-stone-200 mb-4">Temporal Analysis</h2>
@@ -247,13 +257,22 @@ export function TopicDetailPage() {
               </div>
 
               {/* Timeline Chart */}
-              <div className="bg-stone-900 border border-stone-800 rounded-lg p-6">
+              <div className="bg-stone-900 border border-stone-800 rounded-lg p-6 mb-6">
                 <TopicTimelineChart
                   timeline={timeline}
                   bucket={timelineBucket}
                   onBucketChange={handleBucketChange}
                 />
               </div>
+
+              {/* Narrative Evolution Timeline */}
+              {id && (
+                <NarrativeEvolutionTimeline
+                  topicId={id}
+                  bucket={timelineBucket}
+                  onBucketChange={handleBucketChange}
+                />
+              )}
             </>
           ) : (
             <div className="bg-stone-900 border border-stone-800 rounded-lg p-12">
@@ -268,7 +287,16 @@ export function TopicDetailPage() {
 
         {/* Confidence Assessment Section */}
         {linkedRecords.length > 0 && (
-          <ConfidenceStats links={linkedRecords} />
+          <div className="mb-6">
+            <ConfidenceStats links={linkedRecords} />
+          </div>
+        )}
+
+        {/* Coordination Detection Section */}
+        {id && (
+          <div className="mb-6">
+            <CoordinationSection topicId={id} organizationId={organizationId} />
+          </div>
         )}
 
         {/* Linked Source Records Section */}

@@ -105,7 +105,7 @@ Configure in Vercel Dashboard:
 
 ## Files to Create
 
-| File | Purpose ||------|---------|| `vercel.json` | Vercel configuration with rewrites || `api/[...path].ts` | Catch-all serverless function handler || `api/_lib/supabase.ts` | Shared Supabase client for serverless || `api/_lib/ollamaService.ts` | Ollama service for serverless || `api/_lib/types.ts` | Re-exports from src/types |
+| File | Purpose ||------|---------|| `vercel.json` | Vercel configuration with rewrites || `api/[...path].ts `| Catch-all serverless function handler || `api/_lib/supabase.ts` | Shared Supabase client for serverless || `api/_lib/ollamaService.ts` | Ollama service for serverless || `api/_lib/types.ts` | Re-exports from src/types |
 
 ## Files to Modify
 
@@ -114,6 +114,3 @@ Configure in Vercel Dashboard:
 ## Local Development
 
 Local development remains unchanged:
-
-- `npm run dev` continues to run Vite + Express concurrently
-- Production deployment uses Vercel's serverless infrastructure

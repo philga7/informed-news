@@ -6,6 +6,7 @@
  */
 
 import { apiClient } from '../utils/apiClient';
+import type { DuplicateGroup } from '../types/osint';
 
 export interface AnalyticArtifact {
   id: string;
@@ -99,6 +100,44 @@ class AnalysisService {
    */
   async deleteArtifact(artifactId: string): Promise<void> {
     await apiClient.delete(`${this.baseUrl}/artifacts/${artifactId}`);
+  }
+
+  /**
+   * Detect near-duplicate content across source records
+   */
+  async detectDuplicates(params: {
+    topicId?: string;
+    organizationId: string;
+  }): Promise<DuplicateGroup[]> {
+    const response = await apiClient.post(
+      `${this.baseUrl}/detect-duplicates`,
+      {
+        topic_id: params.topicId,
+        organization_id: params.organizationId,
+      }
+    );
+    return response.duplicate_groups || [];
+  }
+
+  /**
+   * Save analyst assessment of potential coordination
+   */
+  async saveCoordinationAssessment(params: {
+    duplicateGroupHash: string;
+    assessment: string;
+    organizationId: string;
+    assessedByUserId?: string;
+  }): Promise<AnalyticArtifact> {
+    const response = await apiClient.post(
+      `${this.baseUrl}/coordination-assessments`,
+      {
+        duplicate_group_hash: params.duplicateGroupHash,
+        assessment: params.assessment,
+        organization_id: params.organizationId,
+        assessed_by_user_id: params.assessedByUserId,
+      }
+    );
+    return response.artifact;
   }
 }
 

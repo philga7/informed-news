@@ -1,4 +1,4 @@
-import type { OsintTopic, TopicSourceLink, TopicTimeline } from '../types/osint';
+import type { OsintTopic, TopicSourceLink, TopicTimeline, RelatedTopic, NarrativeBucket } from '../types/osint';
 
 // Use relative URL in production (Vercel), localhost in development
 const API_BASE = import.meta.env.PROD 
@@ -318,6 +318,59 @@ export const osintTopicsService = {
         last7Days: data.velocity?.last_7_days || 0,
         previous7Days: data.velocity?.previous_7_days || 0,
       },
+    };
+  },
+
+  /**
+   * Get related topics based on shared source records
+   */
+  async getRelatedTopics(topicId: string): Promise<RelatedTopic[]> {
+    const response = await fetch(`${API_BASE}/api/topics/${topicId}/related`);
+    
+    if (!response.ok) {
+      if (response.status === 404) {
+        throw new Error('Topic not found');
+      }
+      throw new Error(`Failed to fetch related topics: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    return data.related_topics || [];
+  },
+
+  /**
+   * Get narrative evolution timeline with key phrases
+   */
+  async getNarrativeTimeline(
+    topicId: string,
+    options?: {
+      bucket?: 'day' | 'week' | 'month';
+      startDate?: string;
+      endDate?: string;
+    }
+  ): Promise<{ topicId: string; buckets: NarrativeBucket[] }> {
+    const params = new URLSearchParams();
+    if (options?.bucket) params.append('bucket', options.bucket);
+    if (options?.startDate) params.append('start_date', options.startDate);
+    if (options?.endDate) params.append('end_date', options.endDate);
+
+    const queryString = params.toString();
+    const url = `${API_BASE}/api/topics/${topicId}/narrative-timeline${queryString ? `?${queryString}` : ''}`;
+    
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      if (response.status === 404) {
+        throw new Error('Topic not found');
+      }
+      throw new Error(`Failed to fetch narrative timeline: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    
+    return {
+      topicId: data.topic_id,
+      buckets: data.buckets || [],
     };
   },
 };
