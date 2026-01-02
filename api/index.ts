@@ -50,20 +50,24 @@ app.use((err: Error, _req: Request, res: Response, _next: express.NextFunction) 
 });
 
 // Vercel serverless function handler
-export default function handler(req: VercelRequest, res: VercelResponse) {
-  // Convert Vercel request to Express-compatible format
-  const expressReq = Object.assign(req, {
-    protocol: req.headers['x-forwarded-proto'] || 'https',
-    secure: req.headers['x-forwarded-proto'] === 'https',
-    ip: req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '',
-    ips: [],
-    subdomains: [],
-  }) as unknown as Request;
-
-  // Convert Vercel response to Express-compatible format
-  const expressRes = res as unknown as Response;
-
-  // Handle the request
-  app(expressReq, expressRes);
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  return new Promise<void>((resolve) => {
+    // Create a mock Node.js request/response that Express expects
+    // VercelRequest/VercelResponse are actually compatible with Express
+    // but we need to ensure proper event handling
+    const expressReq = req as unknown as Request;
+    const expressRes = res as unknown as Response;
+    
+    // Handle response finish
+    const originalEnd = res.end.bind(res);
+    res.end = function(...args: any[]) {
+      originalEnd(...args);
+      resolve();
+      return res;
+    };
+    
+    // Handle the request through Express
+    app(expressReq, expressRes);
+  });
 }
 
