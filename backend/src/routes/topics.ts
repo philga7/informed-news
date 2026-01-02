@@ -571,7 +571,7 @@ router.get('/:id/related', async (req: Request, res: Response) => {
       .from('osint_topics')
       .select('organization_id')
       .eq('id', id)
-      .single();
+      .single() as any;
 
     if (topicError) throw topicError;
     if (!topic || !topic.organization_id) {
