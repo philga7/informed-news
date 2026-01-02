@@ -9,4 +9,6 @@ export { sourcesService } from './sources.service';
 export { articlesService } from './articles.service';
 export { collectionsService } from './collections.service';
 export { topicsService } from './topics.service';
+export { osintTopicsService } from './osintTopics.service';
+export { sourceRecordsService } from './sourceRecords.service';
 

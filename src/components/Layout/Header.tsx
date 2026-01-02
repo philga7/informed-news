@@ -1,16 +1,12 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Newspaper, LogOut, Settings, RefreshCw, Layers, TrendingUp, Clock } from 'lucide-react';
+import { Newspaper, LogOut, RefreshCw, Target, FileText, Database } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { authService, articlesService } from '../../services';
 import { feedsApi } from '../../utils/apiClient';
 import type { NewsArticle } from '../../types';
 
-interface HeaderProps {
-  onOpenSources: () => void;
-}
-
-export function Header({ onOpenSources }: HeaderProps) {
+export function Header() {
   const { state, dispatch } = useApp();
   const location = useLocation();
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -158,60 +154,40 @@ export function Header({ onOpenSources }: HeaderProps) {
             </button>
 
             <Link
-              to="/"
+              to="/topics"
               className={`flex items-center gap-2 px-3 sm:px-4 py-2 font-medium rounded-lg transition-all duration-250 text-sm sm:text-base ${
-                location.pathname === '/'
+                location.pathname === '/topics' || location.pathname.startsWith('/topics/')
                   ? 'bg-stone-700 text-stone-200'
                   : 'bg-stone-800 hover:bg-stone-700 text-stone-300'
               }`}
             >
-              <Newspaper size={18} />
-              <span className="hidden sm:inline">Articles</span>
+              <Target size={18} />
+              <span className="hidden sm:inline">Topics</span>
             </Link>
 
             <Link
-              to="/dashboard"
+              to="/source-records"
               className={`flex items-center gap-2 px-3 sm:px-4 py-2 font-medium rounded-lg transition-all duration-250 text-sm sm:text-base ${
-                location.pathname === '/dashboard' || location.pathname.startsWith('/topic/')
+                location.pathname === '/source-records' || location.pathname.startsWith('/source-records/')
                   ? 'bg-stone-700 text-stone-200'
                   : 'bg-stone-800 hover:bg-stone-700 text-stone-300'
               }`}
             >
-              <TrendingUp size={18} />
-              <span className="hidden sm:inline">Dashboard</span>
+              <FileText size={18} />
+              <span className="hidden sm:inline">Source Records</span>
             </Link>
 
             <Link
-              to="/feeds"
+              to="/sources"
               className={`flex items-center gap-2 px-3 sm:px-4 py-2 font-medium rounded-lg transition-all duration-250 text-sm sm:text-base ${
-                location.pathname === '/feeds'
+                location.pathname === '/sources'
                   ? 'bg-stone-700 text-stone-200'
                   : 'bg-stone-800 hover:bg-stone-700 text-stone-300'
               }`}
             >
-              <Layers size={18} />
-              <span className="hidden sm:inline">Feeds</span>
-            </Link>
-
-            <Link
-              to="/history"
-              className={`flex items-center gap-2 px-3 sm:px-4 py-2 font-medium rounded-lg transition-all duration-250 text-sm sm:text-base ${
-                location.pathname === '/history'
-                  ? 'bg-stone-700 text-stone-200'
-                  : 'bg-stone-800 hover:bg-stone-700 text-stone-300'
-              }`}
-            >
-              <Clock size={18} />
-              <span className="hidden sm:inline">History</span>
-            </Link>
-
-            <button
-              onClick={onOpenSources}
-              className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-stone-800 hover:bg-stone-700 text-stone-300 font-medium rounded-lg transition-all duration-250 text-sm sm:text-base"
-            >
-              <Settings size={18} />
+              <Database size={18} />
               <span className="hidden sm:inline">Sources</span>
-            </button>
+            </Link>
 
             <div className="relative">
               <button
