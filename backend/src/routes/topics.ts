@@ -78,7 +78,7 @@ router.post('/', async (req: Request, res: Response) => {
         description: description || null,
         keywords: keywords || [],
         related_topics: related_topics || [],
-      })
+      } as any)
       .select()
       .single();
 
@@ -139,7 +139,7 @@ router.get('/:id/timeline', async (req: Request, res: Response) => {
       p_bucket: dateTrunc,
       p_start_date: start_date || null,
       p_end_date: end_date || null,
-    });
+    } as any);
 
     // If RPC function doesn't exist, fall back to manual query
     // PGRST202 = PostgREST function not found, 42883 = PostgreSQL function not found
