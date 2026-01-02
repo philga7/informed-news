@@ -1,6 +1,9 @@
 import type { Source } from '../types/osint';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+// Use relative URL in production (Vercel), localhost in development
+const API_BASE = import.meta.env.PROD 
+  ? (import.meta.env.VITE_API_URL || '')
+  : (import.meta.env.VITE_API_URL || 'http://localhost:3001');
 
 interface SourceWithCount extends Source {
   record_count: number;
