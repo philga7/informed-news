@@ -89,7 +89,7 @@ router.patch('/:id', async (req: Request, res: Response) => {
 
     const { data: source, error } = await supabase
       .from('sources')
-      .update(updates)
+      .update(updates as any)
       .eq('id', id)
       .select()
       .single();
