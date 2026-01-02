@@ -389,7 +389,7 @@ router.post('/detect-duplicates', async (req: Request, res: Response) => {
 
       if (sourcesError) throw sourcesError;
 
-      const sourceIds = sources?.map(s => s.id) || [];
+      const sourceIds = (sources || []).map((s: any) => s.id);
 
       if (sourceIds.length > 0) {
         const { data: allRecords, error: recordsError } = await supabase
