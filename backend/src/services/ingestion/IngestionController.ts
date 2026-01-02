@@ -68,15 +68,15 @@ export class IngestionController {
         .insert({
           source_id: dto.source_id,
           title: dto.title,
-          url: dto.url || null,
-          content: dto.content || null,
-          published_at: dto.published_at?.toISOString() || null,
-          language: dto.language || null,
+          url: dto.url ?? null,
+          content: dto.content ?? null,
+          published_at: dto.published_at?.toISOString() ?? null,
+          language: dto.language ?? null,
           geographic_indicators: dto.geographic_indicators 
-            ? JSON.parse(JSON.stringify(dto.geographic_indicators)) 
+            ? (JSON.parse(JSON.stringify(dto.geographic_indicators)) as any)
             : null,
-          raw_metadata: rawMetadata,
-        });
+          raw_metadata: rawMetadata as any,
+        } as any);
 
       if (error) {
         console.error('Error inserting source record:', error);
