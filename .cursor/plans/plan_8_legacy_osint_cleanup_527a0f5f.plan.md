@@ -221,4 +221,3 @@ DROP TYPE IF EXISTS topic_status;
 
 - [ ] Legacy sources (e.g., "Citizen Free Press") appear in OSINT Sources page after migration
 - [ ] "Update News" button triggers OSINT ingestion successfully
-- [ ] Topics page loads OSINT topics correctly
