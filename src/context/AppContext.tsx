@@ -1,8 +1,7 @@
-import React, { createContext, useContext, useReducer, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import type { AppState, AppAction, User } from '../types';
 import { appReducer, initialState } from './appReducer';
 import { useAuth } from '../hooks/useAuth';
-import { useDataLoader } from '../hooks/useDataLoader';
 
 interface AppContextType {
   state: AppState;
@@ -14,8 +13,6 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(appReducer, initialState);
   const { user: supabaseUser, loading: authLoading } = useAuth();
-  const { loadAllData } = useDataLoader(dispatch);
-  const hasLoadedDataRef = useRef(false);
 
   // Handle Supabase auth state changes
   useEffect(() => {
@@ -32,24 +29,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       // Set auth state
       dispatch({ type: 'RESTORE_AUTH', payload: user });
-
-      // Load all user data from Supabase (only once)
-      if (!hasLoadedDataRef.current) {
-        hasLoadedDataRef.current = true;
-        loadAllData(user.id).then((result) => {
-          if (result.success) {
-            console.log('✅ Data loaded from Supabase');
-          } else {
-            console.error('❌ Failed to load data:', result.error);
-          }
-        });
-      }
+      console.log('✅ User authenticated');
     } else {
       // User is logged out
       dispatch({ type: 'LOGOUT' });
-      hasLoadedDataRef.current = false;
     }
-  }, [supabaseUser, authLoading, loadAllData]);
+  }, [supabaseUser, authLoading]);
 
   return (
     <AppContext.Provider value={{ state, dispatch }}>

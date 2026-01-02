@@ -17,7 +17,7 @@ export interface SourceRecordDTO {
   source_id: string;
   title: string;
   url?: string;
-  content: string;
+  content?: string;
   published_at?: Date;
   language?: string;
   geographic_indicators?: string[];

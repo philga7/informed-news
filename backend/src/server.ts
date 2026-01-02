@@ -1,7 +1,6 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
-import feedsRouter from './routes/feeds.js';
 import sourcesRouter from './routes/sources.js';
 import schedulerRouter from './routes/scheduler.js';
 import ingestRouter from './routes/ingest.js';
@@ -22,7 +21,6 @@ app.get('/health', (_req, res) => {
 });
 
 // API Routes
-app.use('/api/feeds', feedsRouter);
 app.use('/api/sources', sourcesRouter);
 app.use('/api/scheduler', schedulerRouter);
 app.use('/api/ingest', ingestRouter);
