@@ -87,9 +87,9 @@ router.patch('/:id', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'No updates provided' });
     }
 
-    // @ts-expect-error - Supabase type inference issue in serverless environment
     const { data: source, error } = await supabase
       .from('sources')
+      // @ts-ignore - Supabase type inference issue in serverless environment
       .update(updates as any)
       .eq('id', id)
       .select()
