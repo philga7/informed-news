@@ -9,14 +9,6 @@
       "source": "/api/:path*",
       "destination": "/api"
     }
-  ],
-  "env": {
-    "SUPABASE_URL": "@supabase_url",
-    "SUPABASE_SERVICE_ROLE_KEY": "@supabase_service_role_key",
-    "VITE_SUPABASE_URL": "@supabase_url",
-    "VITE_SUPABASE_ANON_KEY": "@supabase_anon_key",
-    "OLLAMA_API_KEY": "@ollama_api_key",
-    "OLLAMA_MODEL": "@ollama_model"
-  }
+  ]
 }
 
