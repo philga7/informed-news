@@ -6,8 +6,10 @@
  */
 
 // Use relative URL in production (Vercel), localhost in development
-const API_BASE_URL = import.meta.env.VITE_API_URL || 
-  (import.meta.env.PROD ? '' : 'http://localhost:3001');
+// In production, always use relative URLs (same domain) unless VITE_API_URL is explicitly set
+const API_BASE_URL = import.meta.env.PROD 
+  ? (import.meta.env.VITE_API_URL || '')
+  : (import.meta.env.VITE_API_URL || 'http://localhost:3001');
 
 interface FetchOptions extends RequestInit {
   params?: Record<string, string>;
