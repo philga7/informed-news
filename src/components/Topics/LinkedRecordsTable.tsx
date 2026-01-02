@@ -1,11 +1,13 @@
-import { ExternalLink, Trash2, TrendingUp } from 'lucide-react';
+import { ExternalLink, Trash2, TrendingUp, Edit2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { ConfidenceBadge } from '../UI/ConfidenceBadge';
 
 interface LinkedRecordsTableProps {
   links: Array<{
     id: string;
     relevanceScore: number | null;
     confidenceLevel: string | null;
+    assumptions: string | null;
     analystNotes: string | null;
     linkedAt: Date;
     source_records: {
@@ -20,9 +22,10 @@ interface LinkedRecordsTableProps {
     };
   }>;
   onUnlink: (linkId: string) => void;
+  onEdit?: (linkId: string) => void;
 }
 
-export function LinkedRecordsTable({ links, onUnlink }: LinkedRecordsTableProps) {
+export function LinkedRecordsTable({ links, onUnlink, onEdit }: LinkedRecordsTableProps) {
   const navigate = useNavigate();
 
   const handleViewRecord = (recordId: string) => {
@@ -43,19 +46,6 @@ export function LinkedRecordsTable({ links, onUnlink }: LinkedRecordsTableProps)
       day: 'numeric',
       year: 'numeric',
     });
-  };
-
-  const getConfidenceBadgeColor = (level: string | null) => {
-    switch (level) {
-      case 'HIGH':
-        return 'bg-green-900/30 text-green-400 border-green-800/50';
-      case 'MEDIUM':
-        return 'bg-yellow-900/30 text-yellow-400 border-yellow-800/50';
-      case 'LOW':
-        return 'bg-orange-900/30 text-orange-400 border-orange-800/50';
-      default:
-        return 'bg-stone-800 text-stone-400 border-stone-700';
-    }
   };
 
   const getReliabilityBadgeColor = (rating: string) => {
@@ -133,15 +123,10 @@ export function LinkedRecordsTable({ links, onUnlink }: LinkedRecordsTableProps)
               </td>
               <td className="py-4 px-4">
                 <div className="flex flex-col gap-1">
-                  {link.confidenceLevel && (
-                    <span
-                      className={`inline-block px-2 py-1 text-xs rounded border ${getConfidenceBadgeColor(
-                        link.confidenceLevel
-                      )}`}
-                    >
-                      {link.confidenceLevel}
-                    </span>
-                  )}
+                  <ConfidenceBadge
+                    level={link.confidenceLevel as 'HIGH' | 'MEDIUM' | 'LOW' | null}
+                    assumptions={link.assumptions}
+                  />
                   {link.relevanceScore !== null && (
                     <div className="flex items-center gap-1 text-stone-400 text-xs">
                       <TrendingUp size={12} />
@@ -152,6 +137,18 @@ export function LinkedRecordsTable({ links, onUnlink }: LinkedRecordsTableProps)
               </td>
               <td className="py-4 px-4">
                 <div className="flex items-center justify-center gap-2">
+                  {onEdit && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onEdit(link.id);
+                      }}
+                      className="p-2 bg-stone-800 hover:bg-blue-900/30 text-stone-400 hover:text-blue-400 rounded-lg transition-colors duration-250"
+                      title="Edit link"
+                    >
+                      <Edit2 size={16} />
+                    </button>
+                  )}
                   <button
                     onClick={(e) => handleUnlink(e, link.id)}
                     className="p-2 bg-stone-800 hover:bg-red-900/30 text-stone-400 hover:text-red-400 rounded-lg transition-colors duration-250"

@@ -447,6 +447,66 @@ router.post('/:id/links', async (req: Request, res: Response) => {
 });
 
 /**
+ * PATCH /api/topics/:topicId/links/:linkId
+ * Update a topic-source link metadata
+ * Body: { relevance_score?, confidence_level?, assumptions?, analyst_notes? }
+ */
+router.patch('/:topicId/links/:linkId', async (req: Request, res: Response) => {
+  try {
+    const { topicId, linkId } = req.params;
+    const {
+      relevance_score,
+      confidence_level,
+      assumptions,
+      analyst_notes,
+    } = req.body;
+
+    // Validate confidence_level if provided
+    if (confidence_level && !['HIGH', 'MEDIUM', 'LOW'].includes(confidence_level)) {
+      return res.status(400).json({
+        error: 'Invalid confidence_level. Must be HIGH, MEDIUM, or LOW',
+      });
+    }
+
+    const updates: any = {};
+    if (relevance_score !== undefined) updates.relevance_score = relevance_score;
+    if (confidence_level !== undefined) updates.confidence_level = confidence_level;
+    if (assumptions !== undefined) updates.assumptions = assumptions;
+    if (analyst_notes !== undefined) updates.analyst_notes = analyst_notes;
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ error: 'No updates provided' });
+    }
+
+    const { data: link, error } = await supabase
+      .from('topic_source_links')
+      .update(updates)
+      .eq('id', linkId)
+      .eq('topic_id', topicId)
+      .select()
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return res.status(404).json({ error: 'Link not found' });
+      }
+      throw error;
+    }
+
+    res.json({
+      success: true,
+      link,
+    });
+  } catch (error) {
+    console.error('Error updating topic-source link:', error);
+    res.status(500).json({
+      error: 'Failed to update link',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+/**
  * DELETE /api/topics/:topicId/links/:linkId
  * Unlink a source record from a topic
  */

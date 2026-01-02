@@ -11,6 +11,7 @@ interface LinkRecordModalProps {
     metadata?: {
       relevanceScore?: number;
       confidenceLevel?: 'HIGH' | 'MEDIUM' | 'LOW';
+      assumptions?: string;
       analystNotes?: string;
     }
   ) => Promise<void>;
@@ -24,6 +25,7 @@ export function LinkRecordModal({ organizationId, onLink, onClose }: LinkRecordM
   const [selectedRecord, setSelectedRecord] = useState<any>(null);
   const [confidenceLevel, setConfidenceLevel] = useState<'HIGH' | 'MEDIUM' | 'LOW'>('MEDIUM');
   const [relevanceScore, setRelevanceScore] = useState<number>(0.75);
+  const [assumptions, setAssumptions] = useState('');
   const [analystNotes, setAnalystNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -85,6 +87,7 @@ export function LinkRecordModal({ organizationId, onLink, onClose }: LinkRecordM
       await onLink(selectedRecord.id, {
         relevanceScore,
         confidenceLevel,
+        assumptions: assumptions.trim() || undefined,
         analystNotes: analystNotes.trim() || undefined,
       });
       onClose();
@@ -247,6 +250,25 @@ export function LinkRecordModal({ organizationId, onLink, onClose }: LinkRecordM
                     value={relevanceScore}
                     onChange={(e) => setRelevanceScore(parseFloat(e.target.value))}
                     className="w-full"
+                  />
+                </div>
+
+                {/* Assumptions */}
+                <div>
+                  <label htmlFor="assumptions" className="block text-sm font-medium text-stone-300 mb-2">
+                    Assumptions *
+                  </label>
+                  <p className="text-xs text-stone-500 mb-2">
+                    What assumptions underlie this link? Be explicit about what you're inferring or taking for granted.
+                  </p>
+                  <textarea
+                    id="assumptions"
+                    value={assumptions}
+                    onChange={(e) => setAssumptions(e.target.value)}
+                    rows={3}
+                    required
+                    className="w-full px-4 py-2 bg-stone-800 border border-stone-700 rounded-lg text-stone-200 placeholder-stone-500 focus:outline-none focus:border-blue-600 resize-none"
+                    placeholder="e.g., 'Assuming this source has direct access to the subject matter...'"
                   />
                 </div>
 

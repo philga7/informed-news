@@ -7,9 +7,11 @@ import { LoadingSpinner } from '../UI/LoadingSpinner';
 import { EmptyState } from '../UI/EmptyState';
 import { LinkedRecordsTable } from './LinkedRecordsTable';
 import { LinkRecordModal } from './LinkRecordModal';
+import { EditLinkModal } from './EditLinkModal';
 import { TopicForm } from './TopicForm';
 import { TopicTimelineChart } from './TopicTimelineChart';
 import { TimelineStats } from './TimelineStats';
+import { ConfidenceStats } from './ConfidenceStats';
 import type { TopicTimeline } from '../../types/osint';
 
 export function TopicDetailPage() {
@@ -24,6 +26,7 @@ export function TopicDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showLinkModal, setShowLinkModal] = useState(false);
+  const [editingLinkId, setEditingLinkId] = useState<string | null>(null);
 
   const organizationId = '00000000-0000-0000-0000-000000009997';
 
@@ -123,6 +126,20 @@ export function TopicDetailPage() {
     }
   };
 
+  const handleUpdateLink = async (linkId: string, updates: any) => {
+    if (!id) return;
+
+    try {
+      await osintTopicsService.updateLink(id, linkId, updates);
+      setEditingLinkId(null);
+      // Refresh topic to get updated links
+      await loadTopic();
+    } catch (err) {
+      console.error('Error updating link:', err);
+      throw err;
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-stone-950 flex items-center justify-center">
@@ -152,6 +169,9 @@ export function TopicDetailPage() {
   }
 
   const linkedRecords = topic.topic_source_links || [];
+  const editingLink = editingLinkId 
+    ? linkedRecords.find(link => link.id === editingLinkId) 
+    : null;
 
   return (
     <div className="min-h-screen bg-stone-950">
@@ -246,6 +266,11 @@ export function TopicDetailPage() {
           )}
         </div>
 
+        {/* Confidence Assessment Section */}
+        {linkedRecords.length > 0 && (
+          <ConfidenceStats links={linkedRecords} />
+        )}
+
         {/* Linked Source Records Section */}
         <div className="bg-stone-900 border border-stone-800 rounded-lg p-6">
           <div className="flex items-center justify-between mb-6">
@@ -269,6 +294,7 @@ export function TopicDetailPage() {
             <LinkedRecordsTable
               links={linkedRecords}
               onUnlink={handleUnlinkRecord}
+              onEdit={(linkId) => setEditingLinkId(linkId)}
             />
           )}
         </div>
@@ -293,6 +319,16 @@ export function TopicDetailPage() {
           organizationId={organizationId}
           onLink={handleLinkRecord}
           onClose={() => setShowLinkModal(false)}
+        />
+      )}
+
+      {/* Edit Link Modal */}
+      {editingLink && (
+        <EditLinkModal
+          link={editingLink}
+          topicId={id!}
+          onSave={handleUpdateLink}
+          onClose={() => setEditingLinkId(null)}
         />
       )}
     </div>
