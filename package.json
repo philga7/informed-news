@@ -37,7 +37,10 @@
     "rss-parser": "^3.13.0"
   },
   "overrides": {
-    "html-encoding-sniffer": "^5.0.0"
+    "html-encoding-sniffer": "^5.0.0",
+    "jsdom": {
+      "html-encoding-sniffer": "^5.0.0"
+    }
   },
   "devDependencies": {
     "@eslint/js": "^9.9.1",
