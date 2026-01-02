@@ -7,6 +7,8 @@ import ingestRouter from './routes/ingest.js';
 import topicsRouter from './routes/topics.js';
 import sourceRecordsRouter from './routes/sourceRecords.js';
 import analysisRouter from './routes/analysis.js';
+import auditLogsRouter from './routes/auditLogs.js';
+import qaRouter from './routes/qa.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -27,6 +29,8 @@ app.use('/api/ingest', ingestRouter);
 app.use('/api/topics', topicsRouter);
 app.use('/api/source-records', sourceRecordsRouter);
 app.use('/api/analysis', analysisRouter);
+app.use('/api/audit-logs', auditLogsRouter);
+app.use('/api/qa', qaRouter);
 
 // Error handling middleware
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

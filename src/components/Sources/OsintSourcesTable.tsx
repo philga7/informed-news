@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Edit2, FileText } from 'lucide-react';
 import type { Source } from '../../types/osint';
 import { EditSourceModal } from './EditSourceModal';
+import { SourceValueRating } from './SourceValueRating';
 
 interface OsintSourcesTableProps {
   sources: Array<Source & { record_count: number }>;
@@ -50,6 +51,7 @@ export function OsintSourcesTable({ sources, onUpdate }: OsintSourcesTableProps)
               <th className="text-left py-3 px-4 text-stone-400 text-sm font-medium">Name</th>
               <th className="text-left py-3 px-4 text-stone-400 text-sm font-medium">Type</th>
               <th className="text-left py-3 px-4 text-stone-400 text-sm font-medium">Reliability</th>
+              <th className="text-left py-3 px-4 text-stone-400 text-sm font-medium">Value Rating</th>
               <th className="text-center py-3 px-4 text-stone-400 text-sm font-medium">Records</th>
               <th className="text-left py-3 px-4 text-stone-400 text-sm font-medium">Notes</th>
               <th className="text-center py-3 px-4 text-stone-400 text-sm font-medium">Actions</th>
@@ -84,6 +86,14 @@ export function OsintSourcesTable({ sources, onUpdate }: OsintSourcesTableProps)
                   >
                     {source.reliabilityRating}
                   </span>
+                </td>
+                <td className="py-4 px-4">
+                  <SourceValueRating
+                    sourceId={source.id}
+                    sourceName={source.name}
+                    currentRating={source.valueRating}
+                    onRatingChange={() => {}}
+                  />
                 </td>
                 <td className="py-4 px-4 text-center">
                   <div className="flex items-center justify-center gap-1 text-stone-400">

@@ -1,4 +1,4 @@
-import type { OsintTopic, TopicSourceLink, TopicTimeline, RelatedTopic, NarrativeBucket } from '../types/osint';
+import type { OsintTopic, TopicSourceLink, TopicTimeline, RelatedTopic, NarrativeBucket, TopicStatus, QACompleteness } from '../types/osint';
 
 // Use relative URL in production (Vercel), localhost in development
 const API_BASE = import.meta.env.PROD 
@@ -372,6 +372,13 @@ export const osintTopicsService = {
       topicId: data.topic_id,
       buckets: data.buckets || [],
     };
+  },
+
+  /**
+   * Update topic workflow status
+   */
+  async updateStatus(topicId: string, status: TopicStatus): Promise<OsintTopic> {
+    return this.update(topicId, { status } as any);
   },
 };
 

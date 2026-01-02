@@ -2,6 +2,7 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { fetchNewsFromSource } from '../services/feedFetcher.js';
 import { supabase } from '../utils/supabase.js';
+import { auditService } from '../services/auditService.js';
 import type { NewsSource } from '../types/index.js';
 
 const router = Router();
@@ -68,7 +69,7 @@ router.get('/', async (req: Request, res: Response) => {
 router.patch('/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { name, url, reliability_rating, notes } = req.body;
+    const { name, url, reliability_rating, notes, value_rating } = req.body;
 
     // Validate reliability_rating if provided
     if (reliability_rating && !['HIGH', 'MEDIUM', 'LOW', 'UNKNOWN'].includes(reliability_rating)) {
@@ -77,11 +78,30 @@ router.patch('/:id', async (req: Request, res: Response) => {
       });
     }
 
+    // Validate value_rating if provided
+    if (value_rating !== undefined && (value_rating < 1 || value_rating > 5)) {
+      return res.status(400).json({
+        error: 'Invalid value_rating. Must be between 1 and 5',
+      });
+    }
+
+    // Fetch current state for audit
+    const { data: beforeSource, error: fetchError } = await supabase
+      .from('sources')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !beforeSource) {
+      return res.status(404).json({ error: 'Source not found' });
+    }
+
     const updates: any = {};
     if (name !== undefined) updates.name = name;
     if (url !== undefined) updates.url = url;
     if (reliability_rating !== undefined) updates.reliability_rating = reliability_rating;
     if (notes !== undefined) updates.notes = notes;
+    if (value_rating !== undefined) updates.value_rating = value_rating;
 
     if (Object.keys(updates).length === 0) {
       return res.status(400).json({ error: 'No updates provided' });
@@ -100,6 +120,13 @@ router.patch('/:id', async (req: Request, res: Response) => {
         return res.status(404).json({ error: 'Source not found' });
       }
       throw error;
+    }
+
+    // Audit log: source updated (or source rated if value_rating changed)
+    if (value_rating !== undefined && beforeSource.value_rating !== value_rating) {
+      await auditService.logSourceRated(id, beforeSource.value_rating, value_rating);
+    } else {
+      await auditService.logSourceUpdated(id, beforeSource, source);
     }
 
     res.json({

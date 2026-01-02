@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { supabase } from '../utils/supabase.js';
+import { auditService } from '../services/auditService.js';
 
 const router = Router();
 
@@ -91,6 +92,9 @@ router.post('/', async (req: Request, res: Response) => {
       }
       throw error;
     }
+
+    // Audit log: topic created
+    await auditService.logTopicCreated(topic.id, topic);
 
     res.status(201).json({
       success: true,
@@ -316,13 +320,25 @@ router.get('/:id', async (req: Request, res: Response) => {
 router.patch('/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { name, description, keywords, related_topics } = req.body;
+    const { name, description, keywords, related_topics, status } = req.body;
+
+    // Fetch current state for audit
+    const { data: beforeTopic, error: fetchError } = await supabase
+      .from('osint_topics')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !beforeTopic) {
+      return res.status(404).json({ error: 'Topic not found' });
+    }
 
     const updates: any = {};
     if (name !== undefined) updates.name = name;
     if (description !== undefined) updates.description = description;
     if (keywords !== undefined) updates.keywords = keywords;
     if (related_topics !== undefined) updates.related_topics = related_topics;
+    if (status !== undefined) updates.status = status;
 
     if (Object.keys(updates).length === 0) {
       return res.status(400).json({ error: 'No updates provided' });
@@ -349,6 +365,9 @@ router.patch('/:id', async (req: Request, res: Response) => {
       throw error;
     }
 
+    // Audit log: topic updated
+    await auditService.logTopicUpdated(id, beforeTopic, topic);
+
     res.json({
       success: true,
       topic,
@@ -370,12 +389,26 @@ router.delete('/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
+    // Fetch topic before deletion for audit
+    const { data: topic, error: fetchError } = await supabase
+      .from('osint_topics')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !topic) {
+      return res.status(404).json({ error: 'Topic not found' });
+    }
+
     const { error } = await supabase
       .from('osint_topics')
       .delete()
       .eq('id', id);
 
     if (error) throw error;
+
+    // Audit log: topic deleted
+    await auditService.logTopicDeleted(id, topic);
 
     res.json({
       success: true,
@@ -435,6 +468,15 @@ router.post('/:id/links', async (req: Request, res: Response) => {
       throw error;
     }
 
+    // Audit log: link added
+    await auditService.logLinkAdded(
+      link.id,
+      topicId,
+      source_record_id,
+      link,
+      linked_by_user_id
+    );
+
     res.status(201).json({
       success: true,
       link,
@@ -461,6 +503,7 @@ router.patch('/:topicId/links/:linkId', async (req: Request, res: Response) => {
       confidence_level,
       assumptions,
       analyst_notes,
+      review_status,
     } = req.body;
 
     // Validate confidence_level if provided
@@ -470,11 +513,31 @@ router.patch('/:topicId/links/:linkId', async (req: Request, res: Response) => {
       });
     }
 
+    // Validate review_status if provided
+    if (review_status && !['pending', 'reviewed', 'disputed'].includes(review_status)) {
+      return res.status(400).json({
+        error: 'Invalid review_status. Must be pending, reviewed, or disputed',
+      });
+    }
+
+    // Fetch current state for audit
+    const { data: beforeLink, error: fetchError } = await supabase
+      .from('topic_source_links')
+      .select('*')
+      .eq('id', linkId)
+      .eq('topic_id', topicId)
+      .single();
+
+    if (fetchError || !beforeLink) {
+      return res.status(404).json({ error: 'Link not found' });
+    }
+
     const updates: any = {};
     if (relevance_score !== undefined) updates.relevance_score = relevance_score;
     if (confidence_level !== undefined) updates.confidence_level = confidence_level;
     if (assumptions !== undefined) updates.assumptions = assumptions;
     if (analyst_notes !== undefined) updates.analyst_notes = analyst_notes;
+    if (review_status !== undefined) updates.review_status = review_status;
 
     if (Object.keys(updates).length === 0) {
       return res.status(400).json({ error: 'No updates provided' });
@@ -495,6 +558,9 @@ router.patch('/:topicId/links/:linkId', async (req: Request, res: Response) => {
       }
       throw error;
     }
+
+    // Audit log: link updated
+    await auditService.logLinkUpdated(linkId, beforeLink, link);
 
     res.json({
       success: true,
@@ -517,6 +583,18 @@ router.delete('/:topicId/links/:linkId', async (req: Request, res: Response) => 
   try {
     const { topicId, linkId } = req.params;
 
+    // Fetch link before deletion for audit
+    const { data: link, error: fetchError } = await supabase
+      .from('topic_source_links')
+      .select('*')
+      .eq('id', linkId)
+      .eq('topic_id', topicId)
+      .single();
+
+    if (fetchError || !link) {
+      return res.status(404).json({ error: 'Link not found' });
+    }
+
     const { error } = await supabase
       .from('topic_source_links')
       .delete()
@@ -524,6 +602,9 @@ router.delete('/:topicId/links/:linkId', async (req: Request, res: Response) => 
       .eq('topic_id', topicId);
 
     if (error) throw error;
+
+    // Audit log: link removed
+    await auditService.logLinkRemoved(linkId, link);
 
     res.json({
       success: true,
