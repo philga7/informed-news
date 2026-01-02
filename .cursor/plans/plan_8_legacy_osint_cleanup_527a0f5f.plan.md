@@ -68,8 +68,6 @@ flowchart TB
     AnalysisRoute --> Artifacts
 ```
 
-
-
 ## Implementation Tasks
 
 ### Phase 1: Data Migration
@@ -211,8 +209,6 @@ DROP TYPE IF EXISTS sort_by_type;
 DROP TYPE IF EXISTS topic_status;
 ```
 
-
-
 ## Key Files Summary
 
 | Action | Files ||--------|-------|| Create | `supabase/migrations/20250102000002_migrate_legacy_to_osint.sql` || Modify | `src/components/Layout/Header.tsx`, `src/services/index.ts`, `src/types/index.ts`, `src/context/appReducer.ts`, `src/context/AppContext.tsx`, `backend/src/server.ts` || Delete | 4 legacy services, 14+ legacy components, `useDataLoader.ts`, `backend/src/routes/feeds.ts`, legacy backend services || Optional | `supabase/migrations/20250102000003_drop_legacy_tables.sql` |
@@ -222,3 +218,6 @@ DROP TYPE IF EXISTS topic_status;
 - [ ] Legacy sources (e.g., "Citizen Free Press") appear in OSINT Sources page after migration
 - [ ] "Update News" button triggers OSINT ingestion successfully
 - [ ] Topics page loads OSINT topics correctly
+- [ ] Source Records page shows migrated articles as source records
+- [ ] No console errors from removed legacy code
+- [ ] Build completes without TypeScript errors
