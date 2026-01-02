@@ -574,9 +574,11 @@ router.get('/:id/related', async (req: Request, res: Response) => {
       .single();
 
     if (topicError) throw topicError;
-    if (!topic) {
+    if (!topic || !topic.organization_id) {
       return res.status(404).json({ error: 'Topic not found' });
     }
+
+    const organizationId = topic.organization_id;
 
     // Fetch all other topics in the same organization
     const { data: allTopics, error: allTopicsError } = await supabase
@@ -588,7 +590,7 @@ router.get('/:id/related', async (req: Request, res: Response) => {
           source_record_id
         )
       `)
-      .eq('organization_id', topic.organization_id)
+      .eq('organization_id', organizationId)
       .neq('id', id);
 
     if (allTopicsError) throw allTopicsError;
