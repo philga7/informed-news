@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { feedScheduler } from '../services/scheduler.js';
-import { ingestionScheduler } from '../services/ingestion/index.js';
+import { ingestionScheduler } from '../services/ingestion/IngestionScheduler.js';
 import type { NewsSource } from '../types/index.js';
 
 const router = Router();
