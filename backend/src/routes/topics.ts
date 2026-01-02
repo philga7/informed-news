@@ -106,6 +106,146 @@ router.post('/', async (req: Request, res: Response) => {
 });
 
 /**
+ * GET /api/topics/:id/timeline
+ * Get temporal analysis data for a topic
+ * Query params: bucket (day|week|month), start_date?, end_date?
+ * NOTE: This route MUST come before GET /api/topics/:id to avoid route collision
+ */
+router.get('/:id/timeline', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { bucket = 'day', start_date, end_date } = req.query;
+
+    // Validate bucket parameter
+    if (!['day', 'week', 'month'].includes(bucket as string)) {
+      return res.status(400).json({ error: 'Invalid bucket parameter. Must be day, week, or month' });
+    }
+
+    // Build the date truncation SQL based on bucket
+    const dateTrunc = bucket === 'day' ? 'day' : bucket === 'week' ? 'week' : 'month';
+
+    // Build date range filter
+    let dateFilter = '';
+    if (start_date) {
+      dateFilter += ` AND COALESCE(sr.published_at, sr.ingested_at) >= '${start_date}'`;
+    }
+    if (end_date) {
+      dateFilter += ` AND COALESCE(sr.published_at, sr.ingested_at) <= '${end_date}'`;
+    }
+
+    // Query for timeline aggregation
+    const { data: timelineData, error: timelineError } = await supabase.rpc('get_topic_timeline', {
+      p_topic_id: id,
+      p_bucket: dateTrunc,
+      p_start_date: start_date || null,
+      p_end_date: end_date || null,
+    });
+
+    // If RPC function doesn't exist, fall back to manual query
+    // PGRST202 = PostgREST function not found, 42883 = PostgreSQL function not found
+    if (timelineError && (timelineError.code === 'PGRST202' || timelineError.code === '42883')) {
+      // Manual aggregation query
+      const { data: links, error: linksError } = await supabase
+        .from('topic_source_links')
+        .select(`
+          id,
+          source_records!inner (
+            published_at,
+            ingested_at
+          )
+        `)
+        .eq('topic_id', id);
+
+      if (linksError) throw linksError;
+
+      // Process data in JavaScript
+      const records = links?.map((link: any) => ({
+        date: link.source_records.published_at || link.source_records.ingested_at,
+      })) || [];
+
+      // Filter by date range
+      const filteredRecords = records.filter((record: any) => {
+        const recordDate = new Date(record.date);
+        if (start_date && recordDate < new Date(start_date)) return false;
+        if (end_date && recordDate > new Date(end_date)) return false;
+        return true;
+      });
+
+      // Group by bucket
+      const grouped = new Map<string, number>();
+      filteredRecords.forEach((record: any) => {
+        const date = new Date(record.date);
+        let bucketKey: string;
+        
+        if (bucket === 'day') {
+          bucketKey = date.toISOString().split('T')[0];
+        } else if (bucket === 'week') {
+          const startOfWeek = new Date(date);
+          startOfWeek.setDate(date.getDate() - date.getDay());
+          bucketKey = startOfWeek.toISOString().split('T')[0];
+        } else {
+          bucketKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-01`;
+        }
+
+        grouped.set(bucketKey, (grouped.get(bucketKey) || 0) + 1);
+      });
+
+      const timeline = Array.from(grouped.entries())
+        .map(([date, count]) => ({ date, count }))
+        .sort((a, b) => a.date.localeCompare(b.date));
+
+      // Calculate first mention
+      const sortedDates = filteredRecords
+        .map((r: any) => new Date(r.date))
+        .sort((a, b) => a.getTime() - b.getTime());
+      const firstMention = sortedDates.length > 0 ? sortedDates[0].toISOString() : null;
+
+      // Calculate velocity (last 7 days vs previous 7 days)
+      const now = new Date();
+      const sevenDaysAgo = new Date(now);
+      sevenDaysAgo.setDate(now.getDate() - 7);
+      const fourteenDaysAgo = new Date(now);
+      fourteenDaysAgo.setDate(now.getDate() - 14);
+
+      const last7Days = filteredRecords.filter((r: any) => {
+        const date = new Date(r.date);
+        return date >= sevenDaysAgo && date <= now;
+      }).length;
+
+      const previous7Days = filteredRecords.filter((r: any) => {
+        const date = new Date(r.date);
+        return date >= fourteenDaysAgo && date < sevenDaysAgo;
+      }).length;
+
+      return res.json({
+        success: true,
+        topic_id: id,
+        timeline,
+        first_mention: firstMention,
+        total_records: filteredRecords.length,
+        velocity: {
+          last_7_days: last7Days,
+          previous_7_days: previous7Days,
+        },
+      });
+    }
+
+    if (timelineError) throw timelineError;
+
+    res.json({
+      success: true,
+      ...timelineData,
+    });
+  } catch (error) {
+    console.error('Error fetching topic timeline:', error);
+    res.status(500).json({
+      error: 'Failed to fetch topic timeline',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+/**
  * GET /api/topics/:id
  * Get topic detail with linked records
  */

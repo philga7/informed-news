@@ -1,4 +1,4 @@
-import type { OsintTopic, TopicSourceLink } from '../types/osint';
+import type { OsintTopic, TopicSourceLink, TopicTimeline } from '../types/osint';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -231,6 +231,48 @@ export const osintTopicsService = {
       const error = await response.json();
       throw new Error(error.error || `Failed to unlink source record: ${response.statusText}`);
     }
+  },
+
+  /**
+   * Get timeline data for a topic
+   */
+  async getTimeline(
+    topicId: string,
+    options?: {
+      bucket?: 'day' | 'week' | 'month';
+      startDate?: string;
+      endDate?: string;
+    }
+  ): Promise<TopicTimeline> {
+    const params = new URLSearchParams();
+    if (options?.bucket) params.append('bucket', options.bucket);
+    if (options?.startDate) params.append('start_date', options.startDate);
+    if (options?.endDate) params.append('end_date', options.endDate);
+
+    const queryString = params.toString();
+    const url = `${API_BASE}/api/topics/${topicId}/timeline${queryString ? `?${queryString}` : ''}`;
+    
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      if (response.status === 404) {
+        throw new Error('Topic not found');
+      }
+      throw new Error(`Failed to fetch topic timeline: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    
+    return {
+      topicId: data.topic_id,
+      timeline: data.timeline || [],
+      firstMention: data.first_mention ? new Date(data.first_mention) : null,
+      totalRecords: data.total_records || 0,
+      velocity: {
+        last7Days: data.velocity?.last_7_days || 0,
+        previous7Days: data.velocity?.previous_7_days || 0,
+      },
+    };
   },
 };
 

@@ -140,3 +140,23 @@ export type OsintTopicUpdate = Partial<Omit<OsintTopic, 'id' | 'organizationId' 
 export type TopicSourceLinkUpdate = Partial<Omit<TopicSourceLink, 'id' | 'topicId' | 'sourceRecordId' | 'linkedAt'>>;
 export type AnalyticArtifactUpdate = Partial<Omit<AnalyticArtifact, 'id' | 'organizationId' | 'createdAt'>>;
 
+// ============================================================================
+// TIMELINE TYPES
+// ============================================================================
+
+export interface TimelineBucket {
+  date: string;
+  count: number;
+}
+
+export interface TopicTimeline {
+  topicId: string;
+  timeline: TimelineBucket[];
+  firstMention: Date | null;
+  totalRecords: number;
+  velocity: {
+    last7Days: number;
+    previous7Days: number;
+  };
+}
+
