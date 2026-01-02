@@ -51,12 +51,12 @@ export class ManualInputService implements IngestionService {
       .from('sources')
       .insert({
         organization_id: this.config.organizationId,
-        source_type: 'manual' as const,
+        source_type: 'manual',
         name: sourceName,
         url: null,
-        reliability_rating: 'UNKNOWN' as const,
+        reliability_rating: 'UNKNOWN',
         notes: 'Manually submitted content',
-      })
+      } as any)
       .select('id')
       .single<{ id: string }>();
 
