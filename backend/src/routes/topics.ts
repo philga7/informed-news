@@ -134,6 +134,7 @@ router.get('/:id/timeline', async (req: Request, res: Response) => {
     }
 
     // Query for timeline aggregation
+    // @ts-expect-error - Supabase type inference issue in serverless environment
     const { data: timelineData, error: timelineError } = await supabase.rpc('get_topic_timeline', {
       p_topic_id: id,
       p_bucket: dateTrunc,
@@ -327,6 +328,7 @@ router.patch('/:id', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'No updates provided' });
     }
 
+    // @ts-expect-error - Supabase type inference issue in serverless environment
     const { data: topic, error } = await supabase
       .from('osint_topics')
       .update(updates as any)
@@ -478,6 +480,7 @@ router.patch('/:topicId/links/:linkId', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'No updates provided' });
     }
 
+    // @ts-expect-error - Supabase type inference issue in serverless environment
     const { data: link, error } = await supabase
       .from('topic_source_links')
       .update(updates as any)

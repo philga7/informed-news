@@ -278,6 +278,7 @@ router.patch('/artifacts/:id', async (req: Request, res: Response) => {
       });
     }
 
+    // @ts-expect-error - Supabase type inference issue in serverless environment
     const { data: artifact, error } = await supabase
       .from('analytic_artifacts')
       .update({ reviewed } as any)

@@ -82,6 +82,7 @@ router.post('/rss', async (req: Request, res: Response) => {
     controller.logStats(result);
 
     // Update source updated_at timestamp
+    // @ts-expect-error - Supabase type inference issue in serverless environment
     await supabase
       .from('sources')
       .update({ updated_at: new Date().toISOString() } as any)
