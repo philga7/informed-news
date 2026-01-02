@@ -217,6 +217,49 @@ export const osintTopicsService = {
   },
 
   /**
+   * Update a topic-source link metadata
+   */
+  async updateLink(
+    topicId: string,
+    linkId: string,
+    updates: {
+      relevanceScore?: number;
+      confidenceLevel?: 'HIGH' | 'MEDIUM' | 'LOW';
+      assumptions?: string;
+      analystNotes?: string;
+    }
+  ): Promise<TopicSourceLink> {
+    const response = await fetch(
+      `${API_BASE}/api/topics/${topicId}/links/${linkId}`,
+      {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          relevance_score: updates.relevanceScore,
+          confidence_level: updates.confidenceLevel,
+          assumptions: updates.assumptions,
+          analyst_notes: updates.analystNotes,
+        }),
+      }
+    );
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || `Failed to update link: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    const link = data.link;
+    
+    return {
+      ...link,
+      linkedAt: new Date(link.linked_at),
+    };
+  },
+
+  /**
    * Unlink a source record from a topic
    */
   async unlinkRecord(topicId: string, linkId: string): Promise<void> {

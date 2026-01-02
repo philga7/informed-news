@@ -1,9 +1,118 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { fetchNewsFromSource } from '../services/feedFetcher.js';
+import { supabase } from '../utils/supabase.js';
 import type { NewsSource } from '../types/index.js';
 
 const router = Router();
+
+/**
+ * GET /api/sources
+ * List all OSINT sources for an organization
+ * Query params: organization_id (required)
+ */
+router.get('/', async (req: Request, res: Response) => {
+  try {
+    const { organization_id } = req.query;
+
+    if (!organization_id) {
+      return res.status(400).json({ error: 'organization_id is required' });
+    }
+
+    // Fetch sources with record counts
+    const { data: sources, error } = await supabase
+      .from('sources')
+      .select(`
+        *,
+        source_records (
+          id
+        )
+      `)
+      .eq('organization_id', organization_id as string)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    // Transform data to include record counts
+    const sourcesWithCounts = sources?.map((source: any) => ({
+      id: source.id,
+      organization_id: source.organization_id,
+      source_type: source.source_type,
+      name: source.name,
+      url: source.url,
+      reliability_rating: source.reliability_rating,
+      notes: source.notes,
+      created_at: source.created_at,
+      updated_at: source.updated_at,
+      record_count: source.source_records?.length || 0,
+    }));
+
+    res.json({
+      success: true,
+      sources: sourcesWithCounts || [],
+    });
+  } catch (error) {
+    console.error('Error fetching sources:', error);
+    res.status(500).json({
+      error: 'Failed to fetch sources',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+/**
+ * PATCH /api/sources/:id
+ * Update a source (including reliability rating)
+ * Body: { name?, url?, reliability_rating?, notes? }
+ */
+router.patch('/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { name, url, reliability_rating, notes } = req.body;
+
+    // Validate reliability_rating if provided
+    if (reliability_rating && !['HIGH', 'MEDIUM', 'LOW', 'UNKNOWN'].includes(reliability_rating)) {
+      return res.status(400).json({
+        error: 'Invalid reliability_rating. Must be HIGH, MEDIUM, LOW, or UNKNOWN',
+      });
+    }
+
+    const updates: any = {};
+    if (name !== undefined) updates.name = name;
+    if (url !== undefined) updates.url = url;
+    if (reliability_rating !== undefined) updates.reliability_rating = reliability_rating;
+    if (notes !== undefined) updates.notes = notes;
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ error: 'No updates provided' });
+    }
+
+    const { data: source, error } = await supabase
+      .from('sources')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return res.status(404).json({ error: 'Source not found' });
+      }
+      throw error;
+    }
+
+    res.json({
+      success: true,
+      source,
+    });
+  } catch (error) {
+    console.error('Error updating source:', error);
+    res.status(500).json({
+      error: 'Failed to update source',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
 
 /**
  * POST /api/sources/test
