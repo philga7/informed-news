@@ -8,6 +8,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import express from 'express';
 import cors from 'cors';
+import serverless from 'serverless-http';
 
 // Import routes with proper extensions for serverless
 import feedsRouter from '../backend/src/routes/feeds.js';
@@ -49,39 +50,9 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
   });
 });
 
-// Export the Express app as a Vercel serverless function
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // Set up proper CORS for Vercel
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
-  res.setHeader(
-    'Access-Control-Allow-Headers',
-    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
-  );
+// Wrap Express app with serverless-http for Vercel
+const handler = serverless(app);
 
-  // Handle OPTIONS preflight
-  if (req.method === 'OPTIONS') {
-    res.status(200).end();
-    return;
-  }
-
-  // Create a promise to handle the Express app response
-  return new Promise<void>((resolve, reject) => {
-    // Convert Vercel request/response to Express-compatible format
-    const expressReq = req as any;
-    const expressRes = res as any;
-
-    // Ensure proper URL path handling
-    expressReq.url = req.url || '/';
-    expressReq.path = req.url || '/';
-
-    // Handle the request through Express
-    app(expressReq, expressRes);
-
-    // Resolve when response is finished
-    expressRes.on('finish', () => resolve());
-    expressRes.on('error', (err: Error) => reject(err));
-  });
-}
+// Export the handler for Vercel
+export default handler;
 
