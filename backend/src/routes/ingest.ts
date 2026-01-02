@@ -71,6 +71,7 @@ router.post('/rss', async (req: Request, res: Response) => {
       sourceId: source.id,
       feedUrl: source.url,
       scrapeExternalUrl: false, // TODO: Add this field to sources table
+      extractFullContent: true, // Extract full article content for AI analysis
     });
 
     // Create controller and ingest
