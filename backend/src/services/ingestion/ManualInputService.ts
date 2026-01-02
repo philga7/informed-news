@@ -40,7 +40,7 @@ export class ManualInputService implements IngestionService {
       .eq('organization_id', this.config.organizationId)
       .eq('source_type', 'manual')
       .eq('name', sourceName)
-      .maybeSingle();
+      .maybeSingle<{ id: string }>();
 
     if (existing && !findError) {
       return existing.id;
@@ -51,14 +51,14 @@ export class ManualInputService implements IngestionService {
       .from('sources')
       .insert({
         organization_id: this.config.organizationId,
-        source_type: 'manual',
+        source_type: 'manual' as const,
         name: sourceName,
         url: null,
-        reliability_rating: 'UNKNOWN',
+        reliability_rating: 'UNKNOWN' as const,
         notes: 'Manually submitted content',
       })
       .select('id')
-      .single();
+      .single<{ id: string }>();
 
     if (createError || !newSource) {
       throw new Error(`Failed to create manual source: ${createError?.message || 'Unknown error'}`);
