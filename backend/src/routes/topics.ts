@@ -166,8 +166,8 @@ router.get('/:id/timeline', async (req: Request, res: Response) => {
       // Filter by date range
       const filteredRecords = records.filter((record: any) => {
         const recordDate = new Date(record.date);
-        if (start_date && recordDate < new Date(start_date)) return false;
-        if (end_date && recordDate > new Date(end_date)) return false;
+        if (start_date && recordDate < new Date(start_date as string)) return false;
+        if (end_date && recordDate > new Date(end_date as string)) return false;
         return true;
       });
 
@@ -234,7 +234,7 @@ router.get('/:id/timeline', async (req: Request, res: Response) => {
 
     res.json({
       success: true,
-      ...timelineData,
+      ...(timelineData as any),
     });
   } catch (error) {
     console.error('Error fetching topic timeline:', error);
@@ -329,7 +329,7 @@ router.patch('/:id', async (req: Request, res: Response) => {
 
     const { data: topic, error } = await supabase
       .from('osint_topics')
-      .update(updates)
+      .update(updates as any)
       .eq('id', id)
       .select()
       .single();
@@ -419,7 +419,7 @@ router.post('/:id/links', async (req: Request, res: Response) => {
         assumptions: assumptions || null,
         analyst_notes: analyst_notes || null,
         linked_by_user_id: linked_by_user_id || null,
-      })
+      } as any)
       .select()
       .single();
 
@@ -480,7 +480,7 @@ router.patch('/:topicId/links/:linkId', async (req: Request, res: Response) => {
 
     const { data: link, error } = await supabase
       .from('topic_source_links')
-      .update(updates)
+      .update(updates as any)
       .eq('id', linkId)
       .eq('topic_id', topicId)
       .select()
