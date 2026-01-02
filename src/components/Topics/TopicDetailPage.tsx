@@ -8,13 +8,19 @@ import { EmptyState } from '../UI/EmptyState';
 import { LinkedRecordsTable } from './LinkedRecordsTable';
 import { LinkRecordModal } from './LinkRecordModal';
 import { TopicForm } from './TopicForm';
+import { TopicTimelineChart } from './TopicTimelineChart';
+import { TimelineStats } from './TimelineStats';
+import type { TopicTimeline } from '../../types/osint';
 
 export function TopicDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
   const [topic, setTopic] = useState<any>(null);
+  const [timeline, setTimeline] = useState<TopicTimeline | null>(null);
+  const [timelineBucket, setTimelineBucket] = useState<'day' | 'week' | 'month'>('day');
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingTimeline, setIsLoadingTimeline] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showLinkModal, setShowLinkModal] = useState(false);
@@ -37,9 +43,37 @@ export function TopicDetailPage() {
     }
   };
 
+  const loadTimeline = async () => {
+    if (!id) return;
+    
+    try {
+      setIsLoadingTimeline(true);
+      console.log(`[Timeline] Fetching timeline for topic ${id} with bucket: ${timelineBucket}`);
+      const timelineData = await osintTopicsService.getTimeline(id, {
+        bucket: timelineBucket,
+      });
+      console.log('[Timeline] Timeline data received:', timelineData);
+      setTimeline(timelineData);
+    } catch (err) {
+      console.error('[Timeline] Error loading timeline:', err);
+      // Don't set error state for timeline failures, just log them
+      setTimeline(null);
+    } finally {
+      setIsLoadingTimeline(false);
+    }
+  };
+
   useEffect(() => {
     loadTopic();
   }, [id]);
+
+  useEffect(() => {
+    loadTimeline();
+  }, [id, timelineBucket]);
+
+  const handleBucketChange = (bucket: 'day' | 'week' | 'month') => {
+    setTimelineBucket(bucket);
+  };
 
   const handleUpdateTopic = async (updates: {
     name: string;
@@ -65,6 +99,8 @@ export function TopicDetailPage() {
       await osintTopicsService.unlinkRecord(id, linkId);
       // Refresh topic to get updated links
       await loadTopic();
+      // Refresh timeline to reflect changes
+      await loadTimeline();
     } catch (err) {
       console.error('Error unlinking record:', err);
       setError(err instanceof Error ? err.message : 'Failed to unlink record');
@@ -79,6 +115,8 @@ export function TopicDetailPage() {
       setShowLinkModal(false);
       // Refresh topic to get updated links
       await loadTopic();
+      // Refresh timeline to reflect changes
+      await loadTimeline();
     } catch (err) {
       console.error('Error linking record:', err);
       throw err;
@@ -171,6 +209,41 @@ export function TopicDetailPage() {
             <span>Created {new Date(topic.createdAt).toLocaleDateString()}</span>
             <span>Updated {new Date(topic.updatedAt).toLocaleDateString()}</span>
           </div>
+        </div>
+
+        {/* Timeline Section */}
+        <div className="mb-6">
+          <h2 className="text-2xl font-semibold text-stone-200 mb-4">Temporal Analysis</h2>
+          
+          {isLoadingTimeline ? (
+            <div className="bg-stone-900 border border-stone-800 rounded-lg p-12 flex items-center justify-center">
+              <LoadingSpinner />
+            </div>
+          ) : timeline ? (
+            <>
+              {/* Timeline Stats */}
+              <div className="mb-6">
+                <TimelineStats timeline={timeline} />
+              </div>
+
+              {/* Timeline Chart */}
+              <div className="bg-stone-900 border border-stone-800 rounded-lg p-6">
+                <TopicTimelineChart
+                  timeline={timeline}
+                  bucket={timelineBucket}
+                  onBucketChange={handleBucketChange}
+                />
+              </div>
+            </>
+          ) : (
+            <div className="bg-stone-900 border border-stone-800 rounded-lg p-12">
+              <EmptyState
+                title="No Timeline Data"
+                description="Timeline analysis will appear once source records are linked to this topic."
+                icon={<FileText size={48} className="text-stone-600" />}
+              />
+            </div>
+          )}
         </div>
 
         {/* Linked Source Records Section */}
