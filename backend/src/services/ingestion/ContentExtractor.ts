@@ -3,11 +3,30 @@
  * 
  * Extracts clean, readable content from web pages using Mozilla's Readability library.
  * This is used to get full article text for AI analysis instead of just RSS summaries.
+ * 
+ * Note: jsdom is dynamically imported to avoid loading it in serverless environments
+ * where it has dependency conflicts. Content extraction will only work when jsdom
+ * can be successfully loaded.
  */
 
 import { Readability } from '@mozilla/readability';
-import { JSDOM } from 'jsdom';
 import axios from 'axios';
+
+// Dynamic import for jsdom to avoid loading it at module initialization
+let JSDOM: typeof import('jsdom').JSDOM | null = null;
+
+async function getJSDOM() {
+  if (!JSDOM) {
+    try {
+      const jsdomModule = await import('jsdom');
+      JSDOM = jsdomModule.JSDOM;
+    } catch (error) {
+      console.error('Failed to load jsdom:', error);
+      throw new Error('jsdom is not available - content extraction disabled');
+    }
+  }
+  return JSDOM;
+}
 
 export interface ExtractedContent {
   title: string;
@@ -38,7 +57,7 @@ export class ContentExtractor {
       });
 
       // Parse with Readability
-      return this.extractFromHtml(html, url);
+      return await this.extractFromHtml(html, url);
     } catch (error) {
       if (axios.isAxiosError(error)) {
         console.warn(`Content extraction failed for ${url}:`, error.message);
@@ -52,10 +71,13 @@ export class ContentExtractor {
   /**
    * Extract content from HTML string
    */
-  extractFromHtml(html: string, url: string): ExtractedContent | null {
+  async extractFromHtml(html: string, url: string): Promise<ExtractedContent | null> {
     try {
+      // Dynamically load jsdom
+      const JSDOMClass = await getJSDOM();
+      
       // Create DOM from HTML
-      const dom = new JSDOM(html, { url });
+      const dom = new JSDOMClass(html, { url });
       const document = dom.window.document;
 
       // Use Readability to extract article
