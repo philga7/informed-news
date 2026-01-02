@@ -244,5 +244,3 @@ export interface QACompleteness {
 ## Files Changed Summary
 
 | Category | Files ||----------|-------|| **Migrations** | 2 new SQL files || **Backend Routes** | 2 new, 3 modified || **Backend Services** | 1 new (auditService.ts) || **Frontend Services** | 1 new, 2 modified || **Frontend Components** | 5 new, 4 modified || **Types** | 1 modified |---
-
-## Not In Scope (per requirements)
