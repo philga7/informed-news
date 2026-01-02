@@ -3,9 +3,12 @@
  * 
  * Wraps existing RSS feed parsing logic and normalizes
  * RSS items into SourceRecordDTO format for the OSINT schema.
+ * 
+ * Optionally extracts full article content from URLs for better AI analysis.
  */
 
 import { parseRSSFeed } from '../feedFetcher.js';
+import { contentExtractor } from './ContentExtractor.js';
 import type { NewsSource } from '../../types/index.js';
 import type { IngestionService, SourceRecordDTO } from '../../types/ingestion.js';
 
@@ -13,6 +16,7 @@ interface RssIngestionConfig {
   sourceId: string;
   feedUrl: string;
   scrapeExternalUrl?: boolean;
+  extractFullContent?: boolean; // Extract full article content from URLs
 }
 
 export class RssIngestionService implements IngestionService {
@@ -75,14 +79,29 @@ export class RssIngestionService implements IngestionService {
       // Parse RSS feed using existing logic
       const rssItems = await parseRSSFeed(this.config.feedUrl, source);
 
-      // Normalize to SourceRecordDTO format
-      const dtos: SourceRecordDTO[] = rssItems.map(item => {
-        const fullContent = [
+      // Process items in parallel with content extraction if enabled
+      const dtos = await Promise.all(rssItems.map(async (item) => {
+        // Start with RSS feed content
+        let fullContent = [
           item.description || '',
           item.content || '',
         ].filter(Boolean).join('\n\n');
 
-        const language = this.detectLanguage(fullContent);
+        // If content extraction is enabled and RSS content is short, fetch full article
+        const minContentLength = 500; // Characters
+        if (this.config.extractFullContent && fullContent.length < minContentLength) {
+          console.log(`📄 Extracting full content for: ${item.title}`);
+          const extractedContent = await contentExtractor.extractTextOnly(item.link);
+          
+          if (extractedContent && extractedContent.length > fullContent.length) {
+            fullContent = extractedContent;
+            console.log(`✅ Extracted ${extractedContent.length} chars from ${item.link}`);
+          } else {
+            console.log(`⚠️  Content extraction failed or yielded less content for ${item.link}`);
+          }
+        }
+
+        const language = this.detectLanguage(fullContent || item.title);
         const geographicIndicators = this.extractGeographicIndicators(
           `${item.title} ${fullContent}`
         );
@@ -91,7 +110,7 @@ export class RssIngestionService implements IngestionService {
           source_id: this.config.sourceId,
           title: item.title,
           url: item.link,
-          content: fullContent,
+          content: fullContent || undefined,
           published_at: new Date(item.pubDate),
           language,
           geographic_indicators: geographicIndicators.length > 0 ? geographicIndicators : undefined,
@@ -104,9 +123,10 @@ export class RssIngestionService implements IngestionService {
               link: item.link,
               pubDate: item.pubDate,
             },
+            extracted_content_length: fullContent.length,
           },
         };
-      });
+      }));
 
       return dtos;
     } catch (error) {

@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, ExternalLink, Calendar, Database, Link as LinkIcon } from 'lucide-react';
+import { ArrowLeft, ExternalLink, Calendar, Database, Link as LinkIcon, Sparkles, FileText, Users, MessageSquare } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { sourceRecordsService } from '../../services';
+import { analysisService, type AnalyticArtifact } from '../../services/analysis.service';
 import { LoadingSpinner } from '../UI/LoadingSpinner';
 import { EmptyState } from '../UI/EmptyState';
 import { LinkToTopicModal } from './LinkToTopicModal';
+import { ArtifactCard } from './ArtifactCard';
 
 export function SourceRecordDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -15,6 +17,9 @@ export function SourceRecordDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showLinkModal, setShowLinkModal] = useState(false);
+  const [artifacts, setArtifacts] = useState<AnalyticArtifact[]>([]);
+  const [isLoadingArtifacts, setIsLoadingArtifacts] = useState(false);
+  const [analysisLoading, setAnalysisLoading] = useState<string | null>(null);
 
   const organizationId = '00000000-0000-0000-0000-000000009997';
 
@@ -34,9 +39,66 @@ export function SourceRecordDetailPage() {
     }
   };
 
+  const loadArtifacts = async () => {
+    if (!id) return;
+
+    try {
+      setIsLoadingArtifacts(true);
+      const fetchedArtifacts = await analysisService.getArtifactsForSourceRecord(id);
+      setArtifacts(fetchedArtifacts);
+    } catch (err) {
+      console.error('Error loading artifacts:', err);
+    } finally {
+      setIsLoadingArtifacts(false);
+    }
+  };
+
   useEffect(() => {
     loadRecord();
+    loadArtifacts();
   }, [id]);
+
+  const handleGenerateSummary = async () => {
+    if (!id) return;
+    try {
+      setAnalysisLoading('summary');
+      await analysisService.generateSummary(id);
+      await loadArtifacts();
+    } catch (err) {
+      console.error('Error generating summary:', err);
+      alert(err instanceof Error ? err.message : 'Failed to generate summary');
+    } finally {
+      setAnalysisLoading(null);
+    }
+  };
+
+  const handleExtractEntities = async () => {
+    if (!id) return;
+    try {
+      setAnalysisLoading('entities');
+      await analysisService.extractEntities(id);
+      await loadArtifacts();
+    } catch (err) {
+      console.error('Error extracting entities:', err);
+      alert(err instanceof Error ? err.message : 'Failed to extract entities');
+    } finally {
+      setAnalysisLoading(null);
+    }
+  };
+
+  const handleAnalyzeTone = async () => {
+    if (!id) return;
+    try {
+      setAnalysisLoading('tone');
+      await analysisService.analyzeTone(id);
+      await loadArtifacts();
+    } catch (err) {
+      console.error('Error analyzing tone:', err);
+      alert(err instanceof Error ? err.message : 'Failed to analyze tone');
+    } finally {
+      setAnalysisLoading(null);
+    }
+  };
 
   const handleLinkToTopics = async (topicIds: string[]) => {
     // This would call the API to link to multiple topics
@@ -230,6 +292,100 @@ export function SourceRecordDetailPage() {
                 </div>
               ))}
             </div>
+          )}
+        </div>
+
+        {/* AI-Assisted Analysis Section */}
+        <div className="mt-6 bg-stone-900 border border-stone-800 rounded-lg p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Sparkles size={20} className="text-accent" />
+            <h2 className="text-xl font-semibold text-stone-200">AI-Assisted Analysis</h2>
+          </div>
+
+          <p className="text-sm text-stone-400 mb-4">
+            Generate AI-powered analysis to assist with source evaluation. All outputs require human verification.
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+            <button
+              onClick={handleGenerateSummary}
+              disabled={analysisLoading !== null}
+              className="flex items-center justify-center gap-2 px-4 py-3 bg-stone-800 hover:bg-stone-700 border border-stone-700 hover:border-stone-600 text-stone-200 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {analysisLoading === 'summary' ? (
+                <>
+                  <LoadingSpinner />
+                  <span>Generating...</span>
+                </>
+              ) : (
+                <>
+                  <FileText size={18} />
+                  <span>Generate Summary</span>
+                </>
+              )}
+            </button>
+
+            <button
+              onClick={handleExtractEntities}
+              disabled={analysisLoading !== null}
+              className="flex items-center justify-center gap-2 px-4 py-3 bg-stone-800 hover:bg-stone-700 border border-stone-700 hover:border-stone-600 text-stone-200 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {analysisLoading === 'entities' ? (
+                <>
+                  <LoadingSpinner />
+                  <span>Extracting...</span>
+                </>
+              ) : (
+                <>
+                  <Users size={18} />
+                  <span>Extract Entities</span>
+                </>
+              )}
+            </button>
+
+            <button
+              onClick={handleAnalyzeTone}
+              disabled={analysisLoading !== null}
+              className="flex items-center justify-center gap-2 px-4 py-3 bg-stone-800 hover:bg-stone-700 border border-stone-700 hover:border-stone-600 text-stone-200 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {analysisLoading === 'tone' ? (
+                <>
+                  <LoadingSpinner />
+                  <span>Analyzing...</span>
+                </>
+              ) : (
+                <>
+                  <MessageSquare size={18} />
+                  <span>Analyze Tone</span>
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* Existing Artifacts */}
+          {isLoadingArtifacts ? (
+            <div className="flex justify-center py-8">
+              <LoadingSpinner />
+            </div>
+          ) : artifacts.length > 0 ? (
+            <div>
+              <h3 className="text-sm font-semibold text-stone-400 uppercase mb-3">
+                Analysis History ({artifacts.length})
+              </h3>
+              <div className="space-y-3">
+                {artifacts.map((artifact) => (
+                  <ArtifactCard
+                    key={artifact.id}
+                    artifact={artifact}
+                    onUpdate={loadArtifacts}
+                  />
+                ))}
+              </div>
+            </div>
+          ) : (
+            <p className="text-stone-500 text-center py-4 text-sm">
+              No analysis artifacts yet. Click the buttons above to generate AI-assisted analysis.
+            </p>
           )}
         </div>
       </div>

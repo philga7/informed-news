@@ -7,6 +7,7 @@ import schedulerRouter from './routes/scheduler.js';
 import ingestRouter from './routes/ingest.js';
 import topicsRouter from './routes/topics.js';
 import sourceRecordsRouter from './routes/sourceRecords.js';
+import analysisRouter from './routes/analysis.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -27,6 +28,7 @@ app.use('/api/scheduler', schedulerRouter);
 app.use('/api/ingest', ingestRouter);
 app.use('/api/topics', topicsRouter);
 app.use('/api/source-records', sourceRecordsRouter);
+app.use('/api/analysis', analysisRouter);
 
 // Error handling middleware
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

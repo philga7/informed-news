@@ -154,3 +154,48 @@ export const schedulerApi = {
   },
 };
 
+/**
+ * Generic API client for custom endpoints
+ */
+export const apiClient = {
+  /**
+   * GET request
+   */
+  async get(endpoint: string, params?: Record<string, string>) {
+    const response = await apiFetch(endpoint, { method: 'GET', params });
+    return response.json();
+  },
+
+  /**
+   * POST request
+   */
+  async post(endpoint: string, data?: any) {
+    const response = await apiFetch(endpoint, {
+      method: 'POST',
+      body: data ? JSON.stringify(data) : undefined,
+    });
+    return response.json();
+  },
+
+  /**
+   * PATCH request
+   */
+  async patch(endpoint: string, data?: any) {
+    const response = await apiFetch(endpoint, {
+      method: 'PATCH',
+      body: data ? JSON.stringify(data) : undefined,
+    });
+    return response.json();
+  },
+
+  /**
+   * DELETE request
+   */
+  async delete(endpoint: string) {
+    const response = await apiFetch(endpoint, {
+      method: 'DELETE',
+    });
+    return response.json();
+  },
+};
+
