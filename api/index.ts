@@ -6,9 +6,8 @@
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import express from 'express';
+import express, { type Request, type Response } from 'express';
 import cors from 'cors';
-import serverless from 'serverless-http';
 
 // Import routes with proper extensions for serverless
 import feedsRouter from '../backend/src/routes/feeds.js';
@@ -26,7 +25,7 @@ app.use(cors());
 app.use(express.json());
 
 // Health check
-app.get('/health', (_req, res) => {
+app.get('/health', (_req: Request, res: Response) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
@@ -42,7 +41,7 @@ app.use('/api/analysis', analysisRouter);
 // These will be handled by GitHub Actions workflows
 
 // Error handling middleware
-app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+app.use((err: Error, _req: Request, res: Response, _next: express.NextFunction) => {
   console.error('Unhandled error:', err);
   res.status(500).json({
     error: 'Internal server error',
@@ -50,9 +49,21 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
   });
 });
 
-// Wrap Express app with serverless-http for Vercel
-const handler = serverless(app);
+// Vercel serverless function handler
+export default function handler(req: VercelRequest, res: VercelResponse) {
+  // Convert Vercel request to Express-compatible format
+  const expressReq = Object.assign(req, {
+    protocol: req.headers['x-forwarded-proto'] || 'https',
+    secure: req.headers['x-forwarded-proto'] === 'https',
+    ip: req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '',
+    ips: [],
+    subdomains: [],
+  }) as unknown as Request;
 
-// Export the handler for Vercel
-export default handler;
+  // Convert Vercel response to Express-compatible format
+  const expressRes = res as unknown as Response;
+
+  // Handle the request
+  app(expressReq, expressRes);
+}
 
