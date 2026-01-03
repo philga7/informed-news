@@ -399,6 +399,9 @@ router.patch('/:id', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Topic not found' });
     }
 
+    // Type assertion: after the null check, beforeTopic is guaranteed to exist
+    const currentTopic = beforeTopic as any;
+
     const updates: any = {};
     if (name !== undefined) updates.name = name;
     if (description !== undefined) updates.description = description;
@@ -416,12 +419,12 @@ router.patch('/:id', async (req: Request, res: Response) => {
     if (lessonsLearned !== undefined) updates.lessons_learned = lessonsLearned;
     
     // If marking as resolved, set resolved_at timestamp
-    if (status === 'resolved' && !beforeTopic.resolved_at) {
+    if (status === 'resolved' && !currentTopic.resolved_at) {
       updates.resolved_at = new Date().toISOString();
     }
     
     // If changing from resolved to another status, clear resolved_at
-    if (status && status !== 'resolved' && beforeTopic.status === 'resolved') {
+    if (status && status !== 'resolved' && currentTopic.status === 'resolved') {
       updates.resolved_at = null;
     }
 
@@ -451,7 +454,7 @@ router.patch('/:id', async (req: Request, res: Response) => {
     }
 
     // Audit log: topic updated
-    await auditService.logTopicUpdated(id, beforeTopic, topic);
+    await auditService.logTopicUpdated(id, currentTopic, topic);
 
     res.json({
       success: true,
