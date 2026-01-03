@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Newspaper, RefreshCw, Target, FileText, Database } from 'lucide-react';
+import { Newspaper, RefreshCw, BarChart3, Target, FileText, Database } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { useOrganization } from '../../context/OrganizationContext';
 import { OrganizationSwitcher } from '../Profile/OrganizationSwitcher';
@@ -94,6 +94,18 @@ export function Header() {
               <span className="hidden sm:inline">{state.ui.isFetching ? 'Updating...' : 'Update News'}</span>
               <span className="sm:hidden">Update</span>
             </button>
+
+            <Link
+              to="/dashboard"
+              className={`flex items-center gap-2 px-3 sm:px-4 py-2 font-medium rounded-lg transition-all duration-250 text-sm sm:text-base ${
+                location.pathname === '/dashboard'
+                  ? 'bg-stone-700 text-stone-200'
+                  : 'bg-stone-800 hover:bg-stone-700 text-stone-300'
+              }`}
+            >
+              <BarChart3 size={18} />
+              <span className="hidden sm:inline">Dashboard</span>
+            </Link>
 
             <Link
               to="/topics"
