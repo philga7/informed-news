@@ -9,6 +9,7 @@ import sourceRecordsRouter from './routes/sourceRecords.js';
 import analysisRouter from './routes/analysis.js';
 import auditLogsRouter from './routes/auditLogs.js';
 import qaRouter from './routes/qa.js';
+import organizationsRouter from './routes/organizations.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -23,6 +24,7 @@ app.get('/health', (_req, res) => {
 });
 
 // API Routes
+app.use('/api/organizations', organizationsRouter);
 app.use('/api/sources', sourcesRouter);
 app.use('/api/scheduler', schedulerRouter);
 app.use('/api/ingest', ingestRouter);

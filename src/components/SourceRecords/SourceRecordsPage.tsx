@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FileText, Search, Filter, RefreshCw } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
+import { useOrganization } from '../../context/OrganizationContext';
 import { sourceRecordsService } from '../../services';
 import { EmptyState } from '../UI/EmptyState';
 import { LoadingSpinner } from '../UI/LoadingSpinner';
@@ -9,6 +10,7 @@ import { SourceRecordFilters } from './SourceRecordFilters';
 
 export function SourceRecordsPage() {
   const { user } = useAuth();
+  const { currentOrganization } = useOrganization();
   const navigate = useNavigate();
   const [records, setRecords] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -28,9 +30,12 @@ export function SourceRecordsPage() {
     offset: 0,
   });
 
-  const organizationId = '00000000-0000-0000-0000-000000009997';
-
   const loadRecords = async (showSpinner = true, resetOffset = false) => {
+    if (!currentOrganization) {
+      setIsLoading(false);
+      return;
+    }
+
     try {
       if (showSpinner) {
         setIsLoading(true);
@@ -40,7 +45,7 @@ export function SourceRecordsPage() {
       setError(null);
 
       const result = await sourceRecordsService.getAll({
-        organizationId,
+        organizationId: currentOrganization.id,
         sourceId: filters.sourceId || undefined,
         linkedStatus: filters.linkedStatus === 'all' ? undefined : filters.linkedStatus,
         dateFrom: filters.dateFrom || undefined,
@@ -62,8 +67,10 @@ export function SourceRecordsPage() {
   };
 
   useEffect(() => {
-    loadRecords();
-  }, [organizationId, filters, pagination.offset]);
+    if (currentOrganization) {
+      loadRecords();
+    }
+  }, [currentOrganization?.id, filters, pagination.offset]);
 
   const handleSearch = () => {
     setPagination({ ...pagination, offset: 0 });
@@ -177,7 +184,7 @@ export function SourceRecordsPage() {
             <SourceRecordFilters
               filters={filters}
               onChange={setFilters}
-              organizationId={organizationId}
+              organizationId={currentOrganization?.id || ''}
             />
           )}
         </div>

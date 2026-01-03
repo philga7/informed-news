@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Edit2, FileText, Plus } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
+import { useOrganization } from '../../context/OrganizationContext';
 import { osintTopicsService } from '../../services';
 import { LoadingSpinner } from '../UI/LoadingSpinner';
 import { EmptyState } from '../UI/EmptyState';
@@ -24,6 +25,7 @@ export function TopicDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { currentOrganization } = useOrganization();
   const [topic, setTopic] = useState<any>(null);
   const [timeline, setTimeline] = useState<TopicTimeline | null>(null);
   const [timelineBucket, setTimelineBucket] = useState<'day' | 'week' | 'month'>('day');
@@ -34,8 +36,6 @@ export function TopicDetailPage() {
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [editingLinkId, setEditingLinkId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'history' | 'qa'>('overview');
-
-  const organizationId = '00000000-0000-0000-0000-000000009997';
 
   const loadTopic = async () => {
     if (!id) return;
@@ -361,9 +361,9 @@ export function TopicDetailPage() {
         )}
 
         {/* Coordination Detection Section */}
-        {id && (
+        {id && currentOrganization && (
           <div className="mb-6">
-            <CoordinationSection topicId={id} organizationId={organizationId} />
+            <CoordinationSection topicId={id} organizationId={currentOrganization.id} />
           </div>
         )}
 
@@ -412,9 +412,9 @@ export function TopicDetailPage() {
       )}
 
       {/* Link Record Modal */}
-      {showLinkModal && (
+      {showLinkModal && currentOrganization && (
         <LinkRecordModal
-          organizationId={organizationId}
+          organizationId={currentOrganization.id}
           onLink={handleLinkRecord}
           onClose={() => setShowLinkModal(false)}
         />

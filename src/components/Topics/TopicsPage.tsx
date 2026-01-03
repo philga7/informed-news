@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Target, Plus, Search, RefreshCw } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
+import { useOrganization } from '../../context/OrganizationContext';
 import { osintTopicsService } from '../../services';
 import { EmptyState } from '../UI/EmptyState';
 import { LoadingSpinner } from '../UI/LoadingSpinner';
@@ -10,6 +11,7 @@ import { TopicForm } from './TopicForm';
 
 export function TopicsPage() {
   const { user } = useAuth();
+  const { currentOrganization } = useOrganization();
   const navigate = useNavigate();
   const [topics, setTopics] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -18,10 +20,12 @@ export function TopicsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
 
-  // Organization ID from test data (Plan 1)
-  const organizationId = '00000000-0000-0000-0000-000000009997';
-
   const loadTopics = async (showSpinner = true) => {
+    if (!currentOrganization) {
+      setIsLoading(false);
+      return;
+    }
+
     try {
       if (showSpinner) {
         setIsLoading(true);
@@ -30,7 +34,7 @@ export function TopicsPage() {
       }
       setError(null);
       
-      const fetchedTopics = await osintTopicsService.getAll(organizationId);
+      const fetchedTopics = await osintTopicsService.getAll(currentOrganization.id);
       setTopics(fetchedTopics);
     } catch (err) {
       console.error('Error loading topics:', err);
@@ -42,16 +46,22 @@ export function TopicsPage() {
   };
 
   useEffect(() => {
-    loadTopics();
-  }, [organizationId]);
+    if (currentOrganization) {
+      loadTopics();
+    }
+  }, [currentOrganization?.id]);
 
   const handleCreateTopic = async (topicData: {
     name: string;
     description?: string;
     keywords?: string[];
   }) => {
+    if (!currentOrganization) {
+      throw new Error('No organization selected');
+    }
+
     try {
-      const newTopic = await osintTopicsService.create(organizationId, topicData);
+      const newTopic = await osintTopicsService.create(currentOrganization.id, topicData);
       setTopics([newTopic, ...topics]);
       setShowCreateModal(false);
     } catch (err) {

@@ -5,6 +5,7 @@
  */
 
 export { authService } from './auth.service';
+export { organizationService } from './organization.service';
 export { osintTopicsService } from './osintTopics.service';
 export { osintSourcesService } from './osintSources.service';
 export { sourceRecordsService } from './sourceRecords.service';
