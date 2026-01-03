@@ -112,8 +112,6 @@ flowchart TB
     TP --> CA
 ```
 
-
-
 ## Data Model
 
 ```mermaid
@@ -197,8 +195,6 @@ CREATE TABLE watch_item_records (
 );
 ```
 
-
-
 ### Type Definitions
 
 Update [`src/types/osint.ts`](src/types/osint.ts):
@@ -223,8 +219,6 @@ export interface WatchItem {
   signalCount?: number;
 }
 ```
-
-
 
 ### Service Layer
 
@@ -326,8 +320,6 @@ ALTER TABLE indicators
 ADD COLUMN triggered_topic_id UUID REFERENCES osint_topics(id);
 ```
 
-
-
 ### Service Layer
 
 Create [`src/services/indicators.service.ts`](src/services/indicators.service.ts):
@@ -376,8 +368,6 @@ CREATE TABLE scan_sessions (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 ```
-
-
 
 ### Scan Metrics Dashboard
 

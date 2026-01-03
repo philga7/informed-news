@@ -3,10 +3,17 @@
 ## Project Overview
 
 Informed News is an OSINT (Open Source Intelligence) platform that enables analysts to:
+- **Two-Tier Intelligence Model**: Separate situational awareness (Tier 1: Watch Items, Indicators, Scan) from deep analysis (Tier 2: Topics)
 - Aggregate intelligence from multiple sources (RSS feeds, APIs, email, manual input)
-- Organize information into topic-centric intelligence streams
+- **Environmental Scan**: Rapid triage workflow with keyboard shortcuts and session tracking
+- **Watch Items**: Lightweight monitoring entities that can escalate to full topics
+- **Indicators & Warnings**: Predefined triggers that automatically create topics when conditions are met
+- Organize information into topic-centric intelligence streams with question-driven requirements
+- **Claims & Corroboration**: Track factual claims across sources with corroboration matrix visualization
 - Link source records to topics with confidence ratings and relevance scores
 - Generate AI-powered analytic artifacts (summaries, entity extraction, sentiment analysis, timelines)
+- **Analyst Dashboards**: Structured daily (15 min), weekly, and monthly review workflows
+- **Feed Hygiene**: Track source effectiveness and identify stale feeds
 - Manage multi-tenant organizations with role-based access
 - Maintain QA workflows with review status tracking
 - Track audit trails for all intelligence operations
@@ -47,24 +54,53 @@ src/
 ├── components/          # React components organized by feature
 │   ├── Auth/           # Authentication components (Supabase)
 │   ├── Dashboard/      # Analyst workflow dashboards (Daily/Weekly/Monthly)
+│   │   ├── AnalystDashboard.tsx
+│   │   ├── DailyReview.tsx
+│   │   ├── WeeklyReview.tsx
+│   │   └── MonthlyAudit.tsx
+│   ├── Indicators/     # Indicators & Warnings (Tier 1)
+│   │   ├── IndicatorsPage.tsx
+│   │   ├── IndicatorCard.tsx
+│   │   ├── IndicatorForm.tsx
+│   │   ├── IndicatorCheckModal.tsx
+│   │   └── TriggeredIndicatorsBanner.tsx
+│   ├── Scan/           # Environmental Scan workflow (Tier 1)
+│   │   ├── ScanPage.tsx
+│   │   ├── ScanItem.tsx
+│   │   ├── ScanSidebar.tsx
+│   │   ├── QuickActionsPanel.tsx
+│   │   ├── QuickLinkToTopicModal.tsx
+│   │   ├── CreateWatchItemModal.tsx
+│   │   └── KeyboardShortcutsModal.tsx
+│   ├── WatchList/      # Watch Items (Tier 1)
+│   │   ├── WatchListPage.tsx
+│   │   ├── WatchItemCard.tsx
+│   │   ├── WatchItemForm.tsx
+│   │   └── EscalateToTopicModal.tsx
 │   ├── Profile/        # User & organization management
-│   ├── Topics/         # OSINT topic management components
+│   ├── Topics/         # OSINT topic management (Tier 2)
 │   │   ├── ClaimsAnalysis.tsx
 │   │   ├── CollectionPlanCard.tsx
 │   │   ├── CorroborationMatrix.tsx
 │   │   ├── ResolutionModal.tsx
+│   │   ├── TopicDetailPage.tsx
+│   │   ├── TopicsPage.tsx
 │   │   └── ...
 │   ├── SourceRecords/  # Source record display & management
 │   ├── Sources/        # OSINT source management
-│   ├── Layout/         # Layout components (Header, etc.)
+│   ├── Layout/         # Layout components (Header, Sidebar)
 │   └── UI/             # Reusable UI components
 ├── services/           # Data service layer (Supabase operations)
 │   ├── auth.service.ts
 │   ├── claims.service.ts
+│   ├── indicators.service.ts
 │   ├── organization.service.ts
 │   ├── osintTopics.service.ts
 │   ├── osintSources.service.ts
+│   ├── scan.service.ts
+│   ├── scanSessions.service.ts
 │   ├── sourceRecords.service.ts
+│   ├── watchItems.service.ts
 │   ├── analysis.service.ts
 │   ├── auditLog.service.ts
 │   └── qa.service.ts
@@ -76,7 +112,7 @@ src/
 │   └── useAuth.ts      # Supabase authentication hook
 ├── types/              # TypeScript type definitions
 │   ├── index.ts        # Core application types
-│   ├── osint.ts        # OSINT domain types (Topics, Records, Links, Artifacts)
+│   ├── osint.ts        # OSINT domain types (Topics, Records, Links, Artifacts, Watch Items, Indicators)
 │   └── database.ts     # Supabase database schema types
 └── utils/              # Utility functions
     ├── supabase.ts     # Supabase client configuration
@@ -88,10 +124,15 @@ backend/
 │   │   ├── sources.ts
 │   │   ├── topics.ts
 │   │   ├── sourceRecords.ts
+│   │   ├── watchItems.ts
+│   │   ├── indicators.ts
+│   │   ├── claims.ts
+│   │   ├── scanSessions.ts
 │   │   ├── ingest.ts
 │   │   ├── analysis.ts
 │   │   ├── qa.ts
 │   │   ├── auditLogs.ts
+│   │   ├── organizations.ts
 │   │   └── scheduler.ts
 │   ├── services/       # Backend business logic
 │   │   ├── feedFetcher.ts
@@ -106,6 +147,13 @@ supabase/
 └── migrations/         # Database schema migrations
     ├── initial_schema.sql
     ├── osint_*.sql
+    ├── question_driven_topics.sql
+    ├── expand_topic_status.sql
+    ├── claims_corroboration.sql
+    ├── watch_items.sql
+    ├── scan_view.sql
+    ├── indicators.sql
+    ├── scan_sessions.sql
     └── workflow_fields.sql
 ```
 
@@ -169,6 +217,90 @@ supabase/
     - Supports/contradicts indicator (true, false, or null for neutral)
     - Evidence excerpts and analyst notes
     - Corroboration status: corroborated (multiple sources), single-source (one source), contradicted (conflicting sources)
+
+### Two-Tier Intelligence Model
+
+The application implements a two-tier intelligence model separating situational awareness from deep analysis:
+
+#### Tier 1: Situational Awareness
+
+11. **Watch Items**: Lightweight monitoring entities for potential topics
+    - Title, category (domain), and notes
+    - Indicator triggers defining escalation criteria
+    - Status: watching → escalated → archived
+    - Signal count (linked source records)
+    - Can escalate to full topics (Tier 2)
+    - One-to-many relationship with source records via junction table
+
+12. **Indicators**: Predefined escalation triggers for specific conditions
+    - Domain categorization (politics, finance, technology, etc.)
+    - Check frequency (daily, weekly, monthly)
+    - Triggered status with timestamp
+    - Action on trigger (what should happen)
+    - Can automatically create topics when triggered
+    - Links to created topic via triggered_topic_id
+
+13. **Environmental Scan**: Rapid triage workflow for source records
+    - Scan status (pending, reviewed, linked, dismissed)
+    - Keyboard shortcuts for rapid processing
+    - Quick actions: dismiss, link to topic, create watch item
+    - Review tracking (reviewed_at, reviewed_by)
+
+14. **Scan Sessions**: Workflow analytics and productivity tracking
+    - Session duration tracking
+    - Counter metrics: items reviewed, linked, watch items created, dismissed
+    - Session notes for context
+    - Aggregated statistics for organization performance
+
+#### Tier 2: Deep Analysis
+
+Topics (as described above) represent deep intelligence analysis with:
+- Question-driven intelligence requirements
+- Claims and corroboration tracking
+- Full analytic artifacts (summaries, entity extraction, timelines)
+- Resolution workflow with confidence levels
+
+## Application Navigation
+
+The application uses a sidebar-based navigation structure with the following routes:
+
+### Primary Routes
+- `/dashboard` - Analyst Dashboard (landing page after authentication)
+  - Daily Review (15-minute triage workflow)
+  - Weekly Review (quality checks and corroboration)
+  - Monthly Audit (strategic reflection and metrics)
+- `/scan` - Environmental Scan (Tier 1 rapid triage)
+  - Keyboard shortcuts for rapid processing
+  - Session tracking with metrics
+  - Quick actions: dismiss, link to topic, create watch item
+- `/watch-list` - Watch Items (Tier 1 monitoring)
+  - Lightweight monitoring entities
+  - Review mode for weekly triage
+  - Escalation to topics
+- `/indicators` - Indicators & Warnings (Tier 1 triggers)
+  - Predefined escalation triggers
+  - Check workflow and status tracking
+  - Automatic topic creation on trigger
+- `/topics` - Intelligence Topics (Tier 2 deep analysis)
+  - Question-driven requirements
+  - Claims and corroboration
+  - Resolution workflow
+- `/source-records` - Source Records
+  - All ingested content
+  - Linking to topics and watch items
+- `/sources` - OSINT Sources
+  - Source management
+  - Feed hygiene tracking
+  - Domain categorization
+- `/profile` - User Profile & Organization Management
+  - Organization switching
+  - Member management
+  - Settings
+
+### Navigation Components
+- **Header** - Organization switcher, update news button, triggered indicators banner
+- **Sidebar** - Main navigation with icons and labels (collapsible on mobile)
+- **TriggeredIndicatorsBanner** - Global alert for triggered indicators (appears below header)
 
 ## AI Agent Responsibilities
 
@@ -481,6 +613,57 @@ export const osintTopicsService = {
     if (error) throw error;
   },
 };
+
+// Watch Items Service (Tier 1)
+export const watchItemsService = {
+  async getAll(organizationId: string, filters?: { category?: string; status?: string }): Promise<WatchItem[]>,
+  async getById(watchItemId: string): Promise<WatchItem>,
+  async create(watchItem: WatchItemInsert): Promise<WatchItem>,
+  async update(watchItemId: string, updates: WatchItemUpdate): Promise<WatchItem>,
+  async archive(watchItemId: string): Promise<void>,
+  async delete(watchItemId: string): Promise<void>,
+  async linkRecord(watchItemId: string, sourceRecordId: string): Promise<void>,
+  async unlinkRecord(watchItemId: string, sourceRecordId: string): Promise<void>,
+  async getSignalCount(watchItemId: string): Promise<number>,
+  async escalateToTopic(watchItemId: string, topicData: OsintTopicInsert): Promise<OsintTopic>,
+};
+
+// Indicators Service (Tier 1)
+export const indicatorsService = {
+  async getAll(organizationId: string, filters?: { domain?: string; isTriggered?: boolean }): Promise<Indicator[]>,
+  async getById(indicatorId: string): Promise<Indicator>,
+  async create(indicator: IndicatorInsert): Promise<Indicator>,
+  async update(indicatorId: string, updates: IndicatorUpdate): Promise<Indicator>,
+  async delete(indicatorId: string): Promise<void>,
+  async markAsChecked(indicatorId: string): Promise<void>,
+  async trigger(indicatorId: string, topicData?: OsintTopicInsert): Promise<Indicator>,
+  async reset(indicatorId: string): Promise<Indicator>,
+  async getDueForCheck(organizationId: string): Promise<Indicator[]>,
+  async getTriggered(organizationId: string): Promise<Indicator[]>,
+};
+
+// Claims Service
+export const claimsService = {
+  async getClaimsByTopic(topicId: string): Promise<ClaimWithEvidence[]>,
+  async createClaim(topicId: string, claimText: string, options?: Partial<ClaimInsert>): Promise<Claim>,
+  async updateClaim(claimId: string, updates: ClaimUpdate): Promise<Claim>,
+  async deleteClaim(claimId: string): Promise<void>,
+  async addEvidence(claimId: string, linkId: string, options?: Partial<ClaimEvidenceInsert>): Promise<ClaimEvidence>,
+  async updateEvidence(claimId: string, evidenceId: string, updates: ClaimEvidenceUpdate): Promise<ClaimEvidence>,
+  async deleteEvidence(claimId: string, evidenceId: string): Promise<void>,
+  async getCorroborationMatrix(topicId: string): Promise<CorroborationMatrix>,
+};
+
+// Scan Sessions Service
+export const scanSessionsService = {
+  async create(organizationId: string, userId: string): Promise<ScanSession>,
+  async update(sessionId: string, updates: Partial<ScanSession>): Promise<ScanSession>,
+  async end(sessionId: string, counters: SessionCounters, notes?: string): Promise<ScanSession>,
+  async getById(sessionId: string): Promise<ScanSession>,
+  async getRecent(organizationId: string, limit?: number): Promise<ScanSession[]>,
+  async getStats(organizationId: string, days?: number): Promise<ScanSessionStats>,
+  async delete(sessionId: string): Promise<void>,
+};
 ```
 
 ### Authentication Pattern
@@ -535,6 +718,100 @@ export const analysisService = {
   },
 };
 ```
+
+### Backend API Routes
+
+The application includes comprehensive backend API routes for all major features:
+
+#### Core OSINT Routes
+- `/api/sources` - Source management (RSS, API, email, manual)
+- `/api/source-records` - Source record CRUD and ingestion
+- `/api/topics` - Topic management and analytics
+- `/api/organizations` - Organization management and member roles
+- `/api/ingest` - Content ingestion from external sources
+- `/api/analysis` - AI-powered analysis (summaries, entities, sentiment)
+- `/api/qa` - Quality assurance and completeness checks
+- `/api/audit-logs` - Audit trail queries
+- `/api/scheduler` - Scheduling for automated tasks
+
+#### Two-Tier Intelligence Model Routes
+- `/api/watch-items` - Watch item management (Tier 1)
+  - GET, POST, PATCH, DELETE operations
+  - Link/unlink source records
+  - Escalate to topics
+  - Signal count retrieval
+- `/api/indicators` - Indicators & warnings (Tier 1)
+  - GET, POST, PATCH, DELETE operations
+  - Check, trigger, and reset operations
+  - Due for check and triggered queries
+- `/api/scan-sessions` - Scan workflow analytics
+  - Session lifecycle (create, update, end)
+  - Recent sessions and aggregated statistics
+  - Performance metrics tracking
+
+#### Claims & Corroboration Routes
+- `/api/claims` - Claims tracking
+  - CRUD operations for claims
+  - Evidence management (add, update, delete)
+  - Corroboration matrix generation
+  - Status calculation (corroborated, single-source, disputed)
+
+## Two-Tier Intelligence Workflow
+
+The application implements a structured workflow separating Tier 1 (Situational Awareness) from Tier 2 (Deep Analysis):
+
+### Tier 1: Situational Awareness
+
+**Purpose**: Rapid triage and monitoring without deep analysis commitment
+
+1. **Environmental Scan** (`/scan`)
+   - Review new source records quickly
+   - Keyboard shortcuts: `x` (dismiss), `t` (link to topic), `w` (watch), `i` (indicator)
+   - Session tracking with productivity metrics
+   - No deep analysis required
+
+2. **Watch Items** (`/watch-list`)
+   - Create lightweight monitoring entities for potential topics
+   - Track signal count (linked records)
+   - Define escalation triggers
+   - Weekly review mode for triage
+   - Escalate to topics when warranted
+
+3. **Indicators** (`/indicators`)
+   - Define predefined conditions to monitor
+   - Check frequency: daily, weekly, monthly
+   - Trigger workflow creates topics automatically
+   - Global banner alerts when triggered
+
+### Tier 2: Deep Analysis
+
+**Purpose**: Comprehensive intelligence analysis with question-driven approach
+
+1. **Topics** (`/topics`)
+   - Question-driven intelligence requirements
+   - Collection planning (source types needed, claims to verify, gaps)
+   - Claims and corroboration tracking
+   - Topic lifecycle: active → monitoring → suspended → resolved → archived
+   - Resolution workflow with confidence levels and lessons learned
+
+2. **Workflow Dashboards** (`/dashboard`)
+   - **Daily Review** (~15 min): Triage unlinked records, check stale topics
+   - **Weekly Review** (~1 hour): Quality checks, corroboration verification, resolution candidates
+   - **Monthly Audit** (~2 hours): Strategic reflection, source effectiveness, lifecycle metrics
+
+### Escalation Paths
+
+1. **Scan → Watch Item**: Spotted pattern, not ready for deep analysis
+2. **Watch Item → Topic**: Sufficient signals warrant full investigation
+3. **Indicator Triggered → Topic**: Predefined condition met, automatic escalation
+4. **Scan → Topic**: Directly link to existing topic (already escalated)
+
+### Feed Hygiene
+
+- **Source Effectiveness**: Track percentage of records linked to topics
+- **Stale Feed Detection**: Identify sources with no links in 90+ days
+- **Domain Categorization**: Organize sources by domain (politics, finance, tech, etc.)
+- **Value Ratings**: Analyst-assigned usefulness ratings (1-5 stars)
 
 ## Prohibited Actions
 
