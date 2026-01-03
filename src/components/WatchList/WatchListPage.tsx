@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Eye, Plus, Search, RefreshCw, AlertTriangle, Filter } from 'lucide-react';
+import { Eye, Plus, Search, RefreshCw, AlertTriangle, Filter, List, Archive } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useOrganization } from '../../context/OrganizationContext';
 import { watchItemsService } from '../../services';
@@ -36,6 +36,8 @@ export function WatchListPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [filterCategory, setFilterCategory] = useState<WatchItemCategory | 'all'>('all');
   const [filterStatus, setFilterStatus] = useState<WatchItemStatus | 'all'>('watching');
+  const [reviewMode, setReviewMode] = useState(false);
+  const [currentReviewIndex, setCurrentReviewIndex] = useState(0);
 
   const loadWatchItems = async (showSpinner = true) => {
     if (!currentOrganization) {
@@ -127,9 +129,66 @@ export function WatchListPage() {
     try {
       await watchItemsService.markAsReviewed(itemId);
       await loadWatchItems(false);
+      
+      // In review mode, move to next item
+      if (reviewMode && currentReviewIndex < filteredWatchItems.length - 1) {
+        setCurrentReviewIndex(prev => prev + 1);
+      }
     } catch (err) {
       console.error('Error marking as reviewed:', err);
       setError(err instanceof Error ? err.message : 'Failed to mark as reviewed');
+    }
+  };
+
+  const handleBulkArchiveDormant = async () => {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const dormantItems = watchItems.filter(
+      item => 
+        item.status === 'watching' && 
+        item.signalCount === 0 && 
+        new Date(item.lastReviewedAt) < thirtyDaysAgo
+    );
+
+    if (dormantItems.length === 0) {
+      alert('No dormant items to archive (items with 0 signals and not reviewed in 30+ days).');
+      return;
+    }
+
+    const confirmed = confirm(
+      `Archive ${dormantItems.length} dormant watch item(s)?\n\n` +
+      `These items have 0 signals and haven't been reviewed in 30+ days.`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      await Promise.all(
+        dormantItems.map(item => watchItemsService.archive(item.id))
+      );
+      await loadWatchItems(false);
+      alert(`Successfully archived ${dormantItems.length} dormant item(s).`);
+    } catch (err) {
+      console.error('Error bulk archiving:', err);
+      setError(err instanceof Error ? err.message : 'Failed to bulk archive items');
+    }
+  };
+
+  const toggleReviewMode = () => {
+    setReviewMode(!reviewMode);
+    setCurrentReviewIndex(0);
+  };
+
+  const nextReviewItem = () => {
+    if (currentReviewIndex < filteredWatchItems.length - 1) {
+      setCurrentReviewIndex(prev => prev + 1);
+    }
+  };
+
+  const prevReviewItem = () => {
+    if (currentReviewIndex > 0) {
+      setCurrentReviewIndex(prev => prev - 1);
     }
   };
 
@@ -182,21 +241,49 @@ export function WatchListPage() {
                 Tier 1 situational awareness - potential topics under light monitoring
               </p>
             </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => loadWatchItems(false)}
-                disabled={isRefreshing}
-                className="flex items-center gap-2 px-4 py-2 bg-stone-800 hover:bg-stone-700 text-stone-300 rounded-lg transition-colors duration-250 disabled:opacity-50"
-                title="Refresh watch items"
-              >
-                <RefreshCw size={18} className={isRefreshing ? 'animate-spin' : ''} />
-                <span className="hidden sm:inline">Refresh</span>
-              </button>
+            <div className="flex items-center gap-3">
+              {/* Utility Actions Group */}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={toggleReviewMode}
+                  className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg transition-colors duration-250 text-sm ${
+                    reviewMode
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-stone-800 hover:bg-stone-700 text-stone-300'
+                  }`}
+                  title="Toggle weekly review mode"
+                >
+                  <List size={16} />
+                  <span className="hidden sm:inline whitespace-nowrap">Review Mode</span>
+                </button>
+                <button
+                  onClick={handleBulkArchiveDormant}
+                  className="flex items-center justify-center gap-1.5 px-3 py-2 bg-stone-800 hover:bg-stone-700 text-stone-300 rounded-lg transition-colors duration-250 text-sm"
+                  title="Archive dormant items (0 signals, 30+ days)"
+                >
+                  <Archive size={16} />
+                  <span className="hidden sm:inline whitespace-nowrap">Archive Dormant</span>
+                </button>
+                <button
+                  onClick={() => loadWatchItems(false)}
+                  disabled={isRefreshing}
+                  className="flex items-center justify-center gap-1.5 px-3 py-2 bg-stone-800 hover:bg-stone-700 text-stone-300 rounded-lg transition-colors duration-250 disabled:opacity-50 text-sm"
+                  title="Refresh watch items"
+                >
+                  <RefreshCw size={16} className={isRefreshing ? 'animate-spin' : ''} />
+                  <span className="hidden sm:inline whitespace-nowrap">Refresh</span>
+                </button>
+              </div>
+              
+              {/* Divider */}
+              <div className="h-8 w-px bg-stone-700" />
+              
+              {/* Primary Action */}
               <button
                 onClick={() => setShowCreateModal(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent-hover text-white rounded-lg transition-colors duration-250"
+                className="flex items-center justify-center gap-1.5 px-3 py-2 bg-accent hover:bg-accent-hover text-white rounded-lg transition-colors duration-250 font-medium text-sm whitespace-nowrap"
               >
-                <Plus size={18} />
+                <Plus size={16} />
                 Create Watch Item
               </button>
             </div>
@@ -285,7 +372,43 @@ export function WatchListPage() {
                 : 'Create your first watch item to start monitoring potential topics'
             }
           />
+        ) : reviewMode ? (
+          /* Review Mode - One at a time */
+          <div className="max-w-4xl mx-auto">
+            <div className="mb-6 p-4 bg-blue-900/30 border border-blue-800 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div className="text-blue-200">
+                  <span className="font-semibold">Review Mode:</span> {currentReviewIndex + 1} of {filteredWatchItems.length}
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={prevReviewItem}
+                    disabled={currentReviewIndex === 0}
+                    className="px-3 py-1 bg-stone-800 hover:bg-stone-700 text-stone-300 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Previous
+                  </button>
+                  <button
+                    onClick={nextReviewItem}
+                    disabled={currentReviewIndex === filteredWatchItems.length - 1}
+                    className="px-3 py-1 bg-stone-800 hover:bg-stone-700 text-stone-300 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            </div>
+            
+            <WatchItemCard
+              watchItem={filteredWatchItems[currentReviewIndex]}
+              onDelete={handleDeleteWatchItem}
+              onArchive={handleArchiveWatchItem}
+              onMarkAsReviewed={handleMarkAsReviewed}
+              onRefresh={() => loadWatchItems(false)}
+            />
+          </div>
         ) : (
+          /* Normal Grid View */
           <div className="space-y-8">
             {sortedCategories.map(category => (
               <div key={category}>
