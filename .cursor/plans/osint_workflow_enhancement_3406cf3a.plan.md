@@ -57,17 +57,17 @@ todos:
       - phase2-status-migration
   - id: phase3-claims-migration
     content: Create claims and claim_evidence database tables
-    status: pending
+    status: completed
     dependencies:
       - phase2-soft-limits
   - id: phase3-claims-backend
     content: Add backend routes for claims CRUD operations
-    status: pending
+    status: completed
     dependencies:
       - phase3-claims-migration
   - id: phase3-claims-ui
     content: Create ClaimsAnalysis.tsx and CorroborationMatrix.tsx components
-    status: pending
+    status: completed
     dependencies:
       - phase3-claims-backend
   - id: phase4-daily
@@ -585,4 +585,3 @@ Throughout all phases, implement guidance rather than hard blocks:
 - Warning banners for anti-patterns (too many active topics, missing decision context)
 - Optional fields with "Recommended" labels
 - Progress indicators showing workflow completeness
-- No hard validation blocking saves

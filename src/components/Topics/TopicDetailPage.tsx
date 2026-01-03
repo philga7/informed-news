@@ -20,6 +20,8 @@ import { TopicStatusBadge } from './TopicStatusBadge';
 import { AuditHistoryTab } from './AuditHistoryTab';
 import { QAChecklist } from './QAChecklist';
 import { CollectionPlanCard } from './CollectionPlanCard';
+import { ClaimsAnalysis } from './ClaimsAnalysis';
+import { CorroborationMatrix } from './CorroborationMatrix';
 import type { TopicTimeline } from '../../types/osint';
 
 export function TopicDetailPage() {
@@ -434,6 +436,20 @@ export function TopicDetailPage() {
         {id && currentOrganization && (
           <div className="mb-6">
             <CoordinationSection topicId={id} organizationId={currentOrganization.id} />
+          </div>
+        )}
+
+        {/* Claims Analysis Section */}
+        {id && (
+          <div className="mb-6">
+            <ClaimsAnalysis topicId={id} />
+          </div>
+        )}
+
+        {/* Corroboration Matrix Section */}
+        {id && (
+          <div className="mb-6">
+            <CorroborationMatrix topicId={id} />
           </div>
         )}
 
