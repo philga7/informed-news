@@ -88,7 +88,7 @@ router.get('/:id', async (req: Request, res: Response) => {
         )
       `)
       .eq('id', id)
-      .single();
+      .single() as any;
 
     if (error) {
       if (error.code === 'PGRST116') {
@@ -97,20 +97,25 @@ router.get('/:id', async (req: Request, res: Response) => {
       throw error;
     }
 
+    if (!watchItem) {
+      return res.status(404).json({ error: 'Watch item not found' });
+    }
+
+    const watchItemTyped = watchItem as any;
     const watchItemWithSignals = {
-      id: watchItem.id,
-      organization_id: watchItem.organization_id,
-      title: watchItem.title,
-      category: watchItem.category,
-      notes: watchItem.notes,
-      indicator_triggers: watchItem.indicator_triggers,
-      status: watchItem.status,
-      escalated_topic_id: watchItem.escalated_topic_id,
-      first_noted_at: watchItem.first_noted_at,
-      last_reviewed_at: watchItem.last_reviewed_at,
-      created_at: watchItem.created_at,
-      updated_at: watchItem.updated_at,
-      signal_count: watchItem.watch_item_records?.length || 0,
+      id: watchItemTyped.id,
+      organization_id: watchItemTyped.organization_id,
+      title: watchItemTyped.title,
+      category: watchItemTyped.category,
+      notes: watchItemTyped.notes,
+      indicator_triggers: watchItemTyped.indicator_triggers,
+      status: watchItemTyped.status,
+      escalated_topic_id: watchItemTyped.escalated_topic_id,
+      first_noted_at: watchItemTyped.first_noted_at,
+      last_reviewed_at: watchItemTyped.last_reviewed_at,
+      created_at: watchItemTyped.created_at,
+      updated_at: watchItemTyped.updated_at,
+      signal_count: watchItemTyped.watch_item_records?.length || 0,
     };
 
     res.json({
@@ -190,12 +195,13 @@ router.patch('/:id', async (req: Request, res: Response) => {
     if (status !== undefined) updates.status = status;
     if (last_reviewed_at !== undefined) updates.last_reviewed_at = last_reviewed_at;
 
+    // @ts-ignore - Supabase type inference issue with new tables
     const { data: watchItem, error } = await supabase
       .from('watch_items')
       .update(updates as any)
       .eq('id', id)
       .select()
-      .single();
+      .single() as any;
 
     if (error) {
       if (error.code === 'PGRST116') {
@@ -367,6 +373,7 @@ router.get('/:id/signal-count', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
+    // @ts-ignore - Supabase type inference issue with new RPC functions
     const { data, error } = await supabase
       .rpc('get_watch_item_signal_count', { p_watch_item_id: id } as any);
 
@@ -407,6 +414,7 @@ router.post('/:id/escalate', async (req: Request, res: Response) => {
     }
 
     // Call the database function to escalate
+    // @ts-ignore - Supabase type inference issue with new RPC functions
     const { data: topicId, error } = await supabase
       .rpc('escalate_watch_item_to_topic', {
         p_watch_item_id: id,
@@ -433,12 +441,13 @@ router.post('/:id/escalate', async (req: Request, res: Response) => {
       if (decision_context) updates.decision_context = decision_context;
       if (key_indicators) updates.key_indicators = key_indicators;
 
+      // @ts-ignore - Supabase type inference issue
       const { data: updatedTopic, error: updateError } = await supabase
         .from('osint_topics')
         .update(updates as any)
         .eq('id', topicId)
         .select()
-        .single();
+        .single() as any;
 
       if (updateError) throw updateError;
 
