@@ -150,7 +150,7 @@ router.post('/', async (req: Request, res: Response) => {
         notes: notes || null,
         indicator_triggers: indicator_triggers || [],
         status: 'watching',
-      })
+      } as any)
       .select()
       .single();
 
@@ -192,7 +192,7 @@ router.patch('/:id', async (req: Request, res: Response) => {
 
     const { data: watchItem, error } = await supabase
       .from('watch_items')
-      .update(updates)
+      .update(updates as any)
       .eq('id', id)
       .select()
       .single();
@@ -264,7 +264,7 @@ router.post('/:id/records', async (req: Request, res: Response) => {
       .insert({
         watch_item_id: id,
         source_record_id,
-      })
+      } as any)
       .select()
       .single();
 
@@ -368,7 +368,7 @@ router.get('/:id/signal-count', async (req: Request, res: Response) => {
     const { id } = req.params;
 
     const { data, error } = await supabase
-      .rpc('get_watch_item_signal_count', { p_watch_item_id: id });
+      .rpc('get_watch_item_signal_count', { p_watch_item_id: id } as any);
 
     if (error) throw error;
 
@@ -413,7 +413,7 @@ router.post('/:id/escalate', async (req: Request, res: Response) => {
         p_topic_name: topic_name,
         p_topic_description: topic_description || null,
         p_topic_keywords: topic_keywords || [],
-      });
+      } as any);
 
     if (error) throw error;
 
@@ -435,7 +435,7 @@ router.post('/:id/escalate', async (req: Request, res: Response) => {
 
       const { data: updatedTopic, error: updateError } = await supabase
         .from('osint_topics')
-        .update(updates)
+        .update(updates as any)
         .eq('id', topicId)
         .select()
         .single();
