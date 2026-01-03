@@ -450,7 +450,3 @@ flowchart LR
 ```
 
 ---
-
-## Key Files Summary
-
-| Phase | New Files | Modified Files ||-------|-----------|----------------|| Phase 5 | `migrations/watch_items.sql`, `watchItems.service.ts`, `WatchList/*.tsx` | `osint.ts` || Phase 6 | `migrations/scan_status.sql`, `Scan/*.tsx` | `SourceRecords`, `Header.tsx` |
