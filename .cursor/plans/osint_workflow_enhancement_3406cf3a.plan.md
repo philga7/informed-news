@@ -157,8 +157,6 @@ flowchart TB
     OH --> Components[All App Components]
 ```
 
-
-
 ### New Files
 
 **[`src/services/organization.service.ts`](src/services/organization.service.ts)**:
@@ -265,8 +263,6 @@ ALTER TABLE public.analytic_artifacts
     ON DELETE RESTRICT;
 ```
 
-
-
 #### Service Methods
 
 Add to `organization.service.ts`:
@@ -303,8 +299,6 @@ transferArtifacts(
 // Delete org (only succeeds if no artifacts remain)
 deleteOrganization(orgId: string): Promise<void>
 ```
-
-
 
 #### UI Components
 
@@ -346,8 +340,6 @@ flowchart TD
     C --> H
     H --> J[Redirect to remaining org]
 ```
-
-
 
 #### Edge Cases
 
@@ -395,8 +387,6 @@ CREATE TABLE collection_plans (
   updated_at TIMESTAMPTZ
 );
 ```
-
-
 
 ### UI Changes
 
@@ -474,8 +464,6 @@ CREATE TABLE claim_evidence (
   created_at TIMESTAMPTZ
 );
 ```
-
-
 
 ### UI Components
 
