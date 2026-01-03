@@ -55,6 +55,10 @@ export function TopicsPage() {
     name: string;
     description?: string;
     keywords?: string[];
+    decisionQuestion?: string;
+    decisionContext?: string;
+    keyIndicators?: string[];
+    resolutionCriteria?: string;
   }) => {
     if (!currentOrganization) {
       throw new Error('No organization selected');

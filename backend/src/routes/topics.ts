@@ -32,7 +32,7 @@ router.get('/', async (req: Request, res: Response) => {
 
     if (error) throw error;
 
-    // Transform data to include counts
+    // Transform data to include counts and Phase 1 fields
     const topicsWithCounts = topics?.map((topic: any) => ({
       id: topic.id,
       organization_id: topic.organization_id,
@@ -40,6 +40,11 @@ router.get('/', async (req: Request, res: Response) => {
       description: topic.description,
       keywords: topic.keywords,
       related_topics: topic.related_topics,
+      status: topic.status,
+      decision_question: topic.decision_question,
+      decision_context: topic.decision_context,
+      key_indicators: topic.key_indicators,
+      resolution_criteria: topic.resolution_criteria,
       created_at: topic.created_at,
       updated_at: topic.updated_at,
       linked_records_count: topic.topic_source_links?.length || 0,
@@ -61,11 +66,21 @@ router.get('/', async (req: Request, res: Response) => {
 /**
  * POST /api/topics
  * Create a new topic
- * Body: { organization_id, name, description?, keywords?, related_topics? }
+ * Body: { organization_id, name, description?, keywords?, related_topics?, decision_question?, decision_context?, key_indicators?, resolution_criteria? }
  */
 router.post('/', async (req: Request, res: Response) => {
   try {
-    const { organization_id, name, description, keywords, related_topics } = req.body;
+    const { 
+      organization_id, 
+      name, 
+      description, 
+      keywords, 
+      related_topics,
+      decision_question,
+      decision_context,
+      key_indicators,
+      resolution_criteria,
+    } = req.body;
 
     if (!organization_id || !name) {
       return res.status(400).json({ error: 'organization_id and name are required' });
@@ -79,6 +94,10 @@ router.post('/', async (req: Request, res: Response) => {
         description: description || null,
         keywords: keywords || [],
         related_topics: related_topics || [],
+        decision_question: decision_question || null,
+        decision_context: decision_context || null,
+        key_indicators: key_indicators || [],
+        resolution_criteria: resolution_criteria || null,
       } as any)
       .select()
       .single();
@@ -262,7 +281,7 @@ router.get('/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
-    // Fetch topic with linked records
+    // Fetch topic with linked records and collection plan
     const { data: topic, error: topicError } = await supabase
       .from('osint_topics')
       .select(`
@@ -273,6 +292,7 @@ router.get('/:id', async (req: Request, res: Response) => {
           confidence_level,
           assumptions,
           analyst_notes,
+          review_status,
           linked_by_user_id,
           linked_at,
           source_records (
@@ -291,6 +311,17 @@ router.get('/:id', async (req: Request, res: Response) => {
               reliability_rating
             )
           )
+        ),
+        collection_plans (
+          id,
+          topic_id,
+          source_types_needed,
+          claims_to_verify,
+          coverage_gaps,
+          sources_to_avoid,
+          notes,
+          created_at,
+          updated_at
         )
       `)
       .eq('id', id)
@@ -303,9 +334,21 @@ router.get('/:id', async (req: Request, res: Response) => {
       throw topicError;
     }
 
+    if (!topic) {
+      return res.status(404).json({ error: 'Topic not found' });
+    }
+
+    // Extract collection_plan from array (should be 0 or 1)
+    const topicData = topic as any;
+    const topicWithPlan: any = {
+      ...topicData,
+      collection_plan: topicData.collection_plans?.[0] || null,
+    };
+    delete topicWithPlan.collection_plans;
+
     res.json({
       success: true,
-      topic,
+      topic: topicWithPlan,
     });
   } catch (error) {
     console.error('Error fetching topic:', error);
@@ -319,12 +362,22 @@ router.get('/:id', async (req: Request, res: Response) => {
 /**
  * PATCH /api/topics/:id
  * Update topic metadata
- * Body: { name?, description?, keywords?, related_topics? }
+ * Body: { name?, description?, keywords?, related_topics?, status?, decision_question?, decision_context?, key_indicators?, resolution_criteria? }
  */
 router.patch('/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { name, description, keywords, related_topics, status } = req.body;
+    const { 
+      name, 
+      description, 
+      keywords, 
+      related_topics, 
+      status,
+      decision_question,
+      decision_context,
+      key_indicators,
+      resolution_criteria,
+    } = req.body;
 
     // Fetch current state for audit
     const { data: beforeTopic, error: fetchError } = await supabase
@@ -343,6 +396,10 @@ router.patch('/:id', async (req: Request, res: Response) => {
     if (keywords !== undefined) updates.keywords = keywords;
     if (related_topics !== undefined) updates.related_topics = related_topics;
     if (status !== undefined) updates.status = status;
+    if (decision_question !== undefined) updates.decision_question = decision_question;
+    if (decision_context !== undefined) updates.decision_context = decision_context;
+    if (key_indicators !== undefined) updates.key_indicators = key_indicators;
+    if (resolution_criteria !== undefined) updates.resolution_criteria = resolution_criteria;
 
     if (Object.keys(updates).length === 0) {
       return res.status(400).json({ error: 'No updates provided' });
@@ -892,6 +949,144 @@ function isSignificantPhrase(phrase: string): boolean {
 
   return true;
 }
+
+/**
+ * POST /api/topics/:id/collection-plan
+ * Create or update collection plan for a topic
+ * Body: { source_types_needed?, claims_to_verify?, coverage_gaps?, sources_to_avoid?, notes? }
+ */
+router.post('/:id/collection-plan', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const {
+      source_types_needed,
+      claims_to_verify,
+      coverage_gaps,
+      sources_to_avoid,
+      notes,
+    } = req.body;
+
+    // Verify topic exists
+    const { data: topic, error: topicError } = await supabase
+      .from('osint_topics')
+      .select('id')
+      .eq('id', id)
+      .single();
+
+    if (topicError || !topic) {
+      return res.status(404).json({ error: 'Topic not found' });
+    }
+
+    // Check if collection plan already exists
+    const { data: existingPlan } = await supabase
+      .from('collection_plans')
+      .select('*')
+      .eq('topic_id', id)
+      .single();
+
+    let collectionPlan;
+
+    if (existingPlan) {
+      // Update existing plan
+      const updateData: {
+        source_types_needed?: string[];
+        claims_to_verify?: string[];
+        coverage_gaps?: string[];
+        sources_to_avoid?: string[];
+        notes?: string | null;
+      } = {
+        source_types_needed: source_types_needed || [],
+        claims_to_verify: claims_to_verify || [],
+        coverage_gaps: coverage_gaps || [],
+        sources_to_avoid: sources_to_avoid || [],
+        notes: notes || null,
+      };
+      
+      const { data, error } = await supabase
+        .from('collection_plans')
+        // @ts-ignore - Supabase type inference issue in serverless environment
+        .update(updateData as any)
+        .eq('topic_id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      collectionPlan = data;
+    } else {
+      // Create new plan
+      const insertData: {
+        topic_id: string;
+        source_types_needed: string[];
+        claims_to_verify: string[];
+        coverage_gaps: string[];
+        sources_to_avoid: string[];
+        notes: string | null;
+      } = {
+        topic_id: id,
+        source_types_needed: source_types_needed || [],
+        claims_to_verify: claims_to_verify || [],
+        coverage_gaps: coverage_gaps || [],
+        sources_to_avoid: sources_to_avoid || [],
+        notes: notes || null,
+      };
+      
+      const { data, error } = await supabase
+        .from('collection_plans')
+        // @ts-ignore - Supabase type inference issue in serverless environment
+        .insert(insertData as any)
+        .select()
+        .single();
+
+      if (error) throw error;
+      collectionPlan = data;
+    }
+
+    res.json({
+      success: true,
+      collection_plan: collectionPlan,
+    });
+  } catch (error) {
+    console.error('Error saving collection plan:', error);
+    res.status(500).json({
+      error: 'Failed to save collection plan',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+/**
+ * GET /api/topics/:id/collection-plan
+ * Get collection plan for a topic
+ */
+router.get('/:id/collection-plan', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const { data: collectionPlan, error } = await supabase
+      .from('collection_plans')
+      .select('*')
+      .eq('topic_id', id)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return res.status(404).json({ error: 'Collection plan not found' });
+      }
+      throw error;
+    }
+
+    res.json({
+      success: true,
+      collection_plan: collectionPlan,
+    });
+  } catch (error) {
+    console.error('Error fetching collection plan:', error);
+    res.status(500).json({
+      error: 'Failed to fetch collection plan',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
 
 export default router;
 

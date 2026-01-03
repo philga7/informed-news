@@ -590,5 +590,3 @@ Throughout all phases, implement guidance rather than hard blocks:
 ---
 
 ## Key Files Summary
-
-| Phase | New Files | Modified Files ||-------|-----------|----------------|| 0 | `organization.service.ts`, `OrganizationContext.tsx`, `ProfilePage.tsx`, `OrganizationSwitcher.tsx`, `DeleteOrganizationModal.tsx`, `TransferArtifactsModal.tsx`, cascade migration | `Header.tsx`, `App.tsx`, 6 components with hardcoded orgId || 1 | `CollectionPlanCard.tsx`, new migration | `osint.ts`, `TopicForm.tsx`, `TopicDetailPage.tsx` || 2 | `ResolutionModal.tsx`, new migration | `TopicStatusBadge.tsx`, `TopicsPage.tsx` || 3 | `ClaimsAnalysis.tsx`, `CorroborationMatrix.tsx`, new migration | `EditLinkModal.tsx`, `LinkRecordModal.tsx` |

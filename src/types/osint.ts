@@ -103,6 +103,13 @@ export interface OsintTopic {
   keywords: string[];
   relatedTopics: string[]; // Array of topic IDs
   status: TopicStatus; // Workflow status
+  
+  // Phase 1: Question-driven intelligence fields
+  decisionQuestion: string | null; // The specific question this topic answers
+  decisionContext: string | null; // Why this intelligence matters (decision dependency)
+  keyIndicators: string[]; // Observable indicators that would confirm/refute
+  resolutionCriteria: string | null; // When is the question answered?
+  
   createdAt: Date;
   updatedAt: Date;
 }
@@ -118,6 +125,22 @@ export interface TopicSourceLink {
   reviewStatus: LinkReviewStatus; // QA review status
   linkedByUserId: string | null;
   linkedAt: Date;
+}
+
+// ============================================================================
+// COLLECTION PLAN TYPES (Phase 1)
+// ============================================================================
+
+export interface CollectionPlan {
+  id: string;
+  topicId: string;
+  sourceTypesNeeded: string[]; // e.g., ['government', 'academic', 'primary']
+  claimsToVerify: string[]; // Specific claims needing corroboration
+  coverageGaps: string[]; // Identified gaps in coverage
+  sourcesToAvoid: string[]; // Bias/noise sources to skip
+  notes: string | null;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 // ============================================================================
@@ -148,6 +171,7 @@ export type SourceRecordInsert = Omit<SourceRecord, 'id' | 'ingestedAt'>;
 export type OsintTopicInsert = Omit<OsintTopic, 'id' | 'createdAt' | 'updatedAt'>;
 export type TopicSourceLinkInsert = Omit<TopicSourceLink, 'id' | 'linkedAt'>;
 export type AnalyticArtifactInsert = Omit<AnalyticArtifact, 'id' | 'createdAt'>;
+export type CollectionPlanInsert = Omit<CollectionPlan, 'id' | 'createdAt' | 'updatedAt'>;
 
 // ============================================================================
 // UPDATE TYPES (for partial updates)
@@ -160,6 +184,7 @@ export type SourceRecordUpdate = Partial<Omit<SourceRecord, 'id' | 'sourceId' | 
 export type OsintTopicUpdate = Partial<Omit<OsintTopic, 'id' | 'organizationId' | 'createdAt'>>;
 export type TopicSourceLinkUpdate = Partial<Omit<TopicSourceLink, 'id' | 'topicId' | 'sourceRecordId' | 'linkedAt'>>;
 export type AnalyticArtifactUpdate = Partial<Omit<AnalyticArtifact, 'id' | 'organizationId' | 'createdAt'>>;
+export type CollectionPlanUpdate = Partial<Omit<CollectionPlan, 'id' | 'topicId' | 'createdAt'>>;
 
 // ============================================================================
 // TIMELINE TYPES
