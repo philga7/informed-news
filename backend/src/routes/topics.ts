@@ -334,12 +334,17 @@ router.get('/:id', async (req: Request, res: Response) => {
       throw topicError;
     }
 
+    if (!topic) {
+      return res.status(404).json({ error: 'Topic not found' });
+    }
+
     // Extract collection_plan from array (should be 0 or 1)
-    const topicWithPlan = {
-      ...topic,
-      collection_plan: (topic as any).collection_plans?.[0] || null,
+    const topicData = topic as any;
+    const topicWithPlan: any = {
+      ...topicData,
+      collection_plan: topicData.collection_plans?.[0] || null,
     };
-    delete (topicWithPlan as any).collection_plans;
+    delete topicWithPlan.collection_plans;
 
     res.json({
       success: true,
@@ -983,15 +988,24 @@ router.post('/:id/collection-plan', async (req: Request, res: Response) => {
 
     if (existingPlan) {
       // Update existing plan
+      const updateData: {
+        source_types_needed?: string[];
+        claims_to_verify?: string[];
+        coverage_gaps?: string[];
+        sources_to_avoid?: string[];
+        notes?: string | null;
+      } = {
+        source_types_needed: source_types_needed || [],
+        claims_to_verify: claims_to_verify || [],
+        coverage_gaps: coverage_gaps || [],
+        sources_to_avoid: sources_to_avoid || [],
+        notes: notes || null,
+      };
+      
       const { data, error } = await supabase
         .from('collection_plans')
-        .update({
-          source_types_needed: source_types_needed || [],
-          claims_to_verify: claims_to_verify || [],
-          coverage_gaps: coverage_gaps || [],
-          sources_to_avoid: sources_to_avoid || [],
-          notes: notes || null,
-        } as any)
+        // @ts-ignore - Supabase type inference issue in serverless environment
+        .update(updateData as any)
         .eq('topic_id', id)
         .select()
         .single();
@@ -1000,16 +1014,26 @@ router.post('/:id/collection-plan', async (req: Request, res: Response) => {
       collectionPlan = data;
     } else {
       // Create new plan
+      const insertData: {
+        topic_id: string;
+        source_types_needed: string[];
+        claims_to_verify: string[];
+        coverage_gaps: string[];
+        sources_to_avoid: string[];
+        notes: string | null;
+      } = {
+        topic_id: id,
+        source_types_needed: source_types_needed || [],
+        claims_to_verify: claims_to_verify || [],
+        coverage_gaps: coverage_gaps || [],
+        sources_to_avoid: sources_to_avoid || [],
+        notes: notes || null,
+      };
+      
       const { data, error } = await supabase
         .from('collection_plans')
-        .insert({
-          topic_id: id,
-          source_types_needed: source_types_needed || [],
-          claims_to_verify: claims_to_verify || [],
-          coverage_gaps: coverage_gaps || [],
-          sources_to_avoid: sources_to_avoid || [],
-          notes: notes || null,
-        } as any)
+        // @ts-ignore - Supabase type inference issue in serverless environment
+        .insert(insertData as any)
         .select()
         .single();
 
