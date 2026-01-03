@@ -12,13 +12,18 @@ Informed News enables analysts to collect intelligence from diverse sources (RSS
 ## Key Features
 
 - **Topic-Centric Organization** - Organize intelligence around topics with keywords, descriptions, and related topic associations
+- **Question-Driven Intelligence** - Define decision questions, key indicators, and resolution criteria for focused analysis
+- **Collection Planning** - Track required source types, claims to verify, and coverage gaps per topic
+- **Topic Lifecycle Management** - Enhanced status workflow (active, monitoring, suspended, resolved, archived) with soft limits and stale topic detection
 - **Multi-Source Aggregation** - Collect data from RSS feeds, APIs, email, and manual input sources
 - **AI-Powered Analysis** - Generate summaries, extract entities, analyze sentiment and tone using Ollama integration
 - **Topic-Record Linking** - Link source records to topics with relevance scores, confidence levels, and analyst notes
+- **Claims & Corroboration** - Track factual claims across sources with corroboration matrix visualization
 - **Temporal Analysis** - Visualize intelligence timelines, narrative evolution, and detect coordination patterns
+- **Analyst Dashboards** - Structured daily (~15 min triage), weekly (quality review), and monthly (strategic audit) workflows
 - **QA Workflows** - Track review status, completeness checks, and ensure data quality with structured review processes
 - **Audit Trails** - Complete audit logging for all operations with before/after state tracking
-- **Multi-Tenant Support** - Organization-based workspaces with role-based access control (owner, admin, analyst, member)
+- **Organization Management** - Create, switch, and manage organizations with role-based membership and safe deletion with artifact transfer
 - **Correlation Detection** - Automatically identify related topics and duplicate records
 - **Source Reliability** - Rate sources for reliability and value, track credibility over time
 
@@ -114,9 +119,14 @@ Informed News enables analysts to collect intelligence from diverse sources (RSS
 ```
 informed-news/
 ├── src/                    # Frontend React application
-│   ├── components/         # React components (Topics, Sources, Records, etc.)
+│   ├── components/         # React components
+│   │   ├── Dashboard/      # Analyst workflow dashboards
+│   │   ├── Profile/        # Organization management
+│   │   ├── Topics/         # Topic management & analysis
+│   │   ├── Sources/        # Source management
+│   │   └── SourceRecords/  # Source record management
 │   ├── services/           # Data service layer (Supabase operations)
-│   ├── context/            # React Context (auth & UI state)
+│   ├── context/            # React Context (auth, organization, UI state)
 │   ├── types/              # TypeScript type definitions
 │   └── utils/              # Utilities (Supabase client, API client)
 ├── backend/                # Express.js backend API
@@ -160,11 +170,15 @@ All data operations go through the service layer, keeping components focused on 
 
 ### Intelligence Topics
 
-Create and manage topics to organize intelligence around specific subjects. Topics can have:
-- Descriptions and keywords for discovery
-- Related topic associations
-- Status tracking (active, monitoring, archived)
+Create and manage topics to organize intelligence around specific subjects. Topics support a question-driven intelligence workflow with:
+- Decision questions and context (what question is being answered, why it matters)
+- Key indicators and resolution criteria (what evidence would change your mind)
+- Collection planning (required source types, claims to verify, coverage gaps)
+- Expanded lifecycle status (active, monitoring, suspended, resolved, archived)
+- Resolution workflow with confidence levels and lessons learned
+- Descriptions, keywords, and related topic associations
 - Timeline visualization and narrative evolution
+- Claims corroboration matrix across sources
 
 ### Source Records
 
