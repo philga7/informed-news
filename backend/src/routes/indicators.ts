@@ -86,8 +86,8 @@ router.get('/due-for-check/:organizationId', async (req: Request, res: Response)
   try {
     const { organizationId } = req.params;
 
-    // @ts-ignore - Supabase type inference issue with new RPC functions
     const { data: indicators, error } = await supabase
+      // @ts-ignore - Supabase type inference issue with new RPC functions
       .rpc('get_indicators_due_for_check', {
         p_organization_id: organizationId,
       } as any);
@@ -382,8 +382,8 @@ router.post('/:id/trigger', async (req: Request, res: Response) => {
     const { topic_name, topic_description, topic_keywords } = req.body;
 
     // Call the database function to trigger the indicator
-    // @ts-ignore - Supabase type inference issue with new RPC functions
     const { data: topicId, error } = await supabase
+      // @ts-ignore - Supabase type inference issue with new RPC functions
       .rpc('trigger_indicator', {
         p_indicator_id: id,
         p_topic_name: topic_name || null,
@@ -442,8 +442,8 @@ router.post('/:id/reset', async (req: Request, res: Response) => {
     const { id } = req.params;
 
     // Call the database function to reset the indicator
-    // @ts-ignore - Supabase type inference issue with new RPC functions
     const { error } = await supabase
+      // @ts-ignore - Supabase type inference issue with new RPC functions
       .rpc('reset_indicator', {
         p_indicator_id: id,
       } as any);
