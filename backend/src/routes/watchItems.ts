@@ -195,9 +195,9 @@ router.patch('/:id', async (req: Request, res: Response) => {
     if (status !== undefined) updates.status = status;
     if (last_reviewed_at !== undefined) updates.last_reviewed_at = last_reviewed_at;
 
-    // @ts-ignore - Supabase type inference issue with new tables
     const { data: watchItem, error } = await supabase
       .from('watch_items')
+      // @ts-ignore - Supabase type inference issue with new tables
       .update(updates as any)
       .eq('id', id)
       .select()
@@ -373,8 +373,8 @@ router.get('/:id/signal-count', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
-    // @ts-ignore - Supabase type inference issue with new RPC functions
     const { data, error } = await supabase
+      // @ts-ignore - Supabase type inference issue with new RPC functions
       .rpc('get_watch_item_signal_count', { p_watch_item_id: id } as any);
 
     if (error) throw error;
@@ -414,8 +414,8 @@ router.post('/:id/escalate', async (req: Request, res: Response) => {
     }
 
     // Call the database function to escalate
-    // @ts-ignore - Supabase type inference issue with new RPC functions
     const { data: topicId, error } = await supabase
+      // @ts-ignore - Supabase type inference issue with new RPC functions
       .rpc('escalate_watch_item_to_topic', {
         p_watch_item_id: id,
         p_topic_name: topic_name,
@@ -441,9 +441,9 @@ router.post('/:id/escalate', async (req: Request, res: Response) => {
       if (decision_context) updates.decision_context = decision_context;
       if (key_indicators) updates.key_indicators = key_indicators;
 
-      // @ts-ignore - Supabase type inference issue
       const { data: updatedTopic, error: updateError } = await supabase
         .from('osint_topics')
+        // @ts-ignore - Supabase type inference issue
         .update(updates as any)
         .eq('id', topicId)
         .select()
