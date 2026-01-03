@@ -69,6 +69,10 @@ router.post('/source-records/:id/summarize', async (req: Request, res: Response)
 
     if (insertError) throw insertError;
 
+    if (!artifact) {
+      return res.status(500).json({ error: 'Failed to create artifact' });
+    }
+
     // Audit log: artifact created
     await auditService.logArtifactCreated(artifact.id, artifact);
 
@@ -148,6 +152,10 @@ router.post('/source-records/:id/entities', async (req: Request, res: Response) 
 
     if (insertError) throw insertError;
 
+    if (!artifact) {
+      return res.status(500).json({ error: 'Failed to create artifact' });
+    }
+
     // Audit log: artifact created
     await auditService.logArtifactCreated(artifact.id, artifact);
 
@@ -226,6 +234,10 @@ router.post('/source-records/:id/tone', async (req: Request, res: Response) => {
       .single();
 
     if (insertError) throw insertError;
+
+    if (!artifact) {
+      return res.status(500).json({ error: 'Failed to create artifact' });
+    }
 
     // Audit log: artifact created
     await auditService.logArtifactCreated(artifact.id, artifact);

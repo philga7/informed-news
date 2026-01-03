@@ -93,6 +93,10 @@ router.post('/', async (req: Request, res: Response) => {
       throw error;
     }
 
+    if (!topic) {
+      return res.status(500).json({ error: 'Failed to create topic' });
+    }
+
     // Audit log: topic created
     await auditService.logTopicCreated(topic.id, topic);
 
@@ -466,6 +470,10 @@ router.post('/:id/links', async (req: Request, res: Response) => {
         });
       }
       throw error;
+    }
+
+    if (!link) {
+      return res.status(500).json({ error: 'Failed to create link' });
     }
 
     // Audit log: link added

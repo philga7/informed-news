@@ -96,6 +96,9 @@ router.patch('/:id', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Source not found' });
     }
 
+    // Type assertion for beforeSource
+    const beforeSourceTyped = beforeSource as any;
+
     const updates: any = {};
     if (name !== undefined) updates.name = name;
     if (url !== undefined) updates.url = url;
@@ -123,10 +126,10 @@ router.patch('/:id', async (req: Request, res: Response) => {
     }
 
     // Audit log: source updated (or source rated if value_rating changed)
-    if (value_rating !== undefined && beforeSource.value_rating !== value_rating) {
-      await auditService.logSourceRated(id, beforeSource.value_rating, value_rating);
+    if (value_rating !== undefined && beforeSourceTyped.value_rating !== value_rating) {
+      await auditService.logSourceRated(id, beforeSourceTyped.value_rating, value_rating);
     } else {
-      await auditService.logSourceUpdated(id, beforeSource, source);
+      await auditService.logSourceUpdated(id, beforeSourceTyped, source);
     }
 
     res.json({
