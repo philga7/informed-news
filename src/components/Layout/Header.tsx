@@ -1,13 +1,12 @@
-import { Link, useLocation } from 'react-router-dom';
-import { Newspaper, RefreshCw, BarChart3, Target, FileText, Database, Eye, Radar } from 'lucide-react';
+import { RefreshCw, Newspaper } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { useOrganization } from '../../context/OrganizationContext';
 import { OrganizationSwitcher } from '../Profile/OrganizationSwitcher';
+import { TriggeredIndicatorsBanner } from '../Indicators/TriggeredIndicatorsBanner';
 
 export function Header() {
   const { state, dispatch } = useApp();
   const { currentOrganization } = useOrganization();
-  const location = useLocation();
 
   const handleUpdateNews = async () => {
     if (!currentOrganization) {
@@ -73,104 +72,39 @@ export function Header() {
   };
 
   return (
-    <header className="bg-stone-950 border-b border-stone-800">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
-          <div className="flex items-center gap-2.5">
-            <Newspaper className="text-accent flex-shrink-0" size={20} />
-            <div>
-              <h1 className="text-base font-semibold text-stone-200 leading-tight">Informed News</h1>
-              <p className="text-xs text-stone-500 leading-tight">Last update: {formatLastUpdate()}</p>
+    <>
+      <header className="bg-stone-950 border-b border-stone-800">
+        <div className="px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            {/* Left: Logo and Last Update */}
+            <div className="flex items-center gap-3">
+              <Newspaper className="text-accent flex-shrink-0" size={20} />
+              <div>
+                <h1 className="text-base font-semibold text-stone-200 leading-tight">Informed News</h1>
+                <p className="text-xs text-stone-500 leading-tight">Last update: {formatLastUpdate()}</p>
+              </div>
+            </div>
+
+            {/* Right: Actions */}
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleUpdateNews}
+                disabled={state.ui.isFetching}
+                className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent-hover text-white font-medium rounded-lg transition-all duration-250 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md text-sm"
+              >
+                <RefreshCw size={16} className={state.ui.isFetching ? 'animate-spin' : ''} />
+                <span className="hidden sm:inline">{state.ui.isFetching ? 'Updating...' : 'Update News'}</span>
+                <span className="sm:hidden">Update</span>
+              </button>
+
+              <OrganizationSwitcher />
             </div>
           </div>
-
-          <div className="flex items-center gap-1.5 sm:gap-2">
-            <button
-              onClick={handleUpdateNews}
-              disabled={state.ui.isFetching}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-accent hover:bg-accent-hover text-white font-medium rounded-lg transition-all duration-250 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md text-sm"
-            >
-              <RefreshCw size={16} className={state.ui.isFetching ? 'animate-spin' : ''} />
-              <span className="hidden sm:inline">{state.ui.isFetching ? 'Updating...' : 'Update News'}</span>
-              <span className="sm:hidden">Update</span>
-            </button>
-
-            <Link
-              to="/dashboard"
-              className={`flex items-center gap-1.5 px-3 py-1.5 font-medium rounded-lg transition-all duration-250 text-sm ${
-                location.pathname === '/dashboard'
-                  ? 'bg-stone-700 text-stone-200'
-                  : 'bg-stone-800 hover:bg-stone-700 text-stone-300'
-              }`}
-            >
-              <BarChart3 size={16} />
-              <span className="hidden sm:inline">Dashboard</span>
-            </Link>
-
-            <Link
-              to="/scan"
-              className={`flex items-center gap-1.5 px-3 py-1.5 font-medium rounded-lg transition-all duration-250 text-sm ${
-                location.pathname === '/scan'
-                  ? 'bg-stone-700 text-stone-200'
-                  : 'bg-stone-800 hover:bg-stone-700 text-stone-300'
-              }`}
-            >
-              <Radar size={16} />
-              <span className="hidden sm:inline">Scan</span>
-            </Link>
-
-            <Link
-              to="/watch-list"
-              className={`flex items-center gap-1.5 px-3 py-1.5 font-medium rounded-lg transition-all duration-250 text-sm ${
-                location.pathname === '/watch-list'
-                  ? 'bg-stone-700 text-stone-200'
-                  : 'bg-stone-800 hover:bg-stone-700 text-stone-300'
-              }`}
-            >
-              <Eye size={16} />
-              <span className="hidden sm:inline">Watch List</span>
-            </Link>
-
-            <Link
-              to="/topics"
-              className={`flex items-center gap-1.5 px-3 py-1.5 font-medium rounded-lg transition-all duration-250 text-sm ${
-                location.pathname === '/topics' || location.pathname.startsWith('/topics/')
-                  ? 'bg-stone-700 text-stone-200'
-                  : 'bg-stone-800 hover:bg-stone-700 text-stone-300'
-              }`}
-            >
-              <Target size={16} />
-              <span className="hidden sm:inline">Topics</span>
-            </Link>
-
-            <Link
-              to="/source-records"
-              className={`flex items-center gap-1.5 px-3 py-1.5 font-medium rounded-lg transition-all duration-250 text-sm ${
-                location.pathname === '/source-records' || location.pathname.startsWith('/source-records/')
-                  ? 'bg-stone-700 text-stone-200'
-                  : 'bg-stone-800 hover:bg-stone-700 text-stone-300'
-              }`}
-            >
-              <FileText size={16} />
-              <span className="hidden sm:inline">Source Records</span>
-            </Link>
-
-            <Link
-              to="/sources"
-              className={`flex items-center gap-1.5 px-3 py-1.5 font-medium rounded-lg transition-all duration-250 text-sm ${
-                location.pathname === '/sources'
-                  ? 'bg-stone-700 text-stone-200'
-                  : 'bg-stone-800 hover:bg-stone-700 text-stone-300'
-              }`}
-            >
-              <Database size={16} />
-              <span className="hidden sm:inline">Sources</span>
-            </Link>
-
-            <OrganizationSwitcher />
-          </div>
         </div>
-      </div>
-    </header>
+      </header>
+      
+      {/* Triggered Indicators Banner */}
+      <TriggeredIndicatorsBanner />
+    </>
   );
 }
