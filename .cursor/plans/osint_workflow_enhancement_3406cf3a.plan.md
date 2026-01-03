@@ -157,6 +157,8 @@ flowchart TB
     OH --> Components[All App Components]
 ```
 
+
+
 ### New Files
 
 **[`src/services/organization.service.ts`](src/services/organization.service.ts)**:
@@ -225,9 +227,7 @@ This ensures every user always has at least one organization.
 
 ### Profile Page Route
 
-Add new route: `/profile`
-
-Navigation: Add user avatar/menu in Header with dropdown:
+Add new route: `/profile`Navigation: Add user avatar/menu in Header with dropdown:
 
 - Profile Settings
 - Switch Organization
@@ -235,9 +235,7 @@ Navigation: Add user avatar/menu in Header with dropdown:
 
 ### Safe Organization Deletion (Transfer Required)
 
-**Problem**: Current schema uses `ON DELETE CASCADE` which would delete all sources, topics, records, and artifacts when an organization is deleted. This is dangerous and data-destructive.
-
-**Solution**: Require transferring all artifacts to another organization before deletion is allowed.
+**Problem**: Current schema uses `ON DELETE CASCADE` which would delete all sources, topics, records, and artifacts when an organization is deleted. This is dangerous and data-destructive.**Solution**: Require transferring all artifacts to another organization before deletion is allowed.
 
 #### Database Changes
 
@@ -266,6 +264,8 @@ ALTER TABLE public.analytic_artifacts
     REFERENCES public.organizations(id) 
     ON DELETE RESTRICT;
 ```
+
+
 
 #### Service Methods
 
@@ -304,6 +304,8 @@ transferArtifacts(
 deleteOrganization(orgId: string): Promise<void>
 ```
 
+
+
 #### UI Components
 
 **[`src/components/Profile/DeleteOrganizationModal.tsx`](src/components/Profile/DeleteOrganizationModal.tsx)**:
@@ -311,15 +313,15 @@ deleteOrganization(orgId: string): Promise<void>
 1. **Check for artifacts** - Show counts of sources, topics, artifacts
 2. **If artifacts exist**:
 
-   - Display warning: "This organization has X sources, Y topics, and Z artifacts"
-   - Show dropdown to select target organization for transfer
-   - "Transfer All & Delete" button
-   - Confirmation step with org name typed to confirm
+- Display warning: "This organization has X sources, Y topics, and Z artifacts"
+- Show dropdown to select target organization for transfer
+- "Transfer All & Delete" button
+- Confirmation step with org name typed to confirm
 
 3. **If no artifacts**:
 
-   - Simple confirmation dialog
-   - "Delete Organization" button
+- Simple confirmation dialog
+- "Delete Organization" button
 
 **[`src/components/Profile/TransferArtifactsModal.tsx`](src/components/Profile/TransferArtifactsModal.tsx)**:
 
@@ -344,6 +346,8 @@ flowchart TD
     C --> H
     H --> J[Redirect to remaining org]
 ```
+
+
 
 #### Edge Cases
 
@@ -391,6 +395,8 @@ CREATE TABLE collection_plans (
   updated_at TIMESTAMPTZ
 );
 ```
+
+
 
 ### UI Changes
 
@@ -468,6 +474,8 @@ CREATE TABLE claim_evidence (
   created_at TIMESTAMPTZ
 );
 ```
+
+
 
 ### UI Components
 
@@ -583,16 +591,4 @@ Throughout all phases, implement guidance rather than hard blocks:
 
 ## Key Files Summary
 
-| Phase | New Files | Modified Files |
-
-|-------|-----------|----------------|
-
-| 0 | `organization.service.ts`, `OrganizationContext.tsx`, `ProfilePage.tsx`, `OrganizationSwitcher.tsx`, `DeleteOrganizationModal.tsx`, `TransferArtifactsModal.tsx`, cascade migration | `Header.tsx`, `App.tsx`, 6 components with hardcoded orgId |
-
-| 1 | `CollectionPlanCard.tsx`, new migration | `osint.ts`, `TopicForm.tsx`, `TopicDetailPage.tsx` |
-
-| 2 | `ResolutionModal.tsx`, new migration | `TopicStatusBadge.tsx`, `TopicsPage.tsx` |
-
-| 3 | `ClaimsAnalysis.tsx`, `CorroborationMatrix.tsx`, new migration | `EditLinkModal.tsx`, `LinkRecordModal.tsx` |
-
-| 4 | `DailyReview.tsx`, `WeeklyReview.tsx`, `MonthlyAudit.tsx` | `App.tsx`, `Header.tsx` |
+| Phase | New Files | Modified Files ||-------|-----------|----------------|| 0 | `organization.service.ts`, `OrganizationContext.tsx`, `ProfilePage.tsx`, `OrganizationSwitcher.tsx`, `DeleteOrganizationModal.tsx`, `TransferArtifactsModal.tsx`, cascade migration | `Header.tsx`, `App.tsx`, 6 components with hardcoded orgId || 1 | `CollectionPlanCard.tsx`, new migration | `osint.ts`, `TopicForm.tsx`, `TopicDetailPage.tsx` || 2 | `ResolutionModal.tsx`, new migration | `TopicStatusBadge.tsx`, `TopicsPage.tsx` || 3 | `ClaimsAnalysis.tsx`, `CorroborationMatrix.tsx`, new migration | `EditLinkModal.tsx`, `LinkRecordModal.tsx` |
