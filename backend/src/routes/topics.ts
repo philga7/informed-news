@@ -98,7 +98,7 @@ router.post('/', async (req: Request, res: Response) => {
     }
 
     // Audit log: topic created
-    await auditService.logTopicCreated(topic.id, topic);
+    await auditService.logTopicCreated((topic as any).id, topic as any);
 
     res.status(201).json({
       success: true,
@@ -478,10 +478,10 @@ router.post('/:id/links', async (req: Request, res: Response) => {
 
     // Audit log: link added
     await auditService.logLinkAdded(
-      link.id,
+      (link as any).id,
       topicId,
       source_record_id,
-      link,
+      link as any,
       linked_by_user_id
     );
 
