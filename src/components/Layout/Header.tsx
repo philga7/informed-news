@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Newspaper, RefreshCw, BarChart3, Target, FileText, Database } from 'lucide-react';
+import { Newspaper, RefreshCw, BarChart3, Target, FileText, Database, Eye } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { useOrganization } from '../../context/OrganizationContext';
 import { OrganizationSwitcher } from '../Profile/OrganizationSwitcher';
@@ -76,70 +76,82 @@ export function Header() {
     <header className="bg-stone-950 border-b border-stone-800">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          <div className="flex items-center gap-3">
-            <Newspaper className="text-accent" size={32} />
+          <div className="flex items-center gap-2.5">
+            <Newspaper className="text-accent flex-shrink-0" size={20} />
             <div>
-              <h1 className="text-xl font-semibold text-stone-200">Informed News</h1>
-              <p className="text-xs text-stone-500">Last update: {formatLastUpdate()}</p>
+              <h1 className="text-base font-semibold text-stone-200 leading-tight">Informed News</h1>
+              <p className="text-xs text-stone-500 leading-tight">Last update: {formatLastUpdate()}</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             <button
               onClick={handleUpdateNews}
               disabled={state.ui.isFetching}
-              className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-accent hover:bg-accent-hover text-white font-medium rounded-lg transition-all duration-250 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md text-sm sm:text-base"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-accent hover:bg-accent-hover text-white font-medium rounded-lg transition-all duration-250 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md text-sm"
             >
-              <RefreshCw size={18} className={state.ui.isFetching ? 'animate-spin' : ''} />
+              <RefreshCw size={16} className={state.ui.isFetching ? 'animate-spin' : ''} />
               <span className="hidden sm:inline">{state.ui.isFetching ? 'Updating...' : 'Update News'}</span>
               <span className="sm:hidden">Update</span>
             </button>
 
             <Link
               to="/dashboard"
-              className={`flex items-center gap-2 px-3 sm:px-4 py-2 font-medium rounded-lg transition-all duration-250 text-sm sm:text-base ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 font-medium rounded-lg transition-all duration-250 text-sm ${
                 location.pathname === '/dashboard'
                   ? 'bg-stone-700 text-stone-200'
                   : 'bg-stone-800 hover:bg-stone-700 text-stone-300'
               }`}
             >
-              <BarChart3 size={18} />
+              <BarChart3 size={16} />
               <span className="hidden sm:inline">Dashboard</span>
             </Link>
 
             <Link
+              to="/watch-list"
+              className={`flex items-center gap-1.5 px-3 py-1.5 font-medium rounded-lg transition-all duration-250 text-sm ${
+                location.pathname === '/watch-list'
+                  ? 'bg-stone-700 text-stone-200'
+                  : 'bg-stone-800 hover:bg-stone-700 text-stone-300'
+              }`}
+            >
+              <Eye size={16} />
+              <span className="hidden sm:inline">Watch List</span>
+            </Link>
+
+            <Link
               to="/topics"
-              className={`flex items-center gap-2 px-3 sm:px-4 py-2 font-medium rounded-lg transition-all duration-250 text-sm sm:text-base ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 font-medium rounded-lg transition-all duration-250 text-sm ${
                 location.pathname === '/topics' || location.pathname.startsWith('/topics/')
                   ? 'bg-stone-700 text-stone-200'
                   : 'bg-stone-800 hover:bg-stone-700 text-stone-300'
               }`}
             >
-              <Target size={18} />
+              <Target size={16} />
               <span className="hidden sm:inline">Topics</span>
             </Link>
 
             <Link
               to="/source-records"
-              className={`flex items-center gap-2 px-3 sm:px-4 py-2 font-medium rounded-lg transition-all duration-250 text-sm sm:text-base ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 font-medium rounded-lg transition-all duration-250 text-sm ${
                 location.pathname === '/source-records' || location.pathname.startsWith('/source-records/')
                   ? 'bg-stone-700 text-stone-200'
                   : 'bg-stone-800 hover:bg-stone-700 text-stone-300'
               }`}
             >
-              <FileText size={18} />
+              <FileText size={16} />
               <span className="hidden sm:inline">Source Records</span>
             </Link>
 
             <Link
               to="/sources"
-              className={`flex items-center gap-2 px-3 sm:px-4 py-2 font-medium rounded-lg transition-all duration-250 text-sm sm:text-base ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 font-medium rounded-lg transition-all duration-250 text-sm ${
                 location.pathname === '/sources'
                   ? 'bg-stone-700 text-stone-200'
                   : 'bg-stone-800 hover:bg-stone-700 text-stone-300'
               }`}
             >
-              <Database size={18} />
+              <Database size={16} />
               <span className="hidden sm:inline">Sources</span>
             </Link>
 

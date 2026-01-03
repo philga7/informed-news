@@ -22,6 +22,11 @@ export type ArtifactType =
   | 'network_graph';
 export type OrgMemberRole = 'owner' | 'admin' | 'analyst' | 'member';
 
+// Watch Items (Tier 1 Situational Awareness)
+export type WatchItemStatus = 'watching' | 'escalated' | 'archived';
+export type WatchItemCategory = 'politics' | 'finance' | 'technology' | 
+  'local' | 'international' | 'health' | 'security' | 'other';
+
 // Workflow & QA types
 export type TopicStatus = 'active' | 'monitoring' | 'suspended' | 'resolved' | 'archived';
 export type LinkReviewStatus = 'pending' | 'reviewed' | 'disputed';
@@ -90,6 +95,34 @@ export interface SourceRecord {
   geographicIndicators: Record<string, unknown> | null;
   rawMetadata: Record<string, unknown> | null;
   initialConfidenceFlags: Record<string, unknown> | null;
+}
+
+// ============================================================================
+// WATCH ITEM TYPES (Phase 5: Two-Tier Intelligence Model)
+// ============================================================================
+
+export interface WatchItem {
+  id: string;
+  organizationId: string;
+  title: string;
+  category: WatchItemCategory;
+  notes: string | null;
+  indicatorTriggers: string[];
+  status: WatchItemStatus;
+  escalatedTopicId: string | null;
+  firstNotedAt: Date;
+  lastReviewedAt: Date;
+  createdAt: Date;
+  updatedAt: Date;
+  // Computed fields (not in database)
+  signalCount?: number;
+}
+
+export interface WatchItemRecord {
+  id: string;
+  watchItemId: string;
+  sourceRecordId: string;
+  linkedAt: Date;
 }
 
 // ============================================================================
@@ -262,6 +295,8 @@ export type AnalyticArtifactInsert = Omit<AnalyticArtifact, 'id' | 'createdAt'>;
 export type CollectionPlanInsert = Omit<CollectionPlan, 'id' | 'createdAt' | 'updatedAt'>;
 export type ClaimInsert = Omit<Claim, 'id' | 'createdAt' | 'updatedAt'>;
 export type ClaimEvidenceInsert = Omit<ClaimEvidence, 'id' | 'createdAt' | 'updatedAt'>;
+export type WatchItemInsert = Omit<WatchItem, 'id' | 'createdAt' | 'updatedAt' | 'signalCount'>;
+export type WatchItemRecordInsert = Omit<WatchItemRecord, 'id' | 'linkedAt'>;
 
 // ============================================================================
 // UPDATE TYPES (for partial updates)
@@ -277,6 +312,7 @@ export type AnalyticArtifactUpdate = Partial<Omit<AnalyticArtifact, 'id' | 'orga
 export type CollectionPlanUpdate = Partial<Omit<CollectionPlan, 'id' | 'topicId' | 'createdAt'>>;
 export type ClaimUpdate = Partial<Omit<Claim, 'id' | 'topicId' | 'createdAt'>>;
 export type ClaimEvidenceUpdate = Partial<Omit<ClaimEvidence, 'id' | 'claimId' | 'linkId' | 'createdAt'>>;
+export type WatchItemUpdate = Partial<Omit<WatchItem, 'id' | 'organizationId' | 'createdAt' | 'signalCount'>>;
 
 // ============================================================================
 // TIMELINE TYPES

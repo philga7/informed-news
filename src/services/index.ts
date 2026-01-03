@@ -12,4 +12,5 @@ export { sourceRecordsService } from './sourceRecords.service';
 export { analysisService } from './analysis.service';
 export { auditLogService } from './auditLog.service';
 export { qaService } from './qa.service';
+export { watchItemsService } from './watchItems.service';
 
