@@ -11,6 +11,7 @@ import auditLogsRouter from './routes/auditLogs.js';
 import qaRouter from './routes/qa.js';
 import organizationsRouter from './routes/organizations.js';
 import claimsRouter from './routes/claims.js';
+import watchItemsRouter from './routes/watchItems.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -35,6 +36,7 @@ app.use('/api/analysis', analysisRouter);
 app.use('/api/audit-logs', auditLogsRouter);
 app.use('/api/qa', qaRouter);
 app.use('/api/claims', claimsRouter);
+app.use('/api/watch-items', watchItemsRouter);
 
 // Error handling middleware
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

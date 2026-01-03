@@ -45,7 +45,7 @@ export function OrganizationSwitcher() {
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-3 py-2 bg-stone-800 hover:bg-stone-700 border border-stone-700 rounded-lg transition-colors duration-200 text-stone-200"
+        className="flex items-center gap-1.5 px-3 py-1.5 bg-stone-800 hover:bg-stone-700 border border-stone-700 rounded-lg transition-colors duration-200 text-stone-200"
       >
         <Building2 size={16} />
         <span className="text-sm font-medium">{currentOrganization.name}</span>
