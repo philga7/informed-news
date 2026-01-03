@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Newspaper, RefreshCw, BarChart3, Target, FileText, Database, Eye } from 'lucide-react';
+import { Newspaper, RefreshCw, BarChart3, Target, FileText, Database, Eye, Radar } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { useOrganization } from '../../context/OrganizationContext';
 import { OrganizationSwitcher } from '../Profile/OrganizationSwitcher';
@@ -105,6 +105,18 @@ export function Header() {
             >
               <BarChart3 size={16} />
               <span className="hidden sm:inline">Dashboard</span>
+            </Link>
+
+            <Link
+              to="/scan"
+              className={`flex items-center gap-1.5 px-3 py-1.5 font-medium rounded-lg transition-all duration-250 text-sm ${
+                location.pathname === '/scan'
+                  ? 'bg-stone-700 text-stone-200'
+                  : 'bg-stone-800 hover:bg-stone-700 text-stone-300'
+              }`}
+            >
+              <Radar size={16} />
+              <span className="hidden sm:inline">Scan</span>
             </Link>
 
             <Link

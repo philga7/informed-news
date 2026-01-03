@@ -10,6 +10,7 @@ import { SourcesPage } from './components/Sources/SourcesPage';
 import { ProfilePage } from './components/Profile/ProfilePage';
 import { AnalystDashboard } from './components/Dashboard/AnalystDashboard';
 import { WatchListPage } from './components/WatchList/WatchListPage';
+import { ScanPage } from './components/Scan/ScanPage';
 
 function App() {
   const { state } = useApp();
@@ -24,6 +25,7 @@ function App() {
 
       <Routes>
         <Route path="/dashboard" element={<AnalystDashboard />} />
+        <Route path="/scan" element={<ScanPage />} />
         <Route path="/watch-list" element={<WatchListPage />} />
         <Route path="/topics" element={<TopicsPage />} />
         <Route path="/topics/:id" element={<TopicDetailPage />} />
