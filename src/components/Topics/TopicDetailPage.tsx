@@ -19,6 +19,7 @@ import { NarrativeEvolutionTimeline } from './NarrativeEvolutionTimeline';
 import { TopicStatusBadge } from './TopicStatusBadge';
 import { AuditHistoryTab } from './AuditHistoryTab';
 import { QAChecklist } from './QAChecklist';
+import { CollectionPlanCard } from './CollectionPlanCard';
 import type { TopicTimeline } from '../../types/osint';
 
 export function TopicDetailPage() {
@@ -89,6 +90,10 @@ export function TopicDetailPage() {
     name: string;
     description?: string;
     keywords?: string[];
+    decisionQuestion?: string;
+    decisionContext?: string;
+    keyIndicators?: string[];
+    resolutionCriteria?: string;
   }) => {
     if (!id) return;
 
@@ -143,6 +148,19 @@ export function TopicDetailPage() {
       await loadTopic();
     } catch (err) {
       console.error('Error updating link:', err);
+      throw err;
+    }
+  };
+
+  const handleSaveCollectionPlan = async (plan: any) => {
+    if (!id) return;
+
+    try {
+      const savedPlan = await osintTopicsService.saveCollectionPlan(id, plan);
+      // Update topic state with new collection plan
+      setTopic({ ...topic, collection_plan: savedPlan });
+    } catch (err) {
+      console.error('Error saving collection plan:', err);
       throw err;
     }
   };
@@ -292,8 +310,59 @@ export function TopicDetailPage() {
           {/* Tab Content */}
           <div className="p-6">
             {activeTab === 'overview' && (
-              <div>
-                {/* Overview content will go here */}
+              <div className="space-y-6">
+                {/* Intelligence Requirement Display */}
+                {(topic.decision_question || topic.decision_context || topic.key_indicators?.length > 0 || topic.resolution_criteria) && (
+                  <div className="bg-blue-900/10 border border-blue-800/30 rounded-lg p-6">
+                    <h3 className="text-lg font-semibold text-stone-200 mb-4">Intelligence Requirement</h3>
+                    
+                    {topic.decision_question && (
+                      <div className="mb-4">
+                        <h4 className="text-sm font-medium text-stone-400 mb-1">Decision Question</h4>
+                        <p className="text-stone-300">{topic.decision_question}</p>
+                      </div>
+                    )}
+                    
+                    {topic.decision_context && (
+                      <div className="mb-4">
+                        <h4 className="text-sm font-medium text-stone-400 mb-1">Decision Context</h4>
+                        <p className="text-stone-300">{topic.decision_context}</p>
+                      </div>
+                    )}
+                    
+                    {topic.key_indicators && topic.key_indicators.length > 0 && (
+                      <div className="mb-4">
+                        <h4 className="text-sm font-medium text-stone-400 mb-2">Key Indicators</h4>
+                        <div className="flex flex-wrap gap-2">
+                          {topic.key_indicators.map((indicator: string, index: number) => (
+                            <span
+                              key={index}
+                              className="px-3 py-1 bg-blue-900/30 text-blue-300 text-sm rounded border border-blue-800"
+                            >
+                              {indicator}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {topic.resolution_criteria && (
+                      <div>
+                        <h4 className="text-sm font-medium text-stone-400 mb-1">Resolution Criteria</h4>
+                        <p className="text-stone-300">{topic.resolution_criteria}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Collection Plan Card */}
+                {id && (
+                  <CollectionPlanCard
+                    topicId={id}
+                    collectionPlan={topic.collection_plan || null}
+                    onSave={handleSaveCollectionPlan}
+                  />
+                )}
               </div>
             )}
 
@@ -405,6 +474,10 @@ export function TopicDetailPage() {
             name: topic.name,
             description: topic.description || '',
             keywords: topic.keywords || [],
+            decisionQuestion: topic.decision_question || '',
+            decisionContext: topic.decision_context || '',
+            keyIndicators: topic.key_indicators || [],
+            resolutionCriteria: topic.resolution_criteria || '',
           }}
           onSubmit={handleUpdateTopic}
           onClose={() => setShowEditModal(false)}

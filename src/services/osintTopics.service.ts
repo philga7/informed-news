@@ -1,4 +1,4 @@
-import type { OsintTopic, TopicSourceLink, TopicTimeline, RelatedTopic, NarrativeBucket, TopicStatus, QACompleteness } from '../types/osint';
+import type { OsintTopic, TopicSourceLink, TopicTimeline, RelatedTopic, NarrativeBucket, TopicStatus, QACompleteness, CollectionPlan } from '../types/osint';
 
 // Use relative URL in production (Vercel), localhost in development
 const API_BASE = import.meta.env.PROD 
@@ -13,6 +13,7 @@ interface TopicDetail extends OsintTopic {
   topic_source_links: Array<TopicSourceLink & {
     source_records: any;
   }>;
+  collection_plan?: CollectionPlan | null;
 }
 
 export const osintTopicsService = {
@@ -35,6 +36,7 @@ export const osintTopicsService = {
       ...topic,
       keywords: topic.keywords || [],
       relatedTopics: topic.related_topics || [],
+      keyIndicators: topic.key_indicators || [],
       createdAt: new Date(topic.created_at),
       updatedAt: new Date(topic.updated_at),
     }));
@@ -61,6 +63,10 @@ export const osintTopicsService = {
       ...topic,
       keywords: topic.keywords || [],
       relatedTopics: topic.related_topics || [],
+      keyIndicators: topic.key_indicators || [],
+      decisionQuestion: topic.decision_question || null,
+      decisionContext: topic.decision_context || null,
+      resolutionCriteria: topic.resolution_criteria || null,
       createdAt: new Date(topic.created_at),
       updatedAt: new Date(topic.updated_at),
       topic_source_links: (topic.topic_source_links || []).map((link: any) => ({
@@ -74,6 +80,17 @@ export const osintTopicsService = {
           ingestedAt: new Date(link.source_records.ingested_at),
         } : null,
       })),
+      collection_plan: topic.collection_plan ? {
+        id: topic.collection_plan.id,
+        topicId: topic.collection_plan.topic_id,
+        sourceTypesNeeded: topic.collection_plan.source_types_needed || [],
+        claimsToVerify: topic.collection_plan.claims_to_verify || [],
+        coverageGaps: topic.collection_plan.coverage_gaps || [],
+        sourcesToAvoid: topic.collection_plan.sources_to_avoid || [],
+        notes: topic.collection_plan.notes || null,
+        createdAt: new Date(topic.collection_plan.created_at),
+        updatedAt: new Date(topic.collection_plan.updated_at),
+      } : null,
     };
   },
 
@@ -87,6 +104,10 @@ export const osintTopicsService = {
       description?: string;
       keywords?: string[];
       relatedTopics?: string[];
+      decisionQuestion?: string;
+      decisionContext?: string;
+      keyIndicators?: string[];
+      resolutionCriteria?: string;
     }
   ): Promise<OsintTopic> {
     const response = await fetch(`${API_BASE}/api/topics`, {
@@ -100,6 +121,10 @@ export const osintTopicsService = {
         description: topic.description,
         keywords: topic.keywords || [],
         related_topics: topic.relatedTopics || [],
+        decision_question: topic.decisionQuestion,
+        decision_context: topic.decisionContext,
+        key_indicators: topic.keyIndicators || [],
+        resolution_criteria: topic.resolutionCriteria,
       }),
     });
     
@@ -115,6 +140,10 @@ export const osintTopicsService = {
       ...newTopic,
       keywords: newTopic.keywords || [],
       relatedTopics: newTopic.related_topics || [],
+      keyIndicators: newTopic.key_indicators || [],
+      decisionQuestion: newTopic.decision_question || null,
+      decisionContext: newTopic.decision_context || null,
+      resolutionCriteria: newTopic.resolution_criteria || null,
       createdAt: new Date(newTopic.created_at),
       updatedAt: new Date(newTopic.updated_at),
     };
@@ -130,6 +159,11 @@ export const osintTopicsService = {
       description?: string;
       keywords?: string[];
       relatedTopics?: string[];
+      decisionQuestion?: string;
+      decisionContext?: string;
+      keyIndicators?: string[];
+      resolutionCriteria?: string;
+      status?: TopicStatus;
     }
   ): Promise<OsintTopic> {
     const response = await fetch(`${API_BASE}/api/topics/${topicId}`, {
@@ -142,6 +176,11 @@ export const osintTopicsService = {
         description: updates.description,
         keywords: updates.keywords,
         related_topics: updates.relatedTopics,
+        decision_question: updates.decisionQuestion,
+        decision_context: updates.decisionContext,
+        key_indicators: updates.keyIndicators,
+        resolution_criteria: updates.resolutionCriteria,
+        status: updates.status,
       }),
     });
     
@@ -157,6 +196,10 @@ export const osintTopicsService = {
       ...topic,
       keywords: topic.keywords || [],
       relatedTopics: topic.related_topics || [],
+      keyIndicators: topic.key_indicators || [],
+      decisionQuestion: topic.decision_question || null,
+      decisionContext: topic.decision_context || null,
+      resolutionCriteria: topic.resolution_criteria || null,
       createdAt: new Date(topic.created_at),
       updatedAt: new Date(topic.updated_at),
     };
@@ -378,7 +421,88 @@ export const osintTopicsService = {
    * Update topic workflow status
    */
   async updateStatus(topicId: string, status: TopicStatus): Promise<OsintTopic> {
-    return this.update(topicId, { status } as any);
+    return this.update(topicId, { status });
+  },
+
+  /**
+   * Create or update collection plan for a topic
+   */
+  async saveCollectionPlan(
+    topicId: string,
+    plan: {
+      sourceTypesNeeded?: string[];
+      claimsToVerify?: string[];
+      coverageGaps?: string[];
+      sourcesToAvoid?: string[];
+      notes?: string | null;
+    }
+  ): Promise<CollectionPlan> {
+    const response = await fetch(`${API_BASE}/api/topics/${topicId}/collection-plan`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        source_types_needed: plan.sourceTypesNeeded || [],
+        claims_to_verify: plan.claimsToVerify || [],
+        coverage_gaps: plan.coverageGaps || [],
+        sources_to_avoid: plan.sourcesToAvoid || [],
+        notes: plan.notes,
+      }),
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || `Failed to save collection plan: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    const collectionPlan = data.collection_plan;
+    
+    return {
+      id: collectionPlan.id,
+      topicId: collectionPlan.topic_id,
+      sourceTypesNeeded: collectionPlan.source_types_needed || [],
+      claimsToVerify: collectionPlan.claims_to_verify || [],
+      coverageGaps: collectionPlan.coverage_gaps || [],
+      sourcesToAvoid: collectionPlan.sources_to_avoid || [],
+      notes: collectionPlan.notes || null,
+      createdAt: new Date(collectionPlan.created_at),
+      updatedAt: new Date(collectionPlan.updated_at),
+    };
+  },
+
+  /**
+   * Get collection plan for a topic
+   */
+  async getCollectionPlan(topicId: string): Promise<CollectionPlan | null> {
+    const response = await fetch(`${API_BASE}/api/topics/${topicId}/collection-plan`);
+    
+    if (!response.ok) {
+      if (response.status === 404) {
+        return null;
+      }
+      throw new Error(`Failed to fetch collection plan: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    if (!data.collection_plan) {
+      return null;
+    }
+    
+    const collectionPlan = data.collection_plan;
+    
+    return {
+      id: collectionPlan.id,
+      topicId: collectionPlan.topic_id,
+      sourceTypesNeeded: collectionPlan.source_types_needed || [],
+      claimsToVerify: collectionPlan.claims_to_verify || [],
+      coverageGaps: collectionPlan.coverage_gaps || [],
+      sourcesToAvoid: collectionPlan.sources_to_avoid || [],
+      notes: collectionPlan.notes || null,
+      createdAt: new Date(collectionPlan.created_at),
+      updatedAt: new Date(collectionPlan.updated_at),
+    };
   },
 };
 
