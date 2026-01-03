@@ -23,8 +23,9 @@ export type ArtifactType =
 export type OrgMemberRole = 'owner' | 'admin' | 'analyst' | 'member';
 
 // Workflow & QA types
-export type TopicStatus = 'active' | 'monitoring' | 'archived';
+export type TopicStatus = 'active' | 'monitoring' | 'suspended' | 'resolved' | 'archived';
 export type LinkReviewStatus = 'pending' | 'reviewed' | 'disputed';
+export type ResolutionConfidence = 'HIGH' | 'MEDIUM' | 'LOW';
 export type AuditAction =
   | 'topic_created'
   | 'topic_updated'
@@ -109,6 +110,12 @@ export interface OsintTopic {
   decisionContext: string | null; // Why this intelligence matters (decision dependency)
   keyIndicators: string[]; // Observable indicators that would confirm/refute
   resolutionCriteria: string | null; // When is the question answered?
+  
+  // Phase 2: Resolution metadata
+  resolutionSummary: string | null; // Summary of what was decided/concluded
+  resolutionConfidence: ResolutionConfidence | null; // Confidence in resolution
+  lessonsLearned: string | null; // Optional lessons from investigation
+  resolvedAt: Date | null; // When topic was marked resolved
   
   createdAt: Date;
   updatedAt: Date;

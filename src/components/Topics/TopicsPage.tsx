@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Target, Plus, Search, RefreshCw } from 'lucide-react';
+import { Target, Plus, Search, RefreshCw, AlertTriangle, Clock } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useOrganization } from '../../context/OrganizationContext';
 import { osintTopicsService } from '../../services';
@@ -101,6 +101,24 @@ export function TopicsPage() {
     ))
   );
 
+  // Phase 2: Soft limits and guidance
+  const activeTopicsCount = useMemo(() => {
+    return topics.filter((t: any) => t.status === 'active').length;
+  }, [topics]);
+
+  const staleTopics = useMemo(() => {
+    const fourteenDaysAgo = new Date();
+    fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+    
+    return topics.filter((t: any) => {
+      // Only check active topics
+      if (t.status !== 'active') return false;
+      
+      const updatedAt = new Date(t.updatedAt);
+      return updatedAt < fourteenDaysAgo;
+    });
+  }, [topics]);
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-stone-950 flex items-center justify-center">
@@ -162,6 +180,52 @@ export function TopicsPage() {
             />
           </div>
         </div>
+
+        {/* Phase 2: Soft Limits & Guidance Warnings */}
+        {activeTopicsCount > 10 && (
+          <div className="mb-4 p-4 bg-yellow-900/20 border border-yellow-800/50 rounded-lg flex items-start gap-3">
+            <AlertTriangle className="text-yellow-500 flex-shrink-0 mt-0.5" size={20} />
+            <div className="flex-1">
+              <h3 className="text-yellow-200 font-semibold mb-1">
+                High Active Topic Count ({activeTopicsCount} active)
+              </h3>
+              <p className="text-yellow-200/80 text-sm">
+                <strong>Intelligence tradecraft tip:</strong> Maintaining focus on too many active topics can reduce analytical depth. 
+                Consider archiving completed investigations or suspending topics waiting for new information.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {staleTopics.length > 0 && (
+          <div className="mb-4 p-4 bg-purple-900/20 border border-purple-800/50 rounded-lg flex items-start gap-3">
+            <Clock className="text-purple-400 flex-shrink-0 mt-0.5" size={20} />
+            <div className="flex-1">
+              <h3 className="text-purple-200 font-semibold mb-1">
+                Stale Topics Detected ({staleTopics.length} topic{staleTopics.length !== 1 ? 's' : ''})
+              </h3>
+              <p className="text-purple-200/80 text-sm mb-2">
+                The following active topics haven't been updated in 14+ days. Consider updating, suspending, or resolving them:
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {staleTopics.slice(0, 5).map((topic: any) => (
+                  <button
+                    key={topic.id}
+                    onClick={() => navigate(`/topics/${topic.id}`)}
+                    className="px-3 py-1.5 bg-purple-900/30 hover:bg-purple-900/50 border border-purple-700/50 rounded text-sm text-purple-200 transition-colors duration-200"
+                  >
+                    {topic.name}
+                  </button>
+                ))}
+                {staleTopics.length > 5 && (
+                  <span className="px-3 py-1.5 text-sm text-purple-300">
+                    +{staleTopics.length - 5} more
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Topics List */}
         {filteredTopics.length === 0 ? (

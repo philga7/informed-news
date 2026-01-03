@@ -37,6 +37,13 @@ export const osintTopicsService = {
       keywords: topic.keywords || [],
       relatedTopics: topic.related_topics || [],
       keyIndicators: topic.key_indicators || [],
+      decisionQuestion: topic.decision_question || null,
+      decisionContext: topic.decision_context || null,
+      resolutionCriteria: topic.resolution_criteria || null,
+      resolutionSummary: topic.resolution_summary || null,
+      resolutionConfidence: topic.resolution_confidence || null,
+      lessonsLearned: topic.lessons_learned || null,
+      resolvedAt: topic.resolved_at ? new Date(topic.resolved_at) : null,
       createdAt: new Date(topic.created_at),
       updatedAt: new Date(topic.updated_at),
     }));
@@ -67,6 +74,10 @@ export const osintTopicsService = {
       decisionQuestion: topic.decision_question || null,
       decisionContext: topic.decision_context || null,
       resolutionCriteria: topic.resolution_criteria || null,
+      resolutionSummary: topic.resolution_summary || null,
+      resolutionConfidence: topic.resolution_confidence || null,
+      lessonsLearned: topic.lessons_learned || null,
+      resolvedAt: topic.resolved_at ? new Date(topic.resolved_at) : null,
       createdAt: new Date(topic.created_at),
       updatedAt: new Date(topic.updated_at),
       topic_source_links: (topic.topic_source_links || []).map((link: any) => ({
@@ -164,6 +175,9 @@ export const osintTopicsService = {
       keyIndicators?: string[];
       resolutionCriteria?: string;
       status?: TopicStatus;
+      resolutionSummary?: string;
+      resolutionConfidence?: 'HIGH' | 'MEDIUM' | 'LOW';
+      lessonsLearned?: string;
     }
   ): Promise<OsintTopic> {
     const response = await fetch(`${API_BASE}/api/topics/${topicId}`, {
@@ -181,6 +195,9 @@ export const osintTopicsService = {
         key_indicators: updates.keyIndicators,
         resolution_criteria: updates.resolutionCriteria,
         status: updates.status,
+        resolutionSummary: updates.resolutionSummary,
+        resolutionConfidence: updates.resolutionConfidence,
+        lessonsLearned: updates.lessonsLearned,
       }),
     });
     
@@ -200,6 +217,10 @@ export const osintTopicsService = {
       decisionQuestion: topic.decision_question || null,
       decisionContext: topic.decision_context || null,
       resolutionCriteria: topic.resolution_criteria || null,
+      resolutionSummary: topic.resolution_summary || null,
+      resolutionConfidence: topic.resolution_confidence || null,
+      lessonsLearned: topic.lessons_learned || null,
+      resolvedAt: topic.resolved_at ? new Date(topic.resolved_at) : null,
       createdAt: new Date(topic.created_at),
       updatedAt: new Date(topic.updated_at),
     };
