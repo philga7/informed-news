@@ -15,4 +15,5 @@ export { qaService } from './qa.service';
 export { watchItemsService } from './watchItems.service';
 export { claimsService } from './claims.service';
 export { scanService } from './scan.service';
+export { indicatorsService } from './indicators.service';
 

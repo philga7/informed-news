@@ -30,6 +30,9 @@ export type WatchItemCategory = 'politics' | 'finance' | 'technology' |
 // Environmental Scan View (Phase 6)
 export type ScanStatus = 'pending' | 'reviewed' | 'linked' | 'dismissed';
 
+// Indicators & Warnings (Phase 7)
+export type IndicatorCheckFrequency = 'daily' | 'weekly' | 'monthly';
+
 // Workflow & QA types
 export type TopicStatus = 'active' | 'monitoring' | 'suspended' | 'resolved' | 'archived';
 export type LinkReviewStatus = 'pending' | 'reviewed' | 'disputed';
@@ -137,6 +140,27 @@ export interface WatchItemRecord {
   watchItemId: string;
   sourceRecordId: string;
   linkedAt: Date;
+}
+
+// ============================================================================
+// INDICATOR TYPES (Phase 7: Two-Tier Intelligence Model)
+// ============================================================================
+
+export interface Indicator {
+  id: string;
+  organizationId: string;
+  domain: WatchItemCategory;
+  name: string;
+  description: string | null;
+  sourceUrl: string | null;
+  checkFrequency: IndicatorCheckFrequency;
+  isTriggered: boolean;
+  triggeredAt: Date | null;
+  actionOnTrigger: string | null;
+  lastCheckedAt: Date | null;
+  triggeredTopicId: string | null;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 // ============================================================================
@@ -311,6 +335,7 @@ export type ClaimInsert = Omit<Claim, 'id' | 'createdAt' | 'updatedAt'>;
 export type ClaimEvidenceInsert = Omit<ClaimEvidence, 'id' | 'createdAt' | 'updatedAt'>;
 export type WatchItemInsert = Omit<WatchItem, 'id' | 'createdAt' | 'updatedAt' | 'signalCount'>;
 export type WatchItemRecordInsert = Omit<WatchItemRecord, 'id' | 'linkedAt'>;
+export type IndicatorInsert = Omit<Indicator, 'id' | 'createdAt' | 'updatedAt'>;
 
 // ============================================================================
 // UPDATE TYPES (for partial updates)
@@ -327,6 +352,7 @@ export type CollectionPlanUpdate = Partial<Omit<CollectionPlan, 'id' | 'topicId'
 export type ClaimUpdate = Partial<Omit<Claim, 'id' | 'topicId' | 'createdAt'>>;
 export type ClaimEvidenceUpdate = Partial<Omit<ClaimEvidence, 'id' | 'claimId' | 'linkId' | 'createdAt'>>;
 export type WatchItemUpdate = Partial<Omit<WatchItem, 'id' | 'organizationId' | 'createdAt' | 'signalCount'>>;
+export type IndicatorUpdate = Partial<Omit<Indicator, 'id' | 'organizationId' | 'createdAt'>>;
 
 // ============================================================================
 // TIMELINE TYPES
