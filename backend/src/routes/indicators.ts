@@ -78,6 +78,74 @@ router.get('/', async (req: Request, res: Response) => {
 });
 
 /**
+ * GET /api/indicators/due-for-check/:organizationId
+ * Get indicators that are due for checking based on their frequency
+ * NOTE: Must come before /:id route to avoid route conflicts
+ */
+router.get('/due-for-check/:organizationId', async (req: Request, res: Response) => {
+  try {
+    const { organizationId } = req.params;
+
+    // @ts-ignore - Supabase type inference issue with new RPC functions
+    const { data: indicators, error } = await supabase
+      .rpc('get_indicators_due_for_check', {
+        p_organization_id: organizationId,
+      } as any);
+
+    if (error) {
+      if (handleTableError(res, error)) return;
+      throw error;
+    }
+
+    res.json({
+      success: true,
+      indicators: indicators || [],
+    });
+  } catch (error) {
+    console.error('Error fetching due indicators:', error);
+    res.status(500).json({
+      error: 'Failed to fetch due indicators',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+/**
+ * GET /api/indicators/triggered/:organizationId
+ * Get all triggered indicators for an organization
+ * NOTE: Must come before /:id route to avoid route conflicts
+ */
+router.get('/triggered/:organizationId', async (req: Request, res: Response) => {
+  try {
+    const { organizationId } = req.params;
+
+    // @ts-ignore - Supabase type inference issue with new indicators table
+    const { data: indicators, error } = await supabase
+      .from('indicators')
+      .select('*')
+      .eq('organization_id', organizationId)
+      .eq('is_triggered', true)
+      .order('triggered_at', { ascending: false });
+
+    if (error) {
+      if (handleTableError(res, error)) return;
+      throw error;
+    }
+
+    res.json({
+      success: true,
+      indicators: indicators || [],
+    });
+  } catch (error) {
+    console.error('Error fetching triggered indicators:', error);
+    res.status(500).json({
+      error: 'Failed to fetch triggered indicators',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+/**
  * GET /api/indicators/:id
  * Get a single indicator by ID
  */
@@ -403,72 +471,6 @@ router.post('/:id/reset', async (req: Request, res: Response) => {
     console.error('Error resetting indicator:', error);
     res.status(500).json({
       error: 'Failed to reset indicator',
-      message: error instanceof Error ? error.message : 'Unknown error',
-    });
-  }
-});
-
-/**
- * GET /api/indicators/due-for-check/:organizationId
- * Get indicators that are due for checking based on their frequency
- */
-router.get('/due-for-check/:organizationId', async (req: Request, res: Response) => {
-  try {
-    const { organizationId } = req.params;
-
-    // @ts-ignore - Supabase type inference issue with new RPC functions
-    const { data: indicators, error } = await supabase
-      .rpc('get_indicators_due_for_check', {
-        p_organization_id: organizationId,
-      } as any);
-
-    if (error) {
-      if (handleTableError(res, error)) return;
-      throw error;
-    }
-
-    res.json({
-      success: true,
-      indicators: indicators || [],
-    });
-  } catch (error) {
-    console.error('Error fetching due indicators:', error);
-    res.status(500).json({
-      error: 'Failed to fetch due indicators',
-      message: error instanceof Error ? error.message : 'Unknown error',
-    });
-  }
-});
-
-/**
- * GET /api/indicators/triggered/:organizationId
- * Get all triggered indicators for an organization
- */
-router.get('/triggered/:organizationId', async (req: Request, res: Response) => {
-  try {
-    const { organizationId } = req.params;
-
-    // @ts-ignore - Supabase type inference issue with new indicators table
-    const { data: indicators, error } = await supabase
-      .from('indicators')
-      .select('*')
-      .eq('organization_id', organizationId)
-      .eq('is_triggered', true)
-      .order('triggered_at', { ascending: false });
-
-    if (error) {
-      if (handleTableError(res, error)) return;
-      throw error;
-    }
-
-    res.json({
-      success: true,
-      indicators: indicators || [],
-    });
-  } catch (error) {
-    console.error('Error fetching triggered indicators:', error);
-    res.status(500).json({
-      error: 'Failed to fetch triggered indicators',
       message: error instanceof Error ? error.message : 'Unknown error',
     });
   }
