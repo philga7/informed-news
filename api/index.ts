@@ -40,6 +40,7 @@ async function loadRoutes() {
   const analysisRouter = (await import('../backend/src/routes/analysis.js')).default;
   const auditLogsRouter = (await import('../backend/src/routes/auditLogs.js')).default;
   const qaRouter = (await import('../backend/src/routes/qa.js')).default;
+  const claimsRouter = (await import('../backend/src/routes/claims.js')).default;
 
   // API Routes (ingest excluded - use GitHub Actions)
   app.use('/api/organizations', organizationsRouter);
@@ -49,6 +50,7 @@ async function loadRoutes() {
   app.use('/api/analysis', analysisRouter);
   app.use('/api/audit-logs', auditLogsRouter);
   app.use('/api/qa', qaRouter);
+  app.use('/api/claims', claimsRouter);
   
   // Return 503 for ingest/feeds routes (use GitHub Actions)
   app.use('/api/ingest', (_req, res) => {

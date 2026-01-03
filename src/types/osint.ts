@@ -151,6 +151,87 @@ export interface CollectionPlan {
 }
 
 // ============================================================================
+// CLAIMS TYPES (Phase 3)
+// ============================================================================
+
+export type ClaimType = 'factual' | 'assessment' | 'prediction';
+export type CorroborationStatus = 
+  | 'no_evidence'      // No evidence yet
+  | 'single_source'    // Only one source supports
+  | 'corroborated'     // Multiple sources support
+  | 'disputed'         // Contradicting evidence exists
+  | 'needs_review';    // Neutral or unclear
+
+export interface Claim {
+  id: string;
+  topicId: string;
+  claimText: string;
+  claimType: ClaimType | null;
+  isFalsifiable: boolean;
+  createdByUserId: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface ClaimEvidence {
+  id: string;
+  claimId: string;
+  linkId: string;
+  supports: boolean | null; // true = corroborates, false = contradicts, null = neutral
+  evidenceExcerpt: string | null;
+  analystNotes: string | null;
+  createdByUserId: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface ClaimWithEvidence extends Claim {
+  evidence: Array<ClaimEvidence & {
+    link: TopicSourceLink & {
+      source_records: {
+        id: string;
+        title: string;
+        sources: {
+          id: string;
+          name: string;
+        };
+      };
+    };
+  }>;
+  corroborationStatus: CorroborationStatus;
+  evidenceCounts: {
+    total: number;
+    supporting: number;
+    contradicting: number;
+    neutral: number;
+  };
+}
+
+export interface CorroborationMatrixCell {
+  claimId: string;
+  linkId: string | null;
+  sourceRecordId: string | null;
+  sourceName: string | null;
+  supports: boolean | null;
+  evidenceExcerpt: string | null;
+}
+
+export interface CorroborationMatrix {
+  topicId: string;
+  claims: Array<{
+    id: string;
+    claimText: string;
+    claimType: ClaimType | null;
+  }>;
+  sources: Array<{
+    linkId: string;
+    sourceRecordId: string;
+    sourceName: string;
+  }>;
+  matrix: CorroborationMatrixCell[];
+}
+
+// ============================================================================
 // ANALYTIC ARTIFACT TYPES
 // ============================================================================
 
@@ -179,6 +260,8 @@ export type OsintTopicInsert = Omit<OsintTopic, 'id' | 'createdAt' | 'updatedAt'
 export type TopicSourceLinkInsert = Omit<TopicSourceLink, 'id' | 'linkedAt'>;
 export type AnalyticArtifactInsert = Omit<AnalyticArtifact, 'id' | 'createdAt'>;
 export type CollectionPlanInsert = Omit<CollectionPlan, 'id' | 'createdAt' | 'updatedAt'>;
+export type ClaimInsert = Omit<Claim, 'id' | 'createdAt' | 'updatedAt'>;
+export type ClaimEvidenceInsert = Omit<ClaimEvidence, 'id' | 'createdAt' | 'updatedAt'>;
 
 // ============================================================================
 // UPDATE TYPES (for partial updates)
@@ -192,6 +275,8 @@ export type OsintTopicUpdate = Partial<Omit<OsintTopic, 'id' | 'organizationId' 
 export type TopicSourceLinkUpdate = Partial<Omit<TopicSourceLink, 'id' | 'topicId' | 'sourceRecordId' | 'linkedAt'>>;
 export type AnalyticArtifactUpdate = Partial<Omit<AnalyticArtifact, 'id' | 'organizationId' | 'createdAt'>>;
 export type CollectionPlanUpdate = Partial<Omit<CollectionPlan, 'id' | 'topicId' | 'createdAt'>>;
+export type ClaimUpdate = Partial<Omit<Claim, 'id' | 'topicId' | 'createdAt'>>;
+export type ClaimEvidenceUpdate = Partial<Omit<ClaimEvidence, 'id' | 'claimId' | 'linkId' | 'createdAt'>>;
 
 // ============================================================================
 // TIMELINE TYPES
