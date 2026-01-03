@@ -46,13 +46,22 @@ Informed News is an OSINT (Open Source Intelligence) platform that enables analy
 src/
 ├── components/          # React components organized by feature
 │   ├── Auth/           # Authentication components (Supabase)
+│   ├── Dashboard/      # Analyst workflow dashboards (Daily/Weekly/Monthly)
+│   ├── Profile/        # User & organization management
 │   ├── Topics/         # OSINT topic management components
+│   │   ├── ClaimsAnalysis.tsx
+│   │   ├── CollectionPlanCard.tsx
+│   │   ├── CorroborationMatrix.tsx
+│   │   ├── ResolutionModal.tsx
+│   │   └── ...
 │   ├── SourceRecords/  # Source record display & management
 │   ├── Sources/        # OSINT source management
 │   ├── Layout/         # Layout components (Header, etc.)
 │   └── UI/             # Reusable UI components
 ├── services/           # Data service layer (Supabase operations)
 │   ├── auth.service.ts
+│   ├── claims.service.ts
+│   ├── organization.service.ts
 │   ├── osintTopics.service.ts
 │   ├── osintSources.service.ts
 │   ├── sourceRecords.service.ts
@@ -60,8 +69,9 @@ src/
 │   ├── auditLog.service.ts
 │   └── qa.service.ts
 ├── context/            # React Context (minimal state)
-│   ├── AppContext.tsx  # Auth & UI state management
-│   └── appReducer.ts   # Reducer for auth/UI actions only
+│   ├── AppContext.tsx          # Auth & UI state management
+│   ├── OrganizationContext.tsx # Organization state & switching
+│   └── appReducer.ts           # Reducer for auth/UI actions only
 ├── hooks/              # Custom React hooks
 │   └── useAuth.ts      # Supabase authentication hook
 ├── types/              # TypeScript type definitions
@@ -119,7 +129,9 @@ supabase/
 
 4. **Topics**: Intelligence topics being tracked
    - Have names, descriptions, keywords
-   - Status: active, monitoring, or archived
+   - Status: active, monitoring, suspended, resolved, or archived
+   - Intelligence requirement fields: decision_question, decision_context, key_indicators, resolution_criteria
+   - Resolution metadata: summary, confidence (HIGH/MEDIUM/LOW), lessons learned
    - Can be related to other topics
 
 5. **Topic-Source Links**: Relationships between topics and source records
@@ -138,6 +150,25 @@ supabase/
    - Track user actions (create, update, delete)
    - Store before/after state for changes
    - Include metadata and timestamps
+
+8. **Collection Plans**: Intelligence collection planning per topic
+   - Source types needed (government, academic, primary, expert analysis)
+   - Claims to verify (specific assertions needing corroboration)
+   - Coverage gaps (identified gaps in evidence)
+   - Sources to avoid (biased or unreliable sources to skip)
+   - One-to-one relationship with topics
+
+9. **Claims**: Factual assertions for corroboration tracking
+   - Claim text and type (factual, assessment, prediction)
+   - Falsifiability flag
+   - Associated with topics
+   - Tracked for corroboration status
+
+10. **Claim Evidence**: Links between claims and source records
+    - References claim and topic_source_link
+    - Supports/contradicts indicator (true, false, or null for neutral)
+    - Evidence excerpts and analyst notes
+    - Corroboration status: corroborated (multiple sources), single-source (one source), contradicted (conflicting sources)
 
 ## AI Agent Responsibilities
 
@@ -161,6 +192,23 @@ supabase/
 - **ALWAYS** implement action handlers in `appReducer.ts`
 - **ALWAYS** use the reducer pattern - never mutate state directly
 - **NEVER** store application data in context (use Supabase via services)
+
+### Organization Context
+- **ALWAYS** use `useOrganization()` hook from `src/context/OrganizationContext.tsx` for organization-scoped queries
+- **ALWAYS** use `currentOrganization` to get the active organization
+- **NEVER** hardcode organization IDs in components
+- Organizations are automatically created for new users (Personal workspace)
+- Users can switch between organizations, create new ones, and manage members
+
+```typescript
+import { useOrganization } from '../context/OrganizationContext';
+
+const { currentOrganization, organizations, switchOrganization, refreshOrganizations } = useOrganization();
+const orgId = currentOrganization?.id;
+
+// Use orgId in service calls
+const topics = await osintTopicsService.getAll(orgId);
+```
 
 ### Component Development
 - **ALWAYS** create components in the appropriate feature directory
@@ -299,27 +347,31 @@ export const osintTopicsService = {
 import { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../hooks/useAuth';
+import { useOrganization } from '../context/OrganizationContext';
 import { osintTopicsService } from '../services';
 import type { OsintTopic } from '../types/osint';
 
 export function TopicsPage() {
   const { state } = useApp();
   const { user } = useAuth();
+  const { currentOrganization } = useOrganization();
   const [topics, setTopics] = useState<OsintTopic[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const organizationId = 'your-org-id'; // Get from org context or props
-
   useEffect(() => {
-    loadTopics();
-  }, [organizationId]);
+    if (currentOrganization?.id) {
+      loadTopics();
+    }
+  }, [currentOrganization?.id]);
 
   const loadTopics = async () => {
+    if (!currentOrganization?.id) return;
+    
     try {
       setIsLoading(true);
       setError(null);
-      const fetchedTopics = await osintTopicsService.getAll(organizationId);
+      const fetchedTopics = await osintTopicsService.getAll(currentOrganization.id);
       setTopics(fetchedTopics);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load topics');
