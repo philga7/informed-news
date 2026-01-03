@@ -294,10 +294,12 @@ router.get('/scan/stats/domains', async (req: Request, res: Response) => {
     }
 
     // Get all source records with their source domains for this organization
-    const { data: sources } = await supabase
+    const { data: sources, error: sourcesError } = await supabase
       .from('sources')
       .select('id')
       .eq('organization_id', organization_id as string);
+
+    if (sourcesError) throw sourcesError;
 
     if (!sources || sources.length === 0) {
       return res.json({
@@ -306,7 +308,7 @@ router.get('/scan/stats/domains', async (req: Request, res: Response) => {
       });
     }
 
-    const sourceIds = sources.map(s => s.id);
+    const sourceIds = (sources || []).map((s: any) => s.id);
 
     const { data: records, error } = await supabase
       .from('source_records')
@@ -371,7 +373,7 @@ router.patch('/:id/scan-status', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'scan_status is required' });
     }
 
-    const updateData: any = {
+    const updateData: Record<string, unknown> = {
       scan_status,
       reviewed_at: new Date().toISOString(),
     };
@@ -382,7 +384,7 @@ router.patch('/:id/scan-status', async (req: Request, res: Response) => {
 
     const { data, error } = await supabase
       .from('source_records')
-      .update(updateData)
+      .update(updateData as any)
       .eq('id', id)
       .select()
       .single();
@@ -419,7 +421,7 @@ router.patch('/batch/scan-status', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'scan_status is required' });
     }
 
-    const updateData: any = {
+    const updateData: Record<string, unknown> = {
       scan_status,
       reviewed_at: new Date().toISOString(),
     };
@@ -430,7 +432,7 @@ router.patch('/batch/scan-status', async (req: Request, res: Response) => {
 
     const { data, error } = await supabase
       .from('source_records')
-      .update(updateData)
+      .update(updateData as any)
       .in('id', record_ids)
       .select();
 
