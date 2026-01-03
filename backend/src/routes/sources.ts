@@ -20,7 +20,7 @@ router.get('/', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'organization_id is required' });
     }
 
-    // Fetch sources with record counts
+    // Fetch sources with record counts (simpler query first)
     const { data: sources, error } = await supabase
       .from('sources')
       .select(`
@@ -32,21 +32,94 @@ router.get('/', async (req: Request, res: Response) => {
       .eq('organization_id', organization_id as string)
       .order('created_at', { ascending: false });
 
-    if (error) throw error;
+    if (error) {
+      console.error('Error fetching sources:', error);
+      throw error;
+    }
 
-    // Transform data to include record counts
-    const sourcesWithCounts = sources?.map((source: any) => ({
-      id: source.id,
-      organization_id: source.organization_id,
-      source_type: source.source_type,
-      name: source.name,
-      url: source.url,
-      reliability_rating: source.reliability_rating,
-      notes: source.notes,
-      created_at: source.created_at,
-      updated_at: source.updated_at,
-      record_count: source.source_records?.length || 0,
-    }));
+    // Get all source record IDs to fetch links
+    const sourceRecordIds: string[] = [];
+    const sourceIdToRecordIds: Record<string, string[]> = {};
+    
+    (sources || []).forEach((source: any) => {
+      const recordIds = (source.source_records || []).map((r: any) => r.id);
+      sourceIdToRecordIds[source.id] = recordIds;
+      sourceRecordIds.push(...recordIds);
+    });
+
+    // Fetch links for all source records in one query
+    let linksByRecordId: Record<string, Array<{ created_at: string }>> = {};
+    if (sourceRecordIds.length > 0) {
+      const { data: linksData, error: linksError } = await supabase
+        .from('topic_source_links')
+        .select('source_record_id, created_at')
+        .in('source_record_id', sourceRecordIds);
+
+      if (!linksError && linksData) {
+        linksData.forEach((link: any) => {
+          const recordId = link.source_record_id;
+          if (!linksByRecordId[recordId]) {
+            linksByRecordId[recordId] = [];
+          }
+          linksByRecordId[recordId].push({ created_at: link.created_at });
+        });
+      }
+    }
+
+    // Transform data to include record counts and hygiene metrics
+    const sourcesWithCounts = (sources || []).map((source: any) => {
+      const recordIds = sourceIdToRecordIds[source.id] || [];
+      const recordCount = recordIds.length;
+      
+      // Count records that have topic links
+      let linkedCount = 0;
+      let mostRecentLinkDate: Date | null = null;
+      
+      recordIds.forEach((recordId: string) => {
+        const links = linksByRecordId[recordId] || [];
+        if (links.length > 0) {
+          linkedCount++;
+          
+          // Check for most recent link date
+          links.forEach((link: any) => {
+            if (link && link.created_at) {
+              try {
+                const linkDate = new Date(link.created_at);
+                if (!isNaN(linkDate.getTime())) {
+                  if (!mostRecentLinkDate || linkDate > mostRecentLinkDate) {
+                    mostRecentLinkDate = linkDate;
+                  }
+                }
+              } catch (e) {
+                // Skip invalid dates
+              }
+            }
+          });
+        }
+      });
+      
+      // Calculate days since last link
+      const daysSinceLastLink = mostRecentLinkDate 
+        ? Math.floor((Date.now() - mostRecentLinkDate.getTime()) / (1000 * 60 * 60 * 24))
+        : recordCount > 0 ? 999 : 0; // 999 if has records but never linked
+      
+      return {
+        id: source.id,
+        organization_id: source.organization_id,
+        source_type: source.source_type,
+        name: source.name,
+        url: source.url,
+        domain: source.domain || null,
+        reliability_rating: source.reliability_rating,
+        value_rating: source.value_rating || null,
+        notes: source.notes,
+        created_at: source.created_at,
+        updated_at: source.updated_at,
+        record_count: recordCount,
+        linked_count: linkedCount,
+        days_since_last_link: daysSinceLastLink,
+      };
+    });
 
     res.json({
       success: true,
@@ -69,7 +142,7 @@ router.get('/', async (req: Request, res: Response) => {
 router.patch('/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { name, url, reliability_rating, notes, value_rating } = req.body;
+    const { name, url, domain, reliability_rating, notes, value_rating } = req.body;
 
     // Validate reliability_rating if provided
     if (reliability_rating && !['HIGH', 'MEDIUM', 'LOW', 'UNKNOWN'].includes(reliability_rating)) {
@@ -102,6 +175,7 @@ router.patch('/:id', async (req: Request, res: Response) => {
     const updates: any = {};
     if (name !== undefined) updates.name = name;
     if (url !== undefined) updates.url = url;
+    if (domain !== undefined) updates.domain = domain;
     if (reliability_rating !== undefined) updates.reliability_rating = reliability_rating;
     if (notes !== undefined) updates.notes = notes;
     if (value_rating !== undefined) updates.value_rating = value_rating;

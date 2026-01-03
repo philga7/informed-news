@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Filter, RefreshCw, AlertCircle, Clock, CheckCircle, Eye, HelpCircle } from 'lucide-react';
+import { Filter, RefreshCw, AlertCircle, Clock, CheckCircle, Eye, HelpCircle, Save } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useOrganization } from '../../context/OrganizationContext';
-import { scanService } from '../../services';
+import { scanService, scanSessionsService } from '../../services';
 import { EmptyState } from '../UI/EmptyState';
 import { LoadingSpinner } from '../UI/LoadingSpinner';
 import { ScanItem } from './ScanItem';
@@ -12,6 +12,7 @@ import { KeyboardShortcutsModal } from './KeyboardShortcutsModal';
 import { QuickLinkToTopicModal } from './QuickLinkToTopicModal';
 import { CreateWatchItemModal } from './CreateWatchItemModal';
 import type { WatchItemCategory, ScanStatus } from '../../types/osint';
+import type { ScanSession } from '../../services/scanSessions.service';
 
 interface ScanRecord {
   id: string;
@@ -69,7 +70,14 @@ export function ScanPage() {
   
   // Session tracking
   const [sessionStartTime] = useState(new Date());
-  const [itemsReviewed, setItemsReviewed] = useState(0);
+  const [currentSession, setCurrentSession] = useState<ScanSession | null>(null);
+  const [sessionCounters, setSessionCounters] = useState({
+    reviewed: 0,
+    linked: 0,
+    watchItems: 0,
+    dismissed: 0,
+  });
+  const [isSavingSession, setIsSavingSession] = useState(false);
   
   // Modals
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
@@ -136,6 +144,25 @@ export function ScanPage() {
       loadRecords();
     }
   }, [currentOrganization?.id, scanMode, selectedDomain, searchQuery]);
+
+  // Create scan session when component mounts
+  useEffect(() => {
+    const createSession = async () => {
+      if (!currentOrganization || !user) return;
+      
+      try {
+        const session = await scanSessionsService.create({
+          organizationId: currentOrganization.id,
+          userId: user.id,
+        });
+        setCurrentSession(session);
+      } catch (err) {
+        console.error('Error creating scan session:', err);
+      }
+    };
+
+    createSession();
+  }, [currentOrganization?.id, user?.id]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -228,7 +255,11 @@ export function ScanPage() {
   const handleDismiss = async (recordId: string) => {
     try {
       await scanService.dismissRecords([recordId], user?.id);
-      setItemsReviewed(prev => prev + 1);
+      setSessionCounters(prev => ({
+        ...prev,
+        reviewed: prev.reviewed + 1,
+        dismissed: prev.dismissed + 1,
+      }));
       await loadRecords(false);
     } catch (err) {
       console.error('Error dismissing record:', err);
@@ -242,7 +273,11 @@ export function ScanPage() {
     try {
       // This will be handled by the modal component
       await scanService.markAsLinked(record.id, user?.id);
-      setItemsReviewed(prev => prev + 1);
+      setSessionCounters(prev => ({
+        ...prev,
+        reviewed: prev.reviewed + 1,
+        linked: prev.linked + 1,
+      }));
       setShowLinkToTopicModal(false);
       await loadRecords(false);
     } catch (err) {
@@ -252,9 +287,54 @@ export function ScanPage() {
   };
 
   const handleCreateWatchItem = async () => {
-    setItemsReviewed(prev => prev + 1);
+    setSessionCounters(prev => ({
+      ...prev,
+      reviewed: prev.reviewed + 1,
+      watchItems: prev.watchItems + 1,
+    }));
     setShowCreateWatchItemModal(false);
     await loadRecords(false);
+  };
+
+  const handleEndSession = async () => {
+    if (!currentSession) return;
+
+    const notes = prompt('Add any notes about this scan session (optional):');
+    if (notes === null) return; // User cancelled
+
+    setIsSavingSession(true);
+    try {
+      await scanSessionsService.end(
+        currentSession.id,
+        {
+          itemsReviewed: sessionCounters.reviewed,
+          itemsLinkedToTopics: sessionCounters.linked,
+          itemsCreatedWatch: sessionCounters.watchItems,
+          itemsDismissed: sessionCounters.dismissed,
+        },
+        notes || undefined
+      );
+      
+      // Create a new session for continued work
+      if (currentOrganization && user) {
+        const newSession = await scanSessionsService.create({
+          organizationId: currentOrganization.id,
+          userId: user.id,
+        });
+        setCurrentSession(newSession);
+        setSessionCounters({
+          reviewed: 0,
+          linked: 0,
+          watchItems: 0,
+          dismissed: 0,
+        });
+      }
+    } catch (err) {
+      console.error('Error ending scan session:', err);
+      alert('Failed to save scan session');
+    } finally {
+      setIsSavingSession(false);
+    }
   };
 
   const sessionDuration = Math.floor((Date.now() - sessionStartTime.getTime()) / 1000 / 60);
@@ -315,9 +395,25 @@ export function ScanPage() {
               </div>
               <div className="flex items-center">
                 <CheckCircle className="w-4 h-4 mr-1" />
-                {itemsReviewed} reviewed
+                {sessionCounters.reviewed} reviewed
+              </div>
+              <div className="text-green-400 font-medium">
+                {sessionCounters.linked} linked
+              </div>
+              <div className="text-blue-400 font-medium">
+                {sessionCounters.watchItems} watch
               </div>
             </div>
+            
+            <button
+              onClick={handleEndSession}
+              disabled={isSavingSession}
+              className="flex items-center gap-2 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors duration-250 disabled:opacity-50"
+              title="End and save this scan session"
+            >
+              <Save className="w-4 h-4" />
+              End Session
+            </button>
             
             <button
               onClick={() => setShowKeyboardHelp(true)}

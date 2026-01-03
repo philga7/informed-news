@@ -13,6 +13,7 @@ import organizationsRouter from './routes/organizations.js';
 import claimsRouter from './routes/claims.js';
 import watchItemsRouter from './routes/watchItems.js';
 import indicatorsRouter from './routes/indicators.js';
+import scanSessionsRouter from './routes/scanSessions.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -39,6 +40,7 @@ app.use('/api/qa', qaRouter);
 app.use('/api/claims', claimsRouter);
 app.use('/api/watch-items', watchItemsRouter);
 app.use('/api/indicators', indicatorsRouter);
+app.use('/api/scan-sessions', scanSessionsRouter);
 
 // Error handling middleware
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

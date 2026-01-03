@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Database } from 'lucide-react';
+import { Database, AlertTriangle, TrendingUp, Calendar } from 'lucide-react';
 import { osintSourcesService } from '../../services';
 import { useOrganization } from '../../context/OrganizationContext';
 import { OsintSourcesTable } from './OsintSourcesTable';
@@ -7,11 +7,24 @@ import { LoadingSpinner } from '../UI/LoadingSpinner';
 import { EmptyState } from '../UI/EmptyState';
 import type { Source } from '../../types/osint';
 
+interface SourceWithMetrics extends Source {
+  record_count: number;
+  linked_count?: number;
+  signal_effectiveness?: number;
+  days_since_last_link?: number;
+}
+
 export function SourcesPage() {
   const { currentOrganization } = useOrganization();
-  const [sources, setSources] = useState<Array<Source & { record_count: number }>>([]);
+  const [sources, setSources] = useState<SourceWithMetrics[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [hygieneStats, setHygieneStats] = useState({
+    totalSources: 0,
+    lowEffectiveness: 0,
+    staleFeeds: 0,
+    avgEffectiveness: 0,
+  });
 
   const loadSources = async () => {
     if (!currentOrganization) {
@@ -23,7 +36,44 @@ export function SourcesPage() {
       setIsLoading(true);
       setError(null);
       const fetchedSources = await osintSourcesService.getAll(currentOrganization.id);
-      setSources(fetchedSources);
+      
+      // Calculate hygiene metrics
+      const ninetyDaysAgo = new Date();
+      ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+      
+      const sourcesWithMetrics = fetchedSources.map((source: any) => {
+        const linkedCount = source.linked_count || 0;
+        const recordCount = source.record_count || 0;
+        const effectiveness = recordCount > 0 ? (linkedCount / recordCount) * 100 : 0;
+        
+        return {
+          ...source,
+          linked_count: linkedCount,
+          signal_effectiveness: effectiveness,
+          days_since_last_link: source.days_since_last_link,
+        };
+      });
+      
+      setSources(sourcesWithMetrics);
+      
+      // Calculate overall hygiene stats
+      const totalSources = sourcesWithMetrics.length;
+      const lowEffectiveness = sourcesWithMetrics.filter(s => 
+        s.record_count > 10 && (s.signal_effectiveness || 0) < 5
+      ).length;
+      const staleFeeds = sourcesWithMetrics.filter(s => 
+        (s.days_since_last_link || 0) > 90 && s.record_count > 0
+      ).length;
+      const avgEffectiveness = totalSources > 0
+        ? sourcesWithMetrics.reduce((sum, s) => sum + (s.signal_effectiveness || 0), 0) / totalSources
+        : 0;
+      
+      setHygieneStats({
+        totalSources,
+        lowEffectiveness,
+        staleFeeds,
+        avgEffectiveness,
+      });
     } catch (err) {
       console.error('Error loading sources:', err);
       setError(err instanceof Error ? err.message : 'Failed to load sources');
@@ -63,12 +113,87 @@ export function SourcesPage() {
           </p>
         </div>
 
+        {/* Feed Hygiene Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+          <div className="bg-stone-900 border border-stone-800 p-4 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm text-stone-400">Avg Effectiveness</div>
+                <div className="text-2xl font-bold text-stone-100 mt-1">
+                  {hygieneStats.avgEffectiveness.toFixed(1)}%
+                </div>
+              </div>
+              <TrendingUp className="text-blue-500" size={32} />
+            </div>
+            <p className="text-xs text-stone-500 mt-2">
+              % of records linked to topics
+            </p>
+          </div>
+          
+          <div className="bg-stone-900 border border-stone-800 p-4 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm text-stone-400">Total Sources</div>
+                <div className="text-2xl font-bold text-stone-100 mt-1">
+                  {hygieneStats.totalSources}
+                </div>
+              </div>
+              <Database className="text-green-500" size={32} />
+            </div>
+            <p className="text-xs text-stone-500 mt-2">
+              Active OSINT sources
+            </p>
+          </div>
+          
+          <div className={`bg-stone-900 border p-4 rounded-lg ${
+            hygieneStats.lowEffectiveness > 0 ? 'border-orange-800' : 'border-stone-800'
+          }`}>
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm text-stone-400">Low Effectiveness</div>
+                <div className={`text-2xl font-bold mt-1 ${
+                  hygieneStats.lowEffectiveness > 0 ? 'text-orange-400' : 'text-stone-100'
+                }`}>
+                  {hygieneStats.lowEffectiveness}
+                </div>
+              </div>
+              <AlertTriangle className={
+                hygieneStats.lowEffectiveness > 0 ? 'text-orange-500' : 'text-stone-600'
+              } size={32} />
+            </div>
+            <p className="text-xs text-stone-500 mt-2">
+              Sources &lt;5% effectiveness (10+ records)
+            </p>
+          </div>
+          
+          <div className={`bg-stone-900 border p-4 rounded-lg ${
+            hygieneStats.staleFeeds > 0 ? 'border-red-800' : 'border-stone-800'
+          }`}>
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm text-stone-400">Stale Feeds</div>
+                <div className={`text-2xl font-bold mt-1 ${
+                  hygieneStats.staleFeeds > 0 ? 'text-red-400' : 'text-stone-100'
+                }`}>
+                  {hygieneStats.staleFeeds}
+                </div>
+              </div>
+              <Calendar className={
+                hygieneStats.staleFeeds > 0 ? 'text-red-500' : 'text-stone-600'
+              } size={32} />
+            </div>
+            <p className="text-xs text-stone-500 mt-2">
+              No links in 90+ days
+            </p>
+          </div>
+        </div>
+
         {/* Content */}
         <div className="bg-stone-900 border border-stone-800 rounded-lg p-6">
           <div className="mb-6">
             <h2 className="text-xl font-semibold text-stone-200">OSINT Sources</h2>
             <p className="text-sm text-stone-500 mt-1">
-              Track source reliability and manage ingestion configurations
+              Track source reliability, signal effectiveness, and feed hygiene
             </p>
           </div>
 

@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { X } from 'lucide-react';
-import type { Source } from '../../types/osint';
+import type { Source, WatchItemCategory } from '../../types/osint';
 
 interface EditSourceModalProps {
   source: Source;
   onSave: (updates: {
     name?: string;
     url?: string;
+    domain?: WatchItemCategory | null;
     reliabilityRating?: 'HIGH' | 'MEDIUM' | 'LOW' | 'UNKNOWN';
     notes?: string;
   }) => Promise<void>;
@@ -16,6 +17,9 @@ interface EditSourceModalProps {
 export function EditSourceModal({ source, onSave, onClose }: EditSourceModalProps) {
   const [name, setName] = useState(source.name);
   const [url, setUrl] = useState(source.url || '');
+  const [domain, setDomain] = useState<WatchItemCategory | 'none'>(
+    source.domain || 'none'
+  );
   const [reliabilityRating, setReliabilityRating] = useState<'HIGH' | 'MEDIUM' | 'LOW' | 'UNKNOWN'>(
     source.reliabilityRating
   );
@@ -30,6 +34,7 @@ export function EditSourceModal({ source, onSave, onClose }: EditSourceModalProp
       await onSave({
         name: name.trim(),
         url: url.trim(),
+        domain: domain === 'none' ? null : domain as WatchItemCategory,
         reliabilityRating,
         notes: notes.trim(),
       });
@@ -81,6 +86,31 @@ export function EditSourceModal({ source, onSave, onClose }: EditSourceModalProp
                 className="w-full px-3 py-2 bg-stone-800 border border-stone-700 rounded-lg text-stone-100 focus:outline-none focus:border-blue-500"
                 placeholder="https://example.com/feed.xml"
               />
+            </div>
+
+            {/* Domain */}
+            <div>
+              <label className="block text-sm font-medium text-stone-300 mb-2">
+                Domain / Category
+              </label>
+              <select
+                value={domain}
+                onChange={(e) => setDomain(e.target.value as WatchItemCategory | 'none')}
+                className="w-full px-3 py-2 bg-stone-800 border border-stone-700 rounded-lg text-stone-100 focus:outline-none focus:border-blue-500"
+              >
+                <option value="none">None</option>
+                <option value="politics">Politics</option>
+                <option value="finance">Finance</option>
+                <option value="technology">Technology</option>
+                <option value="local">Local</option>
+                <option value="international">International</option>
+                <option value="health">Health</option>
+                <option value="security">Security</option>
+                <option value="other">Other</option>
+              </select>
+              <p className="mt-1 text-xs text-stone-500">
+                Assign this source to a domain for better organization in scan view
+              </p>
             </div>
 
             {/* Reliability Rating */}
