@@ -1,32 +1,25 @@
-import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Newspaper, LogOut, RefreshCw, Target, FileText, Database } from 'lucide-react';
+import { Newspaper, RefreshCw, Target, FileText, Database } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
-import { authService } from '../../services';
+import { useOrganization } from '../../context/OrganizationContext';
+import { OrganizationSwitcher } from '../Profile/OrganizationSwitcher';
 
 export function Header() {
   const { state, dispatch } = useApp();
+  const { currentOrganization } = useOrganization();
   const location = useLocation();
-  const [showUserMenu, setShowUserMenu] = useState(false);
-
-  const handleLogout = async () => {
-    try {
-      await authService.signOut();
-      // User state will be automatically cleared by useAuth hook
-    } catch (error) {
-      console.error('Logout error:', error);
-      // Still dispatch logout to clear local state
-      dispatch({ type: 'LOGOUT' });
-    }
-  };
 
   const handleUpdateNews = async () => {
+    if (!currentOrganization) {
+      console.error('No current organization selected');
+      return;
+    }
+
     dispatch({ type: 'SET_FETCHING', payload: true });
     dispatch({ type: 'SET_ERROR', payload: null });
 
     try {
-      // Use hardcoded organization ID (same as SourcesPage)
-      const organizationId = '00000000-0000-0000-0000-000000009997';
+      const organizationId = currentOrganization.id;
       
       // Use relative URL in production (Vercel), localhost in development
       const API_BASE = import.meta.env.PROD 
@@ -138,40 +131,7 @@ export function Header() {
               <span className="hidden sm:inline">Sources</span>
             </Link>
 
-            <div className="relative">
-              <button
-                onClick={() => setShowUserMenu(!showUserMenu)}
-                className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-stone-800 hover:bg-stone-700 text-stone-300 rounded-lg transition-all duration-250"
-              >
-                <span className="text-sm truncate max-w-[100px] sm:max-w-none">{state.authentication.user?.name}</span>
-              </button>
-
-              {showUserMenu && (
-                <>
-                  <div
-                    className="fixed inset-0 z-10"
-                    onClick={() => setShowUserMenu(false)}
-                  />
-                  <div className="absolute right-0 mt-2 w-48 bg-stone-900 border border-stone-800 rounded-lg shadow-xl z-20">
-                    <div className="p-3 border-b border-stone-800">
-                      <p className="text-sm font-medium text-stone-200">
-                        {state.authentication.user?.name}
-                      </p>
-                      <p className="text-xs text-stone-500 truncate">
-                        {state.authentication.user?.email}
-                      </p>
-                    </div>
-                    <button
-                      onClick={handleLogout}
-                      className="w-full flex items-center gap-2 px-4 py-3 text-stone-300 hover:bg-stone-800 transition-colors duration-250 text-sm"
-                    >
-                      <LogOut size={16} />
-                      Sign Out
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
+            <OrganizationSwitcher />
           </div>
         </div>
       </div>

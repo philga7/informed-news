@@ -117,11 +117,27 @@ export const authService = {
    * Update user profile information
    */
   async updateProfile(updates: { name?: string; email?: string }) {
-    const { error } = await supabase.auth.updateUser({
+    // Update auth.users metadata
+    const { data: authData, error: authError } = await supabase.auth.updateUser({
       email: updates.email,
       data: { name: updates.name },
     });
-    if (error) throw error;
+    if (authError) throw authError;
+
+    // Also update profiles table
+    if (authData.user && updates.name) {
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({ name: updates.name })
+        .eq('id', authData.user.id);
+      
+      if (profileError) {
+        console.error('Error updating profile table:', profileError);
+        // Don't throw - auth update succeeded, profile can be fixed later
+      }
+    }
+
+    return authData;
   },
 
   /**

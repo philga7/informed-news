@@ -1,23 +1,28 @@
 import { useState, useEffect } from 'react';
 import { Database } from 'lucide-react';
 import { osintSourcesService } from '../../services';
+import { useOrganization } from '../../context/OrganizationContext';
 import { OsintSourcesTable } from './OsintSourcesTable';
 import { LoadingSpinner } from '../UI/LoadingSpinner';
 import { EmptyState } from '../UI/EmptyState';
 import type { Source } from '../../types/osint';
 
 export function SourcesPage() {
+  const { currentOrganization } = useOrganization();
   const [sources, setSources] = useState<Array<Source & { record_count: number }>>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const organizationId = '00000000-0000-0000-0000-000000009997';
-
   const loadSources = async () => {
+    if (!currentOrganization) {
+      setIsLoading(false);
+      return;
+    }
+
     try {
       setIsLoading(true);
       setError(null);
-      const fetchedSources = await osintSourcesService.getAll(organizationId);
+      const fetchedSources = await osintSourcesService.getAll(currentOrganization.id);
       setSources(fetchedSources);
     } catch (err) {
       console.error('Error loading sources:', err);
@@ -28,8 +33,10 @@ export function SourcesPage() {
   };
 
   useEffect(() => {
-    loadSources();
-  }, []);
+    if (currentOrganization) {
+      loadSources();
+    }
+  }, [currentOrganization?.id]);
 
   const handleUpdateSource = async (sourceId: string, updates: any) => {
     try {

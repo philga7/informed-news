@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, ExternalLink, Calendar, Database, Link as LinkIcon, Sparkles, FileText, Users, MessageSquare } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
+import { useOrganization } from '../../context/OrganizationContext';
 import { sourceRecordsService } from '../../services';
 import { analysisService, type AnalyticArtifact } from '../../services/analysis.service';
 import { LoadingSpinner } from '../UI/LoadingSpinner';
@@ -13,6 +14,7 @@ export function SourceRecordDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { currentOrganization } = useOrganization();
   const [record, setRecord] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -20,8 +22,6 @@ export function SourceRecordDetailPage() {
   const [artifacts, setArtifacts] = useState<AnalyticArtifact[]>([]);
   const [isLoadingArtifacts, setIsLoadingArtifacts] = useState(false);
   const [analysisLoading, setAnalysisLoading] = useState<string | null>(null);
-
-  const organizationId = '00000000-0000-0000-0000-000000009997';
 
   const loadRecord = async () => {
     if (!id) return;
@@ -391,10 +391,10 @@ export function SourceRecordDetailPage() {
       </div>
 
       {/* Link to Topic Modal */}
-      {showLinkModal && (
+      {showLinkModal && currentOrganization && (
         <LinkToTopicModal
           sourceRecordId={id!}
-          organizationId={organizationId}
+          organizationId={currentOrganization.id}
           onLink={handleLinkToTopics}
           onClose={() => setShowLinkModal(false)}
         />

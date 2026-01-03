@@ -44,6 +44,13 @@ router.get('/topics/:id/completeness', async (req: Request, res: Response) => {
       throw topicError;
     }
 
+    if (!topic) {
+      return res.status(404).json({ error: 'Topic not found' });
+    }
+
+    // Type assertion for topic
+    const topicTyped = topic as any;
+
     // Fetch analytic artifacts for this topic
     const { data: artifacts, error: artifactsError } = await supabase
       .from('analytic_artifacts')
@@ -54,8 +61,8 @@ router.get('/topics/:id/completeness', async (req: Request, res: Response) => {
 
     // Run QA checks
     const checks = {
-      has_description: !!(topic.description && topic.description.trim().length > 0),
-      has_keywords: !!(topic.keywords && Array.isArray(topic.keywords) && topic.keywords.length > 0),
+      has_description: !!(topicTyped.description && topicTyped.description.trim().length > 0),
+      has_keywords: !!(topicTyped.keywords && Array.isArray(topicTyped.keywords) && topicTyped.keywords.length > 0),
       all_links_have_confidence: true,
       all_links_reviewed: true,
       all_artifacts_reviewed: true,
@@ -66,8 +73,8 @@ router.get('/topics/:id/completeness', async (req: Request, res: Response) => {
     const unreviewedArtifacts: string[] = [];
 
     // Check links for confidence and review status
-    if (topic.topic_source_links && topic.topic_source_links.length > 0) {
-      topic.topic_source_links.forEach((link: any) => {
+    if (topicTyped.topic_source_links && topicTyped.topic_source_links.length > 0) {
+      topicTyped.topic_source_links.forEach((link: any) => {
         if (!link.confidence_level) {
           checks.all_links_have_confidence = false;
           missingConfidenceLinks.push(link.id);
@@ -103,7 +110,7 @@ router.get('/topics/:id/completeness', async (req: Request, res: Response) => {
       unreviewed_artifacts: unreviewedArtifacts,
       completeness_score: parseFloat(completenessScore.toFixed(2)),
       summary: {
-        total_links: topic.topic_source_links?.length || 0,
+        total_links: topicTyped.topic_source_links?.length || 0,
         total_artifacts: artifacts?.length || 0,
         links_without_confidence: missingConfidenceLinks.length,
         links_pending_review: pendingReviewLinks.length,
@@ -241,14 +248,17 @@ router.get('/organization/:id/dashboard', async (req: Request, res: Response) =>
     if (artifactsError) throw artifactsError;
 
     // Calculate metrics
+    const topicsTyped = (topics || []) as any[];
+    const linksTyped = (links || []) as any[];
+    
     const topicsByStatus = {
-      active: topics?.filter(t => t.status === 'active').length || 0,
-      monitoring: topics?.filter(t => t.status === 'monitoring').length || 0,
-      archived: topics?.filter(t => t.status === 'archived').length || 0,
+      active: topicsTyped.filter(t => t.status === 'active').length || 0,
+      monitoring: topicsTyped.filter(t => t.status === 'monitoring').length || 0,
+      archived: topicsTyped.filter(t => t.status === 'archived').length || 0,
     };
 
-    const linksWithoutConfidence = links?.filter(l => !l.confidence_level).length || 0;
-    const linksPendingReview = links?.filter(l => l.review_status === 'pending').length || 0;
+    const linksWithoutConfidence = linksTyped.filter(l => !l.confidence_level).length || 0;
+    const linksPendingReview = linksTyped.filter(l => l.review_status === 'pending').length || 0;
 
     res.json({
       success: true,

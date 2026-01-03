@@ -33,16 +33,22 @@ async function loadRoutes() {
   // Dynamically import routes (excluding ingest which uses jsdom)
   // Note: ingest routes are excluded from serverless as they use jsdom
   // which has dependency conflicts. Use GitHub Actions for ingestion instead.
+  const organizationsRouter = (await import('../backend/src/routes/organizations.js')).default;
   const sourcesRouter = (await import('../backend/src/routes/sources.js')).default;
   const topicsRouter = (await import('../backend/src/routes/topics.js')).default;
   const sourceRecordsRouter = (await import('../backend/src/routes/sourceRecords.js')).default;
   const analysisRouter = (await import('../backend/src/routes/analysis.js')).default;
+  const auditLogsRouter = (await import('../backend/src/routes/auditLogs.js')).default;
+  const qaRouter = (await import('../backend/src/routes/qa.js')).default;
 
   // API Routes (ingest excluded - use GitHub Actions)
+  app.use('/api/organizations', organizationsRouter);
   app.use('/api/sources', sourcesRouter);
   app.use('/api/topics', topicsRouter);
   app.use('/api/source-records', sourceRecordsRouter);
   app.use('/api/analysis', analysisRouter);
+  app.use('/api/audit-logs', auditLogsRouter);
+  app.use('/api/qa', qaRouter);
   
   // Return 503 for ingest/feeds routes (use GitHub Actions)
   app.use('/api/ingest', (_req, res) => {
