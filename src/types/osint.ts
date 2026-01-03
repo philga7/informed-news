@@ -27,6 +27,9 @@ export type WatchItemStatus = 'watching' | 'escalated' | 'archived';
 export type WatchItemCategory = 'politics' | 'finance' | 'technology' | 
   'local' | 'international' | 'health' | 'security' | 'other';
 
+// Environmental Scan View (Phase 6)
+export type ScanStatus = 'pending' | 'reviewed' | 'linked' | 'dismissed';
+
 // Workflow & QA types
 export type TopicStatus = 'active' | 'monitoring' | 'suspended' | 'resolved' | 'archived';
 export type LinkReviewStatus = 'pending' | 'reviewed' | 'disputed';
@@ -79,6 +82,7 @@ export interface Source {
   reliabilityRating: ReliabilityRating;
   valueRating: number | null; // 1-5 star rating for analyst usefulness
   notes: string | null;
+  domain: WatchItemCategory | null; // Phase 6: Domain categorization for scan view
   createdAt: Date;
   updatedAt: Date;
 }
@@ -95,6 +99,16 @@ export interface SourceRecord {
   geographicIndicators: Record<string, unknown> | null;
   rawMetadata: Record<string, unknown> | null;
   initialConfidenceFlags: Record<string, unknown> | null;
+  // Phase 6: Environmental Scan View fields
+  scanStatus: ScanStatus;
+  reviewedAt: Date | null;
+  reviewedBy: string | null;
+}
+
+// Phase 6: Extended view with source domain information
+export interface SourceRecordWithDomain extends SourceRecord {
+  sourceDomain: WatchItemCategory | null;
+  sourceName: string;
 }
 
 // ============================================================================

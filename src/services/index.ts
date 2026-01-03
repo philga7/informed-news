@@ -13,4 +13,6 @@ export { analysisService } from './analysis.service';
 export { auditLogService } from './auditLog.service';
 export { qaService } from './qa.service';
 export { watchItemsService } from './watchItems.service';
+export { claimsService } from './claims.service';
+export { scanService } from './scan.service';
 
