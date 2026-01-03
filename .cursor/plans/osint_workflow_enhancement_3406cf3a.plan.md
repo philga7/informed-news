@@ -586,7 +586,3 @@ Throughout all phases, implement guidance rather than hard blocks:
 - Optional fields with "Recommended" labels
 - Progress indicators showing workflow completeness
 - No hard validation blocking saves
-
----
-
-## Key Files Summary

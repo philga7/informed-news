@@ -32,7 +32,7 @@ router.get('/', async (req: Request, res: Response) => {
 
     if (error) throw error;
 
-    // Transform data to include counts and Phase 1 fields
+    // Transform data to include counts and Phase 1 + Phase 2 fields
     const topicsWithCounts = topics?.map((topic: any) => ({
       id: topic.id,
       organization_id: topic.organization_id,
@@ -41,10 +41,16 @@ router.get('/', async (req: Request, res: Response) => {
       keywords: topic.keywords,
       related_topics: topic.related_topics,
       status: topic.status,
+      // Phase 1: Question-driven fields
       decision_question: topic.decision_question,
       decision_context: topic.decision_context,
       key_indicators: topic.key_indicators,
       resolution_criteria: topic.resolution_criteria,
+      // Phase 2: Resolution metadata
+      resolution_summary: topic.resolution_summary,
+      resolution_confidence: topic.resolution_confidence,
+      lessons_learned: topic.lessons_learned,
+      resolved_at: topic.resolved_at,
       created_at: topic.created_at,
       updated_at: topic.updated_at,
       linked_records_count: topic.topic_source_links?.length || 0,
@@ -362,7 +368,7 @@ router.get('/:id', async (req: Request, res: Response) => {
 /**
  * PATCH /api/topics/:id
  * Update topic metadata
- * Body: { name?, description?, keywords?, related_topics?, status?, decision_question?, decision_context?, key_indicators?, resolution_criteria? }
+ * Body: { name?, description?, keywords?, related_topics?, status?, decision_question?, decision_context?, key_indicators?, resolution_criteria?, resolutionSummary?, resolutionConfidence?, lessonsLearned? }
  */
 router.patch('/:id', async (req: Request, res: Response) => {
   try {
@@ -377,6 +383,9 @@ router.patch('/:id', async (req: Request, res: Response) => {
       decision_context,
       key_indicators,
       resolution_criteria,
+      resolutionSummary,
+      resolutionConfidence,
+      lessonsLearned,
     } = req.body;
 
     // Fetch current state for audit
@@ -390,6 +399,9 @@ router.patch('/:id', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Topic not found' });
     }
 
+    // Type assertion: after the null check, beforeTopic is guaranteed to exist
+    const currentTopic = beforeTopic as any;
+
     const updates: any = {};
     if (name !== undefined) updates.name = name;
     if (description !== undefined) updates.description = description;
@@ -400,6 +412,21 @@ router.patch('/:id', async (req: Request, res: Response) => {
     if (decision_context !== undefined) updates.decision_context = decision_context;
     if (key_indicators !== undefined) updates.key_indicators = key_indicators;
     if (resolution_criteria !== undefined) updates.resolution_criteria = resolution_criteria;
+    
+    // Phase 2: Resolution metadata
+    if (resolutionSummary !== undefined) updates.resolution_summary = resolutionSummary;
+    if (resolutionConfidence !== undefined) updates.resolution_confidence = resolutionConfidence;
+    if (lessonsLearned !== undefined) updates.lessons_learned = lessonsLearned;
+    
+    // If marking as resolved, set resolved_at timestamp
+    if (status === 'resolved' && !currentTopic.resolved_at) {
+      updates.resolved_at = new Date().toISOString();
+    }
+    
+    // If changing from resolved to another status, clear resolved_at
+    if (status && status !== 'resolved' && currentTopic.status === 'resolved') {
+      updates.resolved_at = null;
+    }
 
     if (Object.keys(updates).length === 0) {
       return res.status(400).json({ error: 'No updates provided' });
@@ -427,7 +454,7 @@ router.patch('/:id', async (req: Request, res: Response) => {
     }
 
     // Audit log: topic updated
-    await auditService.logTopicUpdated(id, beforeTopic, topic);
+    await auditService.logTopicUpdated(id, currentTopic, topic);
 
     res.json({
       success: true,

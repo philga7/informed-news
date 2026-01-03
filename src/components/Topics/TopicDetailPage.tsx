@@ -219,6 +219,7 @@ export function TopicDetailPage() {
                 {id && (
                   <TopicStatusBadge
                     topicId={id}
+                    topicName={topic.name}
                     currentStatus={topic.status || 'active'}
                     onStatusChange={() => loadTopic()}
                   />
