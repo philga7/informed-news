@@ -205,7 +205,8 @@ router.patch('/:id', async (req: Request, res: Response) => {
 
     const { data: claim, error } = await supabase
       .from('claims')
-      .update(updates)
+      // @ts-ignore - Supabase type inference issue in serverless environment
+      .update(updates as any)
       .eq('id', id)
       .select()
       .single();
@@ -339,7 +340,8 @@ router.patch('/:claimId/evidence/:evidenceId', async (req: Request, res: Respons
 
     const { data: evidence, error } = await supabase
       .from('claim_evidence')
-      .update(updates)
+      // @ts-ignore - Supabase type inference issue in serverless environment
+      .update(updates as any)
       .eq('id', evidenceId)
       .eq('claim_id', claimId)
       .select()
