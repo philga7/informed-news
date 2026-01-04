@@ -30,11 +30,12 @@ let routesLoaded = false;
 async function loadRoutes() {
   if (routesLoaded) return;
   
-  // Dynamically import routes (excluding ingest which uses jsdom)
-  // Note: ingest routes are excluded from serverless as they use jsdom
-  // which has dependency conflicts. Use GitHub Actions for ingestion instead.
+  // Dynamically import routes
+  // Note: ingest routes use cheerio/axios for basic RSS parsing (works in serverless)
+  // Full content extraction uses jsdom (dynamically loaded, may fail in serverless)
   const organizationsRouter = (await import('../backend/src/routes/organizations.js')).default;
   const sourcesRouter = (await import('../backend/src/routes/sources.js')).default;
+  const ingestRouter = (await import('../backend/src/routes/ingest.js')).default;
   const topicsRouter = (await import('../backend/src/routes/topics.js')).default;
   const sourceRecordsRouter = (await import('../backend/src/routes/sourceRecords.js')).default;
   const analysisRouter = (await import('../backend/src/routes/analysis.js')).default;
@@ -44,9 +45,10 @@ async function loadRoutes() {
   const watchItemsRouter = (await import('../backend/src/routes/watchItems.js')).default;
   const indicatorsRouter = (await import('../backend/src/routes/indicators.js')).default;
 
-  // API Routes (ingest excluded - use GitHub Actions)
+  // API Routes
   app.use('/api/organizations', organizationsRouter);
   app.use('/api/sources', sourcesRouter);
+  app.use('/api/ingest', ingestRouter);
   app.use('/api/topics', topicsRouter);
   app.use('/api/source-records', sourceRecordsRouter);
   app.use('/api/analysis', analysisRouter);
@@ -55,18 +57,11 @@ async function loadRoutes() {
   app.use('/api/claims', claimsRouter);
   app.use('/api/watch-items', watchItemsRouter);
   app.use('/api/indicators', indicatorsRouter);
-  
-  // Return 503 for ingest/feeds routes (use GitHub Actions)
-  app.use('/api/ingest', (_req, res) => {
-    res.status(503).json({
-      error: 'Ingestion not available in serverless',
-      message: 'Use GitHub Actions workflows for ingestion operations',
-    });
-  });
+  // Note: /api/feeds routes are deprecated in favor of /api/ingest
   app.use('/api/feeds', (_req, res) => {
     res.status(503).json({
-      error: 'Feeds not available in serverless',
-      message: 'Use GitHub Actions workflows for feed operations',
+      error: 'Feeds endpoint deprecated',
+      message: 'Use /api/ingest/rss/all for RSS ingestion',
     });
   });
   

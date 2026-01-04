@@ -1,47 +1,48 @@
 import { useState } from 'react';
 import { X } from 'lucide-react';
-import type { Source, WatchItemCategory } from '../../types/osint';
+import type { WatchItemCategory } from '../../types/osint';
 
-interface EditSourceModalProps {
-  source: Source;
-  onSave: (updates: {
-    name?: string;
+interface CreateSourceModalProps {
+  onSubmit: (sourceData: {
+    name: string;
+    sourceType: 'rss' | 'api' | 'email' | 'manual';
     url?: string;
     domain?: WatchItemCategory | null;
     reliabilityRating?: 'HIGH' | 'MEDIUM' | 'LOW' | 'UNKNOWN';
     notes?: string;
     scrapeExternalUrl?: boolean;
   }) => Promise<void>;
-  onClose: () => void;
+  onCancel: () => void;
 }
 
-export function EditSourceModal({ source, onSave, onClose }: EditSourceModalProps) {
-  const [name, setName] = useState(source.name);
-  const [url, setUrl] = useState(source.url || '');
-  const [domain, setDomain] = useState<WatchItemCategory | 'none'>(
-    source.domain || 'none'
-  );
-  const [reliabilityRating, setReliabilityRating] = useState<'HIGH' | 'MEDIUM' | 'LOW' | 'UNKNOWN'>(
-    source.reliabilityRating
-  );
-  const [scrapeExternalUrl, setScrapeExternalUrl] = useState(source.scrapeExternalUrl || false);
-  const [notes, setNotes] = useState(source.notes || '');
+export function CreateSourceModal({ onSubmit, onCancel }: CreateSourceModalProps) {
+  const [name, setName] = useState('');
+  const [sourceType, setSourceType] = useState<'rss' | 'api' | 'email' | 'manual'>('rss');
+  const [url, setUrl] = useState('');
+  const [domain, setDomain] = useState<WatchItemCategory | 'none'>('none');
+  const [reliabilityRating, setReliabilityRating] = useState<'HIGH' | 'MEDIUM' | 'LOW' | 'UNKNOWN'>('UNKNOWN');
+  const [scrapeExternalUrl, setScrapeExternalUrl] = useState(false);
+  const [notes, setNotes] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
     setIsSaving(true);
 
     try {
-      await onSave({
+      await onSubmit({
         name: name.trim(),
-        url: url.trim(),
+        sourceType,
+        url: url.trim() || undefined,
         domain: domain === 'none' ? null : domain as WatchItemCategory,
         reliabilityRating,
         scrapeExternalUrl,
-        notes: notes.trim(),
+        notes: notes.trim() || undefined,
       });
-    } finally {
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create source');
       setIsSaving(false);
     }
   };
@@ -51,10 +52,11 @@ export function EditSourceModal({ source, onSave, onClose }: EditSourceModalProp
       <div className="bg-stone-900 border border-stone-800 rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-stone-800">
-          <h2 className="text-xl font-semibold text-stone-100">Edit Source</h2>
+          <h2 className="text-xl font-semibold text-stone-100">Create Source</h2>
           <button
-            onClick={onClose}
+            onClick={onCancel}
             className="p-2 hover:bg-stone-800 rounded-lg transition-colors duration-250"
+            disabled={isSaving}
           >
             <X size={20} className="text-stone-400" />
           </button>
@@ -62,11 +64,17 @@ export function EditSourceModal({ source, onSave, onClose }: EditSourceModalProp
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6">
+          {error && (
+            <div className="mb-4 p-4 bg-red-900/30 border border-red-800 rounded-lg text-red-200">
+              {error}
+            </div>
+          )}
+
           <div className="space-y-4">
             {/* Name */}
             <div>
               <label className="block text-sm font-medium text-stone-300 mb-2">
-                Source Name
+                Source Name <span className="text-red-400">*</span>
               </label>
               <input
                 type="text"
@@ -74,7 +82,26 @@ export function EditSourceModal({ source, onSave, onClose }: EditSourceModalProp
                 onChange={(e) => setName(e.target.value)}
                 className="w-full px-3 py-2 bg-stone-800 border border-stone-700 rounded-lg text-stone-100 focus:outline-none focus:border-blue-500"
                 required
+                placeholder="e.g., Reuters RSS Feed"
               />
+            </div>
+
+            {/* Source Type */}
+            <div>
+              <label className="block text-sm font-medium text-stone-300 mb-2">
+                Source Type <span className="text-red-400">*</span>
+              </label>
+              <select
+                value={sourceType}
+                onChange={(e) => setSourceType(e.target.value as 'rss' | 'api' | 'email' | 'manual')}
+                className="w-full px-3 py-2 bg-stone-800 border border-stone-700 rounded-lg text-stone-100 focus:outline-none focus:border-blue-500"
+                required
+              >
+                <option value="rss">RSS Feed</option>
+                <option value="api">API</option>
+                <option value="email">Email</option>
+                <option value="manual">Manual</option>
+              </select>
             </div>
 
             {/* URL */}
@@ -89,6 +116,9 @@ export function EditSourceModal({ source, onSave, onClose }: EditSourceModalProp
                 className="w-full px-3 py-2 bg-stone-800 border border-stone-700 rounded-lg text-stone-100 focus:outline-none focus:border-blue-500"
                 placeholder="https://example.com/feed.xml"
               />
+              <p className="mt-1 text-xs text-stone-500">
+                Required for RSS and API sources
+              </p>
             </div>
 
             {/* Domain */}
@@ -126,10 +156,10 @@ export function EditSourceModal({ source, onSave, onClose }: EditSourceModalProp
                 onChange={(e) => setReliabilityRating(e.target.value as 'HIGH' | 'MEDIUM' | 'LOW' | 'UNKNOWN')}
                 className="w-full px-3 py-2 bg-stone-800 border border-stone-700 rounded-lg text-stone-100 focus:outline-none focus:border-blue-500"
               >
+                <option value="UNKNOWN">Unknown</option>
                 <option value="HIGH">High</option>
                 <option value="MEDIUM">Medium</option>
                 <option value="LOW">Low</option>
-                <option value="UNKNOWN">Unknown</option>
               </select>
               <p className="mt-1 text-xs text-stone-500">
                 Rate the reliability of this source based on historical accuracy
@@ -175,7 +205,7 @@ export function EditSourceModal({ source, onSave, onClose }: EditSourceModalProp
           <div className="flex items-center justify-end gap-3 mt-6">
             <button
               type="button"
-              onClick={onClose}
+              onClick={onCancel}
               className="px-4 py-2 bg-stone-800 hover:bg-stone-700 text-stone-300 rounded-lg transition-colors duration-250"
               disabled={isSaving}
             >
@@ -186,7 +216,7 @@ export function EditSourceModal({ source, onSave, onClose }: EditSourceModalProp
               className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-250 disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={isSaving}
             >
-              {isSaving ? 'Saving...' : 'Save Changes'}
+              {isSaving ? 'Creating...' : 'Create Source'}
             </button>
           </div>
         </form>

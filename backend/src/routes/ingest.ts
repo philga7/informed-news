@@ -16,6 +16,213 @@ import {
 const router = Router();
 
 /**
+ * POST /api/ingest/rss/all
+ * Trigger RSS ingestion for all RSS sources in an organization (one at a time)
+ * 
+ * Body:
+ *   - organization_id: string (required)
+ */
+router.post('/rss/all', async (req: Request, res: Response) => {
+  try {
+    const { organization_id } = req.body;
+
+    if (!organization_id) {
+      return res.status(400).json({
+        error: 'Missing required field',
+        required: ['organization_id'],
+      });
+    }
+
+    // Fetch all RSS sources for this organization
+    const { data: sources, error: sourcesError } = await supabase
+      .from('sources')
+      .select('*')
+      .eq('organization_id', organization_id)
+      .eq('source_type', 'rss') as { data: Array<{
+        id: string;
+        organization_id: string;
+        source_type: string;
+        name: string;
+        url: string | null;
+        scrape_external_url: boolean | null;
+        [key: string]: unknown;
+      }> | null; error: unknown };
+
+    if (sourcesError) {
+      return res.status(500).json({
+        error: 'Failed to fetch sources',
+        message: sourcesError instanceof Error ? sourcesError.message : 'Unknown error',
+      });
+    }
+
+    if (!sources || sources.length === 0) {
+      return res.json({
+        success: true,
+        message: 'No RSS sources found for this organization',
+        results: [],
+        summary: {
+          total_sources: 0,
+          processed: 0,
+          added: 0,
+          skipped: 0,
+          errors: 0,
+        },
+      });
+    }
+
+    // Process sources sequentially (one at a time)
+    console.log(`\n🔄 Starting RSS ingestion for organization ${organization_id}`);
+    console.log(`📋 Found ${sources.length} RSS source(s) to process\n`);
+
+    const results: Array<{
+      source_id: string;
+      source_name: string;
+      success: boolean;
+      added: number;
+      skipped: number;
+      errors: number;
+      error?: string;
+    }> = [];
+
+    let totalAdded = 0;
+    let totalSkipped = 0;
+    let totalErrors = 0;
+
+    for (let i = 0; i < sources.length; i++) {
+      const source = sources[i];
+      const sourceNum = i + 1;
+      
+      console.log(`[${sourceNum}/${sources.length}] Processing source: "${source.name}" (${source.id})`);
+      console.log(`  📡 Feed URL: ${source.url}`);
+      if (!source.url) {
+        console.log(`  ⚠️  Skipping: Source missing URL`);
+        results.push({
+          source_id: source.id,
+          source_name: source.name,
+          success: false,
+          added: 0,
+          skipped: 0,
+          errors: 0,
+          error: 'Source missing URL',
+        });
+        continue;
+      }
+
+      // Verify source still exists before processing
+      const { data: sourceCheck, error: sourceCheckError } = await supabase
+        .from('sources')
+        .select('id')
+        .eq('id', source.id)
+        .single();
+
+      if (sourceCheckError || !sourceCheck) {
+        console.log(`  ❌ Skipping: Source no longer exists in database`);
+        results.push({
+          source_id: source.id,
+          source_name: source.name,
+          success: false,
+          added: 0,
+          skipped: 0,
+          errors: 0,
+          error: 'Source no longer exists in database',
+        });
+        continue;
+      }
+
+      try {
+        const startTime = Date.now();
+        console.log(`  🔍 Starting ingestion...`);
+        
+        // Create RSS ingestion service with scrapeExternalUrl from source config
+        const rssService = new RssIngestionService({
+          sourceId: source.id,
+          feedUrl: source.url,
+          scrapeExternalUrl: source.scrape_external_url || false,
+          extractFullContent: true,
+        });
+
+        // Create controller and ingest
+        const controller = new IngestionController(rssService);
+        const result = await controller.ingest();
+        
+        const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+
+        // Update source updated_at timestamp
+        await supabase
+          .from('sources')
+          // @ts-expect-error - Supabase type inference issue in serverless environment
+          .update({ updated_at: new Date().toISOString() })
+          .eq('id', source.id);
+
+        totalAdded += result.added;
+        totalSkipped += result.skipped;
+        totalErrors += result.errors.length;
+
+        console.log(`  ✅ Completed in ${duration}s: +${result.added} new, ~${result.skipped} duplicates, ❌${result.errors.length} errors`);
+        if (result.errors.length > 0) {
+          console.log(`  ⚠️  Errors encountered:`);
+          result.errors.slice(0, 3).forEach((err, idx) => {
+            console.log(`     ${idx + 1}. ${err}`);
+          });
+          if (result.errors.length > 3) {
+            console.log(`     ... and ${result.errors.length - 3} more`);
+          }
+        }
+
+        results.push({
+          source_id: source.id,
+          source_name: source.name,
+          success: true,
+          added: result.added,
+          skipped: result.skipped,
+          errors: result.errors.length,
+        });
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+        console.log(`  ❌ Failed: ${errorMsg}`);
+        totalErrors++;
+        results.push({
+          source_id: source.id,
+          source_name: source.name,
+          success: false,
+          added: 0,
+          skipped: 0,
+          errors: 1,
+          error: errorMsg,
+        });
+      }
+      
+      console.log(''); // Empty line between sources
+    }
+
+    console.log(`\n📊 Ingestion Summary for organization ${organization_id}:`);
+    console.log(`  Total sources: ${sources.length}`);
+    console.log(`  Successfully processed: ${results.filter((r) => r.success).length}`);
+    console.log(`  Total articles added: ${totalAdded}`);
+    console.log(`  Total duplicates skipped: ${totalSkipped}`);
+    console.log(`  Total errors: ${totalErrors}\n`);
+
+    res.json({
+      success: true,
+      results,
+      summary: {
+        total_sources: sources.length,
+        processed: results.filter((r) => r.success).length,
+        added: totalAdded,
+        skipped: totalSkipped,
+        errors: totalErrors,
+      },
+    });
+  } catch (error) {
+    console.error('RSS ingestion error (all sources):', error);
+    res.status(500).json({
+      error: 'RSS ingestion failed',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+/**
  * POST /api/ingest/rss
  * Trigger RSS ingestion for a configured source
  * 
@@ -41,12 +248,23 @@ router.post('/rss', async (req: Request, res: Response) => {
       .select('*')
       .eq('id', source_id)
       .eq('organization_id', organization_id)
-      .single() as any;
+      .single() as {
+        data: {
+          id: string;
+          organization_id: string;
+          source_type: string;
+          name: string;
+          url: string | null;
+          scrape_external_url: boolean | null;
+          [key: string]: unknown;
+        } | null;
+        error: unknown;
+      };
 
     if (sourceError || !source) {
       return res.status(404).json({
         error: 'Source not found',
-        message: sourceError?.message || 'Source does not exist or does not belong to this organization',
+        message: sourceError instanceof Error ? sourceError.message : 'Source does not exist or does not belong to this organization',
       });
     }
 
@@ -66,11 +284,11 @@ router.post('/rss', async (req: Request, res: Response) => {
       });
     }
 
-    // Create RSS ingestion service
+    // Create RSS ingestion service with scrapeExternalUrl from source config
     const rssService = new RssIngestionService({
       sourceId: source.id,
       feedUrl: source.url,
-      scrapeExternalUrl: false, // TODO: Add this field to sources table
+      scrapeExternalUrl: source.scrape_external_url || false,
       extractFullContent: true, // Extract full article content for AI analysis
     });
 
@@ -84,8 +302,8 @@ router.post('/rss', async (req: Request, res: Response) => {
     // Update source updated_at timestamp
     await supabase
       .from('sources')
-      // @ts-ignore - Supabase type inference issue in serverless environment
-      .update({ updated_at: new Date().toISOString() } as any)
+      // @ts-expect-error - Supabase type inference issue in serverless environment
+      .update({ updated_at: new Date().toISOString() })
       .eq('id', source_id);
 
     res.json({
@@ -151,7 +369,7 @@ router.post('/manual', async (req: Request, res: Response) => {
     if (orgError || !org) {
       return res.status(404).json({
         error: 'Organization not found',
-        message: orgError?.message || 'Organization does not exist',
+        message: orgError instanceof Error ? orgError.message : 'Organization does not exist',
       });
     }
 

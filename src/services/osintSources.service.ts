@@ -11,6 +11,61 @@ interface SourceWithCount extends Source {
 
 export const osintSourcesService = {
   /**
+   * Create a new source
+   */
+  async create(
+    organizationId: string,
+    sourceData: {
+      name: string;
+      sourceType: 'rss' | 'api' | 'email' | 'manual';
+      url?: string;
+      domain?: string | null;
+      reliabilityRating?: 'HIGH' | 'MEDIUM' | 'LOW' | 'UNKNOWN';
+      notes?: string;
+      scrapeExternalUrl?: boolean;
+    }
+  ): Promise<Source> {
+    const response = await fetch(`${API_BASE}/api/sources`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        organization_id: organizationId,
+        source_type: sourceData.sourceType,
+        name: sourceData.name,
+        url: sourceData.url,
+        domain: sourceData.domain,
+        reliability_rating: sourceData.reliabilityRating || 'UNKNOWN',
+        notes: sourceData.notes,
+        scrape_external_url: sourceData.scrapeExternalUrl || false,
+      }),
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || `Failed to create source: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    const source = data.source;
+    
+    return {
+      id: source.id,
+      organizationId: source.organization_id,
+      sourceType: source.source_type,
+      name: source.name,
+      url: source.url,
+      domain: source.domain || null,
+      reliabilityRating: source.reliability_rating,
+      notes: source.notes,
+      scrapeExternalUrl: source.scrape_external_url || false,
+      createdAt: new Date(source.created_at),
+      updatedAt: new Date(source.updated_at),
+    };
+  },
+
+  /**
    * Get all sources for an organization
    */
   async getAll(organizationId: string): Promise<SourceWithCount[]> {
@@ -31,8 +86,10 @@ export const osintSourcesService = {
       sourceType: source.source_type,
       name: source.name,
       url: source.url,
+      domain: source.domain || null,
       reliabilityRating: source.reliability_rating,
       notes: source.notes,
+      scrapeExternalUrl: source.scrape_external_url || false,
       createdAt: new Date(source.created_at),
       updatedAt: new Date(source.updated_at),
       record_count: source.record_count || 0,
@@ -47,8 +104,10 @@ export const osintSourcesService = {
     updates: {
       name?: string;
       url?: string;
+      domain?: string | null;
       reliabilityRating?: 'HIGH' | 'MEDIUM' | 'LOW' | 'UNKNOWN';
       notes?: string;
+      scrapeExternalUrl?: boolean;
     }
   ): Promise<Source> {
     const response = await fetch(`${API_BASE}/api/sources/${sourceId}`, {
@@ -59,8 +118,10 @@ export const osintSourcesService = {
       body: JSON.stringify({
         name: updates.name,
         url: updates.url,
+        domain: updates.domain,
         reliability_rating: updates.reliabilityRating,
         notes: updates.notes,
+        scrape_external_url: updates.scrapeExternalUrl,
       }),
     });
     
@@ -78,11 +139,27 @@ export const osintSourcesService = {
       sourceType: source.source_type,
       name: source.name,
       url: source.url,
+      domain: source.domain || null,
       reliabilityRating: source.reliability_rating,
       notes: source.notes,
+      scrapeExternalUrl: source.scrape_external_url || false,
       createdAt: new Date(source.created_at),
       updatedAt: new Date(source.updated_at),
     };
+  },
+
+  /**
+   * Delete a source (cascade deletes all associated source records and topic links)
+   */
+  async delete(sourceId: string): Promise<void> {
+    const response = await fetch(`${API_BASE}/api/sources/${sourceId}`, {
+      method: 'DELETE',
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || `Failed to delete source: ${response.statusText}`);
+    }
   },
 };
 

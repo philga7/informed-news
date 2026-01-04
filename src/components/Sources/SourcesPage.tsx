@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Database, AlertTriangle, TrendingUp, Calendar } from 'lucide-react';
+import { Database, AlertTriangle, TrendingUp, Calendar, Plus } from 'lucide-react';
 import { osintSourcesService } from '../../services';
 import { useOrganization } from '../../context/OrganizationContext';
 import { OsintSourcesTable } from './OsintSourcesTable';
 import { LoadingSpinner } from '../UI/LoadingSpinner';
 import { EmptyState } from '../UI/EmptyState';
+import { CreateSourceModal } from './CreateSourceModal';
 import type { Source } from '../../types/osint';
 
 interface SourceWithMetrics extends Source {
@@ -19,6 +20,7 @@ export function SourcesPage() {
   const [sources, setSources] = useState<SourceWithMetrics[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const [hygieneStats, setHygieneStats] = useState({
     totalSources: 0,
     lowEffectiveness: 0,
@@ -99,18 +101,67 @@ export function SourcesPage() {
     }
   };
 
+  const handleCreateSource = async (sourceData: {
+    name: string;
+    sourceType: 'rss' | 'api' | 'email' | 'manual';
+    url?: string;
+    domain?: string | null;
+    reliabilityRating?: 'HIGH' | 'MEDIUM' | 'LOW' | 'UNKNOWN';
+    notes?: string;
+    scrapeExternalUrl?: boolean;
+  }) => {
+    if (!currentOrganization) {
+      throw new Error('No organization selected');
+    }
+
+    try {
+      await osintSourcesService.create(currentOrganization.id, sourceData);
+      await loadSources();
+      setShowCreateModal(false);
+    } catch (err) {
+      console.error('Error creating source:', err);
+      throw err;
+    }
+  };
+
+  const handleDeleteSource = async (sourceId: string) => {
+    try {
+      await osintSourcesService.delete(sourceId);
+      // Refresh sources list
+      await loadSources();
+    } catch (err) {
+      console.error('Error deleting source:', err);
+      setError(err instanceof Error ? err.message : 'Failed to delete source');
+      throw err;
+    }
+  };
+
   return (
     <div className="min-h-screen bg-stone-950">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-stone-100 flex items-center gap-3">
-            <Database className="text-blue-500" size={32} />
-            Manage Sources
-          </h1>
-          <p className="mt-2 text-stone-400">
-            Configure and manage your OSINT data sources with reliability ratings
-          </p>
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h1 className="text-3xl font-bold text-stone-100 flex items-center gap-3">
+                <Database className="text-blue-500" size={32} />
+                Manage Sources
+              </h1>
+              <p className="mt-2 text-stone-400">
+                Configure and manage your OSINT data sources with reliability ratings
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              {/* Primary Action */}
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="flex items-center justify-center gap-1.5 px-3 py-2 bg-accent hover:bg-accent-hover text-white rounded-lg transition-colors duration-250 font-medium text-sm whitespace-nowrap"
+              >
+                <Plus size={16} />
+                Create Source
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Feed Hygiene Stats */}
@@ -214,10 +265,22 @@ export function SourcesPage() {
               icon={<Database size={48} className="text-stone-600" />}
             />
           ) : (
-            <OsintSourcesTable sources={sources} onUpdate={handleUpdateSource} />
+            <OsintSourcesTable 
+              sources={sources} 
+              onUpdate={handleUpdateSource}
+              onDelete={handleDeleteSource}
+            />
           )}
         </div>
       </div>
+
+      {/* Create Modal */}
+      {showCreateModal && (
+        <CreateSourceModal
+          onSubmit={handleCreateSource}
+          onCancel={() => setShowCreateModal(false)}
+        />
+      )}
     </div>
   );
 }

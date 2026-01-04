@@ -148,16 +148,24 @@ export function TopicsPage() {
                 Organize and track intelligence topics across your sources
               </p>
             </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => loadTopics(false)}
-                disabled={isRefreshing}
-                className="flex items-center gap-2 px-4 py-2 bg-stone-800 hover:bg-stone-700 text-stone-300 rounded-lg transition-colors duration-250 disabled:opacity-50"
-                title="Refresh topics"
-              >
-                <RefreshCw size={18} className={isRefreshing ? 'animate-spin' : ''} />
-                <span className="hidden sm:inline">Refresh</span>
-              </button>
+            <div className="flex items-center gap-3">
+              {/* Utility Actions Group */}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => loadTopics(false)}
+                  disabled={isRefreshing}
+                  className="flex items-center gap-2 px-4 py-2 bg-stone-800 hover:bg-stone-700 text-stone-300 rounded-lg transition-colors duration-250 disabled:opacity-50"
+                  title="Refresh topics"
+                >
+                  <RefreshCw size={18} className={isRefreshing ? 'animate-spin' : ''} />
+                  <span className="hidden sm:inline">Refresh</span>
+                </button>
+              </div>
+              
+              {/* Divider */}
+              <div className="h-8 w-px bg-stone-700" />
+              
+              {/* Primary Action */}
               <button
                 onClick={() => setShowCreateModal(true)}
                 className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent-hover text-white rounded-lg transition-colors duration-250"

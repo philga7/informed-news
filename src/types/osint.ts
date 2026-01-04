@@ -86,6 +86,7 @@ export interface Source {
   valueRating: number | null; // 1-5 star rating for analyst usefulness
   notes: string | null;
   domain: WatchItemCategory | null; // Phase 6: Domain categorization for scan view
+  scrapeExternalUrl: boolean; // Enable scraping of original URLs from aggregator sites
   createdAt: Date;
   updatedAt: Date;
 }

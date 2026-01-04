@@ -22,7 +22,9 @@ export type AuditAction =
   | 'artifact_created'
   | 'artifact_reviewed'
   | 'artifact_deleted'
+  | 'source_created'
   | 'source_updated'
+  | 'source_deleted'
   | 'source_rated';
 
 export type EntityType = 'topic' | 'source_record' | 'link' | 'artifact' | 'source';
@@ -38,6 +40,52 @@ export interface AuditLogParams {
 }
 
 // ============================================================================
+// AUDIT DATA TYPES
+// ============================================================================
+
+interface TopicData {
+  name: string;
+  description?: string | null;
+  keywords?: string[] | null;
+  status?: string | null;
+}
+
+interface LinkMetadata {
+  confidence_level?: string | null;
+  relevance_score?: number | null;
+  assumptions?: string | null;
+  analyst_notes?: string | null;
+  review_status?: string | null;
+}
+
+interface LinkData {
+  topic_id: string;
+  source_record_id: string;
+  confidence_level?: string | null;
+  relevance_score?: number | null;
+  assumptions?: string | null;
+  analyst_notes?: string | null;
+  review_status?: string | null;
+}
+
+interface ArtifactData {
+  type: string;
+  model_name: string;
+  source_record_id?: string | null;
+  topic_id?: string | null;
+  created_by?: string;
+}
+
+interface SourceData {
+  name: string;
+  source_type: string;
+  reliability_rating?: string | null;
+  value_rating?: number | null;
+  domain?: string | null;
+  record_count?: number;
+}
+
+// ============================================================================
 // AUDIT SERVICE
 // ============================================================================
 
@@ -47,6 +95,7 @@ export const auditService = {
    */
   async logAction(params: AuditLogParams): Promise<void> {
     try {
+      // @ts-expect-error - Supabase types don't include audit_logs table
       const { error } = await supabase.from('audit_logs').insert({
         user_id: params.userId || null,
         action: params.action,
@@ -55,7 +104,7 @@ export const auditService = {
         before_state: params.beforeState || null,
         after_state: params.afterState || null,
         metadata: params.metadata || null,
-      } as any);
+      });
 
       if (error) {
         console.error('[AuditService] Failed to log action:', error);
@@ -70,7 +119,7 @@ export const auditService = {
   /**
    * Convenience method: Log topic creation
    */
-  async logTopicCreated(topicId: string, topic: any, userId?: string): Promise<void> {
+  async logTopicCreated(topicId: string, topic: TopicData, userId?: string): Promise<void> {
     await this.logAction({
       action: 'topic_created',
       entityType: 'topic',
@@ -89,8 +138,8 @@ export const auditService = {
    */
   async logTopicUpdated(
     topicId: string,
-    before: any,
-    after: any,
+    before: TopicData,
+    after: TopicData,
     userId?: string
   ): Promise<void> {
     await this.logAction({
@@ -116,7 +165,7 @@ export const auditService = {
   /**
    * Convenience method: Log topic deletion
    */
-  async logTopicDeleted(topicId: string, topic: any, userId?: string): Promise<void> {
+  async logTopicDeleted(topicId: string, topic: TopicData, userId?: string): Promise<void> {
     await this.logAction({
       action: 'topic_deleted',
       entityType: 'topic',
@@ -136,7 +185,7 @@ export const auditService = {
     linkId: string,
     topicId: string,
     sourceRecordId: string,
-    metadata: any,
+    metadata: LinkMetadata,
     userId?: string
   ): Promise<void> {
     await this.logAction({
@@ -159,8 +208,8 @@ export const auditService = {
    */
   async logLinkUpdated(
     linkId: string,
-    before: any,
-    after: any,
+    before: LinkData,
+    after: LinkData,
     userId?: string
   ): Promise<void> {
     // Check if confidence changed specifically
@@ -196,7 +245,7 @@ export const auditService = {
    */
   async logLinkRemoved(
     linkId: string,
-    link: any,
+    link: LinkData,
     userId?: string
   ): Promise<void> {
     await this.logAction({
@@ -217,7 +266,7 @@ export const auditService = {
    */
   async logArtifactCreated(
     artifactId: string,
-    artifact: any,
+    artifact: ArtifactData,
     userId?: string
   ): Promise<void> {
     await this.logAction({
@@ -239,7 +288,7 @@ export const auditService = {
    */
   async logArtifactReviewed(
     artifactId: string,
-    artifact: any,
+    artifact: ArtifactData,
     userId?: string
   ): Promise<void> {
     await this.logAction({
@@ -257,12 +306,34 @@ export const auditService = {
   },
 
   /**
+   * Convenience method: Log source creation
+   */
+  async logSourceCreated(
+    sourceId: string,
+    source: SourceData,
+    userId?: string
+  ): Promise<void> {
+    await this.logAction({
+      action: 'source_created',
+      entityType: 'source',
+      entityId: sourceId,
+      userId,
+      afterState: {
+        name: source.name,
+        source_type: source.source_type,
+        reliability_rating: source.reliability_rating,
+        domain: source.domain,
+      },
+    });
+  },
+
+  /**
    * Convenience method: Log source update
    */
   async logSourceUpdated(
     sourceId: string,
-    before: any,
-    after: any,
+    before: SourceData,
+    after: SourceData,
     userId?: string
   ): Promise<void> {
     await this.logAction({
@@ -279,6 +350,28 @@ export const auditService = {
         name: after.name,
         reliability_rating: after.reliability_rating,
         value_rating: after.value_rating,
+      },
+    });
+  },
+
+  /**
+   * Convenience method: Log source deletion
+   */
+  async logSourceDeleted(
+    sourceId: string,
+    source: SourceData,
+    userId?: string
+  ): Promise<void> {
+    await this.logAction({
+      action: 'source_deleted',
+      entityType: 'source',
+      entityId: sourceId,
+      userId,
+      beforeState: {
+        name: source.name,
+        source_type: source.source_type,
+        reliability_rating: source.reliability_rating,
+        record_count: source.record_count || 0,
       },
     });
   },
