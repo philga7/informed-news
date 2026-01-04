@@ -196,13 +196,18 @@ router.post('/', async (req: Request, res: Response) => {
       .select()
       .single();
 
-    if (error) {
+    if (error || !source) {
       console.error('Error creating source:', error);
-      throw error;
+      throw error || new Error('Failed to create source');
     }
 
     // Audit log: source created
-    await auditService.logSourceCreated(source.id, source);
+    await auditService.logSourceCreated(source.id, {
+      name: source.name,
+      source_type: source.source_type,
+      reliability_rating: source.reliability_rating,
+      domain: source.domain,
+    });
 
     res.status(201).json({
       success: true,
@@ -342,7 +347,9 @@ router.delete('/:id', async (req: Request, res: Response) => {
 
     // Audit log: source deleted
     await auditService.logSourceDeleted(id, {
-      ...source,
+      name: source.name,
+      source_type: source.source_type,
+      reliability_rating: source.reliability_rating,
       record_count: recordCount || 0,
     });
 
