@@ -86,6 +86,28 @@ interface SourceData {
 }
 
 // ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+/**
+ * Validates if a string is a valid UUID format
+ */
+function isValidUUID(str: string | null | undefined): boolean {
+  if (!str) return false;
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(str);
+}
+
+/**
+ * Normalizes userId to either a valid UUID or null
+ * System identifiers like 'system:ollama' will be converted to null
+ */
+function normalizeUserId(userId: string | null | undefined): string | null {
+  if (!userId) return null;
+  return isValidUUID(userId) ? userId : null;
+}
+
+// ============================================================================
 // AUDIT SERVICE
 // ============================================================================
 
@@ -95,9 +117,12 @@ export const auditService = {
    */
   async logAction(params: AuditLogParams): Promise<void> {
     try {
+      // Normalize userId - only valid UUIDs are allowed, system identifiers become null
+      const normalizedUserId = normalizeUserId(params.userId);
+
       // @ts-expect-error - Supabase types don't include audit_logs table
       const { error } = await supabase.from('audit_logs').insert({
-        user_id: params.userId || null,
+        user_id: normalizedUserId,
         action: params.action,
         entity_type: params.entityType,
         entity_id: params.entityId,
@@ -269,11 +294,14 @@ export const auditService = {
     artifact: ArtifactData,
     userId?: string
   ): Promise<void> {
+    // Only use artifact.created_by if it's a valid UUID, otherwise use provided userId or null
+    const effectiveUserId = userId || (artifact.created_by && isValidUUID(artifact.created_by) ? artifact.created_by : null);
+    
     await this.logAction({
       action: 'artifact_created',
       entityType: 'artifact',
       entityId: artifactId,
-      userId: userId || artifact.created_by,
+      userId: effectiveUserId,
       afterState: {
         type: artifact.type,
         model_name: artifact.model_name,

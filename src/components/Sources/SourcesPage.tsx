@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Database, AlertTriangle, TrendingUp, Calendar, Plus } from 'lucide-react';
 import { osintSourcesService } from '../../services';
 import { useOrganization } from '../../context/OrganizationContext';
@@ -15,6 +15,15 @@ interface SourceWithMetrics extends Source {
   days_since_last_link?: number;
 }
 
+interface SourceUpdateParams {
+  name?: string;
+  url?: string;
+  domain?: string | null;
+  reliabilityRating?: 'HIGH' | 'MEDIUM' | 'LOW' | 'UNKNOWN';
+  notes?: string;
+  scrapeExternalUrl?: boolean;
+}
+
 export function SourcesPage() {
   const { currentOrganization } = useOrganization();
   const [sources, setSources] = useState<SourceWithMetrics[]>([]);
@@ -28,7 +37,7 @@ export function SourcesPage() {
     avgEffectiveness: 0,
   });
 
-  const loadSources = async () => {
+  const loadSources = useCallback(async () => {
     if (!currentOrganization) {
       setIsLoading(false);
       return;
@@ -43,16 +52,18 @@ export function SourcesPage() {
       const ninetyDaysAgo = new Date();
       ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
       
-      const sourcesWithMetrics = fetchedSources.map((source: any) => {
-        const linkedCount = source.linked_count || 0;
-        const recordCount = source.record_count || 0;
+      const sourcesWithMetrics: SourceWithMetrics[] = fetchedSources.map((source) => {
+        // Type assertion needed because service returns SourceWithCount but backend includes additional fields
+        const sourceWithMetrics = source as SourceWithMetrics;
+        const linkedCount = sourceWithMetrics.linked_count || 0;
+        const recordCount = sourceWithMetrics.record_count || 0;
         const effectiveness = recordCount > 0 ? (linkedCount / recordCount) * 100 : 0;
         
         return {
-          ...source,
+          ...sourceWithMetrics,
           linked_count: linkedCount,
           signal_effectiveness: effectiveness,
-          days_since_last_link: source.days_since_last_link,
+          days_since_last_link: sourceWithMetrics.days_since_last_link,
         };
       });
       
@@ -82,15 +93,15 @@ export function SourcesPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [currentOrganization]);
 
   useEffect(() => {
     if (currentOrganization) {
       loadSources();
     }
-  }, [currentOrganization?.id]);
+  }, [currentOrganization, loadSources]);
 
-  const handleUpdateSource = async (sourceId: string, updates: any) => {
+  const handleUpdateSource = async (sourceId: string, updates: SourceUpdateParams) => {
     try {
       await osintSourcesService.update(sourceId, updates);
       // Refresh sources list
@@ -132,6 +143,56 @@ export function SourcesPage() {
     } catch (err) {
       console.error('Error deleting source:', err);
       setError(err instanceof Error ? err.message : 'Failed to delete source');
+      throw err;
+    }
+  };
+
+  const handleRefreshSource = async (sourceId: string, sourceType: string) => {
+    if (!currentOrganization) {
+      setError('No organization selected');
+      return;
+    }
+
+    try {
+      setError(null);
+      
+      // Use relative URL in production (Vercel), localhost in development
+      const API_BASE = import.meta.env.PROD 
+        ? (import.meta.env.VITE_API_URL || '')
+        : (import.meta.env.VITE_API_URL || 'http://localhost:3001');
+
+      // For RSS sources, trigger actual ingestion
+      if (sourceType === 'rss') {
+        const response = await fetch(`${API_BASE}/api/ingest/rss`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            organization_id: currentOrganization.id,
+            source_id: sourceId,
+          }),
+        });
+
+        if (!response.ok) {
+          const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+          throw new Error(error.error || `Failed to refresh source: ${response.statusText}`);
+        }
+
+        const result = await response.json();
+        console.log('✅ RSS source refreshed:', result);
+      } else {
+        // For non-RSS sources (API, email, manual), just update the timestamp
+        // This marks the source as "touched" without triggering ingestion
+        await osintSourcesService.update(sourceId, {});
+        console.log(`✅ ${sourceType.toUpperCase()} source timestamp updated`);
+      }
+      
+      // Refresh sources list to update metrics
+      await loadSources();
+    } catch (err) {
+      console.error('Error refreshing source:', err);
+      setError(err instanceof Error ? err.message : 'Failed to refresh source');
       throw err;
     }
   };
@@ -269,6 +330,7 @@ export function SourcesPage() {
               sources={sources} 
               onUpdate={handleUpdateSource}
               onDelete={handleDeleteSource}
+              onRefresh={(sourceId, sourceType) => handleRefreshSource(sourceId, sourceType)}
             />
           )}
         </div>

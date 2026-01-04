@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Edit2, FileText, AlertTriangle, Link2, Trash2 } from 'lucide-react';
+import { Edit2, FileText, AlertTriangle, Link2, Trash2, RefreshCw } from 'lucide-react';
 import type { Source } from '../../types/osint';
 import { EditSourceModal } from './EditSourceModal';
 import { SourceValueRating } from './SourceValueRating';
@@ -15,11 +15,13 @@ interface OsintSourcesTableProps {
   sources: SourceWithMetrics[];
   onUpdate: (sourceId: string, updates: any) => Promise<void>;
   onDelete: (sourceId: string) => Promise<void>;
+  onRefresh: (sourceId: string, sourceType: string) => Promise<void>;
 }
 
-export function OsintSourcesTable({ sources, onUpdate, onDelete }: OsintSourcesTableProps) {
+export function OsintSourcesTable({ sources, onUpdate, onDelete, onRefresh }: OsintSourcesTableProps) {
   const [editingSource, setEditingSource] = useState<SourceWithMetrics | null>(null);
   const [deletingSourceId, setDeletingSourceId] = useState<string | null>(null);
+  const [refreshingSourceId, setRefreshingSourceId] = useState<string | null>(null);
 
   const getReliabilityBadgeColor = (rating: string) => {
     switch (rating) {
@@ -69,6 +71,24 @@ export function OsintSourcesTable({ sources, onUpdate, onDelete }: OsintSourcesT
         .finally(() => {
           setDeletingSourceId(null);
         });
+    }
+  };
+
+  const handleRefreshClick = async (source: SourceWithMetrics) => {
+    // For RSS sources, require a URL
+    if (source.sourceType === 'rss' && !source.url) {
+      alert(`Cannot refresh "${source.name}": RSS source is missing a URL.`);
+      return;
+    }
+
+    setRefreshingSourceId(source.id);
+    try {
+      await onRefresh(source.id, source.sourceType);
+    } catch (err) {
+      console.error('Error refreshing source:', err);
+      alert(`Failed to refresh source: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setRefreshingSourceId(null);
     }
   };
 
@@ -193,6 +213,17 @@ export function OsintSourcesTable({ sources, onUpdate, onDelete }: OsintSourcesT
                 </td>
                 <td className="py-4 px-4">
                   <div className="flex items-center justify-end gap-1">
+                    <button
+                      onClick={() => handleRefreshClick(source)}
+                      disabled={refreshingSourceId === source.id || (source.sourceType === 'rss' && !source.url)}
+                      className="p-2 hover:bg-stone-800 text-stone-400 hover:text-green-400 rounded-lg transition-colors duration-250 disabled:opacity-50 disabled:cursor-not-allowed"
+                      title={source.sourceType === 'rss' && !source.url ? 'RSS source missing URL' : `Refresh ${source.sourceType.toUpperCase()} source`}
+                    >
+                      <RefreshCw 
+                        size={18} 
+                        className={refreshingSourceId === source.id ? 'animate-spin' : ''}
+                      />
+                    </button>
                     <button
                       onClick={() => setEditingSource(source)}
                       className="p-2 hover:bg-stone-800 text-stone-400 hover:text-blue-400 rounded-lg transition-colors duration-250"
