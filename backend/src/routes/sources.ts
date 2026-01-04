@@ -190,11 +190,22 @@ router.post('/', async (req: Request, res: Response) => {
       sourceData.scrape_external_url = scrape_external_url;
     }
 
-    const { data: source, error } = await supabase
+    const result = await supabase
       .from('sources')
       .insert(sourceData)
       .select()
-      .single();
+      .single() as {
+        data: {
+          id: string;
+          name: string;
+          source_type: string;
+          reliability_rating: string | null;
+          domain: string | null;
+          [key: string]: unknown;
+        } | null;
+        error: unknown;
+      };
+    const { data: source, error } = result;
 
     if (error || !source) {
       console.error('Error creating source:', error);
@@ -318,11 +329,21 @@ router.delete('/:id', async (req: Request, res: Response) => {
     const { id } = req.params;
 
     // Fetch source before deletion for audit log
-    const { data: source, error: fetchError } = await supabase
+    const fetchResult = await supabase
       .from('sources')
       .select('*')
       .eq('id', id)
-      .single();
+      .single() as {
+        data: {
+          id: string;
+          name: string;
+          source_type: string;
+          reliability_rating: string | null;
+          [key: string]: unknown;
+        } | null;
+        error: unknown;
+      };
+    const { data: source, error: fetchError } = fetchResult;
 
     if (fetchError || !source) {
       return res.status(404).json({ error: 'Source not found' });
