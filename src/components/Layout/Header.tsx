@@ -25,8 +25,8 @@ export function Header() {
         ? (import.meta.env.VITE_API_URL || '')
         : (import.meta.env.VITE_API_URL || 'http://localhost:3001');
 
-      // Trigger RSS ingestion for the organization
-      const response = await fetch(`${API_BASE}/api/ingest/rss`, {
+      // Trigger RSS ingestion for all sources in the organization (one at a time)
+      const response = await fetch(`${API_BASE}/api/ingest/rss/all`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -65,7 +65,9 @@ export function Header() {
   const formatLastUpdate = () => {
     if (!state.ui.lastUpdate) return 'Never';
     const date = new Date(state.ui.lastUpdate);
-    return date.toLocaleTimeString('en-US', {
+    return date.toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
       hour: 'numeric',
       minute: '2-digit',
     });

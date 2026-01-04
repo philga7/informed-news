@@ -113,6 +113,7 @@ router.get('/', async (req: Request, res: Response) => {
         reliability_rating: source.reliability_rating,
         value_rating: source.value_rating || null,
         notes: source.notes,
+        scrape_external_url: source.scrape_external_url || false,
         created_at: source.created_at,
         updated_at: source.updated_at,
         record_count: recordCount,
@@ -135,6 +136,88 @@ router.get('/', async (req: Request, res: Response) => {
 });
 
 /**
+ * POST /api/sources
+ * Create a new OSINT source
+ * Body: { organization_id, source_type, name, url?, domain?, reliability_rating?, notes? }
+ */
+router.post('/', async (req: Request, res: Response) => {
+  try {
+    const { organization_id, source_type, name, url, domain, reliability_rating, notes, scrape_external_url } = req.body;
+
+    if (!organization_id) {
+      return res.status(400).json({ error: 'organization_id is required' });
+    }
+
+    if (!source_type) {
+      return res.status(400).json({ error: 'source_type is required' });
+    }
+
+    if (!name || name.trim().length === 0) {
+      return res.status(400).json({ error: 'name is required' });
+    }
+
+    // Validate source_type
+    if (!['rss', 'api', 'email', 'manual'].includes(source_type)) {
+      return res.status(400).json({
+        error: 'Invalid source_type. Must be rss, api, email, or manual',
+      });
+    }
+
+    // Validate reliability_rating if provided
+    if (reliability_rating && !['HIGH', 'MEDIUM', 'LOW', 'UNKNOWN'].includes(reliability_rating)) {
+      return res.status(400).json({
+        error: 'Invalid reliability_rating. Must be HIGH, MEDIUM, LOW, or UNKNOWN',
+      });
+    }
+
+    const sourceData: any = {
+      organization_id,
+      source_type,
+      name: name.trim(),
+      reliability_rating: reliability_rating || 'UNKNOWN',
+    };
+
+    if (url !== undefined) {
+      sourceData.url = url ? url.trim() : null;
+    }
+    if (domain !== undefined) {
+      sourceData.domain = domain || null;
+    }
+    if (notes !== undefined) {
+      sourceData.notes = notes ? notes.trim() : null;
+    }
+    if (scrape_external_url !== undefined) {
+      sourceData.scrape_external_url = scrape_external_url;
+    }
+
+    const { data: source, error } = await supabase
+      .from('sources')
+      .insert(sourceData)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating source:', error);
+      throw error;
+    }
+
+    // Audit log: source created
+    await auditService.logSourceCreated(source.id, source);
+
+    res.status(201).json({
+      success: true,
+      source,
+    });
+  } catch (error) {
+    console.error('Error creating source:', error);
+    res.status(500).json({
+      error: 'Failed to create source',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+/**
  * PATCH /api/sources/:id
  * Update a source (including reliability rating)
  * Body: { name?, url?, reliability_rating?, notes? }
@@ -142,7 +225,7 @@ router.get('/', async (req: Request, res: Response) => {
 router.patch('/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { name, url, domain, reliability_rating, notes, value_rating } = req.body;
+    const { name, url, domain, reliability_rating, notes, value_rating, scrape_external_url } = req.body;
 
     // Validate reliability_rating if provided
     if (reliability_rating && !['HIGH', 'MEDIUM', 'LOW', 'UNKNOWN'].includes(reliability_rating)) {
@@ -179,6 +262,7 @@ router.patch('/:id', async (req: Request, res: Response) => {
     if (reliability_rating !== undefined) updates.reliability_rating = reliability_rating;
     if (notes !== undefined) updates.notes = notes;
     if (value_rating !== undefined) updates.value_rating = value_rating;
+    if (scrape_external_url !== undefined) updates.scrape_external_url = scrape_external_url;
 
     if (Object.keys(updates).length === 0) {
       return res.status(400).json({ error: 'No updates provided' });
@@ -214,6 +298,62 @@ router.patch('/:id', async (req: Request, res: Response) => {
     console.error('Error updating source:', error);
     res.status(500).json({
       error: 'Failed to update source',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+/**
+ * DELETE /api/sources/:id
+ * Delete a source and all associated source records (cascade delete)
+ * Body: none
+ */
+router.delete('/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    // Fetch source before deletion for audit log
+    const { data: source, error: fetchError } = await supabase
+      .from('sources')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !source) {
+      return res.status(404).json({ error: 'Source not found' });
+    }
+
+    // Get record count for audit log
+    const { count: recordCount } = await supabase
+      .from('source_records')
+      .select('*', { count: 'exact', head: true })
+      .eq('source_id', id);
+
+    // Delete source (cascade will delete source_records and topic_source_links)
+    const { error: deleteError } = await supabase
+      .from('sources')
+      .delete()
+      .eq('id', id);
+
+    if (deleteError) {
+      console.error('Error deleting source:', deleteError);
+      throw deleteError;
+    }
+
+    // Audit log: source deleted
+    await auditService.logSourceDeleted(id, {
+      ...source,
+      record_count: recordCount || 0,
+    });
+
+    res.json({
+      success: true,
+      message: 'Source deleted successfully',
+    });
+  } catch (error) {
+    console.error('Error deleting source:', error);
+    res.status(500).json({
+      error: 'Failed to delete source',
       message: error instanceof Error ? error.message : 'Unknown error',
     });
   }

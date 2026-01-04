@@ -52,10 +52,35 @@ export class IngestionController {
   }
 
   /**
+   * Verify that the source exists in the database
+   */
+  private async verifySourceExists(sourceId: string): Promise<boolean> {
+    const { data, error } = await supabase
+      .from('sources')
+      .select('id')
+      .eq('id', sourceId)
+      .single();
+
+    if (error || !data) {
+      console.error(`Source ${sourceId} does not exist in database:`, error?.message || 'Not found');
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
    * Insert a source record into the database
    */
   private async insertRecord(dto: SourceRecordDTO, contentHash: string): Promise<boolean> {
     try {
+      // Verify source exists before attempting insert
+      const sourceExists = await this.verifySourceExists(dto.source_id);
+      if (!sourceExists) {
+        console.error(`Cannot insert record: source ${dto.source_id} does not exist`);
+        return false;
+      }
+
       // Build raw_metadata with content hash
       const rawMetadata = {
         ...(dto.raw_metadata || {}),
@@ -80,6 +105,10 @@ export class IngestionController {
 
       if (error) {
         console.error('Error inserting source record:', error);
+        // Check if it's a foreign key constraint error
+        if (error.code === '23503') {
+          console.error(`Foreign key violation: source ${dto.source_id} does not exist in sources table`);
+        }
         return false;
       }
 
@@ -102,12 +131,24 @@ export class IngestionController {
     };
 
     try {
+      console.log(`    📥 Fetching and normalizing content from source...`);
       // Fetch and normalize content from source
       const dtos = await this.service.fetchAndNormalize();
       result.records = dtos;
+      
+      console.log(`    📦 Found ${dtos.length} item(s) to process`);
 
       // Process each record
-      for (const dto of dtos) {
+      const totalRecords = dtos.length;
+      for (let i = 0; i < dtos.length; i++) {
+        const dto = dtos[i];
+        const recordNum = i + 1;
+        
+        // Log progress every 10 records or for the last record
+        if (recordNum % 10 === 0 || recordNum === totalRecords) {
+          console.log(`    ⏳ Processing record ${recordNum}/${totalRecords}...`);
+        }
+        
         try {
           // Generate content hash
           const contentHash = this.generateContentHash(dto);
@@ -131,6 +172,8 @@ export class IngestionController {
           result.errors.push(`Error processing "${dto.title}": ${errorMsg}`);
         }
       }
+      
+      console.log(`    ✅ Processing complete: ${result.added} added, ${result.skipped} skipped, ${result.errors.length} errors`);
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Unknown error';
       result.errors.push(`Ingestion service error: ${errorMsg}`);

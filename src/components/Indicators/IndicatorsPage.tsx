@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
-import { AlertTriangle, Plus, Search, RefreshCw, Filter, CheckCircle2 } from 'lucide-react';
-import { useAuth } from '../../hooks/useAuth';
+import { AlertTriangle, Plus, Search, RefreshCw } from 'lucide-react';
 import { useOrganization } from '../../context/OrganizationContext';
 import { indicatorsService } from '../../services';
 import { EmptyState } from '../UI/EmptyState';
@@ -10,7 +9,6 @@ import { IndicatorForm } from './IndicatorForm';
 import type { Indicator, WatchItemCategory } from '../../types/osint';
 
 export function IndicatorsPage() {
-  const { user } = useAuth();
   const { currentOrganization } = useOrganization();
   const [indicators, setIndicators] = useState<Indicator[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -35,7 +33,7 @@ export function IndicatorsPage() {
       }
       setError(null);
       
-      const filters: any = {};
+      const filters: { domain?: WatchItemCategory; isTriggered?: boolean } = {};
       if (filterDomain !== 'all') {
         filters.domain = filterDomain;
       }
@@ -60,6 +58,7 @@ export function IndicatorsPage() {
     if (currentOrganization) {
       loadIndicators();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentOrganization?.id, filterDomain, filterStatus]);
 
   const handleCreateIndicator = async (indicatorData: {
@@ -153,16 +152,24 @@ export function IndicatorsPage() {
                 Predefined signals that trigger escalation to deep analysis
               </p>
             </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => loadIndicators(false)}
-                disabled={isRefreshing}
-                className="flex items-center gap-2 px-4 py-2 bg-stone-800 hover:bg-stone-700 text-stone-300 rounded-lg transition-colors duration-250 disabled:opacity-50"
-                title="Refresh indicators"
-              >
-                <RefreshCw size={18} className={isRefreshing ? 'animate-spin' : ''} />
-                <span className="hidden sm:inline">Refresh</span>
-              </button>
+            <div className="flex items-center gap-3">
+              {/* Utility Actions Group */}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => loadIndicators(false)}
+                  disabled={isRefreshing}
+                  className="flex items-center gap-2 px-4 py-2 bg-stone-800 hover:bg-stone-700 text-stone-300 rounded-lg transition-colors duration-250 disabled:opacity-50"
+                  title="Refresh indicators"
+                >
+                  <RefreshCw size={18} className={isRefreshing ? 'animate-spin' : ''} />
+                  <span className="hidden sm:inline">Refresh</span>
+                </button>
+              </div>
+              
+              {/* Divider */}
+              <div className="h-8 w-px bg-stone-700" />
+              
+              {/* Primary Action */}
               <button
                 onClick={() => setShowCreateModal(true)}
                 className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent-hover text-white rounded-lg transition-colors duration-250"

@@ -65,6 +65,8 @@ export class RssIngestionService implements IngestionService {
    */
   async fetchAndNormalize(): Promise<SourceRecordDTO[]> {
     try {
+      console.log(`      🔗 Fetching RSS feed from: ${this.config.feedUrl}`);
+      
       // Create a NewsSource object for the parser
       const source: NewsSource = {
         id: this.config.sourceId,
@@ -78,9 +80,17 @@ export class RssIngestionService implements IngestionService {
 
       // Parse RSS feed using existing logic
       const rssItems = await parseRSSFeed(this.config.feedUrl, source);
+      console.log(`      📰 Parsed ${rssItems.length} RSS item(s) from feed`);
 
       // Process items in parallel with content extraction if enabled
-      const dtos = await Promise.all(rssItems.map(async (item) => {
+      if (this.config.extractFullContent) {
+        console.log(`      📄 Content extraction enabled (min length: 500 chars)`);
+      }
+      if (this.config.scrapeExternalUrl) {
+        console.log(`      🔍 External URL scraping enabled`);
+      }
+      
+      const dtos = await Promise.all(rssItems.map(async (item, index) => {
         // Start with RSS feed content
         let fullContent = [
           item.description || '',
@@ -89,15 +99,16 @@ export class RssIngestionService implements IngestionService {
 
         // If content extraction is enabled and RSS content is short, fetch full article
         const minContentLength = 500; // Characters
+        const originalContentLength = fullContent.length;
         if (this.config.extractFullContent && fullContent.length < minContentLength) {
-          console.log(`📄 Extracting full content for: ${item.title}`);
           const extractedContent = await contentExtractor.extractTextOnly(item.link);
           
           if (extractedContent && extractedContent.length > fullContent.length) {
             fullContent = extractedContent;
-            console.log(`✅ Extracted ${extractedContent.length} chars from ${item.link}`);
-          } else {
-            console.log(`⚠️  Content extraction failed or yielded less content for ${item.link}`);
+            // Only log if we successfully extracted significantly more content
+            if (extractedContent.length > originalContentLength * 1.5) {
+              console.log(`      ✅ Extracted ${extractedContent.length} chars for: ${item.title.substring(0, 60)}...`);
+            }
           }
         }
 

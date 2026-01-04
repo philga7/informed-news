@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Edit2, FileText, AlertTriangle, Link2 } from 'lucide-react';
+import { Edit2, FileText, AlertTriangle, Link2, Trash2 } from 'lucide-react';
 import type { Source } from '../../types/osint';
 import { EditSourceModal } from './EditSourceModal';
 import { SourceValueRating } from './SourceValueRating';
@@ -14,10 +14,12 @@ interface SourceWithMetrics extends Source {
 interface OsintSourcesTableProps {
   sources: SourceWithMetrics[];
   onUpdate: (sourceId: string, updates: any) => Promise<void>;
+  onDelete: (sourceId: string) => Promise<void>;
 }
 
-export function OsintSourcesTable({ sources, onUpdate }: OsintSourcesTableProps) {
+export function OsintSourcesTable({ sources, onUpdate, onDelete }: OsintSourcesTableProps) {
   const [editingSource, setEditingSource] = useState<SourceWithMetrics | null>(null);
+  const [deletingSourceId, setDeletingSourceId] = useState<string | null>(null);
 
   const getReliabilityBadgeColor = (rating: string) => {
     switch (rating) {
@@ -49,6 +51,27 @@ export function OsintSourcesTable({ sources, onUpdate }: OsintSourcesTableProps)
     setEditingSource(null);
   };
 
+  const handleDeleteClick = (source: SourceWithMetrics) => {
+    const recordCount = source.record_count || 0;
+    const linkedCount = source.linked_count || 0;
+    
+    const message = recordCount > 0
+      ? `Delete "${source.name}"?\n\nThis will permanently delete:\n• The source\n• ${recordCount} source record${recordCount !== 1 ? 's' : ''}\n• ${linkedCount} topic link${linkedCount !== 1 ? 's' : ''}\n\nThis action cannot be undone.`
+      : `Delete "${source.name}"?\n\nThis action cannot be undone.`;
+
+    if (confirm(message)) {
+      setDeletingSourceId(source.id);
+      onDelete(source.id)
+        .catch((err) => {
+          console.error('Error deleting source:', err);
+          alert(`Failed to delete source: ${err instanceof Error ? err.message : 'Unknown error'}`);
+        })
+        .finally(() => {
+          setDeletingSourceId(null);
+        });
+    }
+  };
+
   const getEffectivenessColor = (effectiveness: number) => {
     if (effectiveness >= 10) return 'text-green-400';
     if (effectiveness >= 5) return 'text-yellow-400';
@@ -65,8 +88,8 @@ export function OsintSourcesTable({ sources, onUpdate }: OsintSourcesTableProps)
         <table className="w-full">
           <thead>
             <tr className="border-b border-stone-800">
-              <th className="text-left py-3 px-4 text-stone-400 text-sm font-medium">Name</th>
-              <th className="text-left py-3 px-4 text-stone-400 text-sm font-medium">Type</th>
+              <th className="text-left py-3 px-4 pr-2 text-stone-400 text-sm font-medium">Name</th>
+              <th className="text-left py-3 pl-2 px-4 text-stone-400 text-sm font-medium">Type</th>
               <th className="text-left py-3 px-4 text-stone-400 text-sm font-medium">Domain</th>
               <th className="text-left py-3 px-4 text-stone-400 text-sm font-medium">Reliability</th>
               <th className="text-left py-3 px-4 text-stone-400 text-sm font-medium">Value Rating</th>
@@ -78,7 +101,7 @@ export function OsintSourcesTable({ sources, onUpdate }: OsintSourcesTableProps)
                 </div>
               </th>
               <th className="text-left py-3 px-4 text-stone-400 text-sm font-medium">Notes</th>
-              <th className="text-center py-3 px-4 text-stone-400 text-sm font-medium">Actions</th>
+              <th className="text-right py-3 px-4 text-stone-400 text-sm font-medium w-16"></th>
             </tr>
           </thead>
           <tbody>
@@ -89,7 +112,7 @@ export function OsintSourcesTable({ sources, onUpdate }: OsintSourcesTableProps)
                   isStale(source) ? 'bg-red-900/10' : ''
                 }`}
               >
-                <td className="py-4 px-4">
+                <td className="py-4 px-4 pr-2">
                   <div className="flex items-start gap-2">
                     {isStale(source) && (
                       <AlertTriangle 
@@ -108,7 +131,7 @@ export function OsintSourcesTable({ sources, onUpdate }: OsintSourcesTableProps)
                     </div>
                   </div>
                 </td>
-                <td className="py-4 px-4">
+                <td className="py-4 pl-2 px-4">
                   <span className="inline-block px-2 py-1 text-xs rounded bg-stone-800 text-stone-300">
                     {getSourceTypeLabel(source.sourceType)}
                   </span>
@@ -169,13 +192,21 @@ export function OsintSourcesTable({ sources, onUpdate }: OsintSourcesTableProps)
                   )}
                 </td>
                 <td className="py-4 px-4">
-                  <div className="flex items-center justify-center">
+                  <div className="flex items-center justify-end gap-1">
                     <button
                       onClick={() => setEditingSource(source)}
-                      className="p-2 bg-stone-800 hover:bg-stone-700 text-stone-400 hover:text-stone-300 rounded-lg transition-colors duration-250"
+                      className="p-2 hover:bg-stone-800 text-stone-400 hover:text-blue-400 rounded-lg transition-colors duration-250"
                       title="Edit source"
                     >
-                      <Edit2 size={16} />
+                      <Edit2 size={18} />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteClick(source)}
+                      disabled={deletingSourceId === source.id}
+                      className="p-2 hover:bg-stone-800 text-stone-400 hover:text-red-400 rounded-lg transition-colors duration-250 disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="Delete source"
+                    >
+                      <Trash2 size={18} />
                     </button>
                   </div>
                 </td>
