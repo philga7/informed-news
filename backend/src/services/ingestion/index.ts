@@ -9,4 +9,5 @@
 export { IngestionController } from './IngestionController.js';
 export { RssIngestionService } from './RssIngestionService.js';
 export { ManualInputService } from './ManualInputService.js';
+export { NitterScrapingService } from './NitterScrapingService.js';
 
