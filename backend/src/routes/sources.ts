@@ -99,9 +99,14 @@ router.get('/', async (req: Request, res: Response) => {
       });
       
       // Calculate days since last link
-      const daysSinceLastLink = mostRecentLinkDate 
-        ? Math.floor((Date.now() - mostRecentLinkDate.getTime()) / (1000 * 60 * 60 * 24))
-        : recordCount > 0 ? 999 : 0; // 999 if has records but never linked
+      let daysSinceLastLink: number;
+      // TypeScript control flow issue - use type assertion
+      const recentDate: Date | null = mostRecentLinkDate as Date | null;
+      if (recentDate) {
+        daysSinceLastLink = Math.floor((Date.now() - recentDate.getTime()) / (1000 * 60 * 60 * 24));
+      } else {
+        daysSinceLastLink = recordCount > 0 ? 999 : 0; // 999 if has records but never linked
+      }
       
       return {
         id: source.id,
@@ -333,6 +338,11 @@ router.patch('/:id', async (req: Request, res: Response) => {
       throw error;
     }
 
+    // Check if source was successfully updated
+    if (!source) {
+      return res.status(500).json({ error: 'Failed to update source' });
+    }
+
     // Audit log: Check what changed
     const retentionPolicyChanged = 
       (retention_max_items !== undefined && beforeSourceTyped.retention_max_items !== retention_max_items) ||
@@ -349,9 +359,9 @@ router.patch('/:id', async (req: Request, res: Response) => {
           retention_action: beforeSourceTyped.retention_action,
         },
         {
-          retention_max_items: source.retention_max_items,
-          retention_days: source.retention_days,
-          retention_action: source.retention_action,
+          retention_max_items: (source as any).retention_max_items,
+          retention_days: (source as any).retention_days,
+          retention_action: (source as any).retention_action,
         }
       );
     }
@@ -360,7 +370,7 @@ router.patch('/:id', async (req: Request, res: Response) => {
       await auditService.logSourceRated(id, beforeSourceTyped.value_rating, value_rating);
     } else if (!retentionPolicyChanged) {
       // Only log general source update if retention policy wasn't the only change
-      await auditService.logSourceUpdated(id, beforeSourceTyped, source);
+      await auditService.logSourceUpdated(id, beforeSourceTyped, source as any);
     }
 
     res.json({

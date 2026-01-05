@@ -103,7 +103,7 @@ export class ManualInputService implements IngestionService {
         .from('sources')
         .select('value_rating')
         .eq('id', this.sourceId)
-        .single();
+        .single<{ value_rating: number | null }>();
 
       if (error || !data) {
         return null;

@@ -79,10 +79,11 @@ router.patch('/:id', async (req: Request, res: Response) => {
 
     const { data: session, error } = await supabase
       .from('scan_sessions')
-      .update(updates as any)
+      // @ts-ignore - Supabase type inference issue in serverless environment
+      .update(updates)
       .eq('id', id)
       .select()
-      .single() as any;
+      .single();
 
     if (error) {
       if (error.code === 'PGRST116') {
@@ -183,17 +184,30 @@ router.get('/stats/:organizationId', async (req: Request, res: Response) => {
     const { organizationId } = req.params;
     const { days = '30' } = req.query;
 
-    const { data, error } = await supabase
+    const result = await supabase
       // @ts-ignore - Supabase type inference issue with RPC functions
       .rpc('get_scan_session_stats', {
         p_organization_id: organizationId,
         p_days: parseInt(days as string, 10),
-      } as any);
+      } as any) as {
+        data: Array<{
+          total_sessions: number;
+          total_items_reviewed: number;
+          total_linked: number;
+          total_watch_items: number;
+          total_dismissed: number;
+          avg_items_per_session: number;
+          avg_session_duration_minutes: number;
+        }> | null;
+        error: unknown;
+      };
+
+    const { data, error } = result;
 
     if (error) throw error;
 
     // Extract single row from result
-    const stats = data && data.length > 0 ? data[0] : {
+    const stats = data && Array.isArray(data) && data.length > 0 ? data[0] : {
       total_sessions: 0,
       total_items_reviewed: 0,
       total_linked: 0,

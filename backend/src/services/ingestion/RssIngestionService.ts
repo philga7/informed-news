@@ -73,7 +73,7 @@ export class RssIngestionService implements IngestionService {
         .from('sources')
         .select('value_rating')
         .eq('id', this.config.sourceId)
-        .single();
+        .single<{ value_rating: number | null }>();
 
       if (error || !data) {
         return this.config.sourceValueRating ?? null;

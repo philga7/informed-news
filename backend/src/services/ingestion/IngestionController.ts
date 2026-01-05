@@ -109,7 +109,7 @@ export class IngestionController {
           content_length: dto.content_length ?? null,
         } as any)
         .select('id')
-        .single();
+        .single<{ id: string }>();
 
       if (error) {
         console.error('Error inserting source record:', error);
@@ -121,7 +121,7 @@ export class IngestionController {
       }
 
       // Audit log: source record created (system ingestion)
-      if (insertedRecord?.id) {
+      if (insertedRecord && insertedRecord.id) {
         await auditService.logSourceRecordCreated(
           insertedRecord.id,
           {
