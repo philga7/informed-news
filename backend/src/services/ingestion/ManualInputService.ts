@@ -7,6 +7,8 @@
  */
 
 import { supabase } from '../../utils/supabase.js';
+import { contentOptimizer } from './ContentOptimizer.js';
+import { mediaTypeDetector } from './MediaTypeDetector.js';
 import type { IngestionService, SourceRecordDTO } from '../../types/ingestion.js';
 
 interface ManualInputConfig {
@@ -89,6 +91,32 @@ export class ManualInputService implements IngestionService {
   }
 
   /**
+   * Get source value rating from database
+   */
+  private async getSourceValueRating(): Promise<number | null> {
+    if (!this.sourceId) {
+      this.sourceId = await this.getOrCreateManualSource();
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('sources')
+        .select('value_rating')
+        .eq('id', this.sourceId)
+        .single();
+
+      if (error || !data) {
+        return null;
+      }
+
+      return data.value_rating ?? null;
+    } catch (error) {
+      console.warn(`Could not fetch source value rating: ${error}`);
+      return null;
+    }
+  }
+
+  /**
    * Fetch and normalize manual input into SourceRecordDTO
    */
   async fetchAndNormalize(): Promise<SourceRecordDTO[]> {
@@ -96,16 +124,52 @@ export class ManualInputService implements IngestionService {
       // Get or create the manual source
       this.sourceId = await this.getOrCreateManualSource();
 
+      // Get source value rating for optimization
+      const sourceValueRating = await this.getSourceValueRating();
+
+      // Detect media type from URL
+      const mediaType = this.config.url
+        ? mediaTypeDetector.detectFromUrl(this.config.url)
+        : 'article';
+
       // Extract geographic indicators
       const fullText = `${this.config.title} ${this.config.content}`;
       const geographicIndicators = this.extractGeographicIndicators(fullText);
+
+      // Determine content length
+      const contentLength = this.config.content?.length || 0;
+
+      // Determine optimization strategy
+      const strategy = contentOptimizer.determineStrategy(
+        sourceValueRating,
+        contentLength,
+        false, // isLinkedToTopic - will be updated later if linked
+        mediaType
+      );
+
+      // Optimize content if needed
+      let optimizedContent = this.config.content;
+      if (optimizedContent && strategy.contentType !== 'full_text') {
+        const extractedForOptimization = {
+          title: this.config.title,
+          textContent: optimizedContent,
+          htmlContent: '',
+          excerpt: optimizedContent.substring(0, 200),
+          byline: undefined,
+          siteName: undefined,
+          length: contentLength,
+          links: [],
+          headings: [],
+        };
+        optimizedContent = contentOptimizer.optimizeContent(extractedForOptimization, strategy);
+      }
 
       // Create single SourceRecordDTO
       const dto: SourceRecordDTO = {
         source_id: this.sourceId,
         title: this.config.title,
         url: this.config.url,
-        content: this.config.content,
+        content: optimizedContent,
         published_at: this.config.publishedAt || new Date(),
         language: this.config.language || 'unknown',
         geographic_indicators: geographicIndicators.length > 0 ? geographicIndicators : undefined,
@@ -114,6 +178,11 @@ export class ManualInputService implements IngestionService {
           submitted_at: new Date().toISOString(),
           input_method: 'api',
         },
+        // Phase 1: Content optimization and media types
+        media_type: mediaType,
+        content_type: strategy.contentType,
+        content_compressed: strategy.shouldCompress,
+        content_length: contentLength,
       };
 
       return [dto];

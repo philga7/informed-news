@@ -25,7 +25,10 @@ export type AuditAction =
   | 'source_created'
   | 'source_updated'
   | 'source_deleted'
-  | 'source_rated';
+  | 'source_rated'
+  | 'source_record_created'
+  | 'source_record_optimized'
+  | 'retention_policy_updated';
 
 export type EntityType = 'topic' | 'source_record' | 'link' | 'artifact' | 'source';
 
@@ -83,6 +86,18 @@ interface SourceData {
   value_rating?: number | null;
   domain?: string | null;
   record_count?: number;
+  retention_max_items?: number | null;
+  retention_days?: number | null;
+  retention_action?: 'delete' | 'archive';
+}
+
+interface SourceRecordData {
+  title: string;
+  source_id: string;
+  media_type?: string;
+  content_type?: string;
+  content_length?: number | null;
+  content_compressed?: boolean;
 }
 
 // ============================================================================
@@ -420,6 +435,87 @@ export const auditService = {
       userId,
       beforeState: { value_rating: oldRating },
       afterState: { value_rating: newRating },
+    });
+  },
+
+  /**
+   * Convenience method: Log source record creation (during ingestion)
+   */
+  async logSourceRecordCreated(
+    recordId: string,
+    record: SourceRecordData,
+    userId?: string
+  ): Promise<void> {
+    await this.logAction({
+      action: 'source_record_created',
+      entityType: 'source_record',
+      entityId: recordId,
+      userId,
+      afterState: {
+        title: record.title,
+        source_id: record.source_id,
+        media_type: record.media_type || 'article',
+        content_type: record.content_type || 'full_text',
+        content_length: record.content_length,
+        content_compressed: record.content_compressed || false,
+      },
+      metadata: {
+        ingestion_method: 'system',
+      },
+    });
+  },
+
+  /**
+   * Convenience method: Log source record optimization
+   */
+  async logSourceRecordOptimized(
+    recordId: string,
+    before: SourceRecordData,
+    after: SourceRecordData,
+    userId?: string
+  ): Promise<void> {
+    await this.logAction({
+      action: 'source_record_optimized',
+      entityType: 'source_record',
+      entityId: recordId,
+      userId,
+      beforeState: {
+        content_type: before.content_type,
+        content_length: before.content_length,
+        content_compressed: before.content_compressed,
+      },
+      afterState: {
+        content_type: after.content_type,
+        content_length: after.content_length,
+        content_compressed: after.content_compressed,
+      },
+    });
+  },
+
+  /**
+   * Convenience method: Log retention policy update
+   */
+  async logRetentionPolicyUpdated(
+    sourceId: string,
+    before: Partial<SourceData>,
+    after: Partial<SourceData>,
+    userId?: string
+  ): Promise<void> {
+    await this.logAction({
+      action: 'retention_policy_updated',
+      entityType: 'source',
+      entityId: sourceId,
+      userId,
+      beforeState: {
+        retention_max_items: before.retention_max_items,
+        retention_days: before.retention_days,
+        retention_action: before.retention_action,
+      },
+      afterState: {
+        retention_max_items: after.retention_max_items,
+        retention_days: after.retention_days,
+        retention_action: after.retention_action,
+      },
     });
   },
 };

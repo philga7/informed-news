@@ -241,7 +241,18 @@ router.post('/', async (req: Request, res: Response) => {
 router.patch('/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { name, url, domain, reliability_rating, notes, value_rating, scrape_external_url } = req.body;
+    const { 
+      name, 
+      url, 
+      domain, 
+      reliability_rating, 
+      notes, 
+      value_rating, 
+      scrape_external_url,
+      retention_max_items,
+      retention_days,
+      retention_action
+    } = req.body;
 
     // Validate reliability_rating if provided
     if (reliability_rating && !['HIGH', 'MEDIUM', 'LOW', 'UNKNOWN'].includes(reliability_rating)) {
@@ -254,6 +265,25 @@ router.patch('/:id', async (req: Request, res: Response) => {
     if (value_rating !== undefined && (value_rating < 1 || value_rating > 5)) {
       return res.status(400).json({
         error: 'Invalid value_rating. Must be between 1 and 5',
+      });
+    }
+
+    // Validate retention policy fields if provided
+    if (retention_max_items !== undefined && retention_max_items !== null && retention_max_items < 1) {
+      return res.status(400).json({
+        error: 'Invalid retention_max_items. Must be at least 1',
+      });
+    }
+
+    if (retention_days !== undefined && retention_days !== null && retention_days < 1) {
+      return res.status(400).json({
+        error: 'Invalid retention_days. Must be at least 1',
+      });
+    }
+
+    if (retention_action !== undefined && !['delete', 'archive'].includes(retention_action)) {
+      return res.status(400).json({
+        error: 'Invalid retention_action. Must be "delete" or "archive"',
       });
     }
 
@@ -279,6 +309,10 @@ router.patch('/:id', async (req: Request, res: Response) => {
     if (notes !== undefined) updates.notes = notes;
     if (value_rating !== undefined) updates.value_rating = value_rating;
     if (scrape_external_url !== undefined) updates.scrape_external_url = scrape_external_url;
+    // Phase 1: Retention policy fields
+    if (retention_max_items !== undefined) updates.retention_max_items = retention_max_items;
+    if (retention_days !== undefined) updates.retention_days = retention_days;
+    if (retention_action !== undefined) updates.retention_action = retention_action;
 
     if (Object.keys(updates).length === 0) {
       return res.status(400).json({ error: 'No updates provided' });
@@ -299,10 +333,33 @@ router.patch('/:id', async (req: Request, res: Response) => {
       throw error;
     }
 
-    // Audit log: source updated (or source rated if value_rating changed)
+    // Audit log: Check what changed
+    const retentionPolicyChanged = 
+      (retention_max_items !== undefined && beforeSourceTyped.retention_max_items !== retention_max_items) ||
+      (retention_days !== undefined && beforeSourceTyped.retention_days !== retention_days) ||
+      (retention_action !== undefined && beforeSourceTyped.retention_action !== retention_action);
+
+    if (retentionPolicyChanged) {
+      // Log retention policy update separately
+      await auditService.logRetentionPolicyUpdated(
+        id,
+        {
+          retention_max_items: beforeSourceTyped.retention_max_items,
+          retention_days: beforeSourceTyped.retention_days,
+          retention_action: beforeSourceTyped.retention_action,
+        },
+        {
+          retention_max_items: source.retention_max_items,
+          retention_days: source.retention_days,
+          retention_action: source.retention_action,
+        }
+      );
+    }
+
     if (value_rating !== undefined && beforeSourceTyped.value_rating !== value_rating) {
       await auditService.logSourceRated(id, beforeSourceTyped.value_rating, value_rating);
-    } else {
+    } else if (!retentionPolicyChanged) {
+      // Only log general source update if retention policy wasn't the only change
       await auditService.logSourceUpdated(id, beforeSourceTyped, source);
     }
 

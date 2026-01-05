@@ -28,6 +28,12 @@ async function getJSDOM() {
   return JSDOM;
 }
 
+export interface Link {
+  url: string;
+  text: string;
+  context?: string;
+}
+
 export interface ExtractedContent {
   title: string;
   textContent: string;
@@ -36,6 +42,8 @@ export interface ExtractedContent {
   byline?: string;
   siteName?: string;
   length: number;
+  links: Link[]; // NEW: Extracted links from content
+  headings: string[]; // NEW: Extracted headings from HTML
 }
 
 export class ContentExtractor {
@@ -69,6 +77,89 @@ export class ContentExtractor {
   }
 
   /**
+   * Extract links from HTML
+   */
+  async extractLinks(html: string, baseUrl: string): Promise<Link[]> {
+    try {
+      const JSDOMClass = await getJSDOM();
+      const dom = new JSDOMClass(html, { url: baseUrl });
+      const document = dom.window.document;
+
+      const links: Link[] = [];
+      const anchorTags = document.querySelectorAll('a[href]');
+
+      // Filter out navigation, footer, and ad links
+      const skipPatterns = [
+        /^(#|javascript:|mailto:|tel:)/i,
+        /(nav|menu|footer|header|sidebar|ad|advertisement|cookie|privacy|terms)/i,
+      ];
+
+      anchorTags.forEach((anchor) => {
+        const href = anchor.getAttribute('href');
+        if (!href) return;
+
+        // Skip navigation/footer/ad links
+        if (skipPatterns.some(pattern => pattern.test(href))) return;
+
+        try {
+          // Resolve relative URLs to absolute
+          const absoluteUrl = new URL(href, baseUrl).href;
+          
+          // Get link text
+          const linkText = (anchor.textContent || '').trim();
+          if (!linkText) return; // Skip empty links
+
+          // Get context (250 chars before and after)
+          const contextLength = 250;
+          let context: string | undefined;
+          
+          const parent = anchor.parentElement;
+          if (parent) {
+            const parentText = parent.textContent || '';
+            const linkIndex = parentText.indexOf(linkText);
+            if (linkIndex >= 0) {
+              const start = Math.max(0, linkIndex - contextLength);
+              const end = Math.min(parentText.length, linkIndex + linkText.length + contextLength);
+              context = parentText.substring(start, end).trim();
+            }
+          }
+
+          links.push({
+            url: absoluteUrl,
+            text: linkText,
+            context: context && context.length > linkText.length ? context : undefined,
+          });
+        } catch (urlError) {
+          // Skip invalid URLs
+          console.debug(`Skipping invalid link: ${href}`);
+        }
+      });
+
+      return links;
+    } catch (error) {
+      console.warn(`Link extraction error for ${baseUrl}:`, error);
+      return [];
+    }
+  }
+
+  /**
+   * Extract headings from HTML
+   */
+  private extractHeadings(document: Document): string[] {
+    const headings: string[] = [];
+    const headingTags = document.querySelectorAll('h1, h2, h3, h4, h5, h6');
+    
+    headingTags.forEach((heading) => {
+      const text = (heading.textContent || '').trim();
+      if (text) {
+        headings.push(text);
+      }
+    });
+
+    return headings;
+  }
+
+  /**
    * Extract content from HTML string
    */
   async extractFromHtml(html: string, url: string): Promise<ExtractedContent | null> {
@@ -79,6 +170,9 @@ export class ContentExtractor {
       // Create DOM from HTML
       const dom = new JSDOMClass(html, { url });
       const document = dom.window.document;
+
+      // Extract links before Readability processes the document
+      const links = await this.extractLinks(html, url);
 
       // Use Readability to extract article
       const reader = new Readability(document, {
@@ -92,6 +186,9 @@ export class ContentExtractor {
         return null;
       }
 
+      // Extract headings from original document
+      const headings = this.extractHeadings(document);
+
       // Handle potentially null/undefined values from Readability
       return {
         title: article.title || '',
@@ -101,6 +198,8 @@ export class ContentExtractor {
         byline: article.byline || undefined,
         siteName: article.siteName || undefined,
         length: article.length || 0,
+        links,
+        headings,
       };
     } catch (error) {
       console.warn(`HTML parsing error for ${url}:`, error);
@@ -116,6 +215,46 @@ export class ContentExtractor {
     const content = await this.extractFromUrl(url);
     return content ? content.textContent : null;
   }
+
+  /**
+   * Extract video content (title only)
+   * For videos, we only extract the title from the page
+   * No transcript extraction or storage
+   */
+  async extractVideoContent(url: string): Promise<string | null> {
+    try {
+      // Fetch the HTML
+      const { data: html } = await axios.get(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; NewsAggregatorBot/1.0)',
+        },
+        timeout: this.timeout,
+        maxContentLength: this.maxContentLength,
+      });
+
+      // Dynamically load jsdom
+      const JSDOMClass = await getJSDOM();
+      const dom = new JSDOMClass(html, { url });
+      const document = dom.window.document;
+
+      // Try to extract title from various meta tags (common for video platforms)
+      const title =
+        document.querySelector('meta[property="og:title"]')?.getAttribute('content') ||
+        document.querySelector('meta[name="twitter:title"]')?.getAttribute('content') ||
+        document.querySelector('title')?.textContent ||
+        null;
+
+      return title ? title.trim() : null;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        console.warn(`Video title extraction failed for ${url}:`, error.message);
+      } else {
+        console.warn(`Video title extraction error for ${url}:`, error);
+      }
+      return null;
+    }
+  }
+
 }
 
 // Export singleton instance

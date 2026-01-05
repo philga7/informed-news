@@ -1,4 +1,5 @@
 import type { SourceRecord } from '../types/osint';
+import { deduplicateContentComprehensive } from '../utils/contentDeduplication';
 
 // Use relative URL in production (Vercel), localhost in development
 const API_BASE = import.meta.env.PROD 
@@ -66,11 +67,26 @@ export const sourceRecordsService = {
     
     const data = await response.json();
     
-    // Convert dates
+    // Convert dates and transform field names
     const records = data.records.map((record: any) => ({
       ...record,
+      sourceId: record.source_id,
       publishedAt: record.published_at ? new Date(record.published_at) : null,
       ingestedAt: new Date(record.ingested_at),
+      // Deduplicate content to fix existing records with duplicated paragraphs
+      content: deduplicateContentComprehensive(record.content),
+      geographicIndicators: record.geographic_indicators,
+      rawMetadata: record.raw_metadata,
+      initialConfidenceFlags: record.initial_confidence_flags,
+      scanStatus: record.scan_status,
+      reviewedAt: record.reviewed_at ? new Date(record.reviewed_at) : null,
+      reviewedBy: record.reviewed_by,
+      // Phase 1: Content optimization and media types
+      mediaType: record.media_type || 'article',
+      contentType: record.content_type || 'full_text',
+      contentCompressed: record.content_compressed || false,
+      contentLength: record.content_length || null,
+      storageOptimizedAt: record.storage_optimized_at ? new Date(record.storage_optimized_at) : null,
       topic_source_links: (record.topic_source_links || []).map((link: any) => ({
         id: link.id,
         topicId: link.topic_id,
@@ -104,8 +120,23 @@ export const sourceRecordsService = {
     
     return {
       ...record,
+      sourceId: record.source_id,
       publishedAt: record.published_at ? new Date(record.published_at) : null,
       ingestedAt: new Date(record.ingested_at),
+      // Deduplicate content to fix existing records with duplicated paragraphs
+      content: deduplicateContentComprehensive(record.content),
+      geographicIndicators: record.geographic_indicators,
+      rawMetadata: record.raw_metadata,
+      initialConfidenceFlags: record.initial_confidence_flags,
+      scanStatus: record.scan_status,
+      reviewedAt: record.reviewed_at ? new Date(record.reviewed_at) : null,
+      reviewedBy: record.reviewed_by,
+      // Phase 1: Content optimization and media types
+      mediaType: record.media_type || 'article',
+      contentType: record.content_type || 'full_text',
+      contentCompressed: record.content_compressed || false,
+      contentLength: record.content_length || null,
+      storageOptimizedAt: record.storage_optimized_at ? new Date(record.storage_optimized_at) : null,
       topic_source_links: (record.topic_source_links || []).map((link: any) => ({
         id: link.id,
         topicId: link.topic_id,
