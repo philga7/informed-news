@@ -89,7 +89,14 @@ export interface Source {
   scrapeExternalUrl: boolean; // Enable scraping of original URLs from aggregator sites
   createdAt: Date;
   updatedAt: Date;
+  // Phase 1: Retention policy configuration
+  retentionMaxItems: number | null;
+  retentionDays: number | null;
+  retentionAction: 'delete' | 'archive';
 }
+
+export type MediaType = 'article' | 'video' | 'podcast' | 'audio' | 'other';
+export type ContentType = 'full_text' | 'summary' | 'structured' | 'minimal';
 
 export interface SourceRecord {
   id: string;
@@ -107,6 +114,12 @@ export interface SourceRecord {
   scanStatus: ScanStatus;
   reviewedAt: Date | null;
   reviewedBy: string | null;
+  // Phase 1: Content optimization and media types
+  mediaType: MediaType;
+  contentType: ContentType;
+  contentCompressed: boolean;
+  contentLength: number | null;
+  storageOptimizedAt: Date | null;
 }
 
 // Phase 6: Extended view with source domain information

@@ -9,6 +9,9 @@
 
 import { parseRSSFeed } from '../feedFetcher.js';
 import { contentExtractor } from './ContentExtractor.js';
+import { contentOptimizer } from './ContentOptimizer.js';
+import { mediaTypeDetector } from './MediaTypeDetector.js';
+import { supabase } from '../../utils/supabase.js';
 import type { NewsSource } from '../../types/index.js';
 import type { IngestionService, SourceRecordDTO } from '../../types/ingestion.js';
 
@@ -17,6 +20,7 @@ interface RssIngestionConfig {
   feedUrl: string;
   scrapeExternalUrl?: boolean;
   extractFullContent?: boolean; // Extract full article content from URLs
+  sourceValueRating?: number | null; // 1-5 rating for optimization strategy
 }
 
 export class RssIngestionService implements IngestionService {
@@ -61,12 +65,37 @@ export class RssIngestionService implements IngestionService {
   }
 
   /**
+   * Fetch source value rating from database
+   */
+  private async getSourceValueRating(): Promise<number | null> {
+    try {
+      const { data, error } = await supabase
+        .from('sources')
+        .select('value_rating')
+        .eq('id', this.config.sourceId)
+        .single<{ value_rating: number | null }>();
+
+      if (error || !data) {
+        return this.config.sourceValueRating ?? null;
+      }
+
+      return data.value_rating ?? this.config.sourceValueRating ?? null;
+    } catch (error) {
+      console.warn(`Could not fetch source value rating: ${error}`);
+      return this.config.sourceValueRating ?? null;
+    }
+  }
+
+  /**
    * Fetch and normalize RSS feed items into SourceRecordDTOs
    */
   async fetchAndNormalize(): Promise<SourceRecordDTO[]> {
     try {
       console.log(`      🔗 Fetching RSS feed from: ${this.config.feedUrl}`);
       
+      // Get source value rating for optimization strategy
+      const sourceValueRating = await this.getSourceValueRating();
+
       // Create a NewsSource object for the parser
       const source: NewsSource = {
         id: this.config.sourceId,
@@ -91,31 +120,124 @@ export class RssIngestionService implements IngestionService {
       }
       
       const dtos = await Promise.all(rssItems.map(async (item, index) => {
-        // Start with RSS feed content
-        let fullContent = [
-          item.description || '',
-          item.content || '',
-        ].filter(Boolean).join('\n\n');
+        // Detect media type from URL and metadata
+        const mediaType = mediaTypeDetector.detectFromContent(
+          null,
+          item.link,
+          {
+            rss_item: {
+              title: item.title,
+              description: item.description,
+              link: item.link,
+              pubDate: item.pubDate,
+              enclosure: (item as any).enclosure,
+            },
+          }
+        );
 
-        // If content extraction is enabled and RSS content is short, fetch full article
-        const minContentLength = 500; // Characters
-        const originalContentLength = fullContent.length;
-        if (this.config.extractFullContent && fullContent.length < minContentLength) {
-          const extractedContent = await contentExtractor.extractTextOnly(item.link);
+        let fullContent: string | undefined;
+        let links: Array<{ url: string; text: string; context?: string }> = [];
+        let headings: string[] = [];
+        let contentLength = 0;
+
+        // Handle videos: extract title only
+        if (mediaType === 'video') {
+          const videoTitle = await contentExtractor.extractVideoContent(item.link);
+          fullContent = videoTitle || item.title;
+          contentLength = fullContent.length;
+        } else {
+          // Handle articles: extract content with links
+          // Start with RSS feed content
+          let rssContent = [
+            item.description || '',
+            item.content || '',
+          ].filter(Boolean).join('\n\n');
+
+          // If content extraction is enabled and RSS content is short, fetch full article
+          const minContentLength = 500; // Characters
+          const originalContentLength = rssContent.length;
           
-          if (extractedContent && extractedContent.length > fullContent.length) {
-            fullContent = extractedContent;
-            // Only log if we successfully extracted significantly more content
-            if (extractedContent.length > originalContentLength * 1.5) {
-              console.log(`      ✅ Extracted ${extractedContent.length} chars for: ${item.title.substring(0, 60)}...`);
+          if (this.config.extractFullContent && rssContent.length < minContentLength) {
+            const extractedContent = await contentExtractor.extractFromUrl(item.link);
+            
+            if (extractedContent) {
+              fullContent = extractedContent.textContent;
+              links = extractedContent.links;
+              headings = extractedContent.headings;
+              contentLength = extractedContent.length;
+
+              // Only log if we successfully extracted significantly more content
+              if (extractedContent.length > originalContentLength * 1.5) {
+                console.log(`      ✅ Extracted ${extractedContent.length} chars for: ${item.title.substring(0, 60)}...`);
+              }
+            } else {
+              fullContent = rssContent;
+              contentLength = rssContent.length;
             }
+          } else {
+            fullContent = rssContent;
+            contentLength = rssContent.length;
+          }
+
+          // Determine optimization strategy
+          const strategy = contentOptimizer.determineStrategy(
+            sourceValueRating,
+            contentLength,
+            false, // isLinkedToTopic - will be updated later if linked
+            mediaType
+          );
+
+          // Optimize content based on strategy
+          if (fullContent) {
+            const extractedForOptimization = {
+              title: item.title,
+              textContent: fullContent,
+              htmlContent: '',
+              excerpt: item.description || '',
+              byline: item.author,
+              siteName: undefined,
+              length: contentLength,
+              links,
+              headings,
+            };
+            fullContent = contentOptimizer.optimizeContent(extractedForOptimization, strategy);
+            contentLength = fullContent.length;
           }
         }
 
         const language = this.detectLanguage(fullContent || item.title);
         const geographicIndicators = this.extractGeographicIndicators(
-          `${item.title} ${fullContent}`
+          `${item.title} ${fullContent || ''}`
         );
+
+        // Determine final optimization strategy for storage
+        const finalStrategy = contentOptimizer.determineStrategy(
+          sourceValueRating,
+          contentLength,
+          false,
+          mediaType
+        );
+
+        // Store links in raw_metadata
+        const rawMetadata: Record<string, any> = {
+          author: item.author,
+          thumbnail: item.thumbnail,
+          rss_item: {
+            title: item.title,
+            description: item.description,
+            link: item.link,
+            pubDate: item.pubDate,
+          },
+          extracted_content_length: contentLength,
+        };
+
+        if (links.length > 0) {
+          rawMetadata.links = links;
+        }
+
+        if (headings.length > 0) {
+          rawMetadata.headings = headings;
+        }
 
         return {
           source_id: this.config.sourceId,
@@ -125,17 +247,12 @@ export class RssIngestionService implements IngestionService {
           published_at: new Date(item.pubDate),
           language,
           geographic_indicators: geographicIndicators.length > 0 ? geographicIndicators : undefined,
-          raw_metadata: {
-            author: item.author,
-            thumbnail: item.thumbnail,
-            rss_item: {
-              title: item.title,
-              description: item.description,
-              link: item.link,
-              pubDate: item.pubDate,
-            },
-            extracted_content_length: fullContent.length,
-          },
+          raw_metadata: rawMetadata,
+          // Phase 1: Content optimization and media types
+          media_type: mediaType,
+          content_type: finalStrategy.contentType,
+          content_compressed: finalStrategy.shouldCompress,
+          content_length: contentLength,
         };
       }));
 

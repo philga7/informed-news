@@ -22,6 +22,11 @@ export interface SourceRecordDTO {
   language?: string;
   geographic_indicators?: string[];
   raw_metadata?: Record<string, any>;
+  // Phase 1: Content optimization and media types
+  media_type?: 'article' | 'video' | 'podcast' | 'audio' | 'other';
+  content_type?: 'full_text' | 'summary' | 'structured' | 'minimal';
+  content_compressed?: boolean;
+  content_length?: number;
 }
 
 // ============================================================================

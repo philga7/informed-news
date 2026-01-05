@@ -73,6 +73,10 @@ export interface Database {
           notes: string | null;
           created_at: string;
           updated_at: string;
+          // Phase 1: Retention policy configuration
+          retention_max_items: number | null;
+          retention_days: number | null;
+          retention_action: 'delete' | 'archive';
         };
         Insert: {
           id?: string;
@@ -84,6 +88,10 @@ export interface Database {
           notes?: string | null;
           created_at?: string;
           updated_at?: string;
+          // Phase 1: Retention policy configuration
+          retention_max_items?: number | null;
+          retention_days?: number | null;
+          retention_action?: 'delete' | 'archive';
         };
         Update: {
           id?: string;
@@ -95,6 +103,10 @@ export interface Database {
           notes?: string | null;
           created_at?: string;
           updated_at?: string;
+          // Phase 1: Retention policy configuration
+          retention_max_items?: number | null;
+          retention_days?: number | null;
+          retention_action?: 'delete' | 'archive';
         };
       };
       source_records: {
@@ -110,6 +122,12 @@ export interface Database {
           geographic_indicators: Json | null;
           raw_metadata: Json | null;
           initial_confidence_flags: Json | null;
+          // Phase 1: Content optimization and media types
+          media_type: 'article' | 'video' | 'podcast' | 'audio' | 'other';
+          content_type: 'full_text' | 'summary' | 'structured' | 'minimal';
+          content_compressed: boolean;
+          content_length: number | null;
+          storage_optimized_at: string | null;
         };
         Insert: {
           id?: string;
@@ -123,6 +141,12 @@ export interface Database {
           geographic_indicators?: Json | null;
           raw_metadata?: Json | null;
           initial_confidence_flags?: Json | null;
+          // Phase 1: Content optimization and media types
+          media_type?: 'article' | 'video' | 'podcast' | 'audio' | 'other';
+          content_type?: 'full_text' | 'summary' | 'structured' | 'minimal';
+          content_compressed?: boolean;
+          content_length?: number | null;
+          storage_optimized_at?: string | null;
         };
         Update: {
           id?: string;
@@ -136,6 +160,12 @@ export interface Database {
           geographic_indicators?: Json | null;
           raw_metadata?: Json | null;
           initial_confidence_flags?: Json | null;
+          // Phase 1: Content optimization and media types
+          media_type?: 'article' | 'video' | 'podcast' | 'audio' | 'other';
+          content_type?: 'full_text' | 'summary' | 'structured' | 'minimal';
+          content_compressed?: boolean;
+          content_length?: number | null;
+          storage_optimized_at?: string | null;
         };
       };
       osint_topics: {

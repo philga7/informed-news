@@ -1,4 +1,5 @@
 import type { SourceRecordWithDomain, ScanStatus, WatchItemCategory } from '../types/osint';
+import { deduplicateContentComprehensive } from '../utils/contentDeduplication';
 
 // Use relative URL in production (Vercel), localhost in development
 const API_BASE = import.meta.env.PROD 
@@ -98,6 +99,8 @@ export const scanService = {
       publishedAt: record.published_at ? new Date(record.published_at) : null,
       ingestedAt: new Date(record.ingested_at),
       reviewedAt: record.reviewed_at ? new Date(record.reviewed_at) : null,
+      // Deduplicate content to fix existing records with duplicated paragraphs
+      content: deduplicateContentComprehensive(record.content),
       sourceDomain: record.source_domain,
       sourceName: record.source_name,
       scanStatus: record.scan_status,

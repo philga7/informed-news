@@ -7,6 +7,7 @@
 
 import crypto from 'crypto';
 import { supabase } from '../../utils/supabase.js';
+import { auditService } from '../auditService.js';
 import type { IngestionService, SourceRecordDTO, IngestionResult } from '../../types/ingestion.js';
 
 export class IngestionController {
@@ -88,7 +89,7 @@ export class IngestionController {
       };
 
       // Insert into source_records table
-      const { error } = await supabase
+      const { data: insertedRecord, error } = await supabase
         .from('source_records')
         .insert({
           source_id: dto.source_id,
@@ -101,7 +102,14 @@ export class IngestionController {
             ? (JSON.parse(JSON.stringify(dto.geographic_indicators)) as any)
             : null,
           raw_metadata: rawMetadata as any,
-        } as any);
+          // Phase 1: Content optimization and media types
+          media_type: dto.media_type ?? 'article',
+          content_type: dto.content_type ?? 'full_text',
+          content_compressed: dto.content_compressed ?? false,
+          content_length: dto.content_length ?? null,
+        } as any)
+        .select('id')
+        .single<{ id: string }>();
 
       if (error) {
         console.error('Error inserting source record:', error);
@@ -110,6 +118,21 @@ export class IngestionController {
           console.error(`Foreign key violation: source ${dto.source_id} does not exist in sources table`);
         }
         return false;
+      }
+
+      // Audit log: source record created (system ingestion)
+      if (insertedRecord && insertedRecord.id) {
+        await auditService.logSourceRecordCreated(
+          insertedRecord.id,
+          {
+            title: dto.title,
+            source_id: dto.source_id,
+            media_type: dto.media_type,
+            content_type: dto.content_type,
+            content_length: dto.content_length ?? null,
+            content_compressed: dto.content_compressed ?? false,
+          }
+        );
       }
 
       return true;
