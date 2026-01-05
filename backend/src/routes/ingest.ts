@@ -11,9 +11,28 @@ import {
   IngestionController,
   RssIngestionService,
   ManualInputService,
+  NitterScrapingService,
 } from '../services/ingestion/index.js';
 
 const router = Router();
+
+/**
+ * Check if a URL is a Nitter instance URL
+ */
+function isNitterUrl(url: string): boolean {
+  if (!url || typeof url !== 'string') {
+    return false;
+  }
+  
+  try {
+    const urlObj = new URL(url);
+    // Check if hostname contains 'nitter' (e.g., nitter.poast.org, nitter.net, etc.)
+    return urlObj.hostname.toLowerCase().includes('nitter');
+  } catch {
+    // If URL parsing fails, check if string contains 'nitter'
+    return url.toLowerCase().includes('nitter');
+  }
+}
 
 /**
  * POST /api/ingest/rss/all
@@ -133,16 +152,27 @@ router.post('/rss/all', async (req: Request, res: Response) => {
         const startTime = Date.now();
         console.log(`  🔍 Starting ingestion...`);
         
-        // Create RSS ingestion service with scrapeExternalUrl from source config
-        const rssService = new RssIngestionService({
-          sourceId: source.id,
-          feedUrl: source.url,
-          scrapeExternalUrl: source.scrape_external_url || false,
-          extractFullContent: true,
-        });
+        // Check if this is a Nitter URL and use appropriate service
+        let service: RssIngestionService | NitterScrapingService;
+        
+        if (isNitterUrl(source.url)) {
+          console.log(`  🐦 Detected Nitter URL, using scraping service`);
+          service = new NitterScrapingService({
+            sourceId: source.id,
+            nitterUrl: source.url,
+          });
+        } else {
+          // Create RSS ingestion service with scrapeExternalUrl from source config
+          service = new RssIngestionService({
+            sourceId: source.id,
+            feedUrl: source.url,
+            scrapeExternalUrl: source.scrape_external_url || false,
+            extractFullContent: true,
+          });
+        }
 
         // Create controller and ingest
-        const controller = new IngestionController(rssService);
+        const controller = new IngestionController(service);
         const result = await controller.ingest();
         
         const duration = ((Date.now() - startTime) / 1000).toFixed(2);
@@ -284,16 +314,27 @@ router.post('/rss', async (req: Request, res: Response) => {
       });
     }
 
-    // Create RSS ingestion service with scrapeExternalUrl from source config
-    const rssService = new RssIngestionService({
-      sourceId: source.id,
-      feedUrl: source.url,
-      scrapeExternalUrl: source.scrape_external_url || false,
-      extractFullContent: true, // Extract full article content for AI analysis
-    });
+    // Check if this is a Nitter URL and use appropriate service
+    let service: RssIngestionService | NitterScrapingService;
+    
+    if (isNitterUrl(source.url)) {
+      console.log(`  🐦 Detected Nitter URL, using scraping service`);
+      service = new NitterScrapingService({
+        sourceId: source.id,
+        nitterUrl: source.url,
+      });
+    } else {
+      // Create RSS ingestion service with scrapeExternalUrl from source config
+      service = new RssIngestionService({
+        sourceId: source.id,
+        feedUrl: source.url,
+        scrapeExternalUrl: source.scrape_external_url || false,
+        extractFullContent: true, // Extract full article content for AI analysis
+      });
+    }
 
     // Create controller and ingest
-    const controller = new IngestionController(rssService);
+    const controller = new IngestionController(service);
     const result = await controller.ingest();
 
     // Log stats
