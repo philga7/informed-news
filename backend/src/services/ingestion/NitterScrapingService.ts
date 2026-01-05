@@ -87,7 +87,7 @@ export class NitterScrapingService implements IngestionService {
   /**
    * Extract tweet statistics from tweet-stats element
    */
-  private extractStats($: cheerio.CheerioAPI, statsElement: cheerio.Element): {
+  private extractStats($: cheerio.CheerioAPI, statsElement: any): {
     comments: number;
     retweets: number;
     likes: number;
@@ -131,7 +131,7 @@ export class NitterScrapingService implements IngestionService {
   /**
    * Parse a single tweet element into ParsedTweet
    */
-  private parseTweet($: cheerio.CheerioAPI, tweetElement: cheerio.Element): ParsedTweet | null {
+  private parseTweet($: cheerio.CheerioAPI, tweetElement: any): ParsedTweet | null {
     try {
       const $tweet = $(tweetElement);
 
