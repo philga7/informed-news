@@ -3,6 +3,7 @@ import type { Request, Response } from 'express';
 import { supabase } from '../utils/supabase.js';
 import { ollamaService } from '../services/ollamaService.js';
 import { auditService } from '../services/auditService.js';
+import { contentPreparer } from '../services/analysis/ContentPreparer.js';
 
 const router = Router();
 
@@ -21,16 +22,16 @@ router.post('/source-records/:id/summarize', async (req: Request, res: Response)
       });
     }
 
-    // Fetch the source record
+    // Fetch the source record with source information
     const { data: record, error: fetchError } = await supabase
       .from('source_records')
       .select(`
         id,
-        title,
-        content,
         source_id,
         sources!inner (
-          organization_id
+          organization_id,
+          name,
+          reliability_rating
         )
       `)
       .eq('id', id)
@@ -40,17 +41,29 @@ router.post('/source-records/:id/summarize', async (req: Request, res: Response)
       return res.status(404).json({ error: 'Source record not found' });
     }
 
-    // Prepare content for analysis (title + content with graceful fallback)
-    const textToAnalyze = record.content 
-      ? `${record.title}\n\n${record.content}`
-      : record.title;
+    // Prepare content for analysis (with metadata, links, structure)
+    let preparedContent;
+    try {
+      preparedContent = await contentPreparer.prepareForAnalysis(id);
+    } catch (prepError) {
+      return res.status(400).json({ 
+        error: 'Failed to prepare content for analysis',
+        message: prepError instanceof Error ? prepError.message : 'Unknown error'
+      });
+    }
 
-    if (!textToAnalyze.trim()) {
+    if (!preparedContent.text || !preparedContent.text.trim()) {
       return res.status(400).json({ error: 'No content available to analyze' });
     }
 
-    // Call Ollama service
-    const summaryResult = await ollamaService.summarize(textToAnalyze);
+    // Get source metadata for enhanced prompts
+    const sourceMetadata = {
+      name: record.sources.name,
+      reliabilityRating: record.sources.reliability_rating,
+    };
+
+    // Call Ollama service with prepared content
+    const summaryResult = await ollamaService.summarize(preparedContent, sourceMetadata);
 
     // Store in analytic_artifacts table
     const { data: artifact, error: insertError } = await supabase
@@ -104,16 +117,16 @@ router.post('/source-records/:id/entities', async (req: Request, res: Response) 
       });
     }
 
-    // Fetch the source record
+    // Fetch the source record with source information
     const { data: record, error: fetchError } = await supabase
       .from('source_records')
       .select(`
         id,
-        title,
-        content,
         source_id,
         sources!inner (
-          organization_id
+          organization_id,
+          name,
+          reliability_rating
         )
       `)
       .eq('id', id)
@@ -123,17 +136,29 @@ router.post('/source-records/:id/entities', async (req: Request, res: Response) 
       return res.status(404).json({ error: 'Source record not found' });
     }
 
-    // Prepare content for analysis
-    const textToAnalyze = record.content 
-      ? `${record.title}\n\n${record.content}`
-      : record.title;
+    // Prepare content for analysis (with metadata, links, structure)
+    let preparedContent;
+    try {
+      preparedContent = await contentPreparer.prepareForAnalysis(id);
+    } catch (prepError) {
+      return res.status(400).json({ 
+        error: 'Failed to prepare content for analysis',
+        message: prepError instanceof Error ? prepError.message : 'Unknown error'
+      });
+    }
 
-    if (!textToAnalyze.trim()) {
+    if (!preparedContent.text || !preparedContent.text.trim()) {
       return res.status(400).json({ error: 'No content available to analyze' });
     }
 
-    // Call Ollama service
-    const entitiesResult = await ollamaService.extractEntities(textToAnalyze);
+    // Get source metadata for enhanced prompts
+    const sourceMetadata = {
+      name: record.sources.name,
+      reliabilityRating: record.sources.reliability_rating,
+    };
+
+    // Call Ollama service with prepared content
+    const entitiesResult = await ollamaService.extractEntities(preparedContent, sourceMetadata);
 
     // Store in analytic_artifacts table
     const { data: artifact, error: insertError } = await supabase
@@ -187,16 +212,16 @@ router.post('/source-records/:id/tone', async (req: Request, res: Response) => {
       });
     }
 
-    // Fetch the source record
+    // Fetch the source record with source information
     const { data: record, error: fetchError } = await supabase
       .from('source_records')
       .select(`
         id,
-        title,
-        content,
         source_id,
         sources!inner (
-          organization_id
+          organization_id,
+          name,
+          reliability_rating
         )
       `)
       .eq('id', id)
@@ -206,17 +231,29 @@ router.post('/source-records/:id/tone', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Source record not found' });
     }
 
-    // Prepare content for analysis
-    const textToAnalyze = record.content 
-      ? `${record.title}\n\n${record.content}`
-      : record.title;
+    // Prepare content for analysis (with metadata, links, structure)
+    let preparedContent;
+    try {
+      preparedContent = await contentPreparer.prepareForAnalysis(id);
+    } catch (prepError) {
+      return res.status(400).json({ 
+        error: 'Failed to prepare content for analysis',
+        message: prepError instanceof Error ? prepError.message : 'Unknown error'
+      });
+    }
 
-    if (!textToAnalyze.trim()) {
+    if (!preparedContent.text || !preparedContent.text.trim()) {
       return res.status(400).json({ error: 'No content available to analyze' });
     }
 
-    // Call Ollama service
-    const toneResult = await ollamaService.analyzeTone(textToAnalyze);
+    // Get source metadata for enhanced prompts
+    const sourceMetadata = {
+      name: record.sources.name,
+      reliabilityRating: record.sources.reliability_rating,
+    };
+
+    // Call Ollama service with prepared content
+    const toneResult = await ollamaService.analyzeTone(preparedContent, sourceMetadata);
 
     // Store in analytic_artifacts table
     const { data: artifact, error: insertError } = await supabase
@@ -462,6 +499,239 @@ router.post('/detect-duplicates', async (req: Request, res: Response) => {
     console.error('Error detecting duplicates:', error);
     res.status(500).json({
       error: 'Failed to detect duplicates',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+/**
+ * POST /api/analysis/source-records/:id/key-facts
+ * Extract key facts from a source record
+ */
+router.post('/source-records/:id/key-facts', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    if (!ollamaService.isAvailable()) {
+      return res.status(503).json({
+        error: 'AI analysis service not available',
+        message: 'OLLAMA_API_KEY not configured',
+      });
+    }
+
+    // Fetch the source record with source information
+    const { data: record, error: fetchError } = await supabase
+      .from('source_records')
+      .select(`
+        id,
+        source_id,
+        sources!inner (
+          organization_id,
+          name,
+          reliability_rating
+        )
+      `)
+      .eq('id', id)
+      .single() as any;
+
+    if (fetchError || !record) {
+      return res.status(404).json({ error: 'Source record not found' });
+    }
+
+    // Prepare content for analysis (with metadata, links, structure)
+    let preparedContent;
+    try {
+      preparedContent = await contentPreparer.prepareForAnalysis(id);
+    } catch (prepError) {
+      return res.status(400).json({ 
+        error: 'Failed to prepare content for analysis',
+        message: prepError instanceof Error ? prepError.message : 'Unknown error'
+      });
+    }
+
+    if (!preparedContent.text || !preparedContent.text.trim()) {
+      return res.status(400).json({ error: 'No content available to analyze' });
+    }
+
+    // Get source metadata for enhanced prompts
+    const sourceMetadata = {
+      name: record.sources.name,
+      reliabilityRating: record.sources.reliability_rating,
+    };
+
+    // Call Ollama service to extract key facts
+    const keyFactsResult = await ollamaService.extractKeyFacts(preparedContent, sourceMetadata);
+
+    // Store in analytic_artifacts table
+    const { data: artifact, error: insertError } = await supabase
+      .from('analytic_artifacts')
+      .insert({
+        source_record_id: id,
+        organization_id: record.sources.organization_id,
+        type: 'key_facts',
+        payload: keyFactsResult as any,
+        model_name: ollamaService.getModelName(),
+        created_by: 'system:ollama',
+        reviewed: false,
+      } as any)
+      .select()
+      .single();
+
+    if (insertError) throw insertError;
+
+    if (!artifact) {
+      return res.status(500).json({ error: 'Failed to create artifact' });
+    }
+
+    // Audit log: artifact created
+    await auditService.logArtifactCreated((artifact as any).id, artifact as any);
+
+    res.json({
+      success: true,
+      artifact,
+    });
+  } catch (error) {
+    console.error('Error extracting key facts:', error);
+    res.status(500).json({
+      error: 'Failed to extract key facts',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+/**
+ * POST /api/analysis/topics/:id/summarize
+ * Generate topic-level summary across all linked source records
+ */
+router.post('/topics/:id/summarize', async (req: Request, res: Response) => {
+  try {
+    const { id: topicId } = req.params;
+
+    if (!ollamaService.isAvailable()) {
+      return res.status(503).json({
+        error: 'AI analysis service not available',
+        message: 'OLLAMA_API_KEY not configured',
+      });
+    }
+
+    // Fetch the topic
+    const { data: topic, error: topicError } = await supabase
+      .from('osint_topics')
+      .select('id, name, description, decision_question, organization_id')
+      .eq('id', topicId)
+      .single() as any;
+
+    if (topicError || !topic) {
+      return res.status(404).json({ error: 'Topic not found' });
+    }
+
+    // Fetch all source records linked to this topic
+    const { data: links, error: linksError } = await supabase
+      .from('topic_source_links')
+      .select(`
+        source_record_id,
+        source_records!inner (
+          id,
+          sources!inner (
+            name,
+            reliability_rating
+          )
+        )
+      `)
+      .eq('topic_id', topicId);
+
+    if (linksError) throw linksError;
+
+    if (!links || links.length === 0) {
+      return res.status(400).json({ 
+        error: 'No source records linked to this topic',
+        message: 'Link source records to the topic before generating a summary'
+      });
+    }
+
+    // Prepare content for each linked record
+    const preparedContents = [];
+    const sourceMetadataMap = new Map<string, { name: string; reliabilityRating: string }>();
+
+    for (const link of links) {
+      try {
+        const recordId = (link as any).source_record_id;
+        const sourceInfo = (link as any).source_records.sources;
+        
+        const prepared = await contentPreparer.prepareForAnalysis(recordId);
+        preparedContents.push(prepared);
+        
+        // Store source metadata (use first occurrence if multiple records from same source)
+        if (!sourceMetadataMap.has(sourceInfo.name)) {
+          sourceMetadataMap.set(sourceInfo.name, {
+            name: sourceInfo.name,
+            reliabilityRating: sourceInfo.reliability_rating,
+          });
+        }
+      } catch (prepError) {
+        console.warn(`Failed to prepare content for record ${(link as any).source_record_id}:`, prepError);
+        // Continue with other records
+      }
+    }
+
+    if (preparedContents.length === 0) {
+      return res.status(400).json({ 
+        error: 'No valid content available for analysis',
+        message: 'All linked records failed content preparation'
+      });
+    }
+
+    // Use first source metadata (or combine if needed)
+    const sourceMetadata = sourceMetadataMap.size > 0 
+      ? Array.from(sourceMetadataMap.values())[0]
+      : undefined;
+
+    // Build topic context
+    const topicContext = {
+      name: topic.name,
+      description: topic.description || undefined,
+      decisionQuestion: topic.decision_question || undefined,
+    };
+
+    // Call Ollama service to generate topic summary
+    const topicSummaryResult = await ollamaService.summarizeTopic(
+      preparedContents,
+      topicContext,
+      sourceMetadata
+    );
+
+    // Store in analytic_artifacts table (with topic_id, not source_record_id)
+    const { data: artifact, error: insertError } = await supabase
+      .from('analytic_artifacts')
+      .insert({
+        topic_id: topicId,
+        organization_id: topic.organization_id,
+        type: 'summary',
+        payload: topicSummaryResult as any,
+        model_name: ollamaService.getModelName(),
+        created_by: 'system:ollama',
+        reviewed: false,
+      } as any)
+      .select()
+      .single();
+
+    if (insertError) throw insertError;
+
+    if (!artifact) {
+      return res.status(500).json({ error: 'Failed to create artifact' });
+    }
+
+    // Audit log: artifact created
+    await auditService.logArtifactCreated((artifact as any).id, artifact as any);
+
+    res.json({
+      success: true,
+      artifact,
+    });
+  } catch (error) {
+    console.error('Error generating topic summary:', error);
+    res.status(500).json({
+      error: 'Failed to generate topic summary',
       message: error instanceof Error ? error.message : 'Unknown error',
     });
   }

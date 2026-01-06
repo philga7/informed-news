@@ -360,55 +360,10 @@ router.get('/scan/stats/domains', async (req: Request, res: Response) => {
 });
 
 /**
- * PATCH /api/source-records/:id/scan-status
- * Update scan status for a single record
- * Body: { scan_status: 'pending' | 'reviewed' | 'linked' | 'dismissed', reviewed_by?: string }
- */
-router.patch('/:id/scan-status', async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const { scan_status, reviewed_by } = req.body;
-
-    if (!scan_status) {
-      return res.status(400).json({ error: 'scan_status is required' });
-    }
-
-    const updateData: Record<string, unknown> = {
-      scan_status,
-      reviewed_at: new Date().toISOString(),
-    };
-
-    if (reviewed_by) {
-      updateData.reviewed_by = reviewed_by;
-    }
-
-    const { data, error } = await supabase
-      .from('source_records')
-      // @ts-ignore - Supabase type inference issue in serverless environment
-      .update(updateData as any)
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    res.json({
-      success: true,
-      record: data,
-    });
-  } catch (error) {
-    console.error('Error updating scan status:', error);
-    res.status(500).json({
-      error: 'Failed to update scan status',
-      message: error instanceof Error ? error.message : 'Unknown error',
-    });
-  }
-});
-
-/**
  * PATCH /api/source-records/batch/scan-status
  * Batch update scan status for multiple records
  * Body: { record_ids: string[], scan_status: 'pending' | 'reviewed' | 'linked' | 'dismissed', reviewed_by?: string }
+ * NOTE: This route must come BEFORE /:id/scan-status to avoid route matching conflicts
  */
 router.patch('/batch/scan-status', async (req: Request, res: Response) => {
   try {
@@ -448,6 +403,53 @@ router.patch('/batch/scan-status', async (req: Request, res: Response) => {
     console.error('Error batch updating scan status:', error);
     res.status(500).json({
       error: 'Failed to batch update scan status',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+/**
+ * PATCH /api/source-records/:id/scan-status
+ * Update scan status for a single record
+ * Body: { scan_status: 'pending' | 'reviewed' | 'linked' | 'dismissed', reviewed_by?: string }
+ * NOTE: This route must come AFTER /batch/scan-status to avoid route matching conflicts
+ */
+router.patch('/:id/scan-status', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { scan_status, reviewed_by } = req.body;
+
+    if (!scan_status) {
+      return res.status(400).json({ error: 'scan_status is required' });
+    }
+
+    const updateData: Record<string, unknown> = {
+      scan_status,
+      reviewed_at: new Date().toISOString(),
+    };
+
+    if (reviewed_by) {
+      updateData.reviewed_by = reviewed_by;
+    }
+
+    const { data, error } = await supabase
+      .from('source_records')
+      // @ts-ignore - Supabase type inference issue in serverless environment
+      .update(updateData as any)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    res.json({
+      success: true,
+      record: data,
+    });
+  } catch (error) {
+    console.error('Error updating scan status:', error);
+    res.status(500).json({
+      error: 'Failed to update scan status',
       message: error instanceof Error ? error.message : 'Unknown error',
     });
   }

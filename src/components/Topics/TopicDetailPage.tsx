@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Edit2, FileText, Plus } from 'lucide-react';
+import { ArrowLeft, Edit2, FileText, Plus, Sparkles } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useOrganization } from '../../context/OrganizationContext';
 import { osintTopicsService } from '../../services';
+import { analysisService, type AnalyticArtifact } from '../../services/analysis.service';
+import { supabase } from '../../utils/supabase';
 import { LoadingSpinner } from '../UI/LoadingSpinner';
 import { EmptyState } from '../UI/EmptyState';
+import { ArtifactCard } from '../SourceRecords/ArtifactCard';
 import { LinkedRecordsTable } from './LinkedRecordsTable';
 import { LinkRecordModal } from './LinkRecordModal';
 import { EditLinkModal } from './EditLinkModal';
@@ -39,6 +42,9 @@ export function TopicDetailPage() {
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [editingLinkId, setEditingLinkId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'history' | 'qa'>('overview');
+  const [topicArtifacts, setTopicArtifacts] = useState<AnalyticArtifact[]>([]);
+  const [isLoadingArtifacts, setIsLoadingArtifacts] = useState(false);
+  const [analysisLoading, setAnalysisLoading] = useState<string | null>(null);
 
   const loadTopic = async () => {
     if (!id) return;
@@ -76,8 +82,44 @@ export function TopicDetailPage() {
     }
   };
 
+  const loadTopicArtifacts = async () => {
+    if (!id) return;
+
+    try {
+      setIsLoadingArtifacts(true);
+      // Fetch artifacts for this topic (topic_id is set, not source_record_id)
+      const { data: artifacts, error } = await supabase
+        .from('analytic_artifacts')
+        .select('*')
+        .eq('topic_id', id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setTopicArtifacts((artifacts || []) as AnalyticArtifact[]);
+    } catch (err) {
+      console.error('Error loading topic artifacts:', err);
+    } finally {
+      setIsLoadingArtifacts(false);
+    }
+  };
+
+  const handleGenerateTopicSummary = async () => {
+    if (!id) return;
+    try {
+      setAnalysisLoading('topic_summary');
+      await analysisService.generateTopicSummary(id);
+      await loadTopicArtifacts();
+    } catch (err) {
+      console.error('Error generating topic summary:', err);
+      alert(err instanceof Error ? err.message : 'Failed to generate topic summary');
+    } finally {
+      setAnalysisLoading(null);
+    }
+  };
+
   useEffect(() => {
     loadTopic();
+    loadTopicArtifacts();
   }, [id]);
 
   useEffect(() => {
@@ -354,6 +396,64 @@ export function TopicDetailPage() {
                         <h4 className="text-sm font-medium text-stone-400 mb-1">Resolution Criteria</h4>
                         <p className="text-stone-300">{topic.resolution_criteria}</p>
                       </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Topic-Level AI Analysis Section */}
+                {linkedRecords.length > 0 && (
+                  <div className="bg-stone-900 border border-stone-800 rounded-lg p-6">
+                    <div className="flex items-center gap-2 mb-4">
+                      <Sparkles size={20} className="text-accent" />
+                      <h2 className="text-xl font-semibold text-stone-200">Topic-Level AI Analysis</h2>
+                    </div>
+
+                    <p className="text-sm text-stone-400 mb-4">
+                      Generate AI-powered summary across all linked source records. Synthesizes information from multiple sources to provide comprehensive intelligence overview.
+                    </p>
+
+                    <button
+                      onClick={handleGenerateTopicSummary}
+                      disabled={analysisLoading !== null || linkedRecords.length === 0}
+                      className="flex items-center justify-center gap-2 px-4 py-3 bg-stone-800 hover:bg-stone-700 border border-stone-700 hover:border-stone-600 text-stone-200 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed mb-6"
+                    >
+                      {analysisLoading === 'topic_summary' ? (
+                        <>
+                          <LoadingSpinner />
+                          <span>Generating Topic Summary...</span>
+                        </>
+                      ) : (
+                        <>
+                          <FileText size={18} />
+                          <span>Generate Topic Summary</span>
+                        </>
+                      )}
+                    </button>
+
+                    {/* Existing Topic Artifacts */}
+                    {isLoadingArtifacts ? (
+                      <div className="flex justify-center py-8">
+                        <LoadingSpinner />
+                      </div>
+                    ) : topicArtifacts.length > 0 ? (
+                      <div>
+                        <h3 className="text-sm font-semibold text-stone-400 uppercase mb-3">
+                          Topic Analysis History ({topicArtifacts.length})
+                        </h3>
+                        <div className="space-y-3">
+                          {topicArtifacts.map((artifact) => (
+                            <ArtifactCard
+                              key={artifact.id}
+                              artifact={artifact}
+                              onUpdate={loadTopicArtifacts}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-stone-500 text-center py-4 text-sm">
+                        No topic-level analysis yet. Click the button above to generate a summary across all linked records.
+                      </p>
                     )}
                   </div>
                 )}
