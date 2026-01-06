@@ -57,7 +57,10 @@ router.post('/rss/all', async (req: Request, res: Response) => {
     if (organization_id === 'all') {
       const { data: organizations, error: orgError } = await supabase
         .from('organizations')
-        .select('id, name');
+        .select('id, name') as {
+          data: Array<{ id: string; name: string }> | null;
+          error: unknown;
+        };
 
       if (orgError) {
         return res.status(500).json({
