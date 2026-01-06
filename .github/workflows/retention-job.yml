@@ -1,0 +1,35 @@
+name: Retention Job
+
+on:
+  # schedule:
+  #   # Run daily at 2 AM UTC
+  #   - cron: '0 2 * * *'
+  workflow_dispatch: # Allow manual triggering
+
+jobs:
+  retention:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run Retention for All Organizations
+        env:
+          API_URL: ${{ secrets.VITE_API_URL || 'https://your-api-url.vercel.app' }}
+        run: |
+          echo "🔄 Running retention for all organizations..."
+          
+          response=$(curl -X POST \
+            "$API_URL/api/retention/organizations/all/apply" \
+            -H "Content-Type: application/json" \
+            -w "\n%{http_code}")
+          
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | head -n-1)
+          
+          if [ "$http_code" -eq 200 ]; then
+            echo "✅ Retention completed for all organizations"
+            echo "$body" | jq '.summary'
+          else
+            echo "❌ Retention failed (HTTP $http_code)"
+            echo "$body"
+            exit 1
+          fi
+

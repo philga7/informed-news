@@ -7,6 +7,8 @@ const API_BASE = import.meta.env.PROD
 
 interface SourceWithCount extends Source {
   record_count: number;
+  linked_count?: number;
+  days_since_last_link?: number;
 }
 
 export const osintSourcesService = {
@@ -93,6 +95,8 @@ export const osintSourcesService = {
       createdAt: new Date(source.created_at),
       updatedAt: new Date(source.updated_at),
       record_count: source.record_count || 0,
+      linked_count: source.linked_count || 0,
+      days_since_last_link: source.days_since_last_link,
     }));
   },
 

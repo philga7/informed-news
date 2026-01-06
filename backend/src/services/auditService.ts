@@ -28,7 +28,10 @@ export type AuditAction =
   | 'source_rated'
   | 'source_record_created'
   | 'source_record_optimized'
-  | 'retention_policy_updated';
+  | 'retention_policy_updated'
+  | 'record_archived'
+  | 'record_deleted'
+  | 'record_restored';
 
 export type EntityType = 'topic' | 'source_record' | 'link' | 'artifact' | 'source';
 
@@ -515,6 +518,62 @@ export const auditService = {
         retention_max_items: after.retention_max_items,
         retention_days: after.retention_days,
         retention_action: after.retention_action,
+      },
+    });
+  },
+
+  /**
+   * Convenience method: Log record archival
+   */
+  async logRecordArchived(
+    recordId: string,
+    reason: string,
+    userId?: string
+  ): Promise<void> {
+    await this.logAction({
+      action: 'record_archived',
+      entityType: 'source_record',
+      entityId: recordId,
+      userId,
+      metadata: {
+        archive_reason: reason,
+      },
+    });
+  },
+
+  /**
+   * Convenience method: Log record deletion
+   */
+  async logRecordDeleted(
+    recordId: string,
+    reason: string,
+    userId?: string
+  ): Promise<void> {
+    await this.logAction({
+      action: 'record_deleted',
+      entityType: 'source_record',
+      entityId: recordId,
+      userId,
+      metadata: {
+        deletion_reason: reason,
+      },
+    });
+  },
+
+  /**
+   * Convenience method: Log record restoration
+   */
+  async logRecordRestored(
+    recordId: string,
+    userId?: string
+  ): Promise<void> {
+    await this.logAction({
+      action: 'record_restored',
+      entityType: 'source_record',
+      entityId: recordId,
+      userId,
+      metadata: {
+        restored_from: 'archived_source_records',
       },
     });
   },

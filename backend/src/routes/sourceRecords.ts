@@ -131,6 +131,7 @@ router.get('/', async (req: Request, res: Response) => {
  *   - organization_id (required)
  *   - scan_status (optional, can be array) - 'pending' | 'reviewed' | 'linked' | 'dismissed'
  *   - domain (optional) - watch_item_category
+ *   - media_type (optional, can be array) - 'article' | 'video' | 'podcast' | 'audio' | 'other'
  *   - date_from (optional)
  *   - date_to (optional)
  *   - search (optional)
@@ -143,6 +144,7 @@ router.get('/scan', async (req: Request, res: Response) => {
       organization_id,
       scan_status,
       domain,
+      media_type,
       date_from,
       date_to,
       search,
@@ -187,6 +189,12 @@ router.get('/scan', async (req: Request, res: Response) => {
     // Apply domain filter
     if (domain) {
       query = query.eq('sources.domain', domain as string);
+    }
+
+    // Apply media type filter
+    if (media_type) {
+      const types = Array.isArray(media_type) ? media_type : [media_type];
+      query = query.in('media_type', types as string[]);
     }
 
     // Date filters

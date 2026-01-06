@@ -1,6 +1,7 @@
-import { useState } from 'react';
-import { X } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { X, Eye, AlertCircle } from 'lucide-react';
 import type { Source, WatchItemCategory } from '../../types/osint';
+import { retentionService, type RetentionPolicy, type RetentionPreview } from '../../services/retention.service';
 
 interface EditSourceModalProps {
   source: Source;
@@ -27,12 +28,55 @@ export function EditSourceModal({ source, onSave, onClose }: EditSourceModalProp
   const [scrapeExternalUrl, setScrapeExternalUrl] = useState(source.scrapeExternalUrl || false);
   const [notes, setNotes] = useState(source.notes || '');
   const [isSaving, setIsSaving] = useState(false);
+  
+  // Retention policy state
+  const [retentionPolicy, setRetentionPolicy] = useState<RetentionPolicy>({
+    maxItems: source.retentionMaxItems,
+    retentionDays: source.retentionDays,
+    action: source.retentionAction || 'archive',
+  });
+  const [isLoadingPolicy, setIsLoadingPolicy] = useState(false);
+  const [preview, setPreview] = useState<RetentionPreview | null>(null);
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+
+  // Load retention policy on mount
+  useEffect(() => {
+    const loadPolicy = async () => {
+      try {
+        setIsLoadingPolicy(true);
+        const policy = await retentionService.getPolicy(source.id);
+        setRetentionPolicy(policy);
+      } catch (err) {
+        console.error('Error loading retention policy:', err);
+        // Use defaults if policy doesn't exist
+      } finally {
+        setIsLoadingPolicy(false);
+      }
+    };
+    loadPolicy();
+  }, [source.id]);
+
+  const handlePreview = async () => {
+    try {
+      setIsLoadingPreview(true);
+      const previewData = await retentionService.preview(source.id);
+      setPreview(previewData);
+      setShowPreview(true);
+    } catch (err) {
+      console.error('Error previewing retention:', err);
+      alert('Failed to preview retention impact');
+    } finally {
+      setIsLoadingPreview(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
 
     try {
+      // Save source updates
       await onSave({
         name: name.trim(),
         url: url.trim(),
@@ -41,6 +85,9 @@ export function EditSourceModal({ source, onSave, onClose }: EditSourceModalProp
         scrapeExternalUrl,
         notes: notes.trim(),
       });
+
+      // Save retention policy
+      await retentionService.updatePolicy(source.id, retentionPolicy);
     } finally {
       setIsSaving(false);
     }
@@ -168,6 +215,126 @@ export function EditSourceModal({ source, onSave, onClose }: EditSourceModalProp
                 className="w-full px-3 py-2 bg-stone-800 border border-stone-700 rounded-lg text-stone-100 focus:outline-none focus:border-blue-500 resize-none"
                 placeholder="Add any notes about this source..."
               />
+            </div>
+
+            {/* Retention Policy Section */}
+            <div className="border-t border-stone-800 pt-4 mt-4">
+              <h3 className="text-lg font-semibold text-stone-100 mb-3">Retention Policy</h3>
+              <p className="text-xs text-stone-500 mb-4">
+                Items outside the retention window will be archived/deleted unless they are linked to topics, have artifacts, linked to watch items, or are not dismissed.
+              </p>
+
+              <div className="space-y-4">
+                {/* Max Items */}
+                <div>
+                  <label className="block text-sm font-medium text-stone-300 mb-2">
+                    Max Items (optional)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={retentionPolicy.maxItems || ''}
+                    onChange={(e) => setRetentionPolicy({
+                      ...retentionPolicy,
+                      maxItems: e.target.value ? parseInt(e.target.value) : null,
+                    })}
+                    className="w-full px-3 py-2 bg-stone-800 border border-stone-700 rounded-lg text-stone-100 focus:outline-none focus:border-blue-500"
+                    placeholder="Keep N most recent items"
+                  />
+                  <p className="mt-1 text-xs text-stone-500">
+                    Keep only the N most recent items from this source
+                  </p>
+                </div>
+
+                {/* Retention Days */}
+                <div>
+                  <label className="block text-sm font-medium text-stone-300 mb-2">
+                    Retention Days (optional)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={retentionPolicy.retentionDays || ''}
+                    onChange={(e) => setRetentionPolicy({
+                      ...retentionPolicy,
+                      retentionDays: e.target.value ? parseInt(e.target.value) : null,
+                    })}
+                    className="w-full px-3 py-2 bg-stone-800 border border-stone-700 rounded-lg text-stone-100 focus:outline-none focus:border-blue-500"
+                    placeholder="Keep items from last N days"
+                  />
+                  <p className="mt-1 text-xs text-stone-500">
+                    Keep only items from the last N days
+                  </p>
+                </div>
+
+                {/* Action */}
+                <div>
+                  <label className="block text-sm font-medium text-stone-300 mb-2">
+                    Action
+                  </label>
+                  <select
+                    value={retentionPolicy.action}
+                    onChange={(e) => setRetentionPolicy({
+                      ...retentionPolicy,
+                      action: e.target.value as 'delete' | 'archive',
+                    })}
+                    className="w-full px-3 py-2 bg-stone-800 border border-stone-700 rounded-lg text-stone-100 focus:outline-none focus:border-blue-500"
+                  >
+                    <option value="archive">Archive</option>
+                    <option value="delete">Delete</option>
+                  </select>
+                  <p className="mt-1 text-xs text-stone-500">
+                    What to do with items outside the retention window
+                  </p>
+                </div>
+
+                {/* Preview Button */}
+                <div>
+                  <button
+                    type="button"
+                    onClick={handlePreview}
+                    disabled={isLoadingPreview || (!retentionPolicy.maxItems && !retentionPolicy.retentionDays)}
+                    className="flex items-center gap-2 px-4 py-2 bg-stone-800 hover:bg-stone-700 text-stone-300 rounded-lg transition-colors duration-250 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Eye className="w-4 h-4" />
+                    {isLoadingPreview ? 'Loading...' : 'Preview Impact'}
+                  </button>
+                </div>
+
+                {/* Preview Results */}
+                {showPreview && preview && (
+                  <div className="bg-stone-800 border border-stone-700 rounded-lg p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <AlertCircle className="w-4 h-4 text-blue-400" />
+                      <span className="text-sm font-medium text-stone-200">Preview Results</span>
+                    </div>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-stone-400">Eligible for {retentionPolicy.action}:</span>
+                        <span className="text-stone-200 font-medium">{preview.eligible}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-stone-400">Protected:</span>
+                        <span className="text-green-400 font-medium">{preview.protected}</span>
+                      </div>
+                      {preview.sample.length > 0 && (
+                        <div className="mt-3 pt-3 border-t border-stone-700">
+                          <p className="text-xs text-stone-500 mb-2">Sample records:</p>
+                          <ul className="space-y-1">
+                            {preview.sample.slice(0, 5).map((record) => (
+                              <li key={record.id} className="text-xs text-stone-400 truncate">
+                                {record.published_at
+                                  ? new Date(record.published_at).toLocaleDateString()
+                                  : new Date(record.ingested_at).toLocaleDateString()}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 

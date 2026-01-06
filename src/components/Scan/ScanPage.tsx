@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Filter, RefreshCw, AlertCircle, Clock, CheckCircle, Eye, HelpCircle, Save } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useOrganization } from '../../context/OrganizationContext';
@@ -11,7 +12,7 @@ import { QuickActionsPanel } from './QuickActionsPanel';
 import { KeyboardShortcutsModal } from './KeyboardShortcutsModal';
 import { QuickLinkToTopicModal } from './QuickLinkToTopicModal';
 import { CreateWatchItemModal } from './CreateWatchItemModal';
-import type { WatchItemCategory, ScanStatus } from '../../types/osint';
+import type { WatchItemCategory, ScanStatus, MediaType } from '../../types/osint';
 import type { ScanSession } from '../../services/scanSessions.service';
 
 interface ScanRecord {
@@ -44,6 +45,7 @@ interface ScanRecord {
 export function ScanPage() {
   const { user } = useAuth();
   const { currentOrganization } = useOrganization();
+  const [searchParams, setSearchParams] = useSearchParams();
   
   // State
   const [records, setRecords] = useState<ScanRecord[]>([]);
@@ -51,9 +53,14 @@ export function ScanPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  // Filters
+  // Filters - read from URL params
   const [scanMode, setScanMode] = useState(true); // Show only untriaged
-  const [selectedDomain, setSelectedDomain] = useState<WatchItemCategory | null>(null);
+  const [selectedDomain, setSelectedDomain] = useState<WatchItemCategory | null>(
+    (searchParams.get('domain') as WatchItemCategory) || null
+  );
+  const [selectedMediaType, setSelectedMediaType] = useState<MediaType | 'all'>(
+    (searchParams.get('media_type') as MediaType) || 'all'
+  );
   const [searchQuery, setSearchQuery] = useState('');
   
   // Navigation & Selection
@@ -115,6 +122,10 @@ export function ScanPage() {
         filters.domain = selectedDomain;
       }
 
+      if (selectedMediaType && selectedMediaType !== 'all') {
+        filters.mediaType = selectedMediaType;
+      }
+
       if (searchQuery) {
         filters.search = searchQuery;
       }
@@ -137,13 +148,25 @@ export function ScanPage() {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, [currentOrganization?.id, scanMode, selectedDomain, searchQuery, selectedRecordIndex]);
+  }, [currentOrganization?.id, scanMode, selectedDomain, selectedMediaType, searchQuery, selectedRecordIndex]);
+
+  // Update URL params when filters change
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (selectedDomain) {
+      params.set('domain', selectedDomain);
+    }
+    if (selectedMediaType && selectedMediaType !== 'all') {
+      params.set('media_type', selectedMediaType);
+    }
+    setSearchParams(params, { replace: true });
+  }, [selectedDomain, selectedMediaType, setSearchParams]);
 
   useEffect(() => {
     if (currentOrganization) {
       loadRecords();
     }
-  }, [currentOrganization?.id, scanMode, selectedDomain, searchQuery]);
+  }, [currentOrganization?.id, scanMode, selectedDomain, selectedMediaType, searchQuery]);
 
   // Create scan session when component mounts
   useEffect(() => {
@@ -384,6 +407,20 @@ export function ScanPage() {
               <Eye className="w-4 h-4 inline mr-1" />
               Scan Mode {scanMode ? 'ON' : 'OFF'}
             </button>
+            
+            {/* Media Type Filter */}
+            <select
+              value={selectedMediaType}
+              onChange={(e) => setSelectedMediaType(e.target.value as MediaType | 'all')}
+              className="px-3 py-1.5 bg-stone-800 border border-stone-700 rounded-lg text-stone-100 text-sm font-medium focus:outline-none focus:border-blue-500 transition-colors duration-250"
+            >
+              <option value="all">All Media</option>
+              <option value="article">Articles</option>
+              <option value="video">Videos</option>
+              <option value="podcast">Podcasts</option>
+              <option value="audio">Audio</option>
+              <option value="other">Other</option>
+            </select>
           </div>
           
           <div className="flex items-center space-x-4">

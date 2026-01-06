@@ -37,9 +37,10 @@ function isNitterUrl(url: string): boolean {
 /**
  * POST /api/ingest/rss/all
  * Trigger RSS ingestion for all RSS sources in an organization (one at a time)
+ * If organization_id is "all", processes all organizations
  * 
  * Body:
- *   - organization_id: string (required)
+ *   - organization_id: string (required) - organization ID or "all" for all organizations
  */
 router.post('/rss/all', async (req: Request, res: Response) => {
   try {
@@ -49,6 +50,189 @@ router.post('/rss/all', async (req: Request, res: Response) => {
       return res.status(400).json({
         error: 'Missing required field',
         required: ['organization_id'],
+      });
+    }
+
+    // If organization_id is "all", process all organizations
+    if (organization_id === 'all') {
+      const { data: organizations, error: orgError } = await supabase
+        .from('organizations')
+        .select('id, name');
+
+      if (orgError) {
+        return res.status(500).json({
+          error: 'Failed to fetch organizations',
+          message: orgError instanceof Error ? orgError.message : 'Unknown error',
+        });
+      }
+
+      if (!organizations || organizations.length === 0) {
+        return res.json({
+          success: true,
+          message: 'No organizations found',
+          results: [],
+          summary: {
+            total_organizations: 0,
+            total_sources: 0,
+            processed: 0,
+            added: 0,
+            skipped: 0,
+            errors: 0,
+          },
+        });
+      }
+
+      const allResults: Array<{
+        organization_id: string;
+        organization_name: string;
+        results: any[];
+        summary: any;
+      }> = [];
+
+      // Process each organization by calling the same logic
+      for (const org of organizations) {
+        try {
+          // Fetch RSS sources for this organization
+          const { data: sources, error: sourcesError } = await supabase
+            .from('sources')
+            .select('*')
+            .eq('organization_id', org.id)
+            .eq('source_type', 'rss') as { data: Array<{
+              id: string;
+              organization_id: string;
+              source_type: string;
+              name: string;
+              url: string | null;
+              scrape_external_url: boolean | null;
+              [key: string]: unknown;
+            }> | null; error: unknown };
+
+          if (sourcesError || !sources || sources.length === 0) {
+            allResults.push({
+              organization_id: org.id,
+              organization_name: org.name,
+              results: [],
+              summary: {
+                total_sources: 0,
+                processed: 0,
+                added: 0,
+                skipped: 0,
+                errors: 0,
+              },
+            });
+            continue;
+          }
+
+          // Process sources (reuse the same logic below)
+          const orgResults: Array<{
+            source_id: string;
+            source_name: string;
+            success: boolean;
+            added: number;
+            skipped: number;
+            errors: number;
+            error?: string;
+          }> = [];
+
+          let orgAdded = 0;
+          let orgSkipped = 0;
+          let orgErrors = 0;
+
+          for (const source of sources) {
+            if (!source.url) {
+              orgResults.push({
+                source_id: source.id,
+                source_name: source.name,
+                success: false,
+                added: 0,
+                skipped: 0,
+                errors: 0,
+                error: 'Source missing URL',
+              });
+              continue;
+            }
+
+            try {
+              const service = isNitterUrl(source.url)
+                ? new NitterScrapingService({
+                    sourceId: source.id,
+                    nitterUrl: source.url,
+                  })
+                : new RssIngestionService({
+                    sourceId: source.id,
+                    feedUrl: source.url,
+                    scrapeExternalUrl: source.scrape_external_url || false,
+                    extractFullContent: true,
+                  });
+
+              const controller = new IngestionController(service);
+              const result = await controller.ingest();
+
+              orgAdded += result.added;
+              orgSkipped += result.skipped;
+              orgErrors += result.errors.length;
+
+              orgResults.push({
+                source_id: source.id,
+                source_name: source.name,
+                success: true,
+                added: result.added,
+                skipped: result.skipped,
+                errors: result.errors.length,
+              });
+            } catch (err) {
+              orgErrors++;
+              orgResults.push({
+                source_id: source.id,
+                source_name: source.name,
+                success: false,
+                added: 0,
+                skipped: 0,
+                errors: 1,
+                error: err instanceof Error ? err.message : 'Unknown error',
+              });
+            }
+          }
+
+          allResults.push({
+            organization_id: org.id,
+            organization_name: org.name,
+            results: orgResults,
+            summary: {
+              total_sources: sources.length,
+              processed: sources.length,
+              added: orgAdded,
+              skipped: orgSkipped,
+              errors: orgErrors,
+            },
+          });
+        } catch (err) {
+          console.error(`Error processing organization ${org.id}:`, err);
+          allResults.push({
+            organization_id: org.id,
+            organization_name: org.name,
+            results: [],
+            summary: {
+              error: err instanceof Error ? err.message : 'Unknown error',
+            },
+          });
+        }
+      }
+
+      // Aggregate summary
+      const summary = {
+        total_organizations: organizations.length,
+        total_sources: allResults.reduce((sum, r) => sum + (r.summary?.total_sources || 0), 0),
+        processed: allResults.reduce((sum, r) => sum + (r.summary?.processed || 0), 0),
+        added: allResults.reduce((sum, r) => sum + (r.summary?.added || 0), 0),
+        skipped: allResults.reduce((sum, r) => sum + (r.summary?.skipped || 0), 0),
+        errors: allResults.reduce((sum, r) => sum + (r.summary?.errors || 0), 0),
+      };
+
+      return res.json({
+        success: true,
+        results: allResults,
+        summary,
       });
     }
 
