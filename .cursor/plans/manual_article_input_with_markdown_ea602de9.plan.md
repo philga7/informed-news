@@ -335,5 +335,3 @@ Success → Refresh Source Records List
 **Modified Files:**
 
 - `package.json` - Add `marked` dependency
-- `src/components/SourceRecords/SourceRecordsPage.tsx` - Add button and modal integration
-- `src/services/sourceRecords.service.ts` - Add `createManual()` method

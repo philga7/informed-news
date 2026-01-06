@@ -9,6 +9,7 @@
 import { supabase } from '../../utils/supabase.js';
 import { contentOptimizer } from './ContentOptimizer.js';
 import { mediaTypeDetector } from './MediaTypeDetector.js';
+import { geographicExtractionService } from '../geographicExtractionService.js';
 import type { IngestionService, SourceRecordDTO } from '../../types/ingestion.js';
 
 interface ManualInputConfig {
@@ -69,26 +70,6 @@ export class ManualInputService implements IngestionService {
     return newSource.id;
   }
 
-  /**
-   * Extract potential geographic indicators from text
-   */
-  private extractGeographicIndicators(text: string): string[] {
-    const indicators: string[] = [];
-    const commonPlaces = [
-      'United States', 'USA', 'America', 'UK', 'United Kingdom',
-      'China', 'Russia', 'Europe', 'Asia', 'Middle East', 'Africa',
-      'Washington', 'New York', 'London', 'Moscow', 'Beijing',
-      'California', 'Texas', 'Florida'
-    ];
-
-    commonPlaces.forEach(place => {
-      if (text.includes(place)) {
-        indicators.push(place);
-      }
-    });
-
-    return [...new Set(indicators)];
-  }
 
   /**
    * Get source value rating from database
@@ -134,7 +115,8 @@ export class ManualInputService implements IngestionService {
 
       // Extract geographic indicators
       const fullText = `${this.config.title} ${this.config.content}`;
-      const geographicIndicators = this.extractGeographicIndicators(fullText);
+      const geographicResult = geographicExtractionService.extractLocations(fullText);
+      const geographicIndicators = geographicResult.locations;
 
       // Determine content length
       const contentLength = this.config.content?.length || 0;
