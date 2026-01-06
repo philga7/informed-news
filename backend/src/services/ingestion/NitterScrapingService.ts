@@ -8,6 +8,7 @@
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 import { parseNitterDate } from '../../utils/dateParser.js';
+import { geographicExtractionService } from '../geographicExtractionService.js';
 import type { IngestionService, SourceRecordDTO } from '../../types/ingestion.js';
 
 interface NitterScrapingConfig {
@@ -63,26 +64,6 @@ export class NitterScrapingService implements IngestionService {
     return englishCount >= 3 ? 'en' : 'unknown';
   }
 
-  /**
-   * Extract geographic indicators from content
-   * Similar to RssIngestionService
-   */
-  private extractGeographicIndicators(text: string): string[] {
-    const indicators: string[] = [];
-    const commonPlaces = [
-      'United States', 'USA', 'America', 'UK', 'United Kingdom', 
-      'China', 'Russia', 'Europe', 'Asia', 'Middle East',
-      'Washington', 'New York', 'London', 'Moscow', 'Beijing'
-    ];
-
-    commonPlaces.forEach(place => {
-      if (text.includes(place)) {
-        indicators.push(place);
-      }
-    });
-
-    return [...new Set(indicators)]; // Remove duplicates
-  }
 
   /**
    * Extract tweet statistics from tweet-stats element
@@ -319,7 +300,8 @@ export class NitterScrapingService implements IngestionService {
         // Detect language and geographic indicators
         const fullText = `${parsedTweet.content} ${parsedTweet.quoteTweetContent || ''}`;
         const language = this.detectLanguage(fullText);
-        const geographicIndicators = this.extractGeographicIndicators(fullText);
+        const geographicResult = geographicExtractionService.extractLocations(fullText);
+        const geographicIndicators = geographicResult.locations;
 
         // Build raw metadata
         const rawMetadata: Record<string, any> = {

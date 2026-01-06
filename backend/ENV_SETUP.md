@@ -75,11 +75,23 @@ All keys are in your Supabase project dashboard:
 
 ## Environment Variables
 
+### Current Variables
+
 | Variable | Required | Source | Purpose |
 |----------|----------|--------|---------|
 | `SUPABASE_URL` | ✅ Yes | Supabase Dashboard | Your project URL |
 | `SUPABASE_SERVICE_ROLE_KEY` | ✅ Yes | Supabase Dashboard | Server-side database access |
 | `PORT` | ❌ No | Manual | Backend server port (default: 3001) |
+
+### Future Variables (Phase 2+)
+
+The following environment variables will be needed for Phase 2 of the Overture Maps integration:
+
+| Variable | Required | Source | Purpose |
+|----------|----------|--------|---------|
+| `OVERTURE_MAPS_API_KEY` | ⏳ Phase 2 | [Overture Maps API](https://www.overturemapsapi.com/docs/intro) | API key for Overture Maps API (ThatAPICompany service) |
+
+**Note:** Nominatim (OpenStreetMap geocoding) does not require an API key but has strict rate limits (1 request/second). See [Nominatim Usage Policy](https://operations.osmfoundation.org/policies/nominatim/) for requirements.
 
 ## Files
 

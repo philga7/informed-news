@@ -713,4 +713,3 @@ jobs:
 
 - Scheduled automatic brief generation
 - Brief templates and customization
-- Brief sharing and collaboration
