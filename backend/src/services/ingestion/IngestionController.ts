@@ -12,9 +12,11 @@ import type { IngestionService, SourceRecordDTO, IngestionResult } from '../../t
 
 export class IngestionController {
   private service: IngestionService;
+  private userId?: string | null;
 
-  constructor(service: IngestionService) {
+  constructor(service: IngestionService, userId?: string | null) {
     this.service = service;
+    this.userId = userId;
   }
 
   /**
@@ -120,7 +122,7 @@ export class IngestionController {
         return false;
       }
 
-      // Audit log: source record created (system ingestion)
+      // Audit log: source record created (system ingestion or manual input)
       if (insertedRecord && insertedRecord.id) {
         await auditService.logSourceRecordCreated(
           insertedRecord.id,
@@ -131,7 +133,8 @@ export class IngestionController {
             content_type: dto.content_type,
             content_length: dto.content_length ?? null,
             content_compressed: dto.content_compressed ?? false,
-          }
+          },
+          this.userId || undefined
         );
       }
 

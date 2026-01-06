@@ -6,6 +6,29 @@ todos: []
 
 # Overture Maps Integration Analysis & Plan
 
+## ⚠️ STATUS: NOT PROCEEDING
+
+**Decision Date:** January 6, 2026**Status:** This integration plan has been **deprecated and will not be implemented**.**Reason:** After implementation attempts, we discovered that:
+
+- **DuckDB has compatibility issues in Vercel serverless environments** (native binaries, cold starts, memory constraints)
+- The official Overture Maps S3 data access method requires DuckDB, which is not suitable for our Vercel deployment
+- Alternative approaches (API services) introduce third-party dependencies and API key requirements
+
+**Next Steps:** Research and evaluate Vercel-friendly alternatives for geographic mapping and POI data that:
+
+- Work reliably in Vercel serverless functions
+- Don't require native binaries or heavy dependencies
+- Provide geocoding and POI lookup capabilities
+- Are cost-effective and maintainable
+
+**Reverted Changes:**
+
+- Phase 1 implementation (geographic extraction service, database migration) - **REVERTED**
+- Phase 2 implementation (Overture Maps services, routes) - **REVERTED**
+- Database migration created to remove `geographic_analysis` field: `20260106160000_revert_geographic_analysis.sql`
+
+---
+
 ## Executive Summary
 
 **Current State:** The application has minimal geographic mapping capabilities:
@@ -130,9 +153,9 @@ todos: []
 - **Nominatim (OpenStreetMap):** Free but **strictly rate-limited (1 req/sec max)**, requires attribution and proper User-Agent
 - **Overture Maps API:** Third-party service by ThatAPICompany, provides REST API access to Overture Maps data
 
-## Recommended Approach: On-Demand Topic-Specific Analysis ✅ APPROVED
+## Recommended Approach: On-Demand Topic-Specific Analysis ❌ NOT PROCEEDING
 
-**Decision:** Proceeding with On-Demand Topic-Specific Analysis using Nominatim + Overture Maps API
+**Decision:** ~~Proceeding with On-Demand Topic-Specific Analysis using Nominatim + Overture Maps API~~**UPDATE:** This approach was evaluated but **not implemented** due to Vercel compatibility issues with DuckDB. Researching Vercel-friendly alternatives.
 
 ### Architecture Overview
 
@@ -259,23 +282,23 @@ Build on-demand geocoding and POI lookup for specific Topics:
     - Limit results per location (e.g., top 20 POIs)
 - Aggregate and return structured geographic data:
     ```typescript
-                            {
-                              locations: Array<{
-                                placeName: string;
-                                coordinates: { lat: number, lng: number };
-                                address?: string;
-                                sourceRecords: string[]; // IDs of source records mentioning this location
-                              }>;
-                              pois: Array<{
-                                id: string;
-                                name: string;
-                                coordinates: { lat: number, lng: number };
-                                category: string;
-                                address?: string;
-                                nearbyLocation: string; // Which location this POI is near
-                              }>;
-                              lastUpdated: string;
-                            }
+                                {
+                                  locations: Array<{
+                                    placeName: string;
+                                    coordinates: { lat: number, lng: number };
+                                    address?: string;
+                                    sourceRecords: string[]; // IDs of source records mentioning this location
+                                  }>;
+                                  pois: Array<{
+                                    id: string;
+                                    name: string;
+                                    coordinates: { lat: number, lng: number };
+                                    category: string;
+                                    address?: string;
+                                    nearbyLocation: string; // Which location this POI is near
+                                  }>;
+                                  lastUpdated: string;
+                                }
     ```
 
 
@@ -294,8 +317,8 @@ Build on-demand geocoding and POI lookup for specific Topics:
 
 - Add migration to add `geographic_analysis` JSONB field to `osint_topics`:
   ```sql
-              ALTER TABLE osint_topics 
-              ADD COLUMN geographic_analysis JSONB;
+                ALTER TABLE osint_topics 
+                ADD COLUMN geographic_analysis JSONB;
   ```
 
 
@@ -388,33 +411,40 @@ Build on-demand geocoding and POI lookup for specific Topics:
 - **Commercial geocoding APIs:** Google Maps, Mapbox (paid, higher rate limits)
 - **Hybrid approach:** Use Nominatim for common places (cached), commercial API for rare places
 
-## Next Steps
+## Next Steps (UPDATED - January 6, 2026)
 
-1. **Obtain API Access:** 
+**Current Status:** Researching Vercel-friendly alternatives
 
-- Sign up for Overture Maps API at [overturemapsapi.com](https://www.overturemapsapi.com/docs/intro) and get API key
-- Review Overture Maps API documentation and rate limits
+1. **Research Vercel-Compatible Solutions:**
 
-2. **Review Nominatim Policy:** 
+- Evaluate geocoding services that work in serverless environments
+- Consider lightweight alternatives that don't require native binaries
+- Assess cost, rate limits, and data quality
+- Test compatibility with Vercel serverless functions
 
-- Read and understand [Nominatim Usage Policy](https://operations.osmfoundation.org/policies/nominatim/)
-- Plan rate limiting implementation (1 req/sec max)
-- Plan attribution display requirements
+2. **Potential Alternatives to Research:**
 
-3. **Conduct Proof of Concept:** 
+- **Mapbox Geocoding API:** REST API, Vercel-compatible, requires API key
+- **Google Maps Geocoding API:** REST API, Vercel-compatible, requires API key
+- **MapTiler:** REST API, Vercel-compatible, open-source options available
+- **Photon (Komoot):** Open-source geocoding API, self-hostable
+- **Pelias:** Open-source geocoding, self-hostable option
+- **Hybrid approach:** Client-side geocoding libraries (e.g., Leaflet Geocoder plugins)
 
-- Test Overture Maps API endpoints with sample queries
-- Test Nominatim geocoding accuracy and rate limiting behavior
-- Test POI query performance and data quality
-- Verify Overture Maps API rate limits and pricing
-- **Test rate limiting:** Verify Nominatim 1 req/sec limit is respected
-- **Test caching:** Verify caching strategy works correctly
-- **Test attribution:** Verify attribution display requirements
+3. **Requirements for New Solution:**
 
-3. **Evaluate Alternatives:** Compare with Nominatim, Google Maps, or Mapbox APIs if needed
-4. **Make Decision:** Based on POC results, decide whether to proceed with Overture Maps API
-5. **If Positive:** Follow implementation plan above (on-demand API approach)
-6. **If Negative:** Consider alternative geocoding services or hybrid approach
+- ✅ Must work reliably in Vercel serverless functions
+- ✅ No native binary dependencies
+- ✅ Reasonable rate limits or cost structure
+- ✅ Good data quality for OSINT use cases
+- ✅ Support for both geocoding and POI lookup (or separate services)
+- ✅ Proper attribution requirements (if using OpenStreetMap data)
+
+4. **Implementation Considerations:**
+
+- Evaluate whether to keep geographic extraction improvements from Phase 1
+- Determine if database schema changes are still needed
+- Plan for gradual rollout with fallback options
 
 ## Files to Modify (If Proceeding)
 
@@ -494,4 +524,3 @@ Build on-demand geocoding and POI lookup for specific Topics:
 - **Nominatim Rate Limits:** 
 - Queue requests if rate limit exceeded
 - Show user-friendly message about rate limiting
-- Use cached data when available

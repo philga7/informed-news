@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FileText, Search, Filter, RefreshCw } from 'lucide-react';
+import { FileText, Search, Filter, RefreshCw, Plus } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useOrganization } from '../../context/OrganizationContext';
 import { sourceRecordsService } from '../../services';
 import { EmptyState } from '../UI/EmptyState';
 import { LoadingSpinner } from '../UI/LoadingSpinner';
 import { SourceRecordFilters } from './SourceRecordFilters';
+import { ManualArticleInputModal } from './ManualArticleInputModal';
 
 export function SourceRecordsPage() {
   const { user } = useAuth();
@@ -18,6 +19,7 @@ export function SourceRecordsPage() {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
+  const [showManualInput, setShowManualInput] = useState(false);
   const [filters, setFilters] = useState({
     sourceId: '',
     linkedStatus: 'all' as 'linked' | 'unlinked' | 'all',
@@ -133,6 +135,13 @@ export function SourceRecordsPage() {
               </p>
             </div>
             <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowManualInput(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-250"
+              >
+                <Plus size={18} />
+                <span className="hidden sm:inline">Add Manual Article</span>
+              </button>
               <button
                 onClick={() => setShowFilters(!showFilters)}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors duration-250 ${
@@ -311,6 +320,17 @@ export function SourceRecordsPage() {
           </>
         )}
       </div>
+
+      {/* Manual Article Input Modal */}
+      {showManualInput && currentOrganization && (
+        <ManualArticleInputModal
+          organizationId={currentOrganization.id}
+          onClose={() => setShowManualInput(false)}
+          onSuccess={() => {
+            loadRecords(true, true);
+          }}
+        />
+      )}
     </div>
   );
 }
