@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { AlertTriangle, Trash2, CheckCircle, Circle } from 'lucide-react';
-import type { AnalyticArtifact, SummaryPayload, EntityExtractionPayload, ToneAnalysisPayload } from '../../services/analysis.service';
+import type { AnalyticArtifact, SummaryPayload, EntityExtractionPayload, ToneAnalysisPayload, KeyFactsPayload, TopicSummaryPayload } from '../../services/analysis.service';
 import { analysisService } from '../../services/analysis.service';
 
 interface ArtifactCardProps {
@@ -76,11 +76,17 @@ export function ArtifactCard({ artifact, onUpdate }: ArtifactCardProps) {
   const renderPayload = () => {
     switch (artifact.type) {
       case 'summary':
+        // Check if this is a topic summary (has topic_id) or source record summary
+        if (artifact.topic_id) {
+          return <TopicSummaryDisplay payload={artifact.payload as TopicSummaryPayload} />;
+        }
         return <SummaryDisplay payload={artifact.payload as SummaryPayload} />;
       case 'entity_extraction':
         return <EntityDisplay payload={artifact.payload as EntityExtractionPayload} />;
       case 'tone_analysis':
         return <ToneDisplay payload={artifact.payload as ToneAnalysisPayload} />;
+      case 'key_facts':
+        return <KeyFactsDisplay payload={artifact.payload as KeyFactsPayload} />;
       default:
         return <pre className="text-xs text-stone-400 whitespace-pre-wrap">{JSON.stringify(artifact.payload, null, 2)}</pre>;
     }
@@ -225,6 +231,162 @@ function EntityDisplay({ payload }: { payload: EntityExtractionPayload }) {
       {renderEntityGroup('Organizations', payload.organizations)}
       {renderEntityGroup('Locations', payload.locations)}
       {renderEntityGroup('Dates', payload.dates)}
+    </div>
+  );
+}
+
+// Key Facts Display Component
+function KeyFactsDisplay({ payload }: { payload: KeyFactsPayload }) {
+  const getCategoryColor = (category?: string) => {
+    switch (category) {
+      case 'event':
+        return 'bg-blue-900/30 text-blue-400 border-blue-800/50';
+      case 'quote':
+        return 'bg-purple-900/30 text-purple-400 border-purple-800/50';
+      case 'statistic':
+        return 'bg-green-900/30 text-green-400 border-green-800/50';
+      case 'claim':
+        return 'bg-orange-900/30 text-orange-400 border-orange-800/50';
+      default:
+        return 'bg-stone-800 text-stone-400 border-stone-700';
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      {payload.facts && payload.facts.length > 0 ? (
+        <ul className="space-y-3">
+          {payload.facts.map((fact, index) => (
+            <li key={index} className="p-3 bg-stone-800 border border-stone-700 rounded-lg">
+              <div className="flex items-start justify-between gap-3 mb-2">
+                <p className="text-sm text-stone-300 flex-1">{fact.fact}</p>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {fact.category && (
+                    <span className={`px-2 py-0.5 rounded text-xs font-medium border ${getCategoryColor(fact.category)}`}>
+                      {fact.category}
+                    </span>
+                  )}
+                  <span className="text-xs text-stone-500">
+                    {(fact.confidence * 100).toFixed(0)}%
+                  </span>
+                </div>
+              </div>
+              {fact.supportingLinks && fact.supportingLinks.length > 0 && (
+                <div className="mt-2 pt-2 border-t border-stone-700">
+                  <span className="text-xs text-stone-400 block mb-1">Supporting links:</span>
+                  <div className="flex flex-wrap gap-2">
+                    {fact.supportingLinks.map((linkUrl, linkIndex) => (
+                      <a
+                        key={linkIndex}
+                        href={linkUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-blue-400 hover:text-blue-300 underline break-all max-w-full truncate"
+                        title={linkUrl}
+                      >
+                        {linkUrl}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-sm text-stone-400">No key facts extracted.</p>
+      )}
+    </div>
+  );
+}
+
+// Topic Summary Display Component
+function TopicSummaryDisplay({ payload }: { payload: TopicSummaryPayload }) {
+  return (
+    <div className="space-y-4">
+      <div>
+        <h5 className="text-xs font-semibold text-stone-400 uppercase mb-2">Executive Summary</h5>
+        <p className="text-sm text-stone-300 leading-relaxed whitespace-pre-wrap">{payload.executiveSummary}</p>
+      </div>
+
+      {payload.keyDevelopments && payload.keyDevelopments.length > 0 && (
+        <div>
+          <h5 className="text-xs font-semibold text-stone-400 uppercase mb-2">Key Developments</h5>
+          <ul className="space-y-1.5">
+            {payload.keyDevelopments.map((dev, index) => (
+              <li key={index} className="flex gap-2 text-sm text-stone-300">
+                <span className="text-accent mt-1">•</span>
+                <span className="flex-1">{dev}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {payload.conflictingPerspectives && payload.conflictingPerspectives.length > 0 && (
+        <div>
+          <h5 className="text-xs font-semibold text-stone-400 uppercase mb-2">Conflicting Perspectives</h5>
+          <ul className="space-y-1.5">
+            {payload.conflictingPerspectives.map((perspective, index) => (
+              <li key={index} className="flex gap-2 text-sm text-amber-300">
+                <span className="text-amber-500 mt-1">⚠</span>
+                <span className="flex-1">{perspective}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {payload.timelineHighlights && payload.timelineHighlights.length > 0 && (
+        <div>
+          <h5 className="text-xs font-semibold text-stone-400 uppercase mb-2">Timeline Highlights</h5>
+          <ul className="space-y-1.5">
+            {payload.timelineHighlights.map((event, index) => (
+              <li key={index} className="flex gap-2 text-sm text-stone-300">
+                <span className="text-blue-400 mt-1">→</span>
+                <span className="flex-1">{event}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {payload.recommendedNextSteps && payload.recommendedNextSteps.length > 0 && (
+        <div>
+          <h5 className="text-xs font-semibold text-stone-400 uppercase mb-2">Recommended Next Steps</h5>
+          <ul className="space-y-1.5">
+            {payload.recommendedNextSteps.map((step, index) => (
+              <li key={index} className="flex gap-2 text-sm text-stone-300">
+                <span className="text-green-400 mt-1">✓</span>
+                <span className="flex-1">{step}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {payload.crossSourceLinks && payload.crossSourceLinks.length > 0 && (
+        <div>
+          <h5 className="text-xs font-semibold text-stone-400 uppercase mb-2">Cross-Source Links</h5>
+          <ul className="space-y-2">
+            {payload.crossSourceLinks.map((link, index) => (
+              <li key={index} className="p-2 bg-stone-800 border border-stone-700 rounded text-sm">
+                <a
+                  href={link.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-400 hover:text-blue-300 break-all"
+                >
+                  {link.url}
+                </a>
+                <div className="text-xs text-stone-500 mt-1">
+                  Mentioned in: {link.mentionedIn.join(', ')}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }

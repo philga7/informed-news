@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, ExternalLink, Calendar, Database, Link as LinkIcon, Sparkles, FileText, Users, MessageSquare } from 'lucide-react';
+import { ArrowLeft, ExternalLink, Calendar, Database, Link as LinkIcon, Sparkles, FileText, Users, MessageSquare, ListChecks } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useOrganization } from '../../context/OrganizationContext';
 import { sourceRecordsService } from '../../services';
@@ -95,6 +95,20 @@ export function SourceRecordDetailPage() {
     } catch (err) {
       console.error('Error analyzing tone:', err);
       alert(err instanceof Error ? err.message : 'Failed to analyze tone');
+    } finally {
+      setAnalysisLoading(null);
+    }
+  };
+
+  const handleExtractKeyFacts = async () => {
+    if (!id) return;
+    try {
+      setAnalysisLoading('key_facts');
+      await analysisService.extractKeyFacts(id);
+      await loadArtifacts();
+    } catch (err) {
+      console.error('Error extracting key facts:', err);
+      alert(err instanceof Error ? err.message : 'Failed to extract key facts');
     } finally {
       setAnalysisLoading(null);
     }
@@ -306,7 +320,7 @@ export function SourceRecordDetailPage() {
             Generate AI-powered analysis to assist with source evaluation. All outputs require human verification.
           </p>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
             <button
               onClick={handleGenerateSummary}
               disabled={analysisLoading !== null}
@@ -357,6 +371,24 @@ export function SourceRecordDetailPage() {
                 <>
                   <MessageSquare size={18} />
                   <span>Analyze Tone</span>
+                </>
+              )}
+            </button>
+
+            <button
+              onClick={handleExtractKeyFacts}
+              disabled={analysisLoading !== null}
+              className="flex items-center justify-center gap-2 px-4 py-3 bg-stone-800 hover:bg-stone-700 border border-stone-700 hover:border-stone-600 text-stone-200 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {analysisLoading === 'key_facts' ? (
+                <>
+                  <LoadingSpinner />
+                  <span>Extracting...</span>
+                </>
+              ) : (
+                <>
+                  <ListChecks size={18} />
+                  <span>Extract Key Facts</span>
                 </>
               )}
             </button>

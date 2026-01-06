@@ -41,6 +41,27 @@ export interface ToneAnalysisPayload {
   biasSignals: string[];
 }
 
+export interface KeyFactsPayload {
+  facts: Array<{
+    fact: string;
+    confidence: number;
+    category?: 'event' | 'quote' | 'statistic' | 'claim';
+    supportingLinks?: string[];
+  }>;
+}
+
+export interface TopicSummaryPayload {
+  executiveSummary: string;
+  keyDevelopments: string[];
+  conflictingPerspectives?: string[];
+  timelineHighlights?: string[];
+  recommendedNextSteps?: string[];
+  crossSourceLinks?: Array<{
+    url: string;
+    mentionedIn: string[];
+  }>;
+}
+
 class AnalysisService {
   private baseUrl = '/api/analysis';
 
@@ -136,6 +157,26 @@ class AnalysisService {
         organization_id: params.organizationId,
         assessed_by_user_id: params.assessedByUserId,
       }
+    );
+    return response.artifact;
+  }
+
+  /**
+   * Extract key facts from a source record
+   */
+  async extractKeyFacts(sourceRecordId: string): Promise<AnalyticArtifact> {
+    const response = await apiClient.post(
+      `${this.baseUrl}/source-records/${sourceRecordId}/key-facts`
+    );
+    return response.artifact;
+  }
+
+  /**
+   * Generate topic-level summary across all linked source records
+   */
+  async generateTopicSummary(topicId: string): Promise<AnalyticArtifact> {
+    const response = await apiClient.post(
+      `${this.baseUrl}/topics/${topicId}/summarize`
     );
     return response.artifact;
   }
