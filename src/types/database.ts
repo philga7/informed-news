@@ -176,7 +176,6 @@ export interface Database {
           description: string | null;
           keywords: Json;
           related_topics: Json;
-          geographic_analysis: Json | null;
           created_at: string;
           updated_at: string;
         };
@@ -187,7 +186,6 @@ export interface Database {
           description?: string | null;
           keywords?: Json;
           related_topics?: Json;
-          geographic_analysis?: Json | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -198,7 +196,6 @@ export interface Database {
           description?: string | null;
           keywords?: Json;
           related_topics?: Json;
-          geographic_analysis?: Json | null;
           created_at?: string;
           updated_at?: string;
         };

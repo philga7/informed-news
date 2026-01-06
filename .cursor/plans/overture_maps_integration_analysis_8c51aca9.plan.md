@@ -1,6 +1,6 @@
 ---
 name: Overture Maps Integration Analysis
-overview: Comprehensive integration of Overture Maps API and Nominatim for geographic analysis, including enhanced NER-based location extraction, on-demand topic geographic analysis, database enhancements, and complete cleanup of legacy Leaflet/react-leaflet dependencies and simple geographic extraction code.
+overview: Analyze Overture Maps Foundation as a potential replacement for current geographic mapping capabilities, evaluate its suitability for the OSINT application, and plan integration if analysis proves positive.
 todos: []
 ---
 
@@ -10,8 +10,8 @@ todos: []
 
 **Current State:** The application has minimal geographic mapping capabilities:
 
-- Leaflet/react-leaflet installed but not actively used (no map components found) - **TO BE REMOVED**
-- Basic geographic extraction using simple string matching in three ingestion services (RssIngestionService, ManualInputService, NitterScrapingService) - **TO BE REPLACED**
+- Leaflet/react-leaflet installed but not actively used (no map components found)
+- Basic geographic extraction using simple string matching (no geocoding)
 - Geographic indicators stored as JSONB arrays of place names (e.g., `["United States", "New York"]`)
 - No coordinates (latitude/longitude), no geocoding service, no map visualization
 
@@ -24,21 +24,17 @@ todos: []
 
 ### Existing Code
 
-- **Geographic Extraction:** Three ingestion services use simple string matching against hardcoded place name lists:
-- `backend/src/services/ingestion/RssIngestionService.ts` (lines 50-65) - ~12 place names
-- `backend/src/services/ingestion/ManualInputService.ts` (lines 75-89) - ~15 place names
-- `backend/src/services/ingestion/NitterScrapingService.ts` (lines 70-84) - ~12 place names
+- **Geographic Extraction:** `backend/src/services/ingestion/RssIngestionService.ts` (lines 42-61) uses simple string matching against a hardcoded list of ~12 place names
 - **Storage:** `geographic_indicators` JSONB field in `source_records` table stores arrays of place name strings
-- **Legacy Dependencies:** Leaflet/react-leaflet installed but unused - will be removed as part of this plan
+- **Visualization:** Leaflet installed but no map components implemented (planned in `.cursor/plans/osint_intelligence_dashboard_implementation_99cd8679.plan.md`)
 
 ### Limitations
 
 1. No geocoding (place names → coordinates)
 2. No reverse geocoding (coordinates → place names)
 3. No POI (Points of Interest) data
-4. No map visualization (Leaflet installed but unused)
-5. Geographic extraction is extremely limited (only 12-15 hardcoded places per service)
-6. Duplicate code across three ingestion services (same simple string matching logic)
+4. No map visualization despite Leaflet being installed
+5. Geographic extraction is extremely limited (only 12 hardcoded places)
 
 ## Overture Maps Foundation Analysis
 
@@ -142,13 +138,12 @@ todos: []
 
 For topic-specific deep-dive analysis, use **Overture Maps API** on-demand when analyzing a specific Topic:
 
-1. **Enhanced location extraction** from source records using NER (replaces simple string matching)
-2. **User initiates deep-dive** on a Topic in `TopicDetailPage`
-3. **Extract locations** from linked source records (using enhanced `geographic_indicators` from NER)
-4. **Geocode locations** on-demand using Nominatim (place name → coordinates)
-5. **Query POIs** around those locations using Overture Maps API
-6. **Display geographic data** (map visualization to be implemented with alternative solution - Leaflet will be removed)
-7. **Cache results** in topic metadata to avoid repeated API calls
+1. **User initiates deep-dive** on a Topic in `TopicDetailPage`
+2. **Extract locations** from linked source records (using existing `geographic_indicators` or enhanced NER)
+3. **Geocode locations** on-demand using Nominatim (place name → coordinates)
+4. **Query POIs** around those locations using Overture Maps API
+5. **Display on map** using Leaflet component
+6. **Cache results** in topic metadata to avoid repeated API calls
 
 ### API Documentation References
 
@@ -160,154 +155,94 @@ For topic-specific deep-dive analysis, use **Overture Maps API** on-demand when 
 - Service: `https://api.overturemapsapi.com`
 - Authentication: API key in `x-api-key` header
 
-## Implementation Plan: Phase-Based Approach
+### Phase 1: Enhanced Geographic Extraction (Immediate)
 
-The implementation is organized into four phases, each building on the previous phase and delivering incremental value.
+Replace simple string matching with proper Named Entity Recognition (NER) for location extraction:
 
-### Phase 1: Foundation & Immediate Improvements
-
-**Goal:** Improve geographic extraction and prepare database infrastructure for geographic analysis.**Deliverables:**
-
-- Enhanced NER-based geographic extraction service
-- All ingestion services using shared extraction service
-- Database schema ready for geographic analysis caching
-
-**Dependencies:** None (can be implemented independently)
-
-#### Step 1.1: Enhanced Geographic Extraction (Replace Simple String Matching)
-
-**Create shared geographic extraction service:**
-
-- Create `backend/src/services/geographicExtractionService.ts`:
-- Implement NER-based location extraction using a library (e.g., `compromise` or `spacy`)
+- Use a library like `compromise` or `spacy` for location extraction
 - Extract place names from article content more accurately
-- Support multiple languages if possible
-- Return structured location data (place names, confidence scores)
 - Store extracted locations in existing `geographic_indicators` field
+- **No geocoding yet** - just better place name extraction
 
-**Update all ingestion services to use shared service:**
+### Phase 2: On-Demand Overture Maps Integration (Topic-Specific)
 
-- Modify `backend/src/services/ingestion/RssIngestionService.ts`:
-- Remove `extractGeographicIndicators()` method (lines 50-65)
-- Import and use `geographicExtractionService.extractLocations()`
-- Update method calls to use new service
-- Modify `backend/src/services/ingestion/ManualInputService.ts`:
-- Remove `extractGeographicIndicators()` method (lines 75-89)
-- Import and use `geographicExtractionService.extractLocations()`
-- Update method calls to use new service
-- Modify `backend/src/services/ingestion/NitterScrapingService.ts`:
-- Remove `extractGeographicIndicators()` method (lines 70-84)
-- Import and use `geographicExtractionService.extractLocations()`
-- Update method calls to use new service
+Build on-demand geocoding and POI lookup for specific Topics:
 
-**Benefits:**
+1. **Backend Service:**
 
-- Single source of truth for geographic extraction
-- More accurate location detection using NER
-- Easier to maintain and enhance
-- Removes duplicate code across three services
+- Create `backend/src/services/overtureMapsService.ts`
+- Implement POI lookup via Overture Maps API (lat/lng + radius → POIs)
+- Create `backend/src/services/nominatimService.ts`
+- Use Nominatim for geocoding (place name → coordinates)
+- **Critical:** Implement rate limiting for Nominatim (max 1 req/sec)
+- **Critical:** Add proper User-Agent header for Nominatim requests
+- **Critical:** Implement attribution display for Nominatim data
+- Add aggressive caching layer to minimize API calls
+- Implement request queuing/throttling for Nominatim
 
-**Configuration:**
+2. **API Endpoints:**
 
-- Add NER library dependency to `package.json` (e.g., `compromise` or `spacy`)
+- Create `backend/src/routes/overture.ts` with endpoints:
+- `POST /api/overture/pois` - Get POIs around coordinates
+- Modify `backend/src/routes/topics.ts`:
+- `GET /api/topics/:id/geographic-analysis` - Get geographic analysis for a topic
 
-#### Step 1.2: Database Schema Enhancement
+3. **Topic Geographic Analysis:**
 
-**Create database migration:**
+- Create `backend/src/services/topicGeographicService.ts`
+- Aggregate locations from all source records linked to a topic
+- Geocode locations on-demand when user views topic
+- Query POIs around geocoded locations
+- Store results in topic metadata (cache)
 
-- Create migration file: `supabase/migrations/YYYYMMDDHHMMSS_add_geographic_analysis.sql`
-- Add `geographic_analysis` JSONB field to `osint_topics` table:
-  ```sql
-          ALTER TABLE osint_topics 
-          ADD COLUMN geographic_analysis JSONB;
-  ```
+4. **Frontend Integration:**
 
+- Create `src/components/Topics/TopicMap.tsx` component
+- Add "Geographic Analysis" section to `TopicDetailPage`
+- Display map with:
+- Source record locations (from geocoded place names)
+- Nearby POIs (from Overture Maps API)
+- Add button to trigger geographic analysis on-demand
 
+5. **Database Enhancement (Optional):**
 
+- Add `geographic_analysis` JSONB field to `osint_topics` table
+- Cache geocoded coordinates and POI data per topic
+- Structure: `{ locations: [...], pois: [...], lastUpdated: timestamp }`
 
-- Add GIN index for efficient queries:
-  ```sql
-          CREATE INDEX idx_topics_geographic ON osint_topics USING GIN(geographic_analysis);
-  ```
+## Implementation Plan (On-Demand API Approach)
 
+### Step 1: Proof of Concept
 
-**Structure:**
+- Obtain Overture Maps API key
+- Test API endpoints with sample queries:
+- Query POIs around a specific lat/lng with radius
+- Test different category filters
+- Test Nominatim for geocoding (place name → coordinates)
+- Measure API response time and accuracy
+- Verify rate limits and pricing (should be free)
 
-```typescript
-{
-  locations: Array<{
-    placeName: string;
-    coordinates: { lat: number, lng: number };
-    address?: string;
-    sourceRecords: string[]; // IDs of source records mentioning this location
-  }>;
-  pois: Array<{
-    id: string;
-    name: string;
-    coordinates: { lat: number, lng: number };
-    category: string;
-    address?: string;
-    nearbyLocation: string; // Which location this POI is near
-  }>;
-  lastUpdated: string; // ISO timestamp
-  attribution: string; // "© OpenStreetMap contributors" for Nominatim data
-}
-```
-
-**Testing:**
-
-- Verify migration runs successfully
-- Verify index is created and queries are efficient
-- Test JSONB field can store and retrieve structured data
-
-### Phase 2: Core Geographic Services
-
-**Goal:** Implement backend services for geocoding and POI lookup, enabling topic geographic analysis.**Deliverables:**
-
-- Overture Maps API service
-- Nominatim geocoding service with rate limiting
-- Topic geographic analysis service
-- API endpoints for geographic analysis
-
-**Dependencies:** Phase 1 (database schema must be in place)
-
-#### Step 2.1: Backend Service Implementation
-
-**Create Overture Maps Service:**
+### Step 2: Backend Service Implementation
 
 - Create `backend/src/services/overtureMapsService.ts`:
 - `getPOIs(lat: number, lng: number, radius: number, categories?: string[]): Promise<POI[]>`
 - `getPOIsByBoundingBox(bbox: BoundingBox, categories?: string[]): Promise<POI[]>`
-- Add API key authentication (from environment variables)
-- Implement request caching (Redis or in-memory) to avoid duplicate calls
-- Handle errors and rate limits gracefully
-
-**Create Nominatim Service:**
-
 - Create `backend/src/services/nominatimService.ts`:
-- `geocodePlace(placeName: string): Promise<{ lat, lng, address? }>`
-- `reverseGeocode(lat: number, lng: number): Promise<{ placeName, address? }>`
-- **Rate limiting:** Enforce maximum 1 request per second with request queue
+- `geocodePlace(placeName: string): Promise<{ lat, lng }>`
+- **Rate limiting:** Enforce maximum 1 request per second
 - **User-Agent:** Set proper User-Agent header identifying the application
 - **Attribution:** Store attribution requirement for display
-- **Caching:** Aggressive caching (cache results indefinitely for same place names)
+- **Caching:** Aggressive caching (cache results for at least 24 hours)
 - **Request queuing:** Queue requests to respect rate limits
-- Handle errors and rate limit responses gracefully
-
-**Important:** Nominatim policy requires:
-
+- Add Overture Maps API key to environment variables
+- Implement request caching (Redis or in-memory) to avoid duplicate calls
+- **Important:** Nominatim policy requires:
 - Valid HTTP Referer or User-Agent (not stock library User-Agents)
 - Attribution display (ODbL license requirement)
 - No bulk geocoding (only user-triggered requests acceptable)
 - Results must be cached
 
-**Configuration:**
-
-- Add environment variable: `OVERTURE_MAPS_API_KEY` - Overture Maps API key from ThatAPICompany
-
-#### Step 2.2: Topic Geographic Analysis Service
-
-**Create topic geographic analysis service:**
+### Step 3: Topic Geographic Analysis Service
 
 - Create `backend/src/services/topicGeographicService.ts`:
 - `analyzeTopicGeography(topicId: string): Promise<GeographicAnalysis>`
@@ -317,142 +252,87 @@ The implementation is organized into four phases, each building on the previous 
     - Process geocoding requests sequentially (1 per second) or use cached results
     - Check cache first before making API call
     - Queue requests if rate limit would be exceeded
-    - Handle geocoding failures gracefully (continue with other locations)
 - **POI Lookup:**
     - For each geocoded location, query Overture Maps `/places` endpoint
     - Use reasonable radius (e.g., 1000-5000 meters depending on location type)
     - Filter by relevant categories if needed
     - Limit results per location (e.g., top 20 POIs)
-- Aggregate and return structured geographic data matching database schema
+- Aggregate and return structured geographic data:
+    ```typescript
+                            {
+                              locations: Array<{
+                                placeName: string;
+                                coordinates: { lat: number, lng: number };
+                                address?: string;
+                                sourceRecords: string[]; // IDs of source records mentioning this location
+                              }>;
+                              pois: Array<{
+                                id: string;
+                                name: string;
+                                coordinates: { lat: number, lng: number };
+                                category: string;
+                                address?: string;
+                                nearbyLocation: string; // Which location this POI is near
+                              }>;
+                              lastUpdated: string;
+                            }
+    ```
+
+
+
+
 - **Caching strategy:** 
     - Cache all geocoded results indefinitely (same place name = same coordinates)
     - Cache POI results for reasonable period (e.g., 7 days)
     - Store in `geographic_analysis` JSONB field in `osint_topics` table
-    - Check cache first, return cached data if available and recent
-    - Only refresh cache when new source records are linked to topic
-
-**Create API endpoints:**
-
-- Create `backend/src/routes/overture.ts`:
-- `POST /api/overture/pois` - Get POIs around coordinates
-- Add request validation and error handling
-- Modify `backend/src/routes/topics.ts`:
-- `GET /api/topics/:id/geographic-analysis` - Get geographic analysis for a topic
+- Create API endpoint: `GET /api/topics/:id/geographic-analysis`
 - Check cache first, return cached data if available and recent
-- If cache miss or stale, trigger new analysis via `topicGeographicService`
+- If cache miss or stale, trigger new analysis
 - Return analysis results with attribution information
-- Handle errors gracefully
 
-**Testing:**
+### Step 4: Database Schema (Optional Enhancement)
 
-- Test Overture Maps API integration with sample queries
-- Test Nominatim geocoding with rate limiting
-- Test topic geographic analysis with real topics
-- Verify caching works correctly
-- Test error handling (API failures, rate limits)
+- Add migration to add `geographic_analysis` JSONB field to `osint_topics`:
+  ```sql
+              ALTER TABLE osint_topics 
+              ADD COLUMN geographic_analysis JSONB;
+  ```
 
-### Phase 3: Frontend & Integration
 
-**Goal:** Create user-facing geographic analysis interface and complete end-to-end integration.**Deliverables:**
 
-- Frontend geographic visualization component
-- Integration with TopicDetailPage
-- Complete end-to-end testing
 
-**Dependencies:** Phase 2 (backend services must be complete)
+- Structure: `{ locations: [...], pois: [...], lastUpdated: timestamp }`
+- Index for efficient queries: `CREATE INDEX idx_topics_geographic ON osint_topics USING GIN(geographic_analysis);`
 
-#### Step 3.1: Frontend Geographic Visualization Component
+### Step 5: Frontend Map Component
 
-**Create geographic visualization component:**
-
-- Create `src/components/Topics/TopicGeographicView.tsx` component:
-- Display geographic data (locations and POIs) in a structured format
-- **Note:** Map visualization will be implemented with an alternative solution (Leaflet to be removed in Phase 4)
-- Display locations for source record locations (from geocoded place names)
-    - Show location name, address, linked source record count
-    - Group by location
-- Display nearby POIs (from Overture Maps API)
-    - Show POI name, category, address, brand (if available)
-    - Group by category
-    - Show which location each POI is near
+- Create `src/components/Topics/TopicMap.tsx`:
+- Leaflet map component using `react-leaflet`
+- Display markers for source record locations (from geocoded place names)
+    - Use different marker style/color for locations vs POIs
+    - Show popup with location name, address, linked source record count
+- Display markers for nearby POIs (from Overture Maps API)
+    - Show popup with POI name, category, address, brand (if available)
+    - Group by category with different colors/icons
+- Cluster markers for better performance (use `react-leaflet-cluster` or similar)
 - Show attribution: "© OpenStreetMap contributors" (required for Nominatim data)
 - Handle loading states and errors gracefully
-- Display cached data indicator if showing cached results
-- Show progress indicator during geocoding (may take time due to rate limits)
-
-**Update TopicDetailPage:**
-
-- Modify `src/components/Topics/TopicDetailPage.tsx`:
-- Add "Geographic Analysis" section (can be a new tab or expandable section)
-- Button to trigger geographic analysis ("Analyze Geography" or "Load Geographic Data")
-- Display `TopicGeographicView` component with locations and POIs
-- Show loading state during API calls (with progress indicator)
+- Center map on locations with appropriate zoom level
+- Add to `TopicDetailPage`:
+- New "Geographic Analysis" section (can be a new tab or expandable section)
+- Button to trigger geographic analysis ("Analyze Geography" or "Load Map")
+- Display map with locations and POIs
+- Show loading state during API calls (with progress indicator if possible)
 - Show message if rate limiting causes delays
-- Display estimated wait time if geocoding queue is long
+- Display cached data indicator if showing cached results
 - Show error messages if API calls fail
-- Allow user to refresh/update geographic analysis
 
-#### Step 3.2: Integration & Testing
+### Step 6: Integration & Testing
 
 - Test with real topics and source records
-- Verify enhanced geographic extraction works across all ingestion services
-- Verify caching works correctly (Nominatim and Overture Maps)
-- Test error handling (API failures, rate limits, network errors)
-- Test rate limiting behavior (verify 1 req/sec for Nominatim)
-- Test attribution display
+- Verify caching works correctly
+- Test error handling (API failures, rate limits)
 - Optimize API call patterns (batch requests if possible)
-- Performance testing with topics containing many locations
-- Verify database migration and indexing work correctly
-- End-to-end user workflow testing
-
-### Phase 4: Cleanup
-
-**Goal:** Remove legacy Leaflet dependencies and any unused geographic code.**Deliverables:**
-
-- All Leaflet dependencies removed
-- No remaining references to Leaflet in codebase
-- Documentation updated
-
-**Dependencies:** Phase 3 (frontend component must be complete and working)
-
-#### Step 4.1: Remove Legacy Leaflet Dependencies
-
-**After all other implementation steps are complete**, remove unused Leaflet/react-leaflet dependencies:
-
-1. **Remove npm packages:**
-
-- Remove `leaflet` from `package.json` dependencies
-- Remove `react-leaflet` from `package.json` dependencies
-- Remove `@types/leaflet` from `package.json` dependencies
-- Run `npm install` to update `package-lock.json`
-
-2. **Remove CSS import:**
-
-- Remove `@import 'leaflet/dist/leaflet.css';` from `src/index.css`
-
-3. **Verify no remaining references:**
-
-- Search codebase for any remaining `leaflet` or `react-leaflet` imports
-- Search for any `Leaflet` or `react-leaflet` component usage
-- Search for any `from 'leaflet'` or `from 'react-leaflet'` statements
-- Remove any unused Leaflet-related code if found
-
-4. **Update documentation:**
-
-- Remove references to Leaflet from any documentation or comments
-- Update architecture diagrams if they reference Leaflet
-- Update any plan files that mention Leaflet
-
-**Files to modify:**
-
-- `package.json` - Remove leaflet, react-leaflet, @types/leaflet dependencies
-- `src/index.css` - Remove Leaflet CSS import
-- Verify no other files import or use Leaflet components
-
-**Testing:**
-
-- Verify application builds and runs without Leaflet
-- Verify no runtime errors related to missing Leaflet dependencies
 
 ## Critical Constraints & Requirements
 
@@ -471,7 +351,6 @@ The implementation is organized into four phases, each building on the previous 
 - Must implement request queuing/throttling
 - Aggressive caching is essential (cache indefinitely for same place names)
 - User experience must account for potential delays
-- Show progress indicators and estimated wait times
 
 ### Overture Maps API
 
@@ -509,9 +388,7 @@ The implementation is organized into four phases, each building on the previous 
 - **Commercial geocoding APIs:** Google Maps, Mapbox (paid, higher rate limits)
 - **Hybrid approach:** Use Nominatim for common places (cached), commercial API for rare places
 
-## Prerequisites
-
-Before starting implementation:
+## Next Steps
 
 1. **Obtain API Access:** 
 
@@ -524,51 +401,33 @@ Before starting implementation:
 - Plan rate limiting implementation (1 req/sec max)
 - Plan attribution display requirements
 
-3. **Evaluate NER Libraries:**
+3. **Conduct Proof of Concept:** 
 
-- Research and select NER library (compromise, spacy, or alternatives)
-- Consider accuracy, performance, and ease of integration
-- Test library with sample text to verify location extraction quality
+- Test Overture Maps API endpoints with sample queries
+- Test Nominatim geocoding accuracy and rate limiting behavior
+- Test POI query performance and data quality
+- Verify Overture Maps API rate limits and pricing
+- **Test rate limiting:** Verify Nominatim 1 req/sec limit is respected
+- **Test caching:** Verify caching strategy works correctly
+- **Test attribution:** Verify attribution display requirements
 
-## Files to Modify
+3. **Evaluate Alternatives:** Compare with Nominatim, Google Maps, or Mapbox APIs if needed
+4. **Make Decision:** Based on POC results, decide whether to proceed with Overture Maps API
+5. **If Positive:** Follow implementation plan above (on-demand API approach)
+6. **If Negative:** Consider alternative geocoding services or hybrid approach
 
-**Backend Services (CREATE):**
+## Files to Modify (If Proceeding)
 
-- `backend/src/services/geographicExtractionService.ts` (CREATE) - Shared NER-based location extraction service
 - `backend/src/services/overtureMapsService.ts` (CREATE) - Overture Maps API client
 - `backend/src/services/nominatimService.ts` (CREATE) - Nominatim geocoding service with rate limiting
 - `backend/src/services/topicGeographicService.ts` (CREATE) - Topic geographic analysis logic
-
-**Backend Services (MODIFY):**
-
-- `backend/src/services/ingestion/RssIngestionService.ts` (MODIFY) - Replace simple geographic extraction with shared service
-- `backend/src/services/ingestion/ManualInputService.ts` (MODIFY) - Replace simple geographic extraction with shared service
-- `backend/src/services/ingestion/NitterScrapingService.ts` (MODIFY) - Replace simple geographic extraction with shared service
-
-**Backend Routes:**
-
 - `backend/src/routes/overture.ts` (CREATE) - API endpoints for Overture Maps
 - `backend/src/routes/topics.ts` (MODIFY) - Add geographic analysis endpoint
-
-**Frontend Components:**
-
-- `src/components/Topics/TopicGeographicView.tsx` (CREATE) - Geographic data visualization component (alternative to Leaflet)
+- `src/components/Topics/TopicMap.tsx` (CREATE) - Leaflet map component with attribution
 - `src/components/Topics/TopicDetailPage.tsx` (MODIFY) - Add geographic analysis section
-
-**Database:**
-
-- `supabase/migrations/YYYYMMDDHHMMSS_add_geographic_analysis.sql` (CREATE) - Add geographic_analysis JSONB field to osint_topics
-
-**Configuration:**
-
+- `backend/src/services/ingestion/RssIngestionService.ts` (MODIFY) - Enhance geographic extraction (optional, Phase 1)
+- Database migration: Add `geographic_analysis` JSONB field to `osint_topics` (optional)
 - Environment variables: Add `OVERTURE_MAPS_API_KEY` configuration
-- `package.json` (MODIFY) - Add NER library dependency (e.g., compromise or spacy)
-
-**Cleanup (Phase 4):**
-
-- `package.json` (MODIFY) - Remove leaflet, react-leaflet, @types/leaflet dependencies
-- `src/index.css` (MODIFY) - Remove Leaflet CSS import
-- Verify no other files import or use Leaflet components
 
 ## Technical Notes
 
@@ -595,25 +454,6 @@ Before starting implementation:
 - **Policy:** [Nominatim Usage Policy](https://operations.osmfoundation.org/policies/nominatim/)
 - **Alternatives:** For bulk geocoding, consider self-hosted Nominatim instance or commercial providers
 
-### Enhanced Geographic Extraction (NER)
-
-- **Approach:** Use Named Entity Recognition library for location extraction
-- **Libraries to consider:**
-- `compromise` - Lightweight NLP library for JavaScript
-- `spacy` - More powerful but may require Python backend or Node.js bindings
-- `ner` - Simple NER library for Node.js
-- Evaluate based on accuracy, performance, and ease of integration
-- **Benefits over string matching:**
-- More accurate location detection
-- Handles variations in place name formatting
-- Can extract locations from natural language text
-- Supports multiple languages (depending on library)
-- **Implementation:**
-- Create shared service to avoid code duplication
-- Extract place names with confidence scores
-- Store in existing `geographic_indicators` JSONB field
-- No geocoding at ingestion time (only on-demand for topics)
-
 ### Hybrid Approach (Recommended)
 
 1. **Geocoding:** Use Nominatim (free, OpenStreetMap) for place name → coordinates
@@ -631,7 +471,7 @@ Before starting implementation:
 
 3. **Caching:** Aggressive caching for both services to minimize API calls
 
-- Cache Nominatim results indefinitely (same place name = same coordinates)
+- Cache Nominatim results for at least 24 hours (same queries should never hit API twice)
 - Cache Overture Maps POI results per location/radius combination
 - Store cached results in database (`geographic_analysis` JSONB field)
 
@@ -648,19 +488,10 @@ Before starting implementation:
 - **Request Batching:** Not possible with Nominatim (sequential only), but can batch Overture Maps queries if supported
 - Use request debouncing for user-triggered analysis
 - **User Experience:** Show loading states and progress for geocoding (may take time due to rate limits)
-- **NER Performance:** Evaluate NER library performance for real-time ingestion (may need async processing)
 
 ### Error Handling
 
 - **Nominatim Rate Limits:** 
 - Queue requests if rate limit exceeded
 - Show user-friendly message about rate limiting
-- Display estimated wait time if queue is long
-- **Overture Maps API Errors:**
-- Handle API key errors gracefully
-- Handle network failures with retry logic
-- Show appropriate error messages to users
-- **Geographic Analysis Failures:**
-- If geocoding fails for a location, continue with other locations
-- Log failures for debugging
-- Show partial results if some locations fail
+- Use cached data when available
