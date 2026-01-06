@@ -577,6 +577,7 @@ router.post('/manual', async (req: Request, res: Response) => {
       source_name,
       language,
       published_at,
+      user_id, // Optional: userId for audit logging
     } = req.body;
 
     // Validate required fields
@@ -612,8 +613,8 @@ router.post('/manual', async (req: Request, res: Response) => {
       publishedAt: published_at ? new Date(published_at) : undefined,
     });
 
-    // Create controller and ingest
-    const controller = new IngestionController(manualService);
+    // Create controller with userId for audit logging
+    const controller = new IngestionController(manualService, user_id || null);
     const result = await controller.ingest();
 
     // Log stats

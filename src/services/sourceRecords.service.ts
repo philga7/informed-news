@@ -162,6 +162,50 @@ export const sourceRecordsService = {
     });
     return result.records;
   },
+
+  /**
+   * Create a manual article via the ingestion API
+   */
+  async createManual(
+    organizationId: string,
+    data: {
+      title: string;
+      content: string; // Plain text (converted from Markdown)
+      url?: string;
+      sourceName?: string;
+      language?: string;
+      publishedAt?: string; // ISO date string (YYYY-MM-DD)
+      userId?: string; // Optional: userId for audit logging
+    }
+  ): Promise<{ success: boolean; record?: SourceRecord }> {
+    const response = await fetch(`${API_BASE}/api/ingest/manual`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        organization_id: organizationId,
+        title: data.title,
+        content: data.content,
+        url: data.url,
+        source_name: data.sourceName,
+        language: data.language,
+        published_at: data.publishedAt ? new Date(data.publishedAt).toISOString() : undefined,
+        user_id: data.userId, // Include userId for audit logging
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+      throw new Error(error.error || error.message || `Failed to create manual article: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    return {
+      success: result.success,
+      record: result.result?.record,
+    };
+  },
 };
 
 
