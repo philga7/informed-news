@@ -13,7 +13,7 @@ export interface AnalyticArtifact {
   source_record_id: string | null;
   topic_id: string | null;
   organization_id: string;
-  type: 'summary' | 'entity_extraction' | 'tone_analysis' | 'sentiment' | 'key_facts' | 'timeline' | 'network_graph';
+  type: 'summary' | 'entity_extraction' | 'tone_analysis' | 'sentiment' | 'key_facts' | 'timeline' | 'network_graph' | 'media_comparison';
   payload: any;
   model_name: string;
   reviewed: boolean;
@@ -60,6 +60,34 @@ export interface TopicSummaryPayload {
     url: string;
     mentionedIn: string[];
   }>;
+}
+
+export interface MediaComparisonPayload {
+  coverageAnalysis: {
+    uniqueToArticles: string[];
+    uniqueToVideos: string[];
+    uniqueToPodcasts: string[];
+    commonThemes: string[];
+  };
+  perspectiveDifferences: Array<{
+    topic: string;
+    articlePerspective: string;
+    videoPerspective: string;
+    podcastPerspective?: string;
+  }>;
+  emphasisAnalysis: {
+    articleEmphasis: string[];
+    videoEmphasis: string[];
+    podcastEmphasis?: string[];
+  };
+  linkAnalysis: {
+    sharedLinks: string[];
+    mediaSpecificLinks: {
+      articles: string[];
+      videos: string[];
+      podcasts: string[];
+    };
+  };
 }
 
 class AnalysisService {
@@ -177,6 +205,16 @@ class AnalysisService {
   async generateTopicSummary(topicId: string): Promise<AnalyticArtifact> {
     const response = await apiClient.post(
       `${this.baseUrl}/topics/${topicId}/summarize`
+    );
+    return response.artifact;
+  }
+
+  /**
+   * Compare content across different media types for a topic
+   */
+  async compareMediaTypes(topicId: string): Promise<AnalyticArtifact> {
+    const response = await apiClient.post(
+      `${this.baseUrl}/topics/${topicId}/compare-media`
     );
     return response.artifact;
   }

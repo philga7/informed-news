@@ -17,6 +17,7 @@ interface NavItem {
   label: string;
   icon: typeof BarChart3;
   matchPattern?: (path: string) => boolean;
+  group?: 'entry' | 'tier1' | 'tier2' | 'reference';
 }
 
 const navItems: NavItem[] = [
@@ -25,42 +26,49 @@ const navItems: NavItem[] = [
     label: 'Dashboard',
     icon: BarChart3,
     matchPattern: (path) => path === '/dashboard',
+    group: 'entry',
   },
   {
     path: '/scan',
     label: 'Scan',
     icon: Radar,
     matchPattern: (path) => path === '/scan',
+    group: 'tier1',
   },
   {
     path: '/watch-list',
     label: 'Watch List',
     icon: Eye,
     matchPattern: (path) => path === '/watch-list',
+    group: 'tier1',
   },
   {
     path: '/indicators',
     label: 'Indicators',
     icon: AlertTriangle,
     matchPattern: (path) => path === '/indicators',
+    group: 'tier1',
   },
   {
     path: '/topics',
     label: 'Topics',
     icon: Target,
     matchPattern: (path) => path === '/topics' || path.startsWith('/topics/'),
+    group: 'tier2',
   },
   {
     path: '/source-records',
     label: 'Source Records',
     icon: FileText,
     matchPattern: (path) => path === '/source-records' || path.startsWith('/source-records/'),
+    group: 'reference',
   },
   {
     path: '/sources',
     label: 'Sources',
     icon: Database,
     matchPattern: (path) => path === '/sources',
+    group: 'reference',
   },
 ];
 
@@ -99,28 +107,43 @@ export function Sidebar() {
         <div className="flex flex-col h-full">
           {/* Navigation Items */}
           <nav className="flex-1 overflow-y-auto p-4 space-y-1 pt-6">
-            {navItems.map((item) => {
+            {navItems.map((item, index) => {
               const Icon = item.icon;
               const active = isActive(item);
+              
+              // Add separator before Tier 2 and Reference sections
+              const prevItem = index > 0 ? navItems[index - 1] : null;
+              const showSeparator = 
+                prevItem &&
+                item.group &&
+                prevItem.group &&
+                ((item.group === 'tier2' && prevItem.group === 'tier1') ||
+                 (item.group === 'reference' && prevItem.group !== 'reference'));
 
               return (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  onClick={() => setIsMobileOpen(false)}
-                  className={`
-                    flex items-center gap-3 px-4 py-3 rounded-lg
-                    transition-all duration-200
-                    ${
-                      active
-                        ? 'bg-accent text-white shadow-lg'
-                        : 'text-stone-300 hover:bg-stone-800 hover:text-stone-100'
-                    }
-                  `}
-                >
-                  <Icon size={20} className="flex-shrink-0" />
-                  <span className="font-medium">{item.label}</span>
-                </Link>
+                <div key={item.path}>
+                  {showSeparator && (
+                    <div className="my-3 px-4">
+                      <div className="h-px bg-stone-700"></div>
+                    </div>
+                  )}
+                  <Link
+                    to={item.path}
+                    onClick={() => setIsMobileOpen(false)}
+                    className={`
+                      flex items-center gap-3 px-4 py-3 rounded-lg
+                      transition-all duration-200
+                      ${
+                        active
+                          ? 'bg-accent text-white shadow-lg'
+                          : 'text-stone-300 hover:bg-stone-800 hover:text-stone-100'
+                      }
+                    `}
+                  >
+                    <Icon size={20} className="flex-shrink-0" />
+                    <span className="font-medium">{item.label}</span>
+                  </Link>
+                </div>
               );
             })}
           </nav>

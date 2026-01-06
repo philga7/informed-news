@@ -19,7 +19,8 @@ export type ArtifactType =
   | 'sentiment'
   | 'key_facts'
   | 'timeline'
-  | 'network_graph';
+  | 'network_graph'
+  | 'media_comparison';
 export type OrgMemberRole = 'owner' | 'admin' | 'analyst' | 'member';
 
 // Watch Items (Tier 1 Situational Awareness)
@@ -477,6 +478,38 @@ export interface SourceValueReport {
       name: string;
       valueRating: number;
     } | null;
+  };
+}
+
+// ============================================================================
+// MEDIA COMPARISON TYPES (Phase 3: Cross-Content Analysis)
+// ============================================================================
+
+export interface MediaComparisonResponse {
+  coverageAnalysis: {
+    uniqueToArticles: string[];
+    uniqueToVideos: string[]; // Based on title analysis
+    uniqueToPodcasts: string[];
+    commonThemes: string[];
+  };
+  perspectiveDifferences: Array<{
+    topic: string;
+    articlePerspective: string;
+    videoPerspective: string; // Inferred from titles
+    podcastPerspective?: string;
+  }>;
+  emphasisAnalysis: {
+    articleEmphasis: string[];
+    videoEmphasis: string[]; // Based on title keywords/themes
+    podcastEmphasis?: string[];
+  };
+  linkAnalysis: {
+    sharedLinks: string[]; // Links mentioned across multiple media types
+    mediaSpecificLinks: {
+      articles: string[];
+      videos: string[]; // Usually empty (videos don't have links)
+      podcasts: string[];
+    };
   };
 }
 

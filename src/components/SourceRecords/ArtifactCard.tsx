@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { AlertTriangle, Trash2, CheckCircle, Circle } from 'lucide-react';
-import type { AnalyticArtifact, SummaryPayload, EntityExtractionPayload, ToneAnalysisPayload, KeyFactsPayload, TopicSummaryPayload } from '../../services/analysis.service';
+import type { AnalyticArtifact, SummaryPayload, EntityExtractionPayload, ToneAnalysisPayload, KeyFactsPayload, TopicSummaryPayload, MediaComparisonPayload } from '../../services/analysis.service';
+import { MediaComparisonCard } from '../Topics/MediaComparisonCard';
 import { analysisService } from '../../services/analysis.service';
 
 interface ArtifactCardProps {
@@ -68,6 +69,8 @@ export function ArtifactCard({ artifact, onUpdate }: ArtifactCardProps) {
         return 'Timeline';
       case 'network_graph':
         return 'Network Graph';
+      case 'media_comparison':
+        return 'Media Comparison';
       default:
         return type;
     }
@@ -87,6 +90,8 @@ export function ArtifactCard({ artifact, onUpdate }: ArtifactCardProps) {
         return <ToneDisplay payload={artifact.payload as ToneAnalysisPayload} />;
       case 'key_facts':
         return <KeyFactsDisplay payload={artifact.payload as KeyFactsPayload} />;
+      case 'media_comparison':
+        return <MediaComparisonCard payload={artifact.payload as MediaComparisonPayload} />;
       default:
         return <pre className="text-xs text-stone-400 whitespace-pre-wrap">{JSON.stringify(artifact.payload, null, 2)}</pre>;
     }
