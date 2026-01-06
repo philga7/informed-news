@@ -11,7 +11,6 @@ import { parseRSSFeed } from '../feedFetcher.js';
 import { contentExtractor } from './ContentExtractor.js';
 import { contentOptimizer } from './ContentOptimizer.js';
 import { mediaTypeDetector } from './MediaTypeDetector.js';
-import { geographicExtractionService } from '../geographicExtractionService.js';
 import { supabase } from '../../utils/supabase.js';
 import type { NewsSource } from '../../types/index.js';
 import type { IngestionService, SourceRecordDTO } from '../../types/ingestion.js';
@@ -44,6 +43,26 @@ export class RssIngestionService implements IngestionService {
     return englishCount >= 3 ? 'en' : 'unknown';
   }
 
+  /**
+   * Extract geographic indicators from content
+   * Basic implementation - can be enhanced with NER libraries
+   */
+  private extractGeographicIndicators(text: string): string[] {
+    const indicators: string[] = [];
+    const commonPlaces = [
+      'United States', 'USA', 'America', 'UK', 'United Kingdom', 
+      'China', 'Russia', 'Europe', 'Asia', 'Middle East',
+      'Washington', 'New York', 'London', 'Moscow', 'Beijing'
+    ];
+
+    commonPlaces.forEach(place => {
+      if (text.includes(place)) {
+        indicators.push(place);
+      }
+    });
+
+    return [...new Set(indicators)]; // Remove duplicates
+  }
 
   /**
    * Fetch source value rating from database
@@ -187,10 +206,9 @@ export class RssIngestionService implements IngestionService {
         }
 
         const language = this.detectLanguage(fullContent || item.title);
-        const geographicResult = geographicExtractionService.extractLocations(
+        const geographicIndicators = this.extractGeographicIndicators(
           `${item.title} ${fullContent || ''}`
         );
-        const geographicIndicators = geographicResult.locations;
 
         // Determine final optimization strategy for storage
         const finalStrategy = contentOptimizer.determineStrategy(
