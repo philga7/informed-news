@@ -20,15 +20,16 @@ router.get('/', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'organization_id is required' });
     }
 
-    // Fetch sources with record counts (simpler query first)
+    // Check if service role key is configured (for debugging)
+    const hasServiceRole = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!hasServiceRole) {
+      console.warn('⚠️  SUPABASE_SERVICE_ROLE_KEY not set - queries may be blocked by RLS');
+    }
+
+    // Fetch sources (without nested records to avoid pagination issues)
     const { data: sources, error } = await supabase
       .from('sources')
-      .select(`
-        *,
-        source_records (
-          id
-        )
-      `)
+      .select('*')
       .eq('organization_id', organization_id as string)
       .order('created_at', { ascending: false });
 
@@ -37,76 +38,120 @@ router.get('/', async (req: Request, res: Response) => {
       throw error;
     }
 
-    // Get all source record IDs to fetch links
-    const sourceRecordIds: string[] = [];
-    const sourceIdToRecordIds: Record<string, string[]> = {};
-    
-    (sources || []).forEach((source: any) => {
-      const recordIds = (source.source_records || []).map((r: any) => r.id);
-      sourceIdToRecordIds[source.id] = recordIds;
-      sourceRecordIds.push(...recordIds);
-    });
-
-    // Fetch links for all source records in one query
-    let linksByRecordId: Record<string, Array<{ created_at: string }>> = {};
-    if (sourceRecordIds.length > 0) {
-      const { data: linksData, error: linksError } = await supabase
-        .from('topic_source_links')
-        .select('source_record_id, created_at')
-        .in('source_record_id', sourceRecordIds);
-
-      if (!linksError && linksData) {
-        linksData.forEach((link: any) => {
-          const recordId = link.source_record_id;
-          if (!linksByRecordId[recordId]) {
-            linksByRecordId[recordId] = [];
-          }
-          linksByRecordId[recordId].push({ created_at: link.created_at });
-        });
-      }
+    if (!sources || sources.length === 0) {
+      return res.json({
+        success: true,
+        sources: [],
+      });
     }
 
-    // Transform data to include record counts and hygiene metrics
-    const sourcesWithCounts = (sources || []).map((source: any) => {
-      const recordIds = sourceIdToRecordIds[source.id] || [];
-      const recordCount = recordIds.length;
+    // Process each source individually to get accurate metrics
+    const sourcesWithCounts = await Promise.all(sources.map(async (source: any) => {
+      // Get record count for this source
+      const { count: recordCount, error: countError } = await supabase
+        .from('source_records')
+        .select('*', { count: 'exact', head: true })
+        .eq('source_id', source.id);
       
-      // Count records that have topic links
+      if (countError) {
+        console.error(`Error counting records for source ${source.id}:`, countError);
+      }
+
+      const recordCountValue = recordCount || 0;
+
+      // Get all record IDs for this source
+      const { data: records, error: recordsError } = await supabase
+        .from('source_records')
+        .select('id')
+        .eq('source_id', source.id);
+
+      if (recordsError) {
+        console.error(`Error fetching records for source ${source.id}:`, recordsError);
+      }
+
+      const recordIds = (records || []).map((r: any) => r.id).filter((id: string) => id);
+      
+      // Query links only for records belonging to this source
+      let linksByRecordId: Record<string, Array<{ created_at: string }>> = {};
       let linkedCount = 0;
       let mostRecentLinkDate: Date | null = null;
-      
-      recordIds.forEach((recordId: string) => {
-        const links = linksByRecordId[recordId] || [];
-        if (links.length > 0) {
-          linkedCount++;
+
+      if (recordIds.length > 0) {
+        // Query in batches if needed (Supabase limit is ~100 items per .in() query)
+        const batchSize = 100;
+        for (let i = 0; i < recordIds.length; i += batchSize) {
+          const batch = recordIds.slice(i, i + batchSize);
           
-          // Check for most recent link date
-          links.forEach((link: any) => {
-            if (link && link.created_at) {
-              try {
-                const linkDate = new Date(link.created_at);
-                if (!isNaN(linkDate.getTime())) {
-                  if (!mostRecentLinkDate || linkDate > mostRecentLinkDate) {
-                    mostRecentLinkDate = linkDate;
-                  }
-                }
-              } catch (e) {
-                // Skip invalid dates
+          // Fetch topic_source_links for this batch
+          const { data: topicLinksData, error: topicLinksError } = await supabase
+            .from('topic_source_links')
+            .select('source_record_id, linked_at')
+            .in('source_record_id', batch);
+
+          if (topicLinksError) {
+            console.error(`Error fetching topic links for source ${source.id}:`, topicLinksError);
+          } else if (topicLinksData) {
+            topicLinksData.forEach((link: any) => {
+              const recordId = link.source_record_id;
+              if (!linksByRecordId[recordId]) {
+                linksByRecordId[recordId] = [];
               }
-            }
-          });
+              linksByRecordId[recordId].push({ created_at: link.linked_at });
+            });
+          }
+
+          // Fetch watch_item_records links for this batch
+          const { data: watchItemLinksData, error: watchItemLinksError } = await supabase
+            .from('watch_item_records')
+            .select('source_record_id, linked_at')
+            .in('source_record_id', batch);
+
+          if (watchItemLinksError) {
+            console.error(`Error fetching watch item links for source ${source.id}:`, watchItemLinksError);
+          } else if (watchItemLinksData) {
+            watchItemLinksData.forEach((link: any) => {
+              const recordId = link.source_record_id;
+              if (!linksByRecordId[recordId]) {
+                linksByRecordId[recordId] = [];
+              }
+              linksByRecordId[recordId].push({ created_at: link.linked_at });
+            });
+          }
         }
-      });
+
+        // Count linked records and find most recent link date
+        recordIds.forEach((recordId: string) => {
+          const links = linksByRecordId[recordId] || [];
+          if (links.length > 0) {
+            linkedCount++;
+            
+            // Check for most recent link date
+            links.forEach((link: any) => {
+              if (link && link.created_at) {
+                try {
+                  const linkDate = new Date(link.created_at);
+                  if (!isNaN(linkDate.getTime())) {
+                    if (!mostRecentLinkDate || linkDate > mostRecentLinkDate) {
+                      mostRecentLinkDate = linkDate;
+                    }
+                  }
+                } catch (e) {
+                  // Skip invalid dates
+                }
+              }
+            });
+          }
+        });
+      }
       
       // Calculate days since last link
       let daysSinceLastLink: number;
-      // TypeScript control flow issue - use type assertion
-      const recentDate: Date | null = mostRecentLinkDate as Date | null;
-      if (recentDate) {
-        daysSinceLastLink = Math.floor((Date.now() - recentDate.getTime()) / (1000 * 60 * 60 * 24));
+      if (mostRecentLinkDate) {
+        daysSinceLastLink = Math.floor((Date.now() - mostRecentLinkDate.getTime()) / (1000 * 60 * 60 * 24));
       } else {
-        daysSinceLastLink = recordCount > 0 ? 999 : 0; // 999 if has records but never linked
+        daysSinceLastLink = recordCountValue > 0 ? 999 : 0; // 999 if has records but never linked
       }
+
       
       return {
         id: source.id,
@@ -121,11 +166,11 @@ router.get('/', async (req: Request, res: Response) => {
         scrape_external_url: source.scrape_external_url || false,
         created_at: source.created_at,
         updated_at: source.updated_at,
-        record_count: recordCount,
+        record_count: recordCountValue,
         linked_count: linkedCount,
         days_since_last_link: daysSinceLastLink,
       };
-    });
+    }));
 
     res.json({
       success: true,

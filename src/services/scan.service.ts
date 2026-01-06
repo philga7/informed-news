@@ -1,4 +1,4 @@
-import type { SourceRecordWithDomain, ScanStatus, WatchItemCategory } from '../types/osint';
+import type { SourceRecordWithDomain, ScanStatus, WatchItemCategory, MediaType } from '../types/osint';
 import { deduplicateContentComprehensive } from '../utils/contentDeduplication';
 
 // Use relative URL in production (Vercel), localhost in development
@@ -10,6 +10,7 @@ interface ScanFilters {
   organizationId: string;
   scanStatus?: ScanStatus | ScanStatus[];
   domain?: WatchItemCategory;
+  mediaType?: MediaType | MediaType[];
   dateFrom?: string;
   dateTo?: string;
   search?: string;
@@ -79,6 +80,15 @@ export const scanService = {
     }
     
     if (filters.domain) params.append('domain', filters.domain);
+    
+    // Handle array of media types
+    if (filters.mediaType) {
+      const types = Array.isArray(filters.mediaType) 
+        ? filters.mediaType 
+        : [filters.mediaType];
+      types.forEach(type => params.append('media_type', type));
+    }
+    
     if (filters.dateFrom) params.append('date_from', filters.dateFrom);
     if (filters.dateTo) params.append('date_to', filters.dateTo);
     if (filters.search) params.append('search', filters.search);

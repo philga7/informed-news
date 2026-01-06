@@ -8,6 +8,7 @@ import { TopicDetailPage } from './components/Topics/TopicDetailPage';
 import { SourceRecordsPage } from './components/SourceRecords/SourceRecordsPage';
 import { SourceRecordDetailPage } from './components/SourceRecords/SourceRecordDetailPage';
 import { SourcesPage } from './components/Sources/SourcesPage';
+import { ArchivedRecordsPage } from './components/Sources/ArchivedRecordsPage';
 import { ProfilePage } from './components/Profile/ProfilePage';
 import { AnalystDashboard } from './components/Dashboard/AnalystDashboard';
 import { WatchListPage } from './components/WatchList/WatchListPage';
@@ -39,6 +40,7 @@ function App() {
             <Route path="/source-records" element={<SourceRecordsPage />} />
             <Route path="/source-records/:id" element={<SourceRecordDetailPage />} />
             <Route path="/sources" element={<SourcesPage />} />
+            <Route path="/sources/archived" element={<ArchivedRecordsPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />

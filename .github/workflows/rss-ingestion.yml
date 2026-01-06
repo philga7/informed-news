@@ -1,0 +1,36 @@
+name: RSS Ingestion
+
+on:
+  # schedule:
+  #   # Run every 4 hours
+  #   - cron: '0 */4 * * *'
+  workflow_dispatch: # Allow manual triggering
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger RSS Ingestion for All Organizations
+        env:
+          API_URL: ${{ secrets.VITE_API_URL || 'https://your-api-url.vercel.app' }}
+        run: |
+          echo "🔄 Starting RSS ingestion for all organizations..."
+          
+          response=$(curl -X POST \
+            "$API_URL/api/ingest/rss/all" \
+            -H "Content-Type: application/json" \
+            -d '{"organization_id": "all"}' \
+            -w "\n%{http_code}")
+          
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | head -n-1)
+          
+          if [ "$http_code" -eq 200 ]; then
+            echo "✅ RSS ingestion completed"
+            echo "$body" | jq '.summary'
+          else
+            echo "❌ RSS ingestion failed (HTTP $http_code)"
+            echo "$body"
+            exit 1
+          fi
+

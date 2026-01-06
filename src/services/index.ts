@@ -17,4 +17,5 @@ export { claimsService } from './claims.service';
 export { scanService } from './scan.service';
 export { indicatorsService } from './indicators.service';
 export { scanSessionsService } from './scanSessions.service';
+export { retentionService } from './retention.service';
 

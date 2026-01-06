@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Database, AlertTriangle, TrendingUp, Calendar, Plus } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Database, AlertTriangle, TrendingUp, Calendar, Plus, Archive } from 'lucide-react';
 import { osintSourcesService } from '../../services';
 import { useOrganization } from '../../context/OrganizationContext';
 import { OsintSourcesTable } from './OsintSourcesTable';
@@ -25,6 +26,7 @@ interface SourceUpdateParams {
 }
 
 export function SourcesPage() {
+  const navigate = useNavigate();
   const { currentOrganization } = useOrganization();
   const [sources, setSources] = useState<SourceWithMetrics[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -213,6 +215,14 @@ export function SourcesPage() {
               </p>
             </div>
             <div className="flex items-center gap-3">
+              {/* View Archived Records */}
+              <button
+                onClick={() => navigate('/sources/archived')}
+                className="flex items-center justify-center gap-1.5 px-3 py-2 bg-stone-800 hover:bg-stone-700 text-stone-300 rounded-lg transition-colors duration-250 font-medium text-sm whitespace-nowrap"
+              >
+                <Archive size={16} />
+                Archived Records
+              </button>
               {/* Primary Action */}
               <button
                 onClick={() => setShowCreateModal(true)}

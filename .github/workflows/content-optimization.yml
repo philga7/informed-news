@@ -1,0 +1,35 @@
+name: Content Optimization Job
+
+on:
+  # schedule:
+  #   # Run weekly on Sundays at 3 AM UTC
+  #   - cron: '0 3 * * 0'
+  workflow_dispatch: # Allow manual triggering
+
+jobs:
+  optimization:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run Content Optimization for All Organizations
+        env:
+          API_URL: ${{ secrets.VITE_API_URL || 'https://your-api-url.vercel.app' }}
+        run: |
+          echo "🔄 Running content optimization for all organizations..."
+          
+          response=$(curl -X POST \
+            "$API_URL/api/optimization/organizations/all/apply" \
+            -H "Content-Type: application/json" \
+            -w "\n%{http_code}")
+          
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | head -n-1)
+          
+          if [ "$http_code" -eq 200 ]; then
+            echo "✅ Optimization completed for all organizations"
+            echo "$body" | jq '.summary'
+          else
+            echo "❌ Optimization failed (HTTP $http_code)"
+            echo "$body"
+            exit 1
+          fi
+
