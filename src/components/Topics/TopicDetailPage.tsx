@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Edit2, FileText, Plus, Sparkles } from 'lucide-react';
+import { ArrowLeft, Edit2, FileText, Plus, Sparkles, Film } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useOrganization } from '../../context/OrganizationContext';
 import { osintTopicsService } from '../../services';
@@ -115,6 +115,31 @@ export function TopicDetailPage() {
     } finally {
       setAnalysisLoading(null);
     }
+  };
+
+  const handleCompareMediaTypes = async () => {
+    if (!id) return;
+    try {
+      setAnalysisLoading('media_comparison');
+      await analysisService.compareMediaTypes(id);
+      await loadTopicArtifacts();
+    } catch (err) {
+      console.error('Error comparing media types:', err);
+      alert(err instanceof Error ? err.message : 'Failed to compare media types');
+    } finally {
+      setAnalysisLoading(null);
+    }
+  };
+
+  // Check if there are multiple media types linked
+  const hasMultipleMediaTypes = () => {
+    if (!linkedRecords || linkedRecords.length === 0) return false;
+    const mediaTypes = new Set(
+      linkedRecords
+        .map(link => (link.source_records as any)?.media_type || 'article')
+        .filter(Boolean)
+    );
+    return mediaTypes.size >= 2;
   };
 
   useEffect(() => {
@@ -310,13 +335,6 @@ export function TopicDetailPage() {
           </div>
         </div>
 
-        {/* Related Topics Section */}
-        {id && (
-          <div className="mb-6">
-            <RelatedTopicsWidget topicId={id} />
-          </div>
-        )}
-
         {/* Tabs Navigation */}
         <div className="bg-stone-900 border border-stone-800 rounded-lg mb-6">
           <div className="flex border-b border-stone-800">
@@ -412,23 +430,45 @@ export function TopicDetailPage() {
                       Generate AI-powered summary across all linked source records. Synthesizes information from multiple sources to provide comprehensive intelligence overview.
                     </p>
 
-                    <button
-                      onClick={handleGenerateTopicSummary}
-                      disabled={analysisLoading !== null || linkedRecords.length === 0}
-                      className="flex items-center justify-center gap-2 px-4 py-3 bg-stone-800 hover:bg-stone-700 border border-stone-700 hover:border-stone-600 text-stone-200 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed mb-6"
-                    >
-                      {analysisLoading === 'topic_summary' ? (
-                        <>
-                          <LoadingSpinner />
-                          <span>Generating Topic Summary...</span>
-                        </>
-                      ) : (
-                        <>
-                          <FileText size={18} />
-                          <span>Generate Topic Summary</span>
-                        </>
+                    <div className="flex flex-wrap gap-3 mb-6">
+                      <button
+                        onClick={handleGenerateTopicSummary}
+                        disabled={analysisLoading !== null || linkedRecords.length === 0}
+                        className="flex items-center justify-center gap-2 px-4 py-3 bg-stone-800 hover:bg-stone-700 border border-stone-700 hover:border-stone-600 text-stone-200 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {analysisLoading === 'topic_summary' ? (
+                          <>
+                            <LoadingSpinner />
+                            <span>Generating Topic Summary...</span>
+                          </>
+                        ) : (
+                          <>
+                            <FileText size={18} />
+                            <span>Generate Topic Summary</span>
+                          </>
+                        )}
+                      </button>
+
+                      {hasMultipleMediaTypes() && (
+                        <button
+                          onClick={handleCompareMediaTypes}
+                          disabled={analysisLoading !== null || linkedRecords.length === 0}
+                          className="flex items-center justify-center gap-2 px-4 py-3 bg-stone-800 hover:bg-stone-700 border border-stone-700 hover:border-stone-600 text-stone-200 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {analysisLoading === 'media_comparison' ? (
+                            <>
+                              <LoadingSpinner />
+                              <span>Comparing Media Types...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Film size={18} />
+                              <span>Compare Media Types</span>
+                            </>
+                          )}
+                        </button>
                       )}
-                    </button>
+                    </div>
 
                     {/* Existing Topic Artifacts */}
                     {isLoadingArtifacts ? (
@@ -458,13 +498,48 @@ export function TopicDetailPage() {
                   </div>
                 )}
 
-                {/* Collection Plan Card */}
+                {/* Collection Plan Card - Planning tool, should come before linking sources */}
                 {id && (
                   <CollectionPlanCard
                     topicId={id}
                     collectionPlan={topic.collection_plan || null}
                     onSave={handleSaveCollectionPlan}
                   />
+                )}
+
+                {/* Linked Source Records Section - Collection phase, needs to be early */}
+                <div className="bg-stone-900 border border-stone-800 rounded-lg p-6">
+                  <div className="flex items-center justify-between mb-6">
+                    <h2 className="text-2xl font-semibold text-stone-200">Linked Source Records</h2>
+                    <button
+                      onClick={() => setShowLinkModal(true)}
+                      className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent-hover text-white rounded-lg transition-colors duration-250"
+                    >
+                      <Plus size={18} />
+                      Link Source Record
+                    </button>
+                  </div>
+
+                  {linkedRecords.length === 0 ? (
+                    <EmptyState
+                      title="No linked records"
+                      description="Link source records to this topic to start building your intelligence picture."
+                      icon={<FileText size={48} className="text-stone-600" />}
+                    />
+                  ) : (
+                    <LinkedRecordsTable
+                      links={linkedRecords}
+                      onUnlink={handleUnlinkRecord}
+                      onEdit={(linkId) => setEditingLinkId(linkId)}
+                    />
+                  )}
+                </div>
+
+                {/* Confidence Assessment Section - Closely related to source records */}
+                {linkedRecords.length > 0 && (
+                  <div className="mb-6">
+                    <ConfidenceStats links={linkedRecords} />
+                  </div>
                 )}
               </div>
             )}
@@ -479,108 +554,81 @@ export function TopicDetailPage() {
           </div>
         </div>
 
-        {/* Timeline Section - Only show in Overview tab */}
+        {/* Verification Phase - Claims & Corroboration (should come before pattern detection) */}
         {activeTab === 'overview' && (
           <>
-        <div className="mb-6">
-          <h2 className="text-2xl font-semibold text-stone-200 mb-4">Temporal Analysis</h2>
-          
-          {isLoadingTimeline ? (
-            <div className="bg-stone-900 border border-stone-800 rounded-lg p-12 flex items-center justify-center">
-              <LoadingSpinner />
-            </div>
-          ) : timeline ? (
-            <>
-              {/* Timeline Stats */}
+            {/* Claims Analysis Section */}
+            {id && (
               <div className="mb-6">
-                <TimelineStats timeline={timeline} />
+                <ClaimsAnalysis topicId={id} />
               </div>
+            )}
 
-              {/* Timeline Chart */}
-              <div className="bg-stone-900 border border-stone-800 rounded-lg p-6 mb-6">
-                <TopicTimelineChart
-                  timeline={timeline}
-                  bucket={timelineBucket}
-                  onBucketChange={handleBucketChange}
-                />
+            {/* Corroboration Matrix Section */}
+            {id && (
+              <div className="mb-6">
+                <CorroborationMatrix topicId={id} />
               </div>
+            )}
 
-              {/* Narrative Evolution Timeline */}
-              {id && (
-                <NarrativeEvolutionTimeline
-                  topicId={id}
-                  bucket={timelineBucket}
-                  onBucketChange={handleBucketChange}
-                />
+            {/* Pattern Detection Phase - Temporal & Coordination Analysis */}
+            <div className="mb-6">
+              <h2 className="text-2xl font-semibold text-stone-200 mb-4">Temporal Analysis</h2>
+              
+              {isLoadingTimeline ? (
+                <div className="bg-stone-900 border border-stone-800 rounded-lg p-12 flex items-center justify-center">
+                  <LoadingSpinner />
+                </div>
+              ) : timeline ? (
+                <>
+                  {/* Timeline Stats */}
+                  <div className="mb-6">
+                    <TimelineStats timeline={timeline} />
+                  </div>
+
+                  {/* Timeline Chart */}
+                  <div className="bg-stone-900 border border-stone-800 rounded-lg p-6 mb-6">
+                    <TopicTimelineChart
+                      timeline={timeline}
+                      bucket={timelineBucket}
+                      onBucketChange={handleBucketChange}
+                    />
+                  </div>
+
+                  {/* Narrative Evolution Timeline */}
+                  {id && (
+                    <NarrativeEvolutionTimeline
+                      topicId={id}
+                      bucket={timelineBucket}
+                      onBucketChange={handleBucketChange}
+                    />
+                  )}
+                </>
+              ) : (
+                <div className="bg-stone-900 border border-stone-800 rounded-lg p-12">
+                  <EmptyState
+                    title="No Timeline Data"
+                    description="Timeline analysis will appear once source records are linked to this topic."
+                    icon={<FileText size={48} className="text-stone-600" />}
+                  />
+                </div>
               )}
-            </>
-          ) : (
-            <div className="bg-stone-900 border border-stone-800 rounded-lg p-12">
-              <EmptyState
-                title="No Timeline Data"
-                description="Timeline analysis will appear once source records are linked to this topic."
-                icon={<FileText size={48} className="text-stone-600" />}
-              />
             </div>
-          )}
-        </div>
 
-        {/* Confidence Assessment Section */}
-        {linkedRecords.length > 0 && (
-          <div className="mb-6">
-            <ConfidenceStats links={linkedRecords} />
-          </div>
-        )}
+            {/* Coordination Detection Section */}
+            {id && currentOrganization && (
+              <div className="mb-6">
+                <CoordinationSection topicId={id} organizationId={currentOrganization.id} />
+              </div>
+            )}
 
-        {/* Coordination Detection Section */}
-        {id && currentOrganization && (
-          <div className="mb-6">
-            <CoordinationSection topicId={id} organizationId={currentOrganization.id} />
-          </div>
-        )}
-
-        {/* Claims Analysis Section */}
-        {id && (
-          <div className="mb-6">
-            <ClaimsAnalysis topicId={id} />
-          </div>
-        )}
-
-        {/* Corroboration Matrix Section */}
-        {id && (
-          <div className="mb-6">
-            <CorroborationMatrix topicId={id} />
-          </div>
-        )}
-
-        {/* Linked Source Records Section */}
-        <div className="bg-stone-900 border border-stone-800 rounded-lg p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-semibold text-stone-200">Linked Source Records</h2>
-            <button
-              onClick={() => setShowLinkModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent-hover text-white rounded-lg transition-colors duration-250"
-            >
-              <Plus size={18} />
-              Link Source Record
-            </button>
-          </div>
-
-          {linkedRecords.length === 0 ? (
-            <EmptyState
-              title="No linked records"
-              description="Link source records to this topic to start building your intelligence picture."
-              icon={<FileText size={48} className="text-stone-600" />}
-            />
-          ) : (
-            <LinkedRecordsTable
-              links={linkedRecords}
-              onUnlink={handleUnlinkRecord}
-              onEdit={(linkId) => setEditingLinkId(linkId)}
-            />
-          )}
-        </div>
-        </>
+            {/* Context Section - Related Topics (moved to end) */}
+            {id && (
+              <div className="mb-6">
+                <RelatedTopicsWidget topicId={id} />
+              </div>
+            )}
+          </>
         )}
       </div>
 

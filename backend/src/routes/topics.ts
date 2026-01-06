@@ -310,6 +310,7 @@ router.get('/:id', async (req: Request, res: Response) => {
             ingested_at,
             language,
             source_id,
+            media_type,
             sources (
               id,
               name,

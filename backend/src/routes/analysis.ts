@@ -738,6 +738,148 @@ router.post('/topics/:id/summarize', async (req: Request, res: Response) => {
 });
 
 /**
+ * POST /api/analysis/topics/:id/compare-media
+ * Compare content across different media types for a topic
+ */
+router.post('/topics/:id/compare-media', async (req: Request, res: Response) => {
+  try {
+    const { id: topicId } = req.params;
+
+    if (!ollamaService.isAvailable()) {
+      return res.status(503).json({
+        error: 'AI analysis service not available',
+        message: 'OLLAMA_API_KEY not configured',
+      });
+    }
+
+    // Fetch the topic
+    const { data: topic, error: topicError } = await supabase
+      .from('osint_topics')
+      .select('id, name, description, decision_question, organization_id')
+      .eq('id', topicId)
+      .single() as any;
+
+    if (topicError || !topic) {
+      return res.status(404).json({ error: 'Topic not found' });
+    }
+
+    // Fetch all source records linked to this topic with media type information
+    const { data: links, error: linksError } = await supabase
+      .from('topic_source_links')
+      .select(`
+        source_record_id,
+        source_records!inner (
+          id,
+          media_type,
+          sources!inner (
+            name,
+            reliability_rating
+          )
+        )
+      `)
+      .eq('topic_id', topicId);
+
+    if (linksError) throw linksError;
+
+    if (!links || links.length === 0) {
+      return res.status(400).json({ 
+        error: 'No source records linked to this topic',
+        message: 'Link source records to the topic before comparing media types'
+      });
+    }
+
+    // Group records by media type
+    const recordsByMediaType = new Map<string, typeof links>();
+    for (const link of links) {
+      const record = (link as any).source_records;
+      const mediaType = record.media_type || 'article';
+      if (!recordsByMediaType.has(mediaType)) {
+        recordsByMediaType.set(mediaType, []);
+      }
+      recordsByMediaType.get(mediaType)!.push(link);
+    }
+
+    // Check if we have at least 2 different media types
+    if (recordsByMediaType.size < 2) {
+      return res.status(400).json({ 
+        error: 'Insufficient media type diversity',
+        message: 'At least 2 different media types required for comparison. Current media types: ' + Array.from(recordsByMediaType.keys()).join(', ')
+      });
+    }
+
+    // Prepare content for each linked record
+    const preparedRecords: Array<{ 
+      mediaType: string; 
+      content: any; 
+      sourceName: string 
+    }> = [];
+
+    for (const link of links) {
+      try {
+        const recordId = (link as any).source_record_id;
+        const record = (link as any).source_records;
+        const sourceInfo = record.sources;
+        
+        const prepared = await contentPreparer.prepareForAnalysis(recordId);
+        preparedRecords.push({
+          mediaType: record.media_type || 'article',
+          content: prepared,
+          sourceName: sourceInfo.name,
+        });
+      } catch (prepError) {
+        console.warn(`Failed to prepare content for record ${(link as any).source_record_id}:`, prepError);
+        // Continue with other records
+      }
+    }
+
+    if (preparedRecords.length === 0) {
+      return res.status(400).json({ 
+        error: 'No valid content available for analysis',
+        message: 'All linked records failed content preparation'
+      });
+    }
+
+    // Call Ollama service to compare media types
+    const comparisonResult = await ollamaService.compareMediaTypes(preparedRecords);
+
+    // Store in analytic_artifacts table (with topic_id, not source_record_id)
+    const { data: artifact, error: insertError } = await supabase
+      .from('analytic_artifacts')
+      .insert({
+        topic_id: topicId,
+        organization_id: topic.organization_id,
+        type: 'media_comparison',
+        payload: comparisonResult as any,
+        model_name: ollamaService.getModelName(),
+        created_by: 'system:ollama',
+        reviewed: false,
+      } as any)
+      .select()
+      .single();
+
+    if (insertError) throw insertError;
+
+    if (!artifact) {
+      return res.status(500).json({ error: 'Failed to create artifact' });
+    }
+
+    // Audit log: artifact created
+    await auditService.logArtifactCreated((artifact as any).id, artifact as any);
+
+    res.json({
+      success: true,
+      artifact,
+    });
+  } catch (error) {
+    console.error('Error comparing media types:', error);
+    res.status(500).json({
+      error: 'Failed to compare media types',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+/**
  * POST /api/analysis/coordination-assessments
  * Save analyst assessment of potential coordination
  * Body: { duplicate_group_hash, assessment, organization_id, assessed_by_user_id? }

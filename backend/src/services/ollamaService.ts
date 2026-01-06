@@ -1,5 +1,5 @@
 import { Ollama } from 'ollama';
-import type { PreparedContent, Link } from './analysis/ContentPreparer.js';
+import type { PreparedContent, Link, MediaType } from './analysis/ContentPreparer.js';
 
 /**
  * OllamaService
@@ -47,6 +47,34 @@ export interface TopicSummaryResponse {
     url: string;
     mentionedIn: string[];
   }>;
+}
+
+export interface MediaComparisonResponse {
+  coverageAnalysis: {
+    uniqueToArticles: string[];
+    uniqueToVideos: string[]; // Based on title analysis
+    uniqueToPodcasts: string[];
+    commonThemes: string[];
+  };
+  perspectiveDifferences: Array<{
+    topic: string;
+    articlePerspective: string;
+    videoPerspective: string; // Inferred from titles
+    podcastPerspective?: string;
+  }>;
+  emphasisAnalysis: {
+    articleEmphasis: string[];
+    videoEmphasis: string[]; // Based on title keywords/themes
+    podcastEmphasis?: string[];
+  };
+  linkAnalysis: {
+    sharedLinks: string[]; // Links mentioned across multiple media types
+    mediaSpecificLinks: {
+      articles: string[];
+      videos: string[]; // Usually empty (videos don't have links)
+      podcasts: string[];
+    };
+  };
 }
 
 class OllamaService {
@@ -462,6 +490,239 @@ ${content.mediaType === 'video' ? '- This is a video title - analyze what the vi
 
 Respond with a JSON object in this exact format:
 ${outputFormats[analysisType]}`;
+  }
+
+  /**
+   * Compare content across different media types
+   */
+  async compareMediaTypes(
+    records: Array<{ 
+      mediaType: MediaType; 
+      content: PreparedContent; 
+      sourceName: string 
+    }>
+  ): Promise<MediaComparisonResponse> {
+    if (!this.client) {
+      throw new Error('Ollama service not available - API key not configured');
+    }
+
+    if (!records || records.length === 0) {
+      throw new Error('Cannot compare media types with no records');
+    }
+
+    // Group by media type
+    const byMediaType = {
+      articles: records.filter(r => r.mediaType === 'article'),
+      videos: records.filter(r => r.mediaType === 'video'),
+      podcasts: records.filter(r => r.mediaType === 'podcast'),
+      audio: records.filter(r => r.mediaType === 'audio'),
+      other: records.filter(r => r.mediaType === 'other'),
+    };
+
+    // Count unique media types
+    const uniqueMediaTypes = Object.entries(byMediaType)
+      .filter(([_, records]) => records.length > 0)
+      .map(([type, _]) => type);
+
+    if (uniqueMediaTypes.length < 2) {
+      throw new Error('At least 2 different media types required for comparison');
+    }
+
+    const prompt = this.buildMediaComparisonPrompt(records, byMediaType);
+
+    try {
+      const response = await this.callWithTimeout(prompt);
+      const parsed = this.parseJsonResponse(response);
+
+      return {
+        coverageAnalysis: {
+          uniqueToArticles: Array.isArray(parsed.coverageAnalysis?.uniqueToArticles) 
+            ? parsed.coverageAnalysis.uniqueToArticles 
+            : [],
+          uniqueToVideos: Array.isArray(parsed.coverageAnalysis?.uniqueToVideos)
+            ? parsed.coverageAnalysis.uniqueToVideos
+            : [],
+          uniqueToPodcasts: Array.isArray(parsed.coverageAnalysis?.uniqueToPodcasts)
+            ? parsed.coverageAnalysis.uniqueToPodcasts
+            : [],
+          commonThemes: Array.isArray(parsed.coverageAnalysis?.commonThemes)
+            ? parsed.coverageAnalysis.commonThemes
+            : [],
+        },
+        perspectiveDifferences: Array.isArray(parsed.perspectiveDifferences)
+          ? parsed.perspectiveDifferences.map((pd: any) => ({
+              topic: pd.topic || '',
+              articlePerspective: pd.articlePerspective || '',
+              videoPerspective: pd.videoPerspective || '',
+              podcastPerspective: pd.podcastPerspective || undefined,
+            }))
+          : [],
+        emphasisAnalysis: {
+          articleEmphasis: Array.isArray(parsed.emphasisAnalysis?.articleEmphasis)
+            ? parsed.emphasisAnalysis.articleEmphasis
+            : [],
+          videoEmphasis: Array.isArray(parsed.emphasisAnalysis?.videoEmphasis)
+            ? parsed.emphasisAnalysis.videoEmphasis
+            : [],
+          podcastEmphasis: Array.isArray(parsed.emphasisAnalysis?.podcastEmphasis)
+            ? parsed.emphasisAnalysis.podcastEmphasis
+            : undefined,
+        },
+        linkAnalysis: {
+          sharedLinks: Array.isArray(parsed.linkAnalysis?.sharedLinks)
+            ? parsed.linkAnalysis.sharedLinks
+            : [],
+          mediaSpecificLinks: {
+            articles: Array.isArray(parsed.linkAnalysis?.mediaSpecificLinks?.articles)
+              ? parsed.linkAnalysis.mediaSpecificLinks.articles
+              : [],
+            videos: Array.isArray(parsed.linkAnalysis?.mediaSpecificLinks?.videos)
+              ? parsed.linkAnalysis.mediaSpecificLinks.videos
+              : [],
+            podcasts: Array.isArray(parsed.linkAnalysis?.mediaSpecificLinks?.podcasts)
+              ? parsed.linkAnalysis.mediaSpecificLinks.podcasts
+              : [],
+          },
+        },
+      };
+    } catch (error) {
+      console.error('Media comparison error:', error);
+      throw new Error(`Media comparison failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Build media comparison prompt
+   */
+  private buildMediaComparisonPrompt(
+    records: Array<{ mediaType: MediaType; content: PreparedContent; sourceName: string }>,
+    byMediaType: {
+      articles: typeof records;
+      videos: typeof records;
+      podcasts: typeof records;
+      audio: typeof records;
+      other: typeof records;
+    }
+  ): string {
+    const articlesText = byMediaType.articles.map((r, idx) => `
+--- ARTICLE ${idx + 1} ---
+Source: ${r.sourceName}
+Title: ${r.content.metadata.siteName || 'Unknown'} - ${r.content.text.substring(0, 200)}${r.content.text.length > 200 ? '...' : ''}
+Published: ${r.content.metadata.publishedAt?.toISOString() || 'Unknown'}
+URL: ${r.content.metadata.url}
+${r.content.links.length > 0 ? `Links: ${r.content.links.map(l => l.url).join(', ')}` : ''}
+${r.content.text.length > 2000 ? r.content.text.substring(0, 2000) + '...(truncated)' : r.content.text}
+`).join('\n');
+
+    const videosText = byMediaType.videos.map((r, idx) => `
+--- VIDEO ${idx + 1} (TITLE ONLY) ---
+Source: ${r.sourceName}
+Title: ${r.content.text}
+Published: ${r.content.metadata.publishedAt?.toISOString() || 'Unknown'}
+URL: ${r.content.metadata.url}
+Note: Only the video title is available for analysis. Infer content from title.
+`).join('\n');
+
+    const podcastsText = byMediaType.podcasts.map((r, idx) => `
+--- PODCAST ${idx + 1} ---
+Source: ${r.sourceName}
+Title: ${r.content.text.substring(0, 200)}${r.content.text.length > 200 ? '...' : ''}
+Published: ${r.content.metadata.publishedAt?.toISOString() || 'Unknown'}
+URL: ${r.content.metadata.url}
+${r.content.text.length > 2000 ? r.content.text.substring(0, 2000) + '...(truncated)' : r.content.text}
+`).join('\n');
+
+    // Collect all links from articles
+    const allLinks = byMediaType.articles.flatMap(r => r.content.links);
+    const uniqueLinks = Array.from(new Set(allLinks.map(l => l.url)));
+
+    return `You are analyzing content across different media types to identify differences in coverage, perspective, and emphasis.
+
+MEDIA TYPE BREAKDOWN:
+- Articles: ${byMediaType.articles.length}
+- Videos: ${byMediaType.videos.length} (title-only analysis)
+- Podcasts: ${byMediaType.podcasts.length}
+
+ARTICLES:
+${articlesText || '(No articles)'}
+
+VIDEOS (TITLE ONLY):
+${videosText || '(No videos)'}
+
+PODCASTS:
+${podcastsText || '(No podcasts)'}
+
+${uniqueLinks.length > 0 ? `
+LINKS MENTIONED IN ARTICLES:
+${uniqueLinks.map(url => {
+  const mentionedIn = byMediaType.articles
+    .filter((r, idx) => r.content.links.some(l => l.url === url))
+    .map((r, idx) => `Article ${byMediaType.articles.indexOf(r) + 1}`);
+  return `- ${url} (mentioned in: ${mentionedIn.join(', ')})`;
+}).join('\n')}
+` : ''}
+
+ANALYSIS TASK:
+Compare and contrast how different media types cover this topic. Identify:
+
+1. **Coverage Analysis:**
+   - What themes or information are unique to articles?
+   - What themes or information are unique to videos? (infer from titles)
+   - What themes or information are unique to podcasts?
+   - What themes are common across all media types?
+
+2. **Perspective Differences:**
+   - How do articles frame the topic?
+   - How do videos frame the topic? (infer from titles)
+   - How do podcasts frame the topic?
+   - Identify specific topics where perspectives differ
+
+3. **Emphasis Analysis:**
+   - What do articles emphasize?
+   - What do videos emphasize? (based on title keywords/themes)
+   - What do podcasts emphasize?
+
+4. **Link Analysis:**
+   - Which links are shared across multiple media types?
+   - Which links are specific to articles?
+   - Note: Videos typically don't have links (title-only)
+
+IMPORTANT NOTES:
+- Videos only have titles available - infer content and perspective from title analysis
+- Be explicit about limitations when video content is involved
+- Links are provided for reference (do not fetch them)
+- Distinguish between what is stated vs. what you infer
+
+Respond with a JSON object in this exact format:
+{
+  "coverageAnalysis": {
+    "uniqueToArticles": ["Theme 1", "Theme 2"],
+    "uniqueToVideos": ["Theme 1 (inferred from titles)", "Theme 2"],
+    "uniqueToPodcasts": ["Theme 1"],
+    "commonThemes": ["Theme shared across all"]
+  },
+  "perspectiveDifferences": [
+    {
+      "topic": "Specific topic or aspect",
+      "articlePerspective": "How articles frame it",
+      "videoPerspective": "How videos frame it (inferred from titles)",
+      "podcastPerspective": "How podcasts frame it"
+    }
+  ],
+  "emphasisAnalysis": {
+    "articleEmphasis": ["What articles emphasize"],
+    "videoEmphasis": ["What videos emphasize (from title analysis)"],
+    "podcastEmphasis": ["What podcasts emphasize"]
+  },
+  "linkAnalysis": {
+    "sharedLinks": ["URLs mentioned across multiple media types"],
+    "mediaSpecificLinks": {
+      "articles": ["URLs only in articles"],
+      "videos": [],
+      "podcasts": ["URLs only in podcasts"]
+    }
+  }
+}`;
   }
 
   /**
