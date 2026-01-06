@@ -3,7 +3,7 @@ import type { Request, Response } from 'express';
 import { supabase } from '../utils/supabase.js';
 import { ollamaService } from '../services/ollamaService.js';
 import { auditService } from '../services/auditService.js';
-import { contentPreparer } from '../services/analysis/ContentPreparer.js';
+import { contentPreparer, type MediaType } from '../services/analysis/ContentPreparer.js';
 
 const router = Router();
 
@@ -809,10 +809,13 @@ router.post('/topics/:id/compare-media', async (req: Request, res: Response) => 
 
     // Prepare content for each linked record
     const preparedRecords: Array<{ 
-      mediaType: string; 
+      mediaType: MediaType; 
       content: any; 
       sourceName: string 
     }> = [];
+
+    // Valid MediaType values
+    const validMediaTypes: MediaType[] = ['article', 'video', 'podcast', 'audio', 'other'];
 
     for (const link of links) {
       try {
@@ -821,8 +824,15 @@ router.post('/topics/:id/compare-media', async (req: Request, res: Response) => 
         const sourceInfo = record.sources;
         
         const prepared = await contentPreparer.prepareForAnalysis(recordId);
+        
+        // Validate and cast mediaType
+        const rawMediaType = record.media_type || 'article';
+        const mediaType: MediaType = validMediaTypes.includes(rawMediaType as MediaType) 
+          ? (rawMediaType as MediaType)
+          : 'article';
+        
         preparedRecords.push({
-          mediaType: record.media_type || 'article',
+          mediaType,
           content: prepared,
           sourceName: sourceInfo.name,
         });
