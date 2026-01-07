@@ -102,6 +102,9 @@ router.put('/sources/:sourceId/policy', async (req: Request, res: Response) => {
       .single();
 
     if (error) throw error;
+    if (!updatedSource) {
+      return res.status(500).json({ error: 'Failed to update source' });
+    }
 
     // Audit log
     await auditService.logRetentionPolicyUpdated(
@@ -200,7 +203,7 @@ router.post('/organizations/all/apply', async (req: Request, res: Response) => {
     // Fetch all organizations
     const { data: organizations, error } = await supabase
       .from('organizations')
-      .select('id, name');
+      .select('id, name') as { data: Array<{ id: string; name: string }> | null; error: unknown };
 
     if (error) throw error;
     if (!organizations || organizations.length === 0) {
@@ -291,10 +294,14 @@ router.get('/sources/:sourceId/preview', async (req: Request, res: Response) => 
       .single();
 
     if (sourceError) {
-      if (sourceError.code === 'PGRST116') {
+      if ((sourceError as { code?: string }).code === 'PGRST116') {
         return res.status(404).json({ error: 'Source not found' });
       }
       throw sourceError;
+    }
+
+    if (!source) {
+      return res.status(404).json({ error: 'Source not found' });
     }
 
     if (!source.retention_max_items && !source.retention_days) {
@@ -462,7 +469,7 @@ router.post('/archived/:id/restore', async (req: Request, res: Response) => {
       };
 
     if (fetchError) {
-      if (fetchError.code === 'PGRST116') {
+      if ((fetchError as { code?: string }).code === 'PGRST116') {
         return res.status(404).json({ error: 'Archived record not found' });
       }
       throw fetchError;
@@ -475,7 +482,7 @@ router.post('/archived/:id/restore', async (req: Request, res: Response) => {
     // Insert back into source_records
     const { data: restoredRecord, error: restoreError } = await supabase
       .from('source_records')
-      // @ts-expect-error - Supabase type inference issue, archived_record fields match source_records
+      // @ts-ignore - Supabase type inference issue, archived_record fields match source_records
       .insert({
         id: archivedRecord.id,
         source_id: archivedRecord.source_id,
