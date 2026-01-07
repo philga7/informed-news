@@ -49,10 +49,12 @@ router.get('/', async (req: Request, res: Response) => {
     const sourceIds = sources.map((s: any) => s.id);
     
     // Get all metrics in one query using SQL aggregation
-    const { data: metricsData, error: metricsError } = await supabase.rpc('get_source_metrics', {
-      p_source_ids: sourceIds,
-      // @ts-ignore - Supabase type inference issue with RPC functions
-    } as any) as { data: any; error: any };
+    // Supabase RPC typing: this function may not exist in generated DB types, so TS infers args as `never`.
+    // This is server-side only, so we safely cast the client to `any` to call the RPC.
+    const { data: metricsData, error: metricsError } = await (supabase as any).rpc(
+      'get_source_metrics',
+      { p_source_ids: sourceIds }
+    ) as { data: any; error: any };
 
     if (metricsError) {
       console.error('Error fetching source metrics:', metricsError);
