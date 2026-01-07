@@ -251,8 +251,8 @@ export class ContentExtractor {
    * Returns null if extraction fails
    */
   async extractTextOnly(url: string): Promise<string | null> {
-    const content = await this.extractFromUrl(url);
-    return content ? content.textContent : null;
+    const result = await this.extractFromUrl(url);
+    return result.content ? result.content.textContent : null;
   }
 
   /**

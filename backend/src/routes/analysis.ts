@@ -3,7 +3,7 @@ import type { Request, Response } from 'express';
 import { supabase } from '../utils/supabase.js';
 import { ollamaService } from '../services/ollamaService.js';
 import { auditService } from '../services/auditService.js';
-import { contentPreparer, type MediaType } from '../services/analysis/ContentPreparer.js';
+import { contentPreparer, type MediaType, type PreparedContent } from '../services/analysis/ContentPreparer.js';
 import { contentExtractor } from '../services/ingestion/ContentExtractor.js';
 
 const router = Router();
@@ -377,7 +377,8 @@ async function checkAndUpdateLinkReviewStatus(sourceRecordId: string) {
       // No artifacts - update pending links to reviewed
       const { data: updatedLinks, error: linksError } = await supabase
         .from('topic_source_links')
-        .update({ review_status: 'reviewed' } as any)
+        // @ts-ignore - Supabase type inference issue
+        .update({ review_status: 'reviewed' })
         .eq('source_record_id', sourceRecordId)
         .in('review_status', ['pending'])
         .select('id');
@@ -419,7 +420,8 @@ async function checkAndUpdateLinkReviewStatus(sourceRecordId: string) {
 
       const { data: updatedLinks, error: linksError } = await supabase
         .from('topic_source_links')
-        .update({ review_status: 'reviewed' } as any)
+        // @ts-ignore - Supabase type inference issue
+        .update({ review_status: 'reviewed' })
         .eq('source_record_id', sourceRecordId)
         .in('review_status', ['pending'])
         .select('id');
@@ -469,8 +471,6 @@ async function removeWarningsFromArtifacts(sourceRecordId: string) {
     }
 
     // Update artifacts that have warnings
-    const updates: Promise<any>[] = [];
-    
     for (const artifact of artifacts) {
       const artifactTyped = artifact as any;
       const payload = artifactTyped.payload;
@@ -481,24 +481,23 @@ async function removeWarningsFromArtifacts(sourceRecordId: string) {
         const { warning, ...payloadWithoutWarning } = payload;
         
         // Update the artifact
-        updates.push(
-          supabase
+        try {
+          const { error } = await supabase
             .from('analytic_artifacts')
-            .update({ payload: payloadWithoutWarning as any } as any)
-            .eq('id', artifactTyped.id)
-            .then(({ error }) => {
-              if (error) {
-                console.error(`Error removing warning from artifact ${artifactTyped.id}:`, error);
-              } else {
-                console.log(`Removed warning from ${artifactTyped.type} artifact ${artifactTyped.id}`);
-              }
-            })
-        );
+            // @ts-ignore - Supabase type inference issue
+            .update({ payload: payloadWithoutWarning })
+            .eq('id', artifactTyped.id);
+          
+          if (error) {
+            console.error(`Error removing warning from artifact ${artifactTyped.id}:`, error);
+          } else {
+            console.log(`Removed warning from ${artifactTyped.type} artifact ${artifactTyped.id}`);
+          }
+        } catch (err) {
+          console.error(`Error removing warning from artifact ${artifactTyped.id}:`, err);
+        }
       }
     }
-
-    // Wait for all updates to complete (but don't block the response)
-    await Promise.all(updates);
   } catch (error) {
     // Log error but don't fail - this is a cleanup operation
     console.error('Error removing warnings from artifacts:', error);
@@ -722,9 +721,8 @@ router.patch('/artifacts/:id/notes', async (req: Request, res: Response) => {
     // Update the notes content
     const { data: updatedArtifact, error: updateError } = await supabase
       .from('analytic_artifacts')
-      .update({
-        payload: { notes: notes.trim() } as any,
-      } as any)
+      // @ts-ignore - Supabase type inference issue
+      .update({ payload: { notes: notes.trim() } })
       .eq('id', id)
       .select()
       .single();
@@ -817,9 +815,8 @@ router.patch('/artifacts/:id', async (req: Request, res: Response) => {
         // Update notes content when marking as reviewed
         const { error: notesUpdateError } = await supabase
           .from('analytic_artifacts')
-          .update({
-            payload: { notes: req.body.notes.trim() } as any,
-          } as any)
+          // @ts-ignore - Supabase type inference issue
+          .update({ payload: { notes: req.body.notes.trim() } })
           .eq('id', id);
 
         if (notesUpdateError) {

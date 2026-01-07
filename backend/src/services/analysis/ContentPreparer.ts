@@ -111,8 +111,9 @@ export class ContentPreparer {
     let extractedLinks: Link[] = [];
 
     // If fetchFromUrl is provided, fetch fresh content from URL
+    // Note: We already returned early for videos above, so media_type is never 'video' here
     let contentExtractionError: number | undefined;
-    if (fetchFromUrl && record.media_type !== 'video') {
+    if (fetchFromUrl) {
       try {
         const extractionResult = await contentExtractor.extractFromUrl(fetchFromUrl);
         if (extractionResult.content && extractionResult.content.textContent && extractionResult.content.textContent.trim().length > 0) {
