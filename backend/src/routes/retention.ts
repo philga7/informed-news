@@ -432,11 +432,34 @@ router.post('/archived/:id/restore', async (req: Request, res: Response) => {
     const { id } = req.params;
 
     // Fetch archived record
-    const { data: archivedRecord, error: fetchError } = await supabase
+    // Note: archived_source_records table is not in database types, so we use type assertion
+    const { data: archivedRecord, error: fetchError } = await (supabase as any)
       .from('archived_source_records')
       .select('*')
       .eq('id', id)
-      .single();
+      .single() as {
+        data: {
+          id: string;
+          source_id: string;
+          title: string;
+          url: string | null;
+          content: string | null;
+          media_type: string;
+          content_type: string;
+          content_compressed: boolean;
+          content_length: number | null;
+          published_at: string | null;
+          ingested_at: string;
+          language: string | null;
+          geographic_indicators: unknown;
+          raw_metadata: unknown;
+          initial_confidence_flags: unknown;
+          scan_status: string | null;
+          reviewed_at: string | null;
+          reviewed_by: string | null;
+        } | null;
+        error: unknown;
+      };
 
     if (fetchError) {
       if (fetchError.code === 'PGRST116') {
