@@ -355,8 +355,8 @@ async function createClaimsFromKeyFacts(artifact: any) {
 
   // Create claims for each topic
   for (const link of links) {
+    const linkTyped = link as any;
     for (const claimFact of claimFacts) {
-      const linkTyped = link as any;
       // Check if claim already exists for this topic (avoid duplicates)
       const { data: existingClaim, error: checkError } = await supabase
         .from('claims')
@@ -376,7 +376,6 @@ async function createClaimsFromKeyFacts(artifact: any) {
       }
 
       // Create the claim
-      const linkTyped = link as any;
       const { data: newClaim, error: createError } = await supabase
         .from('claims')
         // @ts-ignore - Supabase type inference issue

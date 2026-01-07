@@ -67,7 +67,7 @@ router.get('/', async (req: Request, res: Response) => {
       most_recent_link_date: string | null;
     }>();
 
-    if (metricsData) {
+    if (metricsData && Array.isArray(metricsData)) {
       metricsData.forEach((metric: any) => {
         metricsMap.set(metric.source_id, {
           record_count: metric.record_count || 0,
