@@ -143,6 +143,10 @@ export interface Database {
           content_compressed: boolean;
           content_length: number | null;
           storage_optimized_at: string | null;
+          // Phase 6: Scan view fields
+          scan_status: 'pending' | 'reviewed' | 'linked' | 'dismissed';
+          reviewed_at: string | null;
+          reviewed_by: string | null;
         };
         Insert: {
           id?: string;
@@ -162,6 +166,10 @@ export interface Database {
           content_compressed?: boolean;
           content_length?: number | null;
           storage_optimized_at?: string | null;
+          // Phase 6: Scan view fields
+          scan_status?: 'pending' | 'reviewed' | 'linked' | 'dismissed';
+          reviewed_at?: string | null;
+          reviewed_by?: string | null;
         };
         Update: {
           id?: string;
@@ -175,12 +183,17 @@ export interface Database {
           geographic_indicators?: Json | null;
           raw_metadata?: Json | null;
           initial_confidence_flags?: Json | null;
+          initial_confidence_flags?: Json | null;
           // Phase 1: Content optimization and media types
           media_type?: 'article' | 'video' | 'podcast' | 'audio' | 'other';
           content_type?: 'full_text' | 'summary' | 'structured' | 'minimal';
           content_compressed?: boolean;
           content_length?: number | null;
           storage_optimized_at?: string | null;
+          // Phase 6: Scan view fields
+          scan_status?: 'pending' | 'reviewed' | 'linked' | 'dismissed';
+          reviewed_at?: string | null;
+          reviewed_by?: string | null;
         };
       };
       osint_topics: {
