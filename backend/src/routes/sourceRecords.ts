@@ -532,6 +532,7 @@ router.get('/:id', async (req: Request, res: Response) => {
         ),
         topic_source_links (
           id,
+          topic_id,
           relevance_score,
           confidence_level,
           assumptions,

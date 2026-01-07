@@ -431,8 +431,6 @@ async generateNarrativeBrief(
 }
 ```
 
-
-
 ### 3.3 Brief Routes
 
 **File:** `backend/src/routes/briefs.ts`
@@ -565,8 +563,6 @@ export const briefRetentionService = {
   async previewExpiredBriefs(categoryId?: string): Promise<Brief[]>,
 };
 ```
-
-
 
 ### 6.2 GitHub Actions: Brief Cleanup Workflow
 
