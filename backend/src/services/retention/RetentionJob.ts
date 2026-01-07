@@ -14,6 +14,7 @@ import { RetentionPolicyService, type RetentionPolicy, type RetentionResult } fr
 
 interface Source {
   id: string;
+  name: string;
   organization_id: string;
   retention_max_items: number | null;
   retention_days: number | null;
@@ -46,7 +47,7 @@ export class RetentionJob {
         .from('sources')
         .select('id, name, organization_id, retention_max_items, retention_days, retention_action')
         .eq('organization_id', organizationId)
-        .or('retention_max_items.not.is.null,retention_days.not.is.null');
+        .or('retention_max_items.not.is.null,retention_days.not.is.null') as { data: Source[] | null; error: unknown };
 
       if (error) throw error;
       if (!sources || sources.length === 0) {
@@ -80,7 +81,7 @@ export class RetentionJob {
         .from('sources')
         .select('id, name, organization_id, retention_max_items, retention_days, retention_action')
         .eq('id', sourceId)
-        .single();
+        .single() as { data: Source | null; error: unknown };
 
       if (error) throw error;
       if (!source) throw new Error(`Source ${sourceId} not found`);

@@ -27,13 +27,26 @@ router.get('/sources/:sourceId/policy', async (req: Request, res: Response) => {
       .from('sources')
       .select('id, name, retention_max_items, retention_days, retention_action')
       .eq('id', sourceId)
-      .single();
+      .single() as {
+        data: {
+          id: string;
+          name: string;
+          retention_max_items: number | null;
+          retention_days: number | null;
+          retention_action: 'delete' | 'archive';
+        } | null;
+        error: unknown;
+      };
 
     if (error) {
-      if (error.code === 'PGRST116') {
+      if ((error as { code?: string }).code === 'PGRST116') {
         return res.status(404).json({ error: 'Source not found' });
       }
       throw error;
+    }
+
+    if (!source) {
+      return res.status(404).json({ error: 'Source not found' });
     }
 
     res.json({
@@ -79,13 +92,26 @@ router.put('/sources/:sourceId/policy', async (req: Request, res: Response) => {
       .from('sources')
       .select('id, name, retention_max_items, retention_days, retention_action')
       .eq('id', sourceId)
-      .single();
+      .single() as {
+        data: {
+          id: string;
+          name: string;
+          retention_max_items: number | null;
+          retention_days: number | null;
+          retention_action: 'delete' | 'archive';
+        } | null;
+        error: unknown;
+      };
 
     if (fetchError) {
-      if (fetchError.code === 'PGRST116') {
+      if ((fetchError as { code?: string }).code === 'PGRST116') {
         return res.status(404).json({ error: 'Source not found' });
       }
       throw fetchError;
+    }
+
+    if (!currentSource) {
+      return res.status(404).json({ error: 'Source not found' });
     }
 
     // Update policy
@@ -96,12 +122,26 @@ router.put('/sources/:sourceId/policy', async (req: Request, res: Response) => {
 
     const { data: updatedSource, error } = await supabase
       .from('sources')
-      .update(updateData)
+      // @ts-ignore - Supabase type inference issue in serverless environment
+      .update(updateData as any)
       .eq('id', sourceId)
       .select()
-      .single();
+      .single() as {
+        data: {
+          id: string;
+          name: string;
+          retention_max_items: number | null;
+          retention_days: number | null;
+          retention_action: 'delete' | 'archive';
+          [key: string]: unknown;
+        } | null;
+        error: unknown;
+      };
 
     if (error) throw error;
+    if (!updatedSource) {
+      return res.status(500).json({ error: 'Failed to update source' });
+    }
 
     // Audit log
     await auditService.logRetentionPolicyUpdated(
@@ -200,7 +240,7 @@ router.post('/organizations/all/apply', async (req: Request, res: Response) => {
     // Fetch all organizations
     const { data: organizations, error } = await supabase
       .from('organizations')
-      .select('id, name');
+      .select('id, name') as { data: Array<{ id: string; name: string }> | null; error: unknown };
 
     if (error) throw error;
     if (!organizations || organizations.length === 0) {
@@ -288,13 +328,25 @@ router.get('/sources/:sourceId/preview', async (req: Request, res: Response) => 
       .from('sources')
       .select('id, retention_max_items, retention_days, retention_action')
       .eq('id', sourceId)
-      .single();
+      .single() as {
+        data: {
+          id: string;
+          retention_max_items: number | null;
+          retention_days: number | null;
+          retention_action: 'delete' | 'archive';
+        } | null;
+        error: unknown;
+      };
 
     if (sourceError) {
-      if (sourceError.code === 'PGRST116') {
+      if ((sourceError as { code?: string }).code === 'PGRST116') {
         return res.status(404).json({ error: 'Source not found' });
       }
       throw sourceError;
+    }
+
+    if (!source) {
+      return res.status(404).json({ error: 'Source not found' });
     }
 
     if (!source.retention_max_items && !source.retention_days) {
@@ -432,22 +484,50 @@ router.post('/archived/:id/restore', async (req: Request, res: Response) => {
     const { id } = req.params;
 
     // Fetch archived record
-    const { data: archivedRecord, error: fetchError } = await supabase
+    // Note: archived_source_records table is not in database types, so we use type assertion
+    const { data: archivedRecord, error: fetchError } = await (supabase as any)
       .from('archived_source_records')
       .select('*')
       .eq('id', id)
-      .single();
+      .single() as {
+        data: {
+          id: string;
+          source_id: string;
+          title: string;
+          url: string | null;
+          content: string | null;
+          media_type: string;
+          content_type: string;
+          content_compressed: boolean;
+          content_length: number | null;
+          published_at: string | null;
+          ingested_at: string;
+          language: string | null;
+          geographic_indicators: unknown;
+          raw_metadata: unknown;
+          initial_confidence_flags: unknown;
+          scan_status: string | null;
+          reviewed_at: string | null;
+          reviewed_by: string | null;
+        } | null;
+        error: unknown;
+      };
 
     if (fetchError) {
-      if (fetchError.code === 'PGRST116') {
+      if ((fetchError as { code?: string }).code === 'PGRST116') {
         return res.status(404).json({ error: 'Archived record not found' });
       }
       throw fetchError;
     }
 
+    if (!archivedRecord) {
+      return res.status(404).json({ error: 'Archived record not found' });
+    }
+
     // Insert back into source_records
     const { data: restoredRecord, error: restoreError } = await supabase
       .from('source_records')
+      // @ts-ignore - Supabase type inference issue, archived_record fields match source_records
       .insert({
         id: archivedRecord.id,
         source_id: archivedRecord.source_id,
@@ -467,7 +547,7 @@ router.post('/archived/:id/restore', async (req: Request, res: Response) => {
         scan_status: archivedRecord.scan_status,
         reviewed_at: archivedRecord.reviewed_at,
         reviewed_by: archivedRecord.reviewed_by,
-      })
+      } as any)
       .select()
       .single();
 

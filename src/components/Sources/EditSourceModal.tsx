@@ -12,6 +12,7 @@ interface EditSourceModalProps {
     reliabilityRating?: 'HIGH' | 'MEDIUM' | 'LOW' | 'UNKNOWN';
     notes?: string;
     scrapeExternalUrl?: boolean;
+    enabled?: boolean;
   }) => Promise<void>;
   onClose: () => void;
 }
@@ -26,6 +27,7 @@ export function EditSourceModal({ source, onSave, onClose }: EditSourceModalProp
     source.reliabilityRating
   );
   const [scrapeExternalUrl, setScrapeExternalUrl] = useState(source.scrapeExternalUrl || false);
+  const [enabled, setEnabled] = useState(source.enabled !== undefined ? source.enabled : true);
   const [notes, setNotes] = useState(source.notes || '');
   const [isSaving, setIsSaving] = useState(false);
   
@@ -83,6 +85,7 @@ export function EditSourceModal({ source, onSave, onClose }: EditSourceModalProp
         domain: domain === 'none' ? null : domain as WatchItemCategory,
         reliabilityRating,
         scrapeExternalUrl,
+        enabled,
         notes: notes.trim(),
       });
 
@@ -198,6 +201,26 @@ export function EditSourceModal({ source, onSave, onClose }: EditSourceModalProp
                   </span>
                   <p className="text-xs text-stone-500 mt-1">
                     Enable scraping to find original article URLs from aggregator sites (e.g., Citizen Free Press)
+                  </p>
+                </div>
+              </label>
+            </div>
+
+            {/* Enabled */}
+            <div>
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={enabled}
+                  onChange={(e) => setEnabled(e.target.checked)}
+                  className="w-4 h-4 rounded bg-stone-800 border-stone-700 text-blue-600 focus:ring-blue-500 focus:ring-2"
+                />
+                <div>
+                  <span className="block text-sm font-medium text-stone-300">
+                    Enable Feed Fetching
+                  </span>
+                  <p className="text-xs text-stone-500 mt-1">
+                    When unchecked, this source will be skipped during automated feed ingestion. Existing source records and topic links will remain unchanged.
                   </p>
                 </div>
               </label>

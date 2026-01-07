@@ -7,7 +7,7 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { supabase } from '../utils/supabase.js';
-import { ContentOptimizationJob } from '../services/ingestion/ContentOptimizationJob.js';
+import { ContentOptimizationJob, type OptimizationResult } from '../services/ingestion/ContentOptimizationJob.js';
 
 const router = Router();
 const optimizationJob = new ContentOptimizationJob();
@@ -45,7 +45,7 @@ router.post('/organizations/all/apply', async (req: Request, res: Response) => {
     // Fetch all organizations
     const { data: organizations, error } = await supabase
       .from('organizations')
-      .select('id, name');
+      .select('id, name') as { data: Array<{ id: string; name: string }> | null; error: unknown };
 
     if (error) throw error;
     if (!organizations || organizations.length === 0) {
@@ -66,7 +66,7 @@ router.post('/organizations/all/apply', async (req: Request, res: Response) => {
     const allResults: Array<{
       organizationId: string;
       organizationName: string;
-      result: import('../services/ingestion/ContentOptimizationJob.js').OptimizationResult;
+      result: OptimizationResult;
     }> = [];
 
     // Process each organization
@@ -153,7 +153,14 @@ router.get('/sources/:sourceId/status', async (req: Request, res: Response) => {
     const { data: stats, error } = await supabase
       .from('source_records')
       .select('content_type, content_compressed, content_length')
-      .eq('source_id', sourceId);
+      .eq('source_id', sourceId) as { 
+        data: Array<{
+          content_type: string;
+          content_compressed: boolean;
+          content_length: number | null;
+        }> | null; 
+        error: unknown 
+      };
 
     if (error) throw error;
 

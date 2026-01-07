@@ -25,6 +25,7 @@ export const osintSourcesService = {
       reliabilityRating?: 'HIGH' | 'MEDIUM' | 'LOW' | 'UNKNOWN';
       notes?: string;
       scrapeExternalUrl?: boolean;
+      enabled?: boolean;
     }
   ): Promise<Source> {
     const response = await fetch(`${API_BASE}/api/sources`, {
@@ -41,6 +42,7 @@ export const osintSourcesService = {
         reliability_rating: sourceData.reliabilityRating || 'UNKNOWN',
         notes: sourceData.notes,
         scrape_external_url: sourceData.scrapeExternalUrl || false,
+        enabled: sourceData.enabled !== undefined ? sourceData.enabled : true,
       }),
     });
     
@@ -63,6 +65,7 @@ export const osintSourcesService = {
       valueRating: source.value_rating || null,
       notes: source.notes,
       scrapeExternalUrl: source.scrape_external_url || false,
+      enabled: source.enabled !== undefined ? source.enabled : true,
       createdAt: new Date(source.created_at),
       updatedAt: new Date(source.updated_at),
     };
@@ -94,6 +97,7 @@ export const osintSourcesService = {
       valueRating: source.value_rating || null,
       notes: source.notes,
       scrapeExternalUrl: source.scrape_external_url || false,
+      enabled: source.enabled !== undefined ? source.enabled : true,
       createdAt: new Date(source.created_at),
       updatedAt: new Date(source.updated_at),
       record_count: source.record_count || 0,
@@ -115,6 +119,7 @@ export const osintSourcesService = {
       valueRating?: number;
       notes?: string;
       scrapeExternalUrl?: boolean;
+      enabled?: boolean;
     }
   ): Promise<Source> {
     const response = await fetch(`${API_BASE}/api/sources/${sourceId}`, {
@@ -130,6 +135,7 @@ export const osintSourcesService = {
         value_rating: updates.valueRating,
         notes: updates.notes,
         scrape_external_url: updates.scrapeExternalUrl,
+        enabled: updates.enabled,
       }),
     });
     
@@ -152,6 +158,7 @@ export const osintSourcesService = {
       valueRating: source.value_rating || null,
       notes: source.notes,
       scrapeExternalUrl: source.scrape_external_url || false,
+      enabled: source.enabled !== undefined ? source.enabled : true,
       createdAt: new Date(source.created_at),
       updatedAt: new Date(source.updated_at),
     };

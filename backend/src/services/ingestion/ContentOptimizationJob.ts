@@ -16,7 +16,7 @@ const gunzip = promisify(zlib.gunzip);
 // TYPES
 // ============================================================================
 
-interface OptimizationResult {
+export interface OptimizationResult {
   processed: number;
   compressed: number;
   contentTypeUpdated: number;
@@ -58,7 +58,7 @@ export class ContentOptimizationJob {
       const { data: sources, error: sourcesError } = await supabase
         .from('sources')
         .select('id')
-        .eq('organization_id', organizationId);
+        .eq('organization_id', organizationId) as { data: Array<{ id: string }> | null; error: unknown };
 
       if (sourcesError) throw sourcesError;
       if (!sources || sources.length === 0) {
@@ -109,7 +109,7 @@ export class ContentOptimizationJob {
         .from('sources')
         .select('id, value_rating')
         .eq('id', sourceId)
-        .single();
+        .single() as { data: Source | null; error: unknown };
 
       if (sourceError) throw sourceError;
       if (!source) throw new Error(`Source ${sourceId} not found`);
@@ -118,7 +118,7 @@ export class ContentOptimizationJob {
       const { data: records, error: recordsError } = await supabase
         .from('source_records')
         .select('id, content, content_type, content_compressed, content_length')
-        .eq('source_id', sourceId);
+        .eq('source_id', sourceId) as { data: SourceRecord[] | null; error: unknown };
 
       if (recordsError) throw recordsError;
       if (!records || records.length === 0) {
@@ -179,7 +179,10 @@ export class ContentOptimizationJob {
         .from('source_records')
         .select('id, content, content_compressed')
         .eq('id', recordId)
-        .single();
+        .single() as { 
+          data: { id: string; content: string | null; content_compressed: boolean } | null; 
+          error: unknown 
+        };
 
       if (fetchError) throw fetchError;
       if (!record || !record.content) {
@@ -197,11 +200,12 @@ export class ContentOptimizationJob {
       // Update record
       const { error: updateError } = await supabase
         .from('source_records')
+        // @ts-expect-error - Supabase type inference issue in serverless environment
         .update({
           content: compressed.toString('base64'), // Store as base64
           content_compressed: true,
           storage_optimized_at: new Date().toISOString(),
-        })
+        } as any)
         .eq('id', recordId);
 
       if (updateError) throw updateError;
@@ -221,7 +225,7 @@ export class ContentOptimizationJob {
         .from('sources')
         .select('id, value_rating')
         .eq('id', sourceId)
-        .single();
+        .single() as { data: Source | null; error: unknown };
 
       if (sourceError) throw sourceError;
       if (!source) throw new Error(`Source ${sourceId} not found`);
@@ -230,7 +234,7 @@ export class ContentOptimizationJob {
       const { data: records, error: recordsError } = await supabase
         .from('source_records')
         .select('id, content_type, content_length')
-        .eq('source_id', sourceId);
+        .eq('source_id', sourceId) as { data: SourceRecord[] | null; error: unknown };
 
       if (recordsError) throw recordsError;
       if (!records || records.length === 0) {
@@ -290,10 +294,11 @@ export class ContentOptimizationJob {
 
     const { error } = await supabase
       .from('source_records')
+      // @ts-expect-error - Supabase type inference issue in serverless environment
       .update({
         content_type: newContentType,
         storage_optimized_at: new Date().toISOString(),
-      })
+      } as any)
       .eq('id', recordId);
 
     if (error) throw error;

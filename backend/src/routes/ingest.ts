@@ -144,12 +144,13 @@ router.post('/rss/all', async (req: Request, res: Response) => {
       // Process each organization by calling the same logic
       for (const org of organizations) {
         try {
-          // Fetch RSS sources for this organization
+          // Fetch RSS sources for this organization (only enabled ones)
           const { data: sources, error: sourcesError } = await supabase
             .from('sources')
             .select('*')
             .eq('organization_id', org.id)
-            .eq('source_type', 'rss') as { data: Array<{
+            .eq('source_type', 'rss')
+            .eq('enabled', true) as { data: Array<{
               id: string;
               organization_id: string;
               source_type: string;
@@ -289,12 +290,13 @@ router.post('/rss/all', async (req: Request, res: Response) => {
       });
     }
 
-    // Fetch all RSS sources for this organization
+    // Fetch all enabled RSS sources for this organization
     const { data: sources, error: sourcesError } = await supabase
       .from('sources')
       .select('*')
       .eq('organization_id', organization_id)
-      .eq('source_type', 'rss') as { data: Array<{
+      .eq('source_type', 'rss')
+      .eq('enabled', true) as { data: Array<{
         id: string;
         organization_id: string;
         source_type: string;

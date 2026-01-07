@@ -8,6 +8,8 @@
 import { supabase } from '../../utils/supabase.js';
 import { auditService } from '../auditService.js';
 
+type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
+
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -50,9 +52,9 @@ export class RetentionPolicyService {
   async isRecordProtected(recordId: string): Promise<boolean> {
     try {
       // Use the database function for consistency
-      const { data, error } = await supabase.rpc('is_record_protected', {
+      const { data, error } = await (supabase as any).rpc('is_record_protected', {
         record_id: recordId,
-      });
+      }) as { data: boolean | null; error: unknown };
 
       if (error) {
         console.error('[RetentionPolicyService] Error checking protection:', error);
@@ -139,13 +141,33 @@ export class RetentionPolicyService {
         .from('source_records')
         .select('*')
         .eq('id', recordId)
-        .single();
+        .single() as { data: {
+          id: string;
+          source_id: string;
+          title: string;
+          url: string | null;
+          content: string | null;
+          media_type: string;
+          content_type: string;
+          content_compressed: boolean;
+          content_length: number | null;
+          published_at: string | null;
+          ingested_at: string;
+          language: string | null;
+          geographic_indicators: Json | null;
+          raw_metadata: Json | null;
+          initial_confidence_flags: Json | null;
+          scan_status: string | null;
+          reviewed_at: string | null;
+          reviewed_by: string | null;
+        } | null; error: unknown };
 
       if (fetchError) throw fetchError;
       if (!record) throw new Error(`Record ${recordId} not found`);
 
       // Insert into archived_source_records
-      const { error: archiveError } = await supabase
+      // Note: archived_source_records table is not in database types, so we use type assertion
+      const { error: archiveError } = await (supabase as any)
         .from('archived_source_records')
         .insert({
           id: record.id,
@@ -163,12 +185,12 @@ export class RetentionPolicyService {
           geographic_indicators: record.geographic_indicators,
           raw_metadata: record.raw_metadata,
           initial_confidence_flags: record.initial_confidence_flags,
-          scan_status: record.scan_status,
-          reviewed_at: record.reviewed_at,
-          reviewed_by: record.reviewed_by,
+          scan_status: record.scan_status || null,
+          reviewed_at: record.reviewed_at || null,
+          reviewed_by: record.reviewed_by || null,
           archived_at: new Date().toISOString(),
           archive_reason: reason,
-        });
+        } as any);
 
       if (archiveError) throw archiveError;
 

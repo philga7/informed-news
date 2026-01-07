@@ -77,6 +77,11 @@ export interface Database {
           retention_max_items: number | null;
           retention_days: number | null;
           retention_action: 'delete' | 'archive';
+          // Additional fields
+          scrape_external_url: boolean;
+          domain: 'politics' | 'finance' | 'technology' | 'local' | 'international' | 'health' | 'security' | 'other' | null;
+          value_rating: number | null;
+          enabled: boolean;
         };
         Insert: {
           id?: string;
@@ -92,6 +97,11 @@ export interface Database {
           retention_max_items?: number | null;
           retention_days?: number | null;
           retention_action?: 'delete' | 'archive';
+          // Additional fields
+          scrape_external_url?: boolean;
+          domain?: 'politics' | 'finance' | 'technology' | 'local' | 'international' | 'health' | 'security' | 'other' | null;
+          value_rating?: number | null;
+          enabled?: boolean;
         };
         Update: {
           id?: string;
@@ -107,6 +117,11 @@ export interface Database {
           retention_max_items?: number | null;
           retention_days?: number | null;
           retention_action?: 'delete' | 'archive';
+          // Additional fields
+          scrape_external_url?: boolean;
+          domain?: 'politics' | 'finance' | 'technology' | 'local' | 'international' | 'health' | 'security' | 'other' | null;
+          value_rating?: number | null;
+          enabled?: boolean;
         };
       };
       source_records: {
@@ -128,6 +143,10 @@ export interface Database {
           content_compressed: boolean;
           content_length: number | null;
           storage_optimized_at: string | null;
+          // Phase 6: Scan view fields
+          scan_status: 'pending' | 'reviewed' | 'linked' | 'dismissed';
+          reviewed_at: string | null;
+          reviewed_by: string | null;
         };
         Insert: {
           id?: string;
@@ -147,6 +166,10 @@ export interface Database {
           content_compressed?: boolean;
           content_length?: number | null;
           storage_optimized_at?: string | null;
+          // Phase 6: Scan view fields
+          scan_status?: 'pending' | 'reviewed' | 'linked' | 'dismissed';
+          reviewed_at?: string | null;
+          reviewed_by?: string | null;
         };
         Update: {
           id?: string;
@@ -166,6 +189,10 @@ export interface Database {
           content_compressed?: boolean;
           content_length?: number | null;
           storage_optimized_at?: string | null;
+          // Phase 6: Scan view fields
+          scan_status?: 'pending' | 'reviewed' | 'linked' | 'dismissed';
+          reviewed_at?: string | null;
+          reviewed_by?: string | null;
         };
       };
       osint_topics: {

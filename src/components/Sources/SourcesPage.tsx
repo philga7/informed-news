@@ -23,6 +23,7 @@ interface SourceUpdateParams {
   reliabilityRating?: 'HIGH' | 'MEDIUM' | 'LOW' | 'UNKNOWN';
   notes?: string;
   scrapeExternalUrl?: boolean;
+  enabled?: boolean;
 }
 
 export function SourcesPage() {

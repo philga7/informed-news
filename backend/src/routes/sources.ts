@@ -115,6 +115,7 @@ router.get('/', async (req: Request, res: Response) => {
         value_rating: source.value_rating || null,
         notes: source.notes,
         scrape_external_url: source.scrape_external_url || false,
+        enabled: source.enabled !== undefined ? source.enabled : true,
         created_at: source.created_at,
         updated_at: source.updated_at,
         record_count: metrics.record_count,
@@ -143,7 +144,7 @@ router.get('/', async (req: Request, res: Response) => {
  */
 router.post('/', async (req: Request, res: Response) => {
   try {
-    const { organization_id, source_type, name, url, domain, reliability_rating, notes, scrape_external_url } = req.body;
+    const { organization_id, source_type, name, url, domain, reliability_rating, notes, scrape_external_url, enabled } = req.body;
 
     if (!organization_id) {
       return res.status(400).json({ error: 'organization_id is required' });
@@ -190,6 +191,11 @@ router.post('/', async (req: Request, res: Response) => {
     if (scrape_external_url !== undefined) {
       sourceData.scrape_external_url = scrape_external_url;
     }
+    if (enabled !== undefined) {
+      sourceData.enabled = enabled;
+    } else {
+      sourceData.enabled = true; // Default to enabled
+    }
 
     const result = await supabase
       .from('sources')
@@ -219,6 +225,7 @@ router.post('/', async (req: Request, res: Response) => {
       source_type: source.source_type,
       reliability_rating: source.reliability_rating,
       domain: source.domain,
+      enabled: (source as any).enabled !== undefined ? (source as any).enabled : true,
     });
 
     res.status(201).json({
@@ -250,6 +257,7 @@ router.patch('/:id', async (req: Request, res: Response) => {
       notes, 
       value_rating, 
       scrape_external_url,
+      enabled,
       retention_max_items,
       retention_days,
       retention_action
@@ -310,6 +318,7 @@ router.patch('/:id', async (req: Request, res: Response) => {
     if (notes !== undefined) updates.notes = notes;
     if (value_rating !== undefined) updates.value_rating = value_rating;
     if (scrape_external_url !== undefined) updates.scrape_external_url = scrape_external_url;
+    if (enabled !== undefined) updates.enabled = enabled;
     // Phase 1: Retention policy fields
     if (retention_max_items !== undefined) updates.retention_max_items = retention_max_items;
     if (retention_days !== undefined) updates.retention_days = retention_days;
