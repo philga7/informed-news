@@ -60,6 +60,7 @@ export const osintSourcesService = {
       url: source.url,
       domain: source.domain || null,
       reliabilityRating: source.reliability_rating,
+      valueRating: source.value_rating || null,
       notes: source.notes,
       scrapeExternalUrl: source.scrape_external_url || false,
       createdAt: new Date(source.created_at),
@@ -90,6 +91,7 @@ export const osintSourcesService = {
       url: source.url,
       domain: source.domain || null,
       reliabilityRating: source.reliability_rating,
+      valueRating: source.value_rating || null,
       notes: source.notes,
       scrapeExternalUrl: source.scrape_external_url || false,
       createdAt: new Date(source.created_at),
@@ -101,7 +103,7 @@ export const osintSourcesService = {
   },
 
   /**
-   * Update a source (including reliability rating)
+   * Update a source (including reliability rating and value rating)
    */
   async update(
     sourceId: string,
@@ -110,6 +112,7 @@ export const osintSourcesService = {
       url?: string;
       domain?: string | null;
       reliabilityRating?: 'HIGH' | 'MEDIUM' | 'LOW' | 'UNKNOWN';
+      valueRating?: number;
       notes?: string;
       scrapeExternalUrl?: boolean;
     }
@@ -124,6 +127,7 @@ export const osintSourcesService = {
         url: updates.url,
         domain: updates.domain,
         reliability_rating: updates.reliabilityRating,
+        value_rating: updates.valueRating,
         notes: updates.notes,
         scrape_external_url: updates.scrapeExternalUrl,
       }),
@@ -145,6 +149,7 @@ export const osintSourcesService = {
       url: source.url,
       domain: source.domain || null,
       reliabilityRating: source.reliability_rating,
+      valueRating: source.value_rating || null,
       notes: source.notes,
       scrapeExternalUrl: source.scrape_external_url || false,
       createdAt: new Date(source.created_at),

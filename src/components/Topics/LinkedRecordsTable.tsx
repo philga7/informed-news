@@ -13,6 +13,11 @@ interface LinkedRecordsTableProps {
     assumptions: string | null;
     analystNotes: string | null;
     linkedAt: Date;
+    artifactReviewStatus?: {
+      total: number;
+      reviewed: number;
+      allReviewed: boolean;
+    };
     source_records: {
       id: string;
       title: string;
@@ -133,24 +138,41 @@ export function LinkedRecordsTable({ links, onUnlink, onEdit }: LinkedRecordsTab
                 {formatDate(link.source_records.publishedAt)}
               </td>
               <td className="py-4 px-4">
-                <div className="flex flex-col gap-1">
-                  <ConfidenceBadge
-                    level={link.confidenceLevel as 'HIGH' | 'MEDIUM' | 'LOW' | null}
-                    assumptions={link.assumptions}
-                  />
-                  {link.relevanceScore !== null && (
-                    <div className="flex items-center gap-1 text-stone-400 text-xs">
-                      <TrendingUp size={12} />
-                      <span>{(link.relevanceScore * 100).toFixed(0)}%</span>
-                    </div>
-                  )}
-                </div>
+                {link.artifactReviewStatus && link.artifactReviewStatus.total > 0 && !link.artifactReviewStatus.allReviewed ? (
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs text-amber-400 bg-amber-900/20 px-2 py-1 rounded border border-amber-800/50">
+                      {link.artifactReviewStatus.reviewed} of {link.artifactReviewStatus.total} artifacts reviewed
+                    </span>
+                    <span className="text-xs text-stone-500 italic">
+                      Review all artifacts to show confidence
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-1">
+                    <ConfidenceBadge
+                      level={link.confidenceLevel as 'HIGH' | 'MEDIUM' | 'LOW' | null}
+                      assumptions={link.assumptions}
+                    />
+                    {link.relevanceScore !== null && link.relevanceScore !== undefined && !isNaN(Number(link.relevanceScore)) && (
+                      <div className="flex items-center gap-1 text-stone-400 text-xs">
+                        <TrendingUp size={12} />
+                        <span>{(Number(link.relevanceScore) * 100).toFixed(0)}%</span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </td>
               <td className="py-4 px-4">
-                <LinkReviewStatusBadge 
-                  status={(link.reviewStatus as any) || 'pending'} 
-                  size="sm" 
-                />
+                {link.artifactReviewStatus && link.artifactReviewStatus.total > 0 && !link.artifactReviewStatus.allReviewed ? (
+                  <span className="text-xs text-amber-400 bg-amber-900/20 px-2 py-1 rounded border border-amber-800/50">
+                    Pending artifact review
+                  </span>
+                ) : (
+                  <LinkReviewStatusBadge 
+                    status={(link.reviewStatus as any) || 'pending'} 
+                    size="sm" 
+                  />
+                )}
               </td>
               <td className="py-4 px-4">
                 <div className="flex items-center justify-center gap-2">

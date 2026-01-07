@@ -43,10 +43,20 @@ export interface TopicSummaryResponse {
   keyDevelopments: string[];
   conflictingPerspectives?: string[];
   timelineHighlights?: string[];
+  corroboratedClaims?: Array<{
+    claim: string;
+    sources: string[];
+    sourceCount: number;
+  }>;
   recommendedNextSteps?: string[];
   crossSourceLinks?: Array<{
     url: string;
     mentionedIn: string[];
+  }>;
+  unreviewedRecords?: Array<{
+    title: string;
+    sourceName: string;
+    note: string;
   }>;
 }
 
@@ -397,9 +407,10 @@ Be explicit about uncertainty. Base assessment only on the text provided.`;
    * Summarize a topic across multiple source records
    */
   async summarizeTopic(
-    records: PreparedContent[],
+    records: Array<PreparedContent & { sourceRecordTitle?: string; sourceName?: string }>,
     topicContext: { name: string; description?: string; decisionQuestion?: string },
-    sourceMetadata?: { name: string; reliabilityRating: string }
+    sourceMetadata?: { name: string; reliabilityRating: string },
+    unreviewedRecords?: Array<{ recordId: string; title: string; sourceName: string }>
   ): Promise<TopicSummaryResponse> {
     if (!this.client) {
       throw new Error('Ollama service not available - API key not configured');
@@ -409,19 +420,34 @@ Be explicit about uncertainty. Base assessment only on the text provided.`;
       throw new Error('Cannot summarize topic with no source records');
     }
 
-    const prompt = this.buildTopicSummaryPrompt(records, topicContext, sourceMetadata);
+    const prompt = this.buildTopicSummaryPrompt(records, topicContext, sourceMetadata, unreviewedRecords);
 
     try {
       const response = await this.callWithTimeout(prompt);
       const parsed = this.parseJsonResponse(response);
+
+      // Build unreviewedRecords from the parsed response or use the provided data
+      const unreviewedRecordsData = unreviewedRecords && unreviewedRecords.length > 0
+        ? unreviewedRecords.map(r => ({
+            title: r.title,
+            sourceName: r.sourceName,
+            note: 'This record has artifacts that need review before inclusion in analysis',
+          }))
+        : undefined;
 
       return {
         executiveSummary: parsed.executiveSummary || '',
         keyDevelopments: Array.isArray(parsed.keyDevelopments) ? parsed.keyDevelopments : [],
         conflictingPerspectives: Array.isArray(parsed.conflictingPerspectives) ? parsed.conflictingPerspectives : undefined,
         timelineHighlights: Array.isArray(parsed.timelineHighlights) ? parsed.timelineHighlights : undefined,
+        corroboratedClaims: Array.isArray(parsed.corroboratedClaims) ? parsed.corroboratedClaims.map((cc: any) => ({
+          claim: cc.claim || '',
+          sources: Array.isArray(cc.sources) ? cc.sources : [],
+          sourceCount: typeof cc.sourceCount === 'number' ? cc.sourceCount : (Array.isArray(cc.sources) ? cc.sources.length : 0),
+        })) : undefined,
         recommendedNextSteps: Array.isArray(parsed.recommendedNextSteps) ? parsed.recommendedNextSteps : undefined,
         crossSourceLinks: Array.isArray(parsed.crossSourceLinks) ? parsed.crossSourceLinks : undefined,
+        unreviewedRecords: unreviewedRecordsData || (Array.isArray(parsed.unreviewedRecords) ? parsed.unreviewedRecords : undefined),
       };
     } catch (error) {
       console.error('Topic summarization error:', error);
@@ -478,6 +504,11 @@ Be explicit about uncertainty. Base assessment only on the text provided.`;
 }`,
     };
 
+    // Collect all analyst notes from the content
+    const allNotes = content.analystNotes && content.analystNotes.length > 0 
+      ? content.analystNotes 
+      : [];
+
     return `You are analyzing ${content.mediaType === 'video' ? 'a video title' : 'a web page/article'} for intelligence purposes.
 
 SOURCE CONTEXT:
@@ -507,10 +538,18 @@ DOCUMENT STRUCTURE:
 ${content.structure.headings.join(' → ')}
 ` : ''}
 
+${content.analystNotes && content.analystNotes.length > 0 ? `
+ANALYST NOTES (Additional Context - Not Primary Content):
+${content.analystNotes.map((note, index) => `Note ${index + 1}:\n${note}`).join('\n\n')}
+
+IMPORTANT: These analyst notes provide additional context but are NOT the primary content being analyzed. Use them to inform your analysis, but base your primary assessment on the main content above.
+` : ''}
+
 ANALYSIS TASK: ${taskDescriptions[analysisType]}
 
 INSTRUCTIONS:
-- Base analysis only on provided content
+- Base analysis primarily on the provided content above
+${content.analystNotes && content.analystNotes.length > 0 ? '- Consider analyst notes as additional context that may inform your analysis' : ''}
 ${content.mediaType === 'video' ? '- This is a video title - analyze what the video is likely about based on the title' : ''}
 - Links are provided for reference (do not fetch them)
 - Be explicit about uncertainty
@@ -633,33 +672,53 @@ ${outputFormats[analysisType]}`;
       other: typeof records;
     }
   ): string {
-    const articlesText = byMediaType.articles.map((r, idx) => `
+    const articlesText = byMediaType.articles.map((r, idx) => {
+      const notesText = r.content.analystNotes && r.content.analystNotes.length > 0
+        ? `\nAnalyst Notes: ${r.content.analystNotes.join(' | ')}`
+        : '';
+      return `
 --- ARTICLE ${idx + 1} ---
 Source: ${r.sourceName}
 Title: ${r.content.metadata.siteName || 'Unknown'} - ${r.content.text.substring(0, 200)}${r.content.text.length > 200 ? '...' : ''}
 Published: ${r.content.metadata.publishedAt?.toISOString() || 'Unknown'}
 URL: ${r.content.metadata.url}
-${r.content.links.length > 0 ? `Links: ${r.content.links.map(l => l.url).join(', ')}` : ''}
+${r.content.links.length > 0 ? `Links: ${r.content.links.map(l => l.url).join(', ')}` : ''}${notesText}
 ${r.content.text.length > 2000 ? r.content.text.substring(0, 2000) + '...(truncated)' : r.content.text}
-`).join('\n');
+`;
+    }).join('\n');
 
-    const videosText = byMediaType.videos.map((r, idx) => `
+    const videosText = byMediaType.videos.map((r, idx) => {
+      const notesText = r.content.analystNotes && r.content.analystNotes.length > 0
+        ? `\nAnalyst Notes: ${r.content.analystNotes.join(' | ')}`
+        : '';
+      return `
 --- VIDEO ${idx + 1} (TITLE ONLY) ---
 Source: ${r.sourceName}
 Title: ${r.content.text}
 Published: ${r.content.metadata.publishedAt?.toISOString() || 'Unknown'}
-URL: ${r.content.metadata.url}
+URL: ${r.content.metadata.url}${notesText}
 Note: Only the video title is available for analysis. Infer content from title.
-`).join('\n');
+`;
+    }).join('\n');
 
-    const podcastsText = byMediaType.podcasts.map((r, idx) => `
+    const podcastsText = byMediaType.podcasts.map((r, idx) => {
+      const notesText = r.content.analystNotes && r.content.analystNotes.length > 0
+        ? `\nAnalyst Notes: ${r.content.analystNotes.join(' | ')}`
+        : '';
+      return `
 --- PODCAST ${idx + 1} ---
 Source: ${r.sourceName}
 Title: ${r.content.text.substring(0, 200)}${r.content.text.length > 200 ? '...' : ''}
 Published: ${r.content.metadata.publishedAt?.toISOString() || 'Unknown'}
-URL: ${r.content.metadata.url}
+URL: ${r.content.metadata.url}${notesText}
 ${r.content.text.length > 2000 ? r.content.text.substring(0, 2000) + '...(truncated)' : r.content.text}
-`).join('\n');
+`;
+    }).join('\n');
+    
+    // Collect all analyst notes from all records
+    const allAnalystNotes = records
+      .flatMap(r => r.content.analystNotes || [])
+      .filter((note): note is string => Boolean(note && note.trim().length > 0));
 
     // Collect all links from articles
     const allLinks = byMediaType.articles.flatMap(r => r.content.links);
@@ -689,6 +748,13 @@ ${uniqueLinks.map(url => {
     .map((r, idx) => `Article ${byMediaType.articles.indexOf(r) + 1}`);
   return `- ${url} (mentioned in: ${mentionedIn.join(', ')})`;
 }).join('\n')}
+` : ''}
+
+${allAnalystNotes.length > 0 ? `
+ANALYST NOTES (Additional Context - Not Primary Content):
+These notes provide additional context from analysts but are NOT the primary content being analyzed. Use them to inform your comparison, but base your primary assessment on the source content above.
+
+${allAnalystNotes.map((note, index) => `Note ${index + 1}:\n${note}`).join('\n\n')}
 ` : ''}
 
 ANALYSIS TASK:
@@ -758,24 +824,37 @@ Respond with a JSON object in this exact format:
    * Build topic summary prompt for multiple source records
    */
   private buildTopicSummaryPrompt(
-    records: PreparedContent[],
+    records: Array<PreparedContent & { sourceRecordTitle?: string; sourceName?: string }>,
     topicContext: { name: string; description?: string; decisionQuestion?: string },
-    sourceMetadata?: { name: string; reliabilityRating: string }
+    sourceMetadata?: { name: string; reliabilityRating: string },
+    unreviewedRecords?: Array<{ recordId: string; title: string; sourceName: string }>
   ): string {
     const recordsText = records.map((record, index) => {
       const mediaNote = record.mediaType === 'video' ? ' (VIDEO - title only)' : '';
+      const notesText = record.analystNotes && record.analystNotes.length > 0
+        ? `\nAnalyst Notes: ${record.analystNotes.join(' | ')}`
+        : '';
+      // Use the source record title if available, otherwise fall back to metadata
+      const recordTitle = record.sourceRecordTitle || record.metadata.siteName || record.text.substring(0, 100) || 'Unknown';
+      const sourceName = record.sourceName || record.metadata.siteName || 'Unknown Source';
       return `
 --- SOURCE ${index + 1}${mediaNote} ---
-Title: ${record.metadata.siteName || 'Unknown'} - ${record.text.substring(0, 200)}${record.text.length > 200 ? '...' : ''}
+Source Record Title: "${recordTitle}"
+Source Name: ${sourceName}
 Published: ${record.metadata.publishedAt?.toISOString() || 'Unknown'}
 URL: ${record.metadata.url}
-${record.links.length > 0 ? `Links: ${record.links.map(l => l.url).join(', ')}` : ''}
+${record.links.length > 0 ? `Links: ${record.links.map(l => l.url).join(', ')}` : ''}${notesText}
 ${record.text.length > 2000 ? record.text.substring(0, 2000) + '...(truncated)' : record.text}
 `;
     }).join('\n');
 
     const allLinks = records.flatMap(r => r.links);
     const uniqueLinks = Array.from(new Set(allLinks.map(l => l.url)));
+    
+    // Collect all analyst notes from all records
+    const allAnalystNotes = records
+      .flatMap(r => r.analystNotes || [])
+      .filter((note): note is string => Boolean(note && note.trim().length > 0));
 
     return `You are synthesizing intelligence across multiple sources for the topic: "${topicContext.name}"
 
@@ -797,29 +876,71 @@ ${uniqueLinks.map(url => {
 }).join('\n')}
 ` : ''}
 
+${allAnalystNotes.length > 0 ? `
+ANALYST NOTES (Additional Context - Not Primary Content):
+These notes provide additional context from analysts but are NOT the primary content being analyzed. Use them to inform your synthesis, but base your primary assessment on the source content above.
+
+${allAnalystNotes.map((note, index) => `Note ${index + 1}:\n${note}`).join('\n\n')}
+` : ''}
+
+${unreviewedRecords && unreviewedRecords.length > 0 ? `
+IMPORTANT: UNREVIEWED SOURCE RECORDS
+The following source records are linked to this topic but have NOT been included in this analysis because they have no reviewed artifacts:
+${unreviewedRecords.map((r, idx) => `${idx + 1}. "${r.title}" from ${r.sourceName}`).join('\n')}
+
+You MUST mention in your summary that these records need artifact review before they can be included in the analysis. Include this in your recommendedNextSteps.
+` : ''}
+
 ANALYSIS TASK:
 Synthesize these sources into a comprehensive intelligence summary. Identify:
 - Key developments and events
 - Conflicting perspectives or contradictory information
 - Timeline of important events
 - Links mentioned across multiple sources (potential coordination or shared narratives)
-- Recommended next steps for further investigation
+- **IMPORTANT: When multiple sources mention the same analysis, claim, or development, explicitly note this corroboration and list which sources mentioned it**
+- Recommended next steps for further investigation${unreviewedRecords && unreviewedRecords.length > 0 ? ' (including reviewing artifacts for unreviewed source records)' : ''}
 
 Note: Some sources may be videos (title-only analysis). Be explicit about limitations when video content is involved.
 
+${unreviewedRecords && unreviewedRecords.length > 0 ? 'IMPORTANT: You must include in your recommendedNextSteps that the unreviewed source records listed above need their artifacts reviewed before they can be included in future analyses.\n' : ''}
+
+CORROBORATION TRACKING:
+When multiple sources (2 or more) mention the same analysis, claim, or development, you MUST:
+1. Note this in the executiveSummary or keyDevelopments
+2. Include it in the "corroboratedClaims" array with:
+   - The claim/analysis text
+   - The exact "Source Record Title" from each source that mentioned it (use the titles from "Source Record Title:" lines above)
+   - The count of sources
+3. This helps identify information that has been verified across multiple independent sources
+4. Use the exact source record titles as they appear in the "Source Record Title:" field for each source
+
 Respond with a JSON object in this exact format:
 {
-  "executiveSummary": "A comprehensive 2-3 paragraph summary synthesizing all sources",
+  "executiveSummary": "A comprehensive 2-3 paragraph summary synthesizing all sources${unreviewedRecords && unreviewedRecords.length > 0 ? '. Note that some linked source records were excluded because they have no reviewed artifacts.' : ''}. When multiple sources mention the same analysis or claim, explicitly note this corroboration.",
   "keyDevelopments": ["Development 1", "Development 2", "Development 3"],
   "conflictingPerspectives": ["Perspective A vs Perspective B", "..."],
   "timelineHighlights": ["Event 1 on Date", "Event 2 on Date"],
-  "recommendedNextSteps": ["Action 1", "Action 2"],
+  "corroboratedClaims": [
+    {
+      "claim": "The specific analysis, claim, or development mentioned",
+      "sources": ["Source 1 title", "Source 2 title", "Source 3 title"],
+      "sourceCount": 3
+    }
+  ],
+  "recommendedNextSteps": ["Action 1", "Action 2"${unreviewedRecords && unreviewedRecords.length > 0 ? ', "Review artifacts for unreviewed source records"' : ''}],
   "crossSourceLinks": [
     {
       "url": "https://example.com",
       "mentionedIn": ["Source 1", "Source 3"]
     }
-  ]
+  ]${unreviewedRecords && unreviewedRecords.length > 0 ? `,
+  "unreviewedRecords": [
+    {
+      "title": "Record title",
+      "sourceName": "Source name",
+      "note": "This record has artifacts that need review before inclusion in analysis"
+    }
+  ]` : ''}
 }`;
   }
 

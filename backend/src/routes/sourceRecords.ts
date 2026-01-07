@@ -418,6 +418,21 @@ router.patch('/batch/scan-status', async (req: Request, res: Response) => {
 
     if (error) throw error;
 
+    // If marking as reviewed, also update any linked topic_source_links to 'reviewed'
+    if (scan_status === 'reviewed') {
+      const { error: linksError } = await supabase
+        .from('topic_source_links')
+        // @ts-ignore - Supabase type inference issue
+        .update({ review_status: 'reviewed' })
+        .in('source_record_id', record_ids)
+        .eq('review_status', 'pending'); // Only update pending links
+
+      if (linksError) {
+        console.error('Error updating linked topic_source_links:', linksError);
+        // Don't fail the request, just log the error
+      }
+    }
+
     res.json({
       success: true,
       updated: data?.length || 0,
@@ -464,6 +479,21 @@ router.patch('/:id/scan-status', async (req: Request, res: Response) => {
       .single();
 
     if (error) throw error;
+
+    // If marking as reviewed, also update any linked topic_source_links to 'reviewed'
+    if (scan_status === 'reviewed') {
+      const { error: linksError } = await supabase
+        .from('topic_source_links')
+        // @ts-ignore - Supabase type inference issue
+        .update({ review_status: 'reviewed' })
+        .eq('source_record_id', id)
+        .eq('review_status', 'pending'); // Only update pending links
+
+      if (linksError) {
+        console.error('Error updating linked topic_source_links:', linksError);
+        // Don't fail the request, just log the error
+      }
+    }
 
     res.json({
       success: true,

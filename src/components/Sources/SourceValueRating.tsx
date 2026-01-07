@@ -28,8 +28,8 @@ export function SourceValueRating({
   const handleRatingClick = async (newRating: number) => {
     try {
       setIsUpdating(true);
-      // Update source with new value_rating
-      await osintSourcesService.update(sourceId, { value_rating: newRating } as any);
+      // Update source with new value rating
+      await osintSourcesService.update(sourceId, { valueRating: newRating });
       setRating(newRating);
       onRatingChange?.(newRating);
     } catch (err) {

@@ -5,7 +5,6 @@ import { useAuth } from '../../hooks/useAuth';
 import { useOrganization } from '../../context/OrganizationContext';
 import { osintTopicsService } from '../../services';
 import { analysisService, type AnalyticArtifact } from '../../services/analysis.service';
-import { supabase } from '../../utils/supabase';
 import { LoadingSpinner } from '../UI/LoadingSpinner';
 import { EmptyState } from '../UI/EmptyState';
 import { ArtifactCard } from '../SourceRecords/ArtifactCard';
@@ -88,17 +87,13 @@ export function TopicDetailPage() {
 
     try {
       setIsLoadingArtifacts(true);
-      // Fetch artifacts for this topic (topic_id is set, not source_record_id)
-      const { data: artifacts, error } = await supabase
-        .from('analytic_artifacts')
-        .select('*')
-        .eq('topic_id', id)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setTopicArtifacts((artifacts || []) as AnalyticArtifact[]);
+      // Fetch artifacts for this topic via backend API to avoid RLS issues
+      const artifacts = await analysisService.getTopicArtifacts(id);
+      setTopicArtifacts(artifacts);
     } catch (err) {
       console.error('Error loading topic artifacts:', err);
+      // Don't block the page if artifact loading fails - it's not critical
+      setTopicArtifacts([]);
     } finally {
       setIsLoadingArtifacts(false);
     }
