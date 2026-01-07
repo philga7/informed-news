@@ -301,6 +301,7 @@ router.get('/:id', async (req: Request, res: Response) => {
           review_status,
           linked_by_user_id,
           linked_at,
+          source_record_id,
           source_records (
             id,
             title,
@@ -345,10 +346,93 @@ router.get('/:id', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Topic not found' });
     }
 
-    // Extract collection_plan from array (should be 0 or 1)
+    // Check artifact review status for each linked source record
     const topicData = topic as any;
+    const links = topicData.topic_source_links || [];
+    const recordIds = links.map((link: any) => link.source_record_id).filter(Boolean);
+
+    // Fetch all artifacts for these source records
+    let artifactsByRecord = new Map<string, { total: number; reviewed: number }>();
+    if (recordIds.length > 0) {
+      const { data: allArtifacts, error: artifactsError } = await supabase
+        .from('analytic_artifacts')
+        .select('source_record_id, reviewed')
+        .in('source_record_id', recordIds);
+
+      if (!artifactsError && allArtifacts) {
+        // Group by source_record_id and count reviewed vs total
+        allArtifacts.forEach((artifact: any) => {
+          const recordId = artifact.source_record_id;
+          if (!artifactsByRecord.has(recordId)) {
+            artifactsByRecord.set(recordId, { total: 0, reviewed: 0 });
+          }
+          const counts = artifactsByRecord.get(recordId)!;
+          counts.total++;
+          if (artifact.reviewed) {
+            counts.reviewed++;
+          }
+        });
+      }
+    }
+
+    // Add artifact review status to each link
+    const linksWithArtifactStatus = links.map((link: any) => {
+      const recordId = link.source_record_id;
+      const artifactStatus = artifactsByRecord.get(recordId);
+      const allArtifactsReviewed = artifactStatus
+        ? artifactStatus.total > 0 && artifactStatus.reviewed === artifactStatus.total
+        : true; // If no artifacts, consider it "all reviewed" (nothing to review)
+
+      return {
+        ...link,
+        artifactReviewStatus: artifactStatus
+          ? {
+              total: artifactStatus.total,
+              reviewed: artifactStatus.reviewed,
+              allReviewed: allArtifactsReviewed,
+            }
+          : {
+              total: 0,
+              reviewed: 0,
+              allReviewed: true, // No artifacts means nothing to review
+            },
+      };
+    });
+
+    // If all artifacts are reviewed (or there are no artifacts), ensure the link's review_status is not left as 'pending'.
+    // This handles the case where a record is linked AFTER artifacts were reviewed (no artifact events fire to update links).
+    try {
+      const linksNeedingPromotion = linksWithArtifactStatus
+        .filter((l: any) => (l.review_status === 'pending') && (l.artifactReviewStatus?.allReviewed === true))
+        .map((l: any) => l.id)
+        .filter(Boolean);
+
+      if (linksNeedingPromotion.length > 0) {
+        const { error: promoteError } = await supabase
+          .from('topic_source_links')
+          .update({ review_status: 'reviewed' } as any)
+          .in('id', linksNeedingPromotion)
+          .eq('review_status', 'pending');
+
+        if (promoteError) {
+          console.error('[topics] Error promoting link review_status based on artifact review state:', promoteError);
+        } else {
+          // Update response payload to reflect the promotion immediately
+          linksWithArtifactStatus.forEach((l: any) => {
+            if (linksNeedingPromotion.includes(l.id)) {
+              l.review_status = 'reviewed';
+            }
+          });
+        }
+      }
+    } catch (e) {
+      console.error('[topics] Unexpected error promoting link review_status:', e);
+    }
+
+    // Extract collection_plan from array (should be 0 or 1)
     const topicWithPlan: any = {
       ...topicData,
+      topic_source_links: linksWithArtifactStatus,
       collection_plan: topicData.collection_plans?.[0] || null,
     };
     delete topicWithPlan.collection_plans;
@@ -361,6 +445,119 @@ router.get('/:id', async (req: Request, res: Response) => {
     console.error('Error fetching topic:', error);
     res.status(500).json({
       error: 'Failed to fetch topic',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+/**
+ * PATCH /api/topics/:topicId/links/:linkId
+ * Update a topic-source link metadata
+ * Body: { relevance_score?, confidence_level?, assumptions?, analyst_notes? }
+ * 
+ * NOTE: This route must be defined BEFORE /:id to avoid route conflicts
+ */
+router.patch('/:topicId/links/:linkId', async (req: Request, res: Response) => {
+  try {
+    const { topicId, linkId } = req.params;
+    const {
+      relevance_score,
+      confidence_level,
+      assumptions,
+      analyst_notes,
+      review_status,
+    } = req.body;
+
+    // Validate confidence_level if provided
+    if (confidence_level && !['HIGH', 'MEDIUM', 'LOW'].includes(confidence_level)) {
+      return res.status(400).json({
+        error: 'Invalid confidence_level. Must be HIGH, MEDIUM, or LOW',
+      });
+    }
+
+    // Validate review_status if provided
+    if (review_status && !['pending', 'reviewed', 'disputed'].includes(review_status)) {
+      return res.status(400).json({
+        error: 'Invalid review_status. Must be pending, reviewed, or disputed',
+      });
+    }
+
+    // Fetch current state for audit
+    console.log(`[PATCH /topics/:topicId/links/:linkId] Looking for link:`, { topicId, linkId });
+    const { data: beforeLink, error: fetchError } = await supabase
+      .from('topic_source_links')
+      .select('*')
+      .eq('id', linkId)
+      .eq('topic_id', topicId)
+      .single();
+
+    if (fetchError) {
+      console.error(`[PATCH /topics/:topicId/links/:linkId] Error fetching link:`, fetchError);
+      // Check if link exists with just the ID (without topic_id check)
+      const { data: linkById, error: linkByIdError } = await supabase
+        .from('topic_source_links')
+        .select('id, topic_id')
+        .eq('id', linkId)
+        .single();
+      
+      if (linkById && !linkByIdError) {
+        console.log(`[PATCH /topics/:topicId/links/:linkId] Link exists but topic_id mismatch:`, {
+          requestedTopicId: topicId,
+          actualTopicId: linkById.topic_id,
+        });
+        return res.status(404).json({ 
+          error: 'Link not found',
+          details: `Link exists but belongs to a different topic (expected: ${topicId}, actual: ${linkById.topic_id})`
+        });
+      }
+      
+      return res.status(404).json({ error: 'Link not found' });
+    }
+
+    if (!beforeLink) {
+      console.error(`[PATCH /topics/:topicId/links/:linkId] Link not found (no data returned)`);
+      return res.status(404).json({ error: 'Link not found' });
+    }
+    
+    console.log(`[PATCH /topics/:topicId/links/:linkId] Link found, proceeding with update`);
+
+    const updates: any = {};
+    if (relevance_score !== undefined) updates.relevance_score = relevance_score;
+    if (confidence_level !== undefined) updates.confidence_level = confidence_level;
+    if (assumptions !== undefined) updates.assumptions = assumptions;
+    if (analyst_notes !== undefined) updates.analyst_notes = analyst_notes;
+    if (review_status !== undefined) updates.review_status = review_status;
+
+    const { data: updatedLink, error: updateError } = await supabase
+      .from('topic_source_links')
+      .update(updates)
+      .eq('id', linkId)
+      .eq('topic_id', topicId)
+      .select()
+      .single();
+
+    if (updateError) throw updateError;
+    if (!updatedLink) {
+      return res.status(500).json({ error: 'Failed to update link' });
+    }
+
+    // Audit log: link updated
+    await auditService.logLinkUpdated(
+      (updatedLink as any).id,
+      topicId,
+      (updatedLink as any).source_record_id,
+      beforeLink as any,
+      updatedLink as any
+    );
+
+    res.json({
+      success: true,
+      link: updatedLink,
+    });
+  } catch (error) {
+    console.error('Error updating link:', error);
+    res.status(500).json({
+      error: 'Failed to update link',
       message: error instanceof Error ? error.message : 'Unknown error',
     });
   }
@@ -533,6 +730,43 @@ router.post('/:id/links', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'source_record_id is required' });
     }
 
+    // Check if source record was already reviewed in scan view
+    const { data: sourceRecord, error: sourceRecordError } = await supabase
+      .from('source_records')
+      .select('scan_status, reviewed_at')
+      .eq('id', source_record_id)
+      .single();
+
+    if (sourceRecordError) {
+      return res.status(404).json({ error: 'Source record not found' });
+    }
+
+    // Determine initial review_status:
+    // - If source record scan_status is 'reviewed' → mark link as reviewed
+    // - Else, if the record has no artifacts OR all artifacts are reviewed → mark as reviewed
+    // - Otherwise leave undefined (DB default 'pending')
+    let reviewStatus: 'reviewed' | undefined = undefined;
+    if (sourceRecord?.scan_status === 'reviewed') {
+      reviewStatus = 'reviewed';
+    } else {
+      try {
+        const { data: artifacts, error: artifactsError } = await supabase
+          .from('analytic_artifacts')
+          .select('reviewed')
+          .eq('source_record_id', source_record_id);
+        
+        if (!artifactsError) {
+          const noArtifacts = !artifacts || artifacts.length === 0;
+          const allReviewed = !noArtifacts && artifacts.every((a: any) => a.reviewed === true);
+          if (noArtifacts || allReviewed) {
+            reviewStatus = 'reviewed';
+          }
+        }
+      } catch (e) {
+        console.warn('[topics] Unable to inspect artifacts for initial link review status:', e);
+      }
+    }
+
     const { data: link, error } = await supabase
       .from('topic_source_links')
       .insert({
@@ -543,6 +777,7 @@ router.post('/:id/links', async (req: Request, res: Response) => {
         assumptions: assumptions || null,
         analyst_notes: analyst_notes || null,
         linked_by_user_id: linked_by_user_id || null,
+        review_status: reviewStatus, // Seed initial review status based on scan_status/artifact state (else DB default)
       } as any)
       .select()
       .single();
@@ -578,91 +813,6 @@ router.post('/:id/links', async (req: Request, res: Response) => {
     console.error('Error linking source record:', error);
     res.status(500).json({
       error: 'Failed to link source record',
-      message: error instanceof Error ? error.message : 'Unknown error',
-    });
-  }
-});
-
-/**
- * PATCH /api/topics/:topicId/links/:linkId
- * Update a topic-source link metadata
- * Body: { relevance_score?, confidence_level?, assumptions?, analyst_notes? }
- */
-router.patch('/:topicId/links/:linkId', async (req: Request, res: Response) => {
-  try {
-    const { topicId, linkId } = req.params;
-    const {
-      relevance_score,
-      confidence_level,
-      assumptions,
-      analyst_notes,
-      review_status,
-    } = req.body;
-
-    // Validate confidence_level if provided
-    if (confidence_level && !['HIGH', 'MEDIUM', 'LOW'].includes(confidence_level)) {
-      return res.status(400).json({
-        error: 'Invalid confidence_level. Must be HIGH, MEDIUM, or LOW',
-      });
-    }
-
-    // Validate review_status if provided
-    if (review_status && !['pending', 'reviewed', 'disputed'].includes(review_status)) {
-      return res.status(400).json({
-        error: 'Invalid review_status. Must be pending, reviewed, or disputed',
-      });
-    }
-
-    // Fetch current state for audit
-    const { data: beforeLink, error: fetchError } = await supabase
-      .from('topic_source_links')
-      .select('*')
-      .eq('id', linkId)
-      .eq('topic_id', topicId)
-      .single();
-
-    if (fetchError || !beforeLink) {
-      return res.status(404).json({ error: 'Link not found' });
-    }
-
-    const updates: any = {};
-    if (relevance_score !== undefined) updates.relevance_score = relevance_score;
-    if (confidence_level !== undefined) updates.confidence_level = confidence_level;
-    if (assumptions !== undefined) updates.assumptions = assumptions;
-    if (analyst_notes !== undefined) updates.analyst_notes = analyst_notes;
-    if (review_status !== undefined) updates.review_status = review_status;
-
-    if (Object.keys(updates).length === 0) {
-      return res.status(400).json({ error: 'No updates provided' });
-    }
-
-    const { data: link, error } = await supabase
-      .from('topic_source_links')
-      // @ts-ignore - Supabase type inference issue in serverless environment
-      .update(updates as any)
-      .eq('id', linkId)
-      .eq('topic_id', topicId)
-      .select()
-      .single();
-
-    if (error) {
-      if (error.code === 'PGRST116') {
-        return res.status(404).json({ error: 'Link not found' });
-      }
-      throw error;
-    }
-
-    // Audit log: link updated
-    await auditService.logLinkUpdated(linkId, beforeLink, link);
-
-    res.json({
-      success: true,
-      link,
-    });
-  } catch (error) {
-    console.error('Error updating topic-source link:', error);
-    res.status(500).json({
-      error: 'Failed to update link',
       message: error instanceof Error ? error.message : 'Unknown error',
     });
   }

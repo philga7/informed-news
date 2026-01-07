@@ -4,6 +4,7 @@ import { supabase } from '../utils/supabase.js';
 import { ollamaService } from '../services/ollamaService.js';
 import { auditService } from '../services/auditService.js';
 import { contentPreparer, type MediaType } from '../services/analysis/ContentPreparer.js';
+import { contentExtractor } from '../services/ingestion/ContentExtractor.js';
 
 const router = Router();
 
@@ -14,6 +15,7 @@ const router = Router();
 router.post('/source-records/:id/summarize', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    const { fetchFreshContent } = req.body;
 
     if (!ollamaService.isAvailable()) {
       return res.status(503).json({
@@ -28,6 +30,7 @@ router.post('/source-records/:id/summarize', async (req: Request, res: Response)
       .select(`
         id,
         source_id,
+        url,
         sources!inner (
           organization_id,
           name,
@@ -44,7 +47,7 @@ router.post('/source-records/:id/summarize', async (req: Request, res: Response)
     // Prepare content for analysis (with metadata, links, structure)
     let preparedContent;
     try {
-      preparedContent = await contentPreparer.prepareForAnalysis(id);
+      preparedContent = await contentPreparer.prepareForAnalysis(id, fetchFreshContent === true ? record.url : undefined);
     } catch (prepError) {
       return res.status(400).json({ 
         error: 'Failed to prepare content for analysis',
@@ -65,6 +68,13 @@ router.post('/source-records/:id/summarize', async (req: Request, res: Response)
     // Call Ollama service with prepared content
     const summaryResult = await ollamaService.summarize(preparedContent, sourceMetadata);
 
+    // Add warning if content extraction failed with 403, but only if no reviewed notes exist
+    // (if reviewed notes exist, analyst has already manually added fresh content)
+    const hasReviewedNotes = preparedContent.analystNotes && preparedContent.analystNotes.length > 0;
+    const payloadWithWarning = (preparedContent.contentExtractionError === 403 && !hasReviewedNotes)
+      ? { ...summaryResult, warning: 'Content extraction blocked (HTTP 403). Analysis based on stored content. Consider manually adding notes for full article analysis.' }
+      : summaryResult;
+
     // Store in analytic_artifacts table
     const { data: artifact, error: insertError } = await supabase
       .from('analytic_artifacts')
@@ -72,7 +82,7 @@ router.post('/source-records/:id/summarize', async (req: Request, res: Response)
         source_record_id: id,
         organization_id: record.sources.organization_id,
         type: 'summary',
-        payload: summaryResult as any,
+        payload: payloadWithWarning as any,
         model_name: ollamaService.getModelName(),
         created_by: 'system:ollama',
         reviewed: false,
@@ -109,6 +119,7 @@ router.post('/source-records/:id/summarize', async (req: Request, res: Response)
 router.post('/source-records/:id/entities', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    const { fetchFreshContent } = req.body;
 
     if (!ollamaService.isAvailable()) {
       return res.status(503).json({
@@ -123,6 +134,7 @@ router.post('/source-records/:id/entities', async (req: Request, res: Response) 
       .select(`
         id,
         source_id,
+        url,
         sources!inner (
           organization_id,
           name,
@@ -139,7 +151,7 @@ router.post('/source-records/:id/entities', async (req: Request, res: Response) 
     // Prepare content for analysis (with metadata, links, structure)
     let preparedContent;
     try {
-      preparedContent = await contentPreparer.prepareForAnalysis(id);
+      preparedContent = await contentPreparer.prepareForAnalysis(id, fetchFreshContent === true ? record.url : undefined);
     } catch (prepError) {
       return res.status(400).json({ 
         error: 'Failed to prepare content for analysis',
@@ -160,6 +172,13 @@ router.post('/source-records/:id/entities', async (req: Request, res: Response) 
     // Call Ollama service with prepared content
     const entitiesResult = await ollamaService.extractEntities(preparedContent, sourceMetadata);
 
+    // Add warning if content extraction failed with 403, but only if no reviewed notes exist
+    // (if reviewed notes exist, analyst has already manually added fresh content)
+    const hasReviewedNotes = preparedContent.analystNotes && preparedContent.analystNotes.length > 0;
+    const payloadWithWarning = (preparedContent.contentExtractionError === 403 && !hasReviewedNotes)
+      ? { ...entitiesResult, warning: 'Content extraction blocked (HTTP 403). Analysis based on stored content. Consider manually adding notes for full article analysis.' }
+      : entitiesResult;
+
     // Store in analytic_artifacts table
     const { data: artifact, error: insertError } = await supabase
       .from('analytic_artifacts')
@@ -167,7 +186,7 @@ router.post('/source-records/:id/entities', async (req: Request, res: Response) 
         source_record_id: id,
         organization_id: record.sources.organization_id,
         type: 'entity_extraction',
-        payload: entitiesResult as any,
+        payload: payloadWithWarning as any,
         model_name: ollamaService.getModelName(),
         created_by: 'system:ollama',
         reviewed: false,
@@ -204,6 +223,7 @@ router.post('/source-records/:id/entities', async (req: Request, res: Response) 
 router.post('/source-records/:id/tone', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    const { fetchFreshContent } = req.body;
 
     if (!ollamaService.isAvailable()) {
       return res.status(503).json({
@@ -218,6 +238,7 @@ router.post('/source-records/:id/tone', async (req: Request, res: Response) => {
       .select(`
         id,
         source_id,
+        url,
         sources!inner (
           organization_id,
           name,
@@ -234,7 +255,7 @@ router.post('/source-records/:id/tone', async (req: Request, res: Response) => {
     // Prepare content for analysis (with metadata, links, structure)
     let preparedContent;
     try {
-      preparedContent = await contentPreparer.prepareForAnalysis(id);
+      preparedContent = await contentPreparer.prepareForAnalysis(id, fetchFreshContent === true ? record.url : undefined);
     } catch (prepError) {
       return res.status(400).json({ 
         error: 'Failed to prepare content for analysis',
@@ -255,6 +276,13 @@ router.post('/source-records/:id/tone', async (req: Request, res: Response) => {
     // Call Ollama service with prepared content
     const toneResult = await ollamaService.analyzeTone(preparedContent, sourceMetadata);
 
+    // Add warning if content extraction failed with 403, but only if no reviewed notes exist
+    // (if reviewed notes exist, analyst has already manually added fresh content)
+    const hasReviewedNotes = preparedContent.analystNotes && preparedContent.analystNotes.length > 0;
+    const payloadWithWarning = (preparedContent.contentExtractionError === 403 && !hasReviewedNotes)
+      ? { ...toneResult, warning: 'Content extraction blocked (HTTP 403). Analysis based on stored content. Consider manually adding notes for full article analysis.' }
+      : toneResult;
+
     // Store in analytic_artifacts table
     const { data: artifact, error: insertError } = await supabase
       .from('analytic_artifacts')
@@ -262,7 +290,7 @@ router.post('/source-records/:id/tone', async (req: Request, res: Response) => {
         source_record_id: id,
         organization_id: record.sources.organization_id,
         type: 'tone_analysis',
-        payload: toneResult as any,
+        payload: payloadWithWarning as any,
         model_name: ollamaService.getModelName(),
         created_by: 'system:ollama',
         reviewed: false,
@@ -320,6 +348,162 @@ router.get('/source-records/:id/artifacts', async (req: Request, res: Response) 
     });
   }
 });
+
+/**
+ * Helper function: Check if all artifacts for a source record are reviewed, and update linked topic_source_links accordingly
+ * Called when artifacts are reviewed or deleted
+ */
+async function checkAndUpdateLinkReviewStatus(sourceRecordId: string) {
+  console.log(`\n========== [checkAndUpdateLinkReviewStatus] ==========`);
+  console.log(`Starting check for source_record_id: ${sourceRecordId}`);
+  console.log(`Timestamp: ${new Date().toISOString()}`);
+  
+  try {
+    const { data: allArtifacts, error: artifactsError } = await supabase
+      .from('analytic_artifacts')
+      .select('reviewed')
+      .eq('source_record_id', sourceRecordId);
+
+    if (artifactsError) {
+      console.error('[checkAndUpdateLinkReviewStatus] Error fetching artifacts:', artifactsError);
+      return;
+    }
+
+    console.log(`[checkAndUpdateLinkReviewStatus] Found ${allArtifacts?.length || 0} artifacts for source_record_id ${sourceRecordId}`);
+
+    if (!allArtifacts || allArtifacts.length === 0) {
+      console.log(`[checkAndUpdateLinkReviewStatus] No artifacts found - updating pending links to reviewed`);
+      
+      // No artifacts - update pending links to reviewed
+      const { data: updatedLinks, error: linksError } = await supabase
+        .from('topic_source_links')
+        .update({ review_status: 'reviewed' } as any)
+        .eq('source_record_id', sourceRecordId)
+        .in('review_status', ['pending'])
+        .select('id');
+
+      if (linksError) {
+        console.error('[checkAndUpdateLinkReviewStatus] Error updating links when no artifacts exist:', linksError);
+      } else {
+        console.log(`[checkAndUpdateLinkReviewStatus] Updated ${updatedLinks?.length || 0} topic_source_links to 'reviewed' (no artifacts)`);
+        if (updatedLinks && updatedLinks.length === 0) {
+          console.log(`[checkAndUpdateLinkReviewStatus] WARNING: No links were updated. This might mean:`);
+          console.log(`  - No links exist for this source_record_id`);
+          console.log(`  - All links already have review_status != 'pending'`);
+        }
+      }
+      return;
+    }
+
+    const totalArtifacts = allArtifacts.length;
+    const reviewedArtifacts = allArtifacts.filter((a: any) => a.reviewed === true).length;
+    const unreviewedArtifacts = allArtifacts.filter((a: any) => a.reviewed === false).length;
+
+    console.log(`[checkAndUpdateLinkReviewStatus] Artifact status for source_record_id ${sourceRecordId}: ${reviewedArtifacts} reviewed, ${unreviewedArtifacts} unreviewed, ${totalArtifacts} total`);
+
+    // If all artifacts are reviewed, update pending links to reviewed
+    if (reviewedArtifacts === totalArtifacts) {
+      console.log(`[checkAndUpdateLinkReviewStatus] All artifacts reviewed - updating pending links`);
+      
+      // First, check what links exist
+      const { data: existingLinks, error: fetchLinksError } = await supabase
+        .from('topic_source_links')
+        .select('id, review_status')
+        .eq('source_record_id', sourceRecordId);
+
+      if (fetchLinksError) {
+        console.error('[checkAndUpdateLinkReviewStatus] Error fetching existing links:', fetchLinksError);
+      } else {
+        console.log(`[checkAndUpdateLinkReviewStatus] Found ${existingLinks?.length || 0} existing links:`, existingLinks?.map((l: any) => ({ id: l.id, status: l.review_status })));
+      }
+
+      const { data: updatedLinks, error: linksError } = await supabase
+        .from('topic_source_links')
+        .update({ review_status: 'reviewed' } as any)
+        .eq('source_record_id', sourceRecordId)
+        .in('review_status', ['pending'])
+        .select('id');
+
+      if (linksError) {
+        console.error('[checkAndUpdateLinkReviewStatus] Error updating linked topic_source_links:', linksError);
+      } else {
+        console.log(`[checkAndUpdateLinkReviewStatus] Updated ${updatedLinks?.length || 0} topic_source_links to 'reviewed' (all artifacts reviewed)`);
+        if (updatedLinks && updatedLinks.length > 0) {
+          console.log(`[checkAndUpdateLinkReviewStatus] Updated link IDs:`, updatedLinks.map((l: any) => l.id));
+        } else {
+          console.log(`[checkAndUpdateLinkReviewStatus] WARNING: No links were updated. This might mean:`);
+          console.log(`  - No links exist for this source_record_id`);
+          console.log(`  - All links already have review_status != 'pending'`);
+          console.log(`  - Check existing links above to see their current status`);
+        }
+      }
+    } else {
+      console.log(`[checkAndUpdateLinkReviewStatus] Not all artifacts reviewed (${reviewedArtifacts}/${totalArtifacts}) - skipping link update`);
+    }
+  } catch (error) {
+    console.error('[checkAndUpdateLinkReviewStatus] Unexpected error:', error);
+    throw error; // Re-throw to see full stack trace
+  }
+}
+
+/**
+ * Helper function: Remove warnings from all artifacts for a source record
+ * Called when notes are added/reviewed, indicating analyst is handling fresh content manually
+ */
+async function removeWarningsFromArtifacts(sourceRecordId: string) {
+  try {
+    // Find all artifacts for this source record that have warnings
+    const { data: artifacts, error: fetchError } = await supabase
+      .from('analytic_artifacts')
+      .select('id, payload, type')
+      .eq('source_record_id', sourceRecordId)
+      .in('type', ['summary', 'entity_extraction', 'tone_analysis', 'key_facts']);
+
+    if (fetchError) {
+      console.error('Error fetching artifacts for warning removal:', fetchError);
+      return;
+    }
+
+    if (!artifacts || artifacts.length === 0) {
+      return; // No artifacts to update
+    }
+
+    // Update artifacts that have warnings
+    const updates: Promise<any>[] = [];
+    
+    for (const artifact of artifacts) {
+      const artifactTyped = artifact as any;
+      const payload = artifactTyped.payload;
+      
+      // Check if payload has a warning field
+      if (payload && typeof payload === 'object' && 'warning' in payload) {
+        // Remove warning from payload
+        const { warning, ...payloadWithoutWarning } = payload;
+        
+        // Update the artifact
+        updates.push(
+          supabase
+            .from('analytic_artifacts')
+            .update({ payload: payloadWithoutWarning as any } as any)
+            .eq('id', artifactTyped.id)
+            .then(({ error }) => {
+              if (error) {
+                console.error(`Error removing warning from artifact ${artifactTyped.id}:`, error);
+              } else {
+                console.log(`Removed warning from ${artifactTyped.type} artifact ${artifactTyped.id}`);
+              }
+            })
+        );
+      }
+    }
+
+    // Wait for all updates to complete (but don't block the response)
+    await Promise.all(updates);
+  } catch (error) {
+    // Log error but don't fail - this is a cleanup operation
+    console.error('Error removing warnings from artifacts:', error);
+  }
+}
 
 /**
  * Helper function: Create claims from reviewed key facts artifact
@@ -495,6 +679,80 @@ async function addEntitiesToLinkedTopics(artifact: any) {
 }
 
 /**
+ * PATCH /api/analysis/artifacts/:id/notes
+ * Update notes artifact content
+ */
+router.patch('/artifacts/:id/notes', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { notes } = req.body;
+
+    if (typeof notes !== 'string') {
+      return res.status(400).json({
+        error: 'Invalid request',
+        message: 'notes field must be a string',
+      });
+    }
+
+    // Fetch the artifact to verify it exists and is a notes type
+    const { data: artifact, error: fetchError } = await supabase
+      .from('analytic_artifacts')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (fetchError) {
+      if (fetchError.code === 'PGRST116') {
+        return res.status(404).json({ error: 'Artifact not found' });
+      }
+      throw fetchError;
+    }
+
+    if (!artifact) {
+      return res.status(404).json({ error: 'Artifact not found' });
+    }
+
+    if ((artifact as any).type !== 'notes') {
+      return res.status(400).json({
+        error: 'Invalid artifact type',
+        message: 'This endpoint is only for notes artifacts',
+      });
+    }
+
+    // Update the notes content
+    const { data: updatedArtifact, error: updateError } = await supabase
+      .from('analytic_artifacts')
+      .update({
+        payload: { notes: notes.trim() } as any,
+      } as any)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (updateError) throw updateError;
+
+    if (!updatedArtifact) {
+      return res.status(500).json({ error: 'Failed to update notes' });
+    }
+
+    // Note: Notes updates are not separately audited unless they're part of a review.
+    // When "Reviewed and accepted" is checked, the review action is logged via the
+    // PATCH /artifacts/:id endpoint which includes the notes content update.
+
+    res.json({
+      success: true,
+      artifact: updatedArtifact,
+    });
+  } catch (error) {
+    console.error('Error updating notes:', error);
+    res.status(500).json({
+      error: 'Failed to update notes',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+/**
  * PATCH /api/analysis/artifacts/:id
  * Update artifact review status
  */
@@ -553,6 +811,41 @@ router.patch('/artifacts/:id', async (req: Request, res: Response) => {
           console.error('Error creating claims from key facts:', err);
         });
       }
+
+      // If this is a notes artifact and notes content is provided, save it
+      if (artifactTyped.type === 'notes' && req.body.notes && typeof req.body.notes === 'string') {
+        // Update notes content when marking as reviewed
+        const { error: notesUpdateError } = await supabase
+          .from('analytic_artifacts')
+          .update({
+            payload: { notes: req.body.notes.trim() } as any,
+          } as any)
+          .eq('id', id);
+
+        if (notesUpdateError) {
+          console.error('Error updating notes content:', notesUpdateError);
+          // Don't fail the request, just log the error
+        }
+      }
+
+      // If this is a notes artifact being reviewed, remove warnings from all artifacts
+      // (analyst reviewing notes indicates they're handling fresh content manually)
+      if (artifactTyped.type === 'notes' && artifactTyped.source_record_id) {
+        removeWarningsFromArtifacts(artifactTyped.source_record_id).catch((err) => {
+          // Log error but don't fail the request
+          console.error('Error removing warnings from artifacts:', err);
+        });
+      }
+
+      // After marking an artifact as reviewed, check if all artifacts for this source record are now reviewed
+      // If so, update any pending topic_source_links to 'reviewed'
+      if (artifactTyped.source_record_id) {
+        console.log(`[UPDATE ARTIFACT REVIEW] Artifact ${id} marked as reviewed, checking link review status for source_record_id ${artifactTyped.source_record_id}`);
+        checkAndUpdateLinkReviewStatus(artifactTyped.source_record_id).catch((err) => {
+          // Log error but don't fail the request
+          console.error('[UPDATE ARTIFACT REVIEW] Error checking and updating link review status:', err);
+        });
+      }
     }
 
     res.json({
@@ -569,19 +862,79 @@ router.patch('/artifacts/:id', async (req: Request, res: Response) => {
 });
 
 /**
+ * GET /api/analysis/topics/:id/artifacts
+ * Get all artifacts for a topic (topic-level artifacts)
+ */
+router.get('/topics/:id/artifacts', async (req: Request, res: Response) => {
+  try {
+    const { id: topicId } = req.params;
+
+    const { data: artifacts, error } = await supabase
+      .from('analytic_artifacts')
+      .select('*')
+      .eq('topic_id', topicId)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    res.json({
+      success: true,
+      artifacts: artifacts || [],
+    });
+  } catch (error) {
+    console.error('Error fetching topic artifacts:', error);
+    res.status(500).json({
+      error: 'Failed to fetch topic artifacts',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+/**
  * DELETE /api/analysis/artifacts/:id
  * Delete an artifact (dismiss/archive)
+ * After deletion, check if all remaining artifacts are reviewed and update linked topic_source_links accordingly
  */
 router.delete('/artifacts/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
+    // First, fetch the artifact to get the source_record_id
+    const { data: artifact, error: fetchError } = await supabase
+      .from('analytic_artifacts')
+      .select('source_record_id')
+      .eq('id', id)
+      .single();
+
+    if (fetchError) throw fetchError;
+    if (!artifact) {
+      return res.status(404).json({ error: 'Artifact not found' });
+    }
+
+    const sourceRecordId = (artifact as any).source_record_id;
+
+    console.log(`[DELETE ARTIFACT] Deleting artifact ${id} for source_record_id ${sourceRecordId}`);
+
+    // Delete the artifact
     const { error } = await supabase
       .from('analytic_artifacts')
       .delete()
       .eq('id', id);
 
     if (error) throw error;
+
+    console.log(`[DELETE ARTIFACT] Artifact deleted successfully, checking link review status for source_record_id ${sourceRecordId}`);
+
+    // After deletion, check if all remaining artifacts for this source record are reviewed
+    // If so, update any pending topic_source_links to 'reviewed'
+    try {
+      // Use the shared helper function to check and update link review status
+      await checkAndUpdateLinkReviewStatus(sourceRecordId);
+      console.log(`[DELETE ARTIFACT] Completed link review status check for source_record_id ${sourceRecordId}`);
+    } catch (checkError) {
+      console.error('[DELETE ARTIFACT] Error checking artifact review status after deletion:', checkError);
+      // Don't fail the request, just log the error
+    }
 
     res.json({
       success: true,
@@ -709,6 +1062,7 @@ router.post('/detect-duplicates', async (req: Request, res: Response) => {
 router.post('/source-records/:id/key-facts', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    const { fetchFreshContent } = req.body;
 
     if (!ollamaService.isAvailable()) {
       return res.status(503).json({
@@ -723,6 +1077,7 @@ router.post('/source-records/:id/key-facts', async (req: Request, res: Response)
       .select(`
         id,
         source_id,
+        url,
         sources!inner (
           organization_id,
           name,
@@ -739,7 +1094,7 @@ router.post('/source-records/:id/key-facts', async (req: Request, res: Response)
     // Prepare content for analysis (with metadata, links, structure)
     let preparedContent;
     try {
-      preparedContent = await contentPreparer.prepareForAnalysis(id);
+      preparedContent = await contentPreparer.prepareForAnalysis(id, fetchFreshContent === true ? record.url : undefined);
     } catch (prepError) {
       return res.status(400).json({ 
         error: 'Failed to prepare content for analysis',
@@ -760,6 +1115,13 @@ router.post('/source-records/:id/key-facts', async (req: Request, res: Response)
     // Call Ollama service to extract key facts
     const keyFactsResult = await ollamaService.extractKeyFacts(preparedContent, sourceMetadata);
 
+    // Add warning if content extraction failed with 403, but only if no reviewed notes exist
+    // (if reviewed notes exist, analyst has already manually added fresh content)
+    const hasReviewedNotes = preparedContent.analystNotes && preparedContent.analystNotes.length > 0;
+    const payloadWithWarning = (preparedContent.contentExtractionError === 403 && !hasReviewedNotes)
+      ? { ...keyFactsResult, warning: 'Content extraction blocked (HTTP 403). Analysis based on stored content. Consider manually adding notes for full article analysis.' }
+      : keyFactsResult;
+
     // Store in analytic_artifacts table
     const { data: artifact, error: insertError } = await supabase
       .from('analytic_artifacts')
@@ -767,7 +1129,7 @@ router.post('/source-records/:id/key-facts', async (req: Request, res: Response)
         source_record_id: id,
         organization_id: record.sources.organization_id,
         type: 'key_facts',
-        payload: keyFactsResult as any,
+        payload: payloadWithWarning as any,
         model_name: ollamaService.getModelName(),
         created_by: 'system:ollama',
         reviewed: false,
@@ -830,6 +1192,7 @@ router.post('/topics/:id/summarize', async (req: Request, res: Response) => {
         source_record_id,
         source_records!inner (
           id,
+          title,
           sources!inner (
             name,
             reliability_rating
@@ -847,17 +1210,84 @@ router.post('/topics/:id/summarize', async (req: Request, res: Response) => {
       });
     }
 
-    // Prepare content for each linked record
-    const preparedContents = [];
-    const sourceMetadataMap = new Map<string, { name: string; reliabilityRating: string }>();
+    // Check for reviewed artifacts for each linked source record
+    const recordIds = links.map((link: any) => (link as any).source_record_id);
+    const { data: allArtifacts, error: artifactsError } = await supabase
+      .from('analytic_artifacts')
+      .select('source_record_id, reviewed, type')
+      .in('source_record_id', recordIds);
+
+    if (artifactsError) throw artifactsError;
+
+    // Group artifacts by source_record_id
+    const artifactsByRecord = new Map<string, Array<{ reviewed: boolean; type: string }>>();
+    (allArtifacts || []).forEach((artifact: any) => {
+      if (!artifactsByRecord.has(artifact.source_record_id)) {
+        artifactsByRecord.set(artifact.source_record_id, []);
+      }
+      artifactsByRecord.get(artifact.source_record_id)!.push({
+        reviewed: artifact.reviewed,
+        type: artifact.type,
+      });
+    });
+
+    // Separate records with reviewed artifacts from those without
+    const recordsWithReviewed: Array<{ link: any; recordId: string; sourceInfo: any }> = [];
+    const recordsWithUnreviewed: Array<{ recordId: string; title: string; sourceName: string }> = [];
 
     for (const link of links) {
+      const recordId = (link as any).source_record_id;
+      const sourceInfo = (link as any).source_records.sources;
+      const recordTitle = (link as any).source_records.title || 'Untitled';
+      const artifacts = artifactsByRecord.get(recordId) || [];
+
+      // Check if this record has at least one reviewed artifact
+      const hasReviewedArtifact = artifacts.some(a => a.reviewed === true);
+
+      if (hasReviewedArtifact) {
+        recordsWithReviewed.push({ link, recordId, sourceInfo });
+      } else if (artifacts.length > 0) {
+        // Has artifacts but none are reviewed
+        recordsWithUnreviewed.push({
+          recordId,
+          title: recordTitle,
+          sourceName: sourceInfo.name,
+        });
+      } else {
+        // No artifacts at all - also note this
+        recordsWithUnreviewed.push({
+          recordId,
+          title: recordTitle,
+          sourceName: sourceInfo.name,
+        });
+      }
+    }
+
+    if (recordsWithReviewed.length === 0) {
+      return res.status(400).json({ 
+        error: 'No reviewed artifacts available',
+        message: 'At least one linked source record must have reviewed artifacts. Please review artifacts for linked source records before generating a topic summary.'
+      });
+    }
+
+    // Prepare content only for records with reviewed artifacts
+    // Also track source record titles for corroboration tracking
+    const preparedContents: Array<PreparedContent & { sourceRecordTitle: string; sourceName: string }> = [];
+    const sourceMetadataMap = new Map<string, { name: string; reliabilityRating: string }>();
+
+    for (const { link, recordId, sourceInfo } of recordsWithReviewed) {
       try {
-        const recordId = (link as any).source_record_id;
-        const sourceInfo = (link as any).source_records.sources;
-        
         const prepared = await contentPreparer.prepareForAnalysis(recordId);
-        preparedContents.push(prepared);
+        
+        // Get the source record title from the link data (already fetched)
+        const recordTitle = (link as any).source_records?.title || prepared.metadata.siteName || 'Untitled';
+        
+        // Add source record title and source name to prepared content for AI to reference
+        preparedContents.push({
+          ...prepared,
+          sourceRecordTitle: recordTitle,
+          sourceName: sourceInfo.name,
+        });
         
         // Store source metadata (use first occurrence if multiple records from same source)
         if (!sourceMetadataMap.has(sourceInfo.name)) {
@@ -867,7 +1297,7 @@ router.post('/topics/:id/summarize', async (req: Request, res: Response) => {
           });
         }
       } catch (prepError) {
-        console.warn(`Failed to prepare content for record ${(link as any).source_record_id}:`, prepError);
+        console.warn(`Failed to prepare content for record ${recordId}:`, prepError);
         // Continue with other records
       }
     }
@@ -892,10 +1322,12 @@ router.post('/topics/:id/summarize', async (req: Request, res: Response) => {
     };
 
     // Call Ollama service to generate topic summary
+    // Pass information about unreviewed records so it can be noted in the summary
     const topicSummaryResult = await ollamaService.summarizeTopic(
       preparedContents,
       topicContext,
-      sourceMetadata
+      sourceMetadata,
+      recordsWithUnreviewed.length > 0 ? recordsWithUnreviewed : undefined
     );
 
     // Store in analytic_artifacts table (with topic_id, not source_record_id)
@@ -1300,6 +1732,83 @@ router.post('/coordination-assessments', async (req: Request, res: Response) => 
     console.error('Error saving coordination assessment:', error);
     res.status(500).json({
       error: 'Failed to save coordination assessment',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+/**
+ * POST /api/analysis/source-records/:id/notes
+ * Create a new notes artifact for a source record
+ */
+router.post('/source-records/:id/notes', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { notes } = req.body;
+
+    if (notes === undefined || notes === null || typeof notes !== 'string') {
+      return res.status(400).json({ 
+        error: 'Invalid request',
+        message: 'notes field is required and must be a string'
+      });
+    }
+
+    // Fetch the source record with source information
+    const { data: record, error: fetchError } = await supabase
+      .from('source_records')
+      .select(`
+        id,
+        source_id,
+        sources!inner (
+          organization_id
+        )
+      `)
+      .eq('id', id)
+      .single() as any;
+
+    if (fetchError || !record) {
+      return res.status(404).json({ error: 'Source record not found' });
+    }
+
+    // Create new notes artifact (multiple notes artifacts are allowed per source record)
+    const { data: artifact, error: insertError } = await supabase
+      .from('analytic_artifacts')
+      .insert({
+        source_record_id: id,
+        organization_id: record.sources.organization_id,
+        type: 'notes',
+        payload: { notes: notes.trim() } as any,
+        model_name: 'analyst',
+        created_by: 'analyst',
+        reviewed: false,
+      } as any)
+      .select()
+      .single();
+
+    if (insertError) throw insertError;
+
+    if (!artifact) {
+      return res.status(500).json({ error: 'Failed to create notes artifact' });
+    }
+
+    // Audit log: artifact created
+    await auditService.logArtifactCreated((artifact as any).id, artifact as any);
+
+    // Remove warnings from all artifacts for this source record
+    // (analyst adding notes indicates they're handling fresh content manually)
+    removeWarningsFromArtifacts(id).catch((err) => {
+      // Log error but don't fail the request
+      console.error('Error removing warnings from artifacts:', err);
+    });
+
+    res.json({
+      success: true,
+      artifact,
+    });
+  } catch (error) {
+    console.error('Error creating notes:', error);
+    res.status(500).json({
+      error: 'Failed to create notes',
       message: error instanceof Error ? error.message : 'Unknown error',
     });
   }

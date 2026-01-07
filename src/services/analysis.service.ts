@@ -13,7 +13,7 @@ export interface AnalyticArtifact {
   source_record_id: string | null;
   topic_id: string | null;
   organization_id: string;
-  type: 'summary' | 'entity_extraction' | 'tone_analysis' | 'sentiment' | 'key_facts' | 'timeline' | 'network_graph' | 'media_comparison';
+  type: 'summary' | 'entity_extraction' | 'tone_analysis' | 'sentiment' | 'key_facts' | 'timeline' | 'network_graph' | 'media_comparison' | 'notes';
   payload: any;
   model_name: string;
   reviewed: boolean;
@@ -24,6 +24,7 @@ export interface AnalyticArtifact {
 export interface SummaryPayload {
   summary: string;
   bulletPoints: string[];
+  warning?: string; // Optional warning message (e.g., for 403 errors)
 }
 
 export interface EntityExtractionPayload {
@@ -31,6 +32,7 @@ export interface EntityExtractionPayload {
   organizations: string[];
   locations: string[];
   dates: string[];
+  warning?: string; // Optional warning message (e.g., for 403 errors)
 }
 
 export interface ToneAnalysisPayload {
@@ -40,6 +42,7 @@ export interface ToneAnalysisPayload {
   indicators: string[];
   sentiment: 'positive' | 'negative' | 'neutral' | 'mixed';
   biasSignals: string[];
+  warning?: string; // Optional warning message (e.g., for 403 errors)
 }
 
 export interface KeyFactsPayload {
@@ -49,6 +52,7 @@ export interface KeyFactsPayload {
     category?: 'event' | 'quote' | 'statistic' | 'claim';
     supportingLinks?: string[];
   }>;
+  warning?: string; // Optional warning message (e.g., for 403 errors)
 }
 
 export interface TopicSummaryPayload {
@@ -56,10 +60,20 @@ export interface TopicSummaryPayload {
   keyDevelopments: string[];
   conflictingPerspectives?: string[];
   timelineHighlights?: string[];
+  corroboratedClaims?: Array<{
+    claim: string;
+    sources: string[];
+    sourceCount: number;
+  }>;
   recommendedNextSteps?: string[];
   crossSourceLinks?: Array<{
     url: string;
     mentionedIn: string[];
+  }>;
+  unreviewedRecords?: Array<{
+    title: string;
+    sourceName: string;
+    note: string;
   }>;
 }
 
@@ -97,9 +111,10 @@ class AnalysisService {
   /**
    * Generate AI-assisted summary for a source record
    */
-  async generateSummary(sourceRecordId: string): Promise<AnalyticArtifact> {
+  async generateSummary(sourceRecordId: string, fetchFreshContent: boolean = false): Promise<AnalyticArtifact> {
     const response = await apiClient.post(
-      `${this.baseUrl}/source-records/${sourceRecordId}/summarize`
+      `${this.baseUrl}/source-records/${sourceRecordId}/summarize`,
+      { fetchFreshContent }
     );
     return response.artifact;
   }
@@ -107,9 +122,10 @@ class AnalysisService {
   /**
    * Extract entities from a source record
    */
-  async extractEntities(sourceRecordId: string): Promise<AnalyticArtifact> {
+  async extractEntities(sourceRecordId: string, fetchFreshContent: boolean = false): Promise<AnalyticArtifact> {
     const response = await apiClient.post(
-      `${this.baseUrl}/source-records/${sourceRecordId}/entities`
+      `${this.baseUrl}/source-records/${sourceRecordId}/entities`,
+      { fetchFreshContent }
     );
     return response.artifact;
   }
@@ -117,9 +133,10 @@ class AnalysisService {
   /**
    * Analyze tone and bias in a source record
    */
-  async analyzeTone(sourceRecordId: string): Promise<AnalyticArtifact> {
+  async analyzeTone(sourceRecordId: string, fetchFreshContent: boolean = false): Promise<AnalyticArtifact> {
     const response = await apiClient.post(
-      `${this.baseUrl}/source-records/${sourceRecordId}/tone`
+      `${this.baseUrl}/source-records/${sourceRecordId}/tone`,
+      { fetchFreshContent }
     );
     return response.artifact;
   }
@@ -137,10 +154,14 @@ class AnalysisService {
   /**
    * Update artifact review status
    */
-  async updateArtifactReview(artifactId: string, reviewed: boolean): Promise<AnalyticArtifact> {
+  async updateArtifactReview(artifactId: string, reviewed: boolean, notesContent?: string): Promise<AnalyticArtifact> {
+    const body: any = { reviewed };
+    if (notesContent !== undefined) {
+      body.notes = notesContent;
+    }
     const response = await apiClient.patch(
       `${this.baseUrl}/artifacts/${artifactId}`,
-      { reviewed }
+      body
     );
     return response.artifact;
   }
@@ -150,6 +171,14 @@ class AnalysisService {
    */
   async deleteArtifact(artifactId: string): Promise<void> {
     await apiClient.delete(`${this.baseUrl}/artifacts/${artifactId}`);
+  }
+
+  /**
+   * Get all artifacts for a topic
+   */
+  async getTopicArtifacts(topicId: string): Promise<AnalyticArtifact[]> {
+    const response = await apiClient.get(`${this.baseUrl}/topics/${topicId}/artifacts`);
+    return response.artifacts || [];
   }
 
   /**
@@ -216,9 +245,10 @@ class AnalysisService {
   /**
    * Extract key facts from a source record
    */
-  async extractKeyFacts(sourceRecordId: string): Promise<AnalyticArtifact> {
+  async extractKeyFacts(sourceRecordId: string, fetchFreshContent: boolean = false): Promise<AnalyticArtifact> {
     const response = await apiClient.post(
-      `${this.baseUrl}/source-records/${sourceRecordId}/key-facts`
+      `${this.baseUrl}/source-records/${sourceRecordId}/key-facts`,
+      { fetchFreshContent }
     );
     return response.artifact;
   }
@@ -239,6 +269,28 @@ class AnalysisService {
   async compareMediaTypes(topicId: string): Promise<AnalyticArtifact> {
     const response = await apiClient.post(
       `${this.baseUrl}/topics/${topicId}/compare-media`
+    );
+    return response.artifact;
+  }
+
+  /**
+   * Create or update a notes artifact for a source record
+   */
+  async createNotes(sourceRecordId: string, notes: string): Promise<AnalyticArtifact> {
+    const response = await apiClient.post(
+      `${this.baseUrl}/source-records/${sourceRecordId}/notes`,
+      { notes }
+    );
+    return response.artifact;
+  }
+
+  /**
+   * Update notes artifact content
+   */
+  async updateNotes(artifactId: string, notes: string): Promise<AnalyticArtifact> {
+    const response = await apiClient.patch(
+      `${this.baseUrl}/artifacts/${artifactId}/notes`,
+      { notes }
     );
     return response.artifact;
   }

@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, ExternalLink, Calendar, Database, Link as LinkIcon, Sparkles, FileText, Users, MessageSquare, ListChecks } from 'lucide-react';
+import { ArrowLeft, ExternalLink, Calendar, Database, Link as LinkIcon, Sparkles, FileText, Users, MessageSquare, ListChecks, Loader2, FileEdit, ChevronDown } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useOrganization } from '../../context/OrganizationContext';
 import { sourceRecordsService } from '../../services';
@@ -23,6 +23,32 @@ export function SourceRecordDetailPage() {
   const [isLoadingArtifacts, setIsLoadingArtifacts] = useState(false);
   const [analysisLoading, setAnalysisLoading] = useState<string | null>(null);
   const [newArtifactIds, setNewArtifactIds] = useState<Set<string>>(new Set());
+  // Initialize summaryContentSource from localStorage, defaulting to 'stored'
+  const [summaryContentSource, setSummaryContentSource] = useState<'stored' | 'fresh'>(() => {
+    const saved = localStorage.getItem('informed-news:summaryContentSource');
+    return (saved === 'stored' || saved === 'fresh') ? saved : 'stored';
+  });
+  const [summaryDropdownOpen, setSummaryDropdownOpen] = useState(false);
+  const summaryDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Persist summaryContentSource to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('informed-news:summaryContentSource', summaryContentSource);
+  }, [summaryContentSource]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (summaryDropdownRef.current && !summaryDropdownRef.current.contains(event.target as Node)) {
+        setSummaryDropdownOpen(false);
+      }
+    };
+
+    if (summaryDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [summaryDropdownOpen]);
 
   const loadRecord = async () => {
     if (!id) return;
@@ -63,11 +89,12 @@ export function SourceRecordDetailPage() {
     setNewArtifactIds(new Set());
   }, [id]);
 
-  const handleGenerateSummary = async () => {
+  const handleGenerateSummary = async (contentSource: 'stored' | 'fresh' = summaryContentSource) => {
     if (!id) return;
     try {
       setAnalysisLoading('summary');
-      const newArtifact = await analysisService.generateSummary(id);
+      setSummaryDropdownOpen(false);
+      const newArtifact = await analysisService.generateSummary(id, contentSource === 'fresh');
       setNewArtifactIds(prev => new Set(prev).add(newArtifact.id));
       await loadArtifacts();
     } catch (err) {
@@ -82,7 +109,7 @@ export function SourceRecordDetailPage() {
     if (!id) return;
     try {
       setAnalysisLoading('entities');
-      const newArtifact = await analysisService.extractEntities(id);
+      const newArtifact = await analysisService.extractEntities(id, summaryContentSource === 'fresh');
       setNewArtifactIds(prev => new Set(prev).add(newArtifact.id));
       await loadArtifacts();
     } catch (err) {
@@ -97,7 +124,7 @@ export function SourceRecordDetailPage() {
     if (!id) return;
     try {
       setAnalysisLoading('tone');
-      const newArtifact = await analysisService.analyzeTone(id);
+      const newArtifact = await analysisService.analyzeTone(id, summaryContentSource === 'fresh');
       setNewArtifactIds(prev => new Set(prev).add(newArtifact.id));
       await loadArtifacts();
     } catch (err) {
@@ -112,7 +139,7 @@ export function SourceRecordDetailPage() {
     if (!id) return;
     try {
       setAnalysisLoading('key_facts');
-      const newArtifact = await analysisService.extractKeyFacts(id);
+      const newArtifact = await analysisService.extractKeyFacts(id, summaryContentSource === 'fresh');
       setNewArtifactIds(prev => new Set(prev).add(newArtifact.id));
       await loadArtifacts();
     } catch (err) {
@@ -123,10 +150,25 @@ export function SourceRecordDetailPage() {
     }
   };
 
+  const handleAddNotes = async () => {
+    if (!id) return;
+    try {
+      setAnalysisLoading('notes');
+      // Create a new notes artifact with empty content
+      const newArtifact = await analysisService.createNotes(id, '');
+      setNewArtifactIds(prev => new Set(prev).add(newArtifact.id));
+      await loadArtifacts();
+    } catch (err) {
+      console.error('Error creating notes:', err);
+      alert(err instanceof Error ? err.message : 'Failed to create notes');
+    } finally {
+      setAnalysisLoading(null);
+    }
+  };
+
   const handleLinkToTopics = async (topicIds: string[]) => {
-    // This would call the API to link to multiple topics
-    // For now, we'll just refresh the record
-    setShowLinkModal(false);
+    // Reload the record to get updated linked topics after linking
+    // The modal will close itself after onLink completes
     await loadRecord();
   };
 
@@ -325,61 +367,158 @@ export function SourceRecordDetailPage() {
             <h2 className="text-xl font-semibold text-stone-200">AI-Assisted Analysis</h2>
           </div>
 
-          <p className="text-sm text-stone-400 mb-4">
-            Generate AI-powered analysis to assist with source evaluation.
-          </p>
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-sm text-stone-400">
+              Generate AI-powered analysis to assist with source evaluation.
+            </p>
+            {summaryContentSource === 'fresh' && (
+              <span className="text-xs text-amber-400 bg-amber-900/20 px-2 py-1 rounded border border-amber-800/50">
+                Using fresh content from URL
+              </span>
+            )}
+          </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-            <button
-              onClick={handleGenerateSummary}
-              disabled={analysisLoading !== null}
-              className="flex items-center justify-center gap-2 px-4 py-2 bg-stone-800 hover:bg-stone-700 border border-stone-700 hover:border-stone-600 text-stone-200 text-sm rounded-lg transition-colors duration-200 disabled:cursor-not-allowed"
-            >
-              {analysisLoading === 'summary' ? (
-                <LoadingSpinner />
-              ) : (
-                <FileText size={16} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
+            {/* Generate Summary Dropdown Button */}
+            <div className="relative" ref={summaryDropdownRef}>
+              <div className="flex">
+                <button
+                  onClick={() => handleGenerateSummary()}
+                  disabled={analysisLoading !== null}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-stone-800 hover:bg-stone-700 border border-stone-700 hover:border-stone-600 text-stone-200 text-xs rounded-l-lg transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <div className="w-4 h-4 flex items-center justify-center">
+                    {analysisLoading === 'summary' ? (
+                      <Loader2 size={16} className="animate-spin" />
+                    ) : (
+                      <FileText size={16} />
+                    )}
+                  </div>
+                  <span>Generate Summary</span>
+                </button>
+                <button
+                  onClick={() => setSummaryDropdownOpen(!summaryDropdownOpen)}
+                  disabled={analysisLoading !== null}
+                  className="px-2 py-2 bg-stone-800 hover:bg-stone-700 border-y border-r border-stone-700 hover:border-stone-600 text-stone-200 text-xs rounded-r-lg transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <ChevronDown size={16} className={`transition-transform duration-200 ${summaryDropdownOpen ? 'rotate-180' : ''}`} />
+                </button>
+              </div>
+              {summaryDropdownOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-10"
+                    onClick={() => setSummaryDropdownOpen(false)}
+                  />
+                  <div className="absolute top-full left-0 mt-2 w-64 bg-stone-900 border border-stone-700 rounded-lg shadow-lg z-20 overflow-hidden">
+                    <button
+                      onClick={() => {
+                        setSummaryContentSource('stored');
+                        setSummaryDropdownOpen(false);
+                      }}
+                      disabled={analysisLoading !== null}
+                      className={`w-full text-left px-4 py-3 transition-colors duration-200 border-b border-stone-800 last:border-b-0 ${
+                        summaryContentSource === 'stored'
+                          ? 'text-blue-400 bg-stone-800'
+                          : 'text-stone-300 hover:bg-stone-800'
+                      } disabled:opacity-50`}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="font-medium text-sm">Use Stored Content</div>
+                          <div className="text-xs text-stone-500 mt-0.5">Analyze content from database (RSS feed or manual input)</div>
+                        </div>
+                        {summaryContentSource === 'stored' && <span className="text-xs ml-2 mt-0.5">✓</span>}
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (!record?.url) {
+                          alert('No URL available for this source record');
+                          setSummaryDropdownOpen(false);
+                          return;
+                        }
+                        setSummaryContentSource('fresh');
+                        setSummaryDropdownOpen(false);
+                      }}
+                      disabled={analysisLoading !== null || !record?.url}
+                      className={`w-full text-left px-4 py-3 transition-colors duration-200 ${
+                        summaryContentSource === 'fresh'
+                          ? 'text-blue-400 bg-stone-800'
+                          : 'text-stone-300 hover:bg-stone-800'
+                      } disabled:opacity-50 disabled:cursor-not-allowed`}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="font-medium text-sm">Fetch Fresh Content</div>
+                          <div className="text-xs text-stone-500 mt-0.5">Fetch and analyze full article from URL</div>
+                        </div>
+                        {summaryContentSource === 'fresh' && <span className="text-xs ml-2 mt-0.5">✓</span>}
+                      </div>
+                    </button>
+                  </div>
+                </>
               )}
-              <span>Generate Summary</span>
-            </button>
+            </div>
 
             <button
               onClick={handleExtractEntities}
               disabled={analysisLoading !== null}
-              className="flex items-center justify-center gap-2 px-4 py-2 bg-stone-800 hover:bg-stone-700 border border-stone-700 hover:border-stone-600 text-stone-200 text-sm rounded-lg transition-colors duration-200 disabled:cursor-not-allowed"
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-stone-800 hover:bg-stone-700 border border-stone-700 hover:border-stone-600 text-stone-200 text-xs rounded-lg transition-colors duration-200 disabled:cursor-not-allowed"
             >
-              {analysisLoading === 'entities' ? (
-                <LoadingSpinner />
-              ) : (
-                <Users size={16} />
-              )}
+              <div className="w-4 h-4 flex items-center justify-center">
+                {analysisLoading === 'entities' ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <Users size={16} />
+                )}
+              </div>
               <span>Extract Entities</span>
             </button>
 
             <button
               onClick={handleAnalyzeTone}
               disabled={analysisLoading !== null}
-              className="flex items-center justify-center gap-2 px-4 py-2 bg-stone-800 hover:bg-stone-700 border border-stone-700 hover:border-stone-600 text-stone-200 text-sm rounded-lg transition-colors duration-200 disabled:cursor-not-allowed"
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-stone-800 hover:bg-stone-700 border border-stone-700 hover:border-stone-600 text-stone-200 text-xs rounded-lg transition-colors duration-200 disabled:cursor-not-allowed"
             >
-              {analysisLoading === 'tone' ? (
-                <LoadingSpinner />
-              ) : (
-                <MessageSquare size={16} />
-              )}
+              <div className="w-4 h-4 flex items-center justify-center">
+                {analysisLoading === 'tone' ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <MessageSquare size={16} />
+                )}
+              </div>
               <span>Analyze Tone</span>
             </button>
 
             <button
               onClick={handleExtractKeyFacts}
               disabled={analysisLoading !== null}
-              className="flex items-center justify-center gap-2 px-4 py-2 bg-stone-800 hover:bg-stone-700 border border-stone-700 hover:border-stone-600 text-stone-200 text-sm rounded-lg transition-colors duration-200 disabled:cursor-not-allowed"
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-stone-800 hover:bg-stone-700 border border-stone-700 hover:border-stone-600 text-stone-200 text-xs rounded-lg transition-colors duration-200 disabled:cursor-not-allowed"
             >
-              {analysisLoading === 'key_facts' ? (
-                <LoadingSpinner />
-              ) : (
-                <ListChecks size={16} />
-              )}
+              <div className="w-4 h-4 flex items-center justify-center">
+                {analysisLoading === 'key_facts' ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <ListChecks size={16} />
+                )}
+              </div>
               <span>Extract Key Facts</span>
+            </button>
+
+            <button
+              onClick={handleAddNotes}
+              disabled={analysisLoading !== null}
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-stone-800 hover:bg-stone-700 border border-stone-700 hover:border-stone-600 text-stone-200 text-xs rounded-lg transition-colors duration-200 disabled:cursor-not-allowed"
+            >
+              <div className="w-4 h-4 flex items-center justify-center">
+                {analysisLoading === 'notes' ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <FileEdit size={16} />
+                )}
+              </div>
+              <span>Add Notes</span>
             </button>
           </div>
 

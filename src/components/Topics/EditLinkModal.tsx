@@ -108,6 +108,17 @@ export function EditLinkModal({ link, topicId, onSave, onClose }: EditLinkModalP
     setError(null);
 
     try {
+      console.log('[EditLinkModal] Submitting link update:', { 
+        linkId: link.id, 
+        topicId, 
+        updates: {
+          relevanceScore,
+          confidenceLevel,
+          assumptions: assumptions.trim() || undefined,
+          analystNotes: analystNotes.trim() || undefined,
+        }
+      });
+      
       // Save link metadata
       await onSave(link.id, {
         relevanceScore,
@@ -159,9 +170,9 @@ export function EditLinkModal({ link, topicId, onSave, onClose }: EditLinkModalP
 
       {/* Modal */}
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div className="bg-stone-900 border border-stone-800 rounded-lg w-full max-w-2xl">
+        <div className="bg-stone-900 border border-stone-800 rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] flex flex-col">
           {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-stone-800">
+          <div className="flex items-center justify-between p-6 border-b border-stone-800 flex-shrink-0">
             <div>
               <h2 className="text-2xl font-semibold text-stone-100">Edit Link</h2>
               <p className="text-sm text-stone-400 mt-1 line-clamp-1">
@@ -177,7 +188,7 @@ export function EditLinkModal({ link, topicId, onSave, onClose }: EditLinkModalP
           </div>
 
           {/* Content */}
-          <form onSubmit={handleSubmit} className="p-6">
+          <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6">
             {error && (
               <div className="mb-4 p-4 bg-red-900/30 border border-red-800 rounded-lg text-red-200">
                 {error}
@@ -370,7 +381,7 @@ export function EditLinkModal({ link, topicId, onSave, onClose }: EditLinkModalP
             </div>
 
             {/* Footer */}
-            <div className="flex items-center justify-end gap-3 mt-6 pt-6 border-t border-stone-800">
+            <div className="flex items-center justify-end gap-3 mt-6 pt-6 border-t border-stone-800 flex-shrink-0">
               <button
                 type="button"
                 onClick={onClose}

@@ -81,8 +81,23 @@ export const osintTopicsService = {
       createdAt: new Date(topic.created_at),
       updatedAt: new Date(topic.updated_at),
       topic_source_links: (topic.topic_source_links || []).map((link: any) => ({
-        ...link,
+        id: link.id,
+        relevanceScore: link.relevance_score,
+        confidenceLevel: link.confidence_level,
+        assumptions: link.assumptions,
+        analystNotes: link.analyst_notes,
+        reviewStatus: link.review_status || 'pending',
+        linkedByUserId: link.linked_by_user_id,
         linkedAt: new Date(link.linked_at),
+        artifactReviewStatus: link.artifactReviewStatus ? {
+          total: link.artifactReviewStatus.total,
+          reviewed: link.artifactReviewStatus.reviewed,
+          allReviewed: link.artifactReviewStatus.allReviewed,
+        } : {
+          total: 0,
+          reviewed: 0,
+          allReviewed: true,
+        },
         source_records: link.source_records ? {
           ...link.source_records,
           publishedAt: link.source_records.published_at 
@@ -195,6 +210,7 @@ export const osintTopicsService = {
         key_indicators: updates.keyIndicators,
         resolution_criteria: updates.resolutionCriteria,
         status: updates.status,
+        // Note: Backend accepts camelCase for these fields (converts to snake_case internally)
         resolutionSummary: updates.resolutionSummary,
         resolutionConfidence: updates.resolutionConfidence,
         lessonsLearned: updates.lessonsLearned,
@@ -296,24 +312,26 @@ export const osintTopicsService = {
       analystNotes?: string;
     }
   ): Promise<TopicSourceLink> {
-    const response = await fetch(
-      `${API_BASE}/api/topics/${topicId}/links/${linkId}`,
-      {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          relevance_score: updates.relevanceScore,
-          confidence_level: updates.confidenceLevel,
-          assumptions: updates.assumptions,
-          analyst_notes: updates.analystNotes,
-        }),
-      }
-    );
+    console.log('[osintTopicsService.updateLink] Calling update with:', { topicId, linkId, updates });
+    const url = `${API_BASE}/api/topics/${topicId}/links/${linkId}`;
+    console.log('[osintTopicsService.updateLink] URL:', url);
+    
+    const response = await fetch(url, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        relevance_score: updates.relevanceScore,
+        confidence_level: updates.confidenceLevel,
+        assumptions: updates.assumptions,
+        analyst_notes: updates.analystNotes,
+      }),
+    });
     
     if (!response.ok) {
       const error = await response.json();
+      console.error('[osintTopicsService.updateLink] Error response:', { status: response.status, error });
       throw new Error(error.error || `Failed to update link: ${response.statusText}`);
     }
     

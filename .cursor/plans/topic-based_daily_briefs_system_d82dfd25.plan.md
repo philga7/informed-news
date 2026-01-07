@@ -696,4 +696,27 @@ jobs:
 ### Brief Category Management
 
 1. User creates category (e.g., "Financial Brief")
+
+<<<<<<< Updated upstream
+
 2. Associates relevant topics (e.g., "Dividend News", "Market Analysis")
+
+=======
+
+2. Associates relevant topics (e.g., "Dividend News", "Market Analysis")
+3. Sets retention policy (e.g., 60 days for financial briefs)
+4. Generates briefs for this category as needed
+
+### Topic-Specific Briefs
+
+1. User selects a topic
+2. Generates brief for that topic
+3. Brief focuses on single topic depth
+4. Uses default 30-day retention
+
+---
+
+## Future Enhancements (Out of Scope)
+
+- Scheduled automatic brief generation
+- Brief templates and customization

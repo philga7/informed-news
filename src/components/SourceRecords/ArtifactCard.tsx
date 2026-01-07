@@ -4,6 +4,10 @@ import type { AnalyticArtifact, SummaryPayload, EntityExtractionPayload, ToneAna
 import { MediaComparisonCard } from '../Topics/MediaComparisonCard';
 import { analysisService } from '../../services/analysis.service';
 
+interface NotesPayload {
+  notes: string;
+}
+
 interface ArtifactCardProps {
   artifact: AnalyticArtifact;
   isNew?: boolean;
@@ -15,13 +19,14 @@ export function ArtifactCard({ artifact, isNew = false, onUpdate, sourceReliabil
   const [isExpanded, setIsExpanded] = useState(isNew);
   const [isUpdating, setIsUpdating] = useState(false);
   const [localArtifact, setLocalArtifact] = useState<AnalyticArtifact>(artifact);
+  const [currentNotes, setCurrentNotes] = useState<string>('');
 
   // Update local artifact when prop changes
   useEffect(() => {
     setLocalArtifact(artifact);
   }, [artifact]);
 
-  const handleReviewToggle = async () => {
+  const handleReviewToggle = async (notesContent?: string) => {
     const newReviewedState = !localArtifact.reviewed;
     
     // Optimistically update local state
@@ -29,7 +34,13 @@ export function ArtifactCard({ artifact, isNew = false, onUpdate, sourceReliabil
     
     try {
       setIsUpdating(true);
-      await analysisService.updateArtifactReview(localArtifact.id, newReviewedState);
+      
+      // For notes artifacts, pass the content when updating review status
+      await analysisService.updateArtifactReview(
+        localArtifact.id, 
+        newReviewedState,
+        localArtifact.type === 'notes' && newReviewedState ? notesContent : undefined
+      );
       // Silently update parent without full reload
       onUpdate?.();
     } catch (error) {
@@ -87,6 +98,8 @@ export function ArtifactCard({ artifact, isNew = false, onUpdate, sourceReliabil
         return 'Network Graph';
       case 'media_comparison':
         return 'Media Comparison';
+      case 'notes':
+        return 'Notes';
       default:
         return type;
     }
@@ -108,6 +121,8 @@ export function ArtifactCard({ artifact, isNew = false, onUpdate, sourceReliabil
         return <KeyFactsDisplay payload={localArtifact.payload as KeyFactsPayload} />;
       case 'media_comparison':
         return <MediaComparisonCard payload={localArtifact.payload as MediaComparisonPayload} />;
+      case 'notes':
+        return <NotesDisplay artifact={localArtifact} onUpdate={onUpdate} onNotesChange={setCurrentNotes} />;
       default:
         return <pre className="text-xs text-stone-400 whitespace-pre-wrap">{JSON.stringify(localArtifact.payload, null, 2)}</pre>;
     }
@@ -156,18 +171,27 @@ export function ArtifactCard({ artifact, isNew = false, onUpdate, sourceReliabil
 
           {/* Footer actions */}
           <div className="flex items-center justify-between pt-4 border-t border-stone-700">
-            <label className="flex items-center gap-2 cursor-pointer group">
-              <input
-                type="checkbox"
-                checked={localArtifact.reviewed}
-                onChange={handleReviewToggle}
-                disabled={isUpdating}
-                className="w-4 h-4 rounded border-stone-600 text-accent focus:ring-accent focus:ring-offset-stone-900"
+            {localArtifact.type === 'notes' ? (
+              <NotesReviewCheckbox
+                artifact={localArtifact}
+                isUpdating={isUpdating}
+                onReviewToggle={handleReviewToggle}
+                currentNotes={currentNotes}
               />
-              <span className="text-sm text-stone-400 group-hover:text-stone-300 transition-colors duration-200">
-                Reviewed and accepted
-              </span>
-            </label>
+            ) : (
+              <label className="flex items-center gap-2 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={localArtifact.reviewed}
+                  onChange={() => handleReviewToggle()}
+                  disabled={isUpdating}
+                  className="w-4 h-4 rounded border-stone-600 text-accent focus:ring-accent focus:ring-offset-stone-900"
+                />
+                <span className="text-sm text-stone-400 group-hover:text-stone-300 transition-colors duration-200">
+                  Reviewed and accepted
+                </span>
+              </label>
+            )}
 
             <button
               onClick={handleDelete}
@@ -184,10 +208,145 @@ export function ArtifactCard({ artifact, isNew = false, onUpdate, sourceReliabil
   );
 }
 
+// Notes Display Component with Markdown Editor
+function NotesDisplay({ 
+  artifact, 
+  onUpdate,
+  onNotesChange,
+}: { 
+  artifact: AnalyticArtifact; 
+  onUpdate?: () => void;
+  onNotesChange?: (notes: string) => void;
+}) {
+  const [notes, setNotes] = useState<string>('');
+  const [isSaving, setIsSaving] = useState(false);
+  const isReviewed = artifact.reviewed;
+
+  useEffect(() => {
+    const payload = artifact.payload as NotesPayload;
+    const savedNotes = payload?.notes || '';
+    setNotes(savedNotes);
+    // Notify parent of current notes
+    onNotesChange?.(savedNotes);
+  }, [artifact, onNotesChange]);
+
+  // Update parent when notes change
+  useEffect(() => {
+    onNotesChange?.(notes);
+  }, [notes, onNotesChange]);
+
+  const handleSave = async () => {
+    if (!notes.trim()) {
+      alert('Notes cannot be empty');
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      await analysisService.updateNotes(artifact.id, notes);
+      onUpdate?.();
+    } catch (error) {
+      console.error('Error saving notes:', error);
+      alert('Failed to save notes');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      {isReviewed ? (
+        // Read-only display for reviewed notes
+        <div className="w-full px-3 py-2 bg-stone-800 border border-stone-600 rounded-lg text-stone-100 font-mono text-sm min-h-[200px] whitespace-pre-wrap">
+          {notes || <span className="text-stone-500 italic">No notes were added before review.</span>}
+        </div>
+      ) : (
+        // Editable textarea for unreviewed notes
+        <textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          rows={12}
+          className="w-full px-3 py-2 bg-stone-800 border border-stone-700 rounded-lg text-stone-100 resize-none font-mono text-sm focus:outline-none focus:border-blue-500"
+          placeholder="Enter your notes in Markdown format..."
+        />
+      )}
+      <div className="flex items-center justify-between">
+        <span className="text-xs text-stone-500">{notes.length} characters</span>
+        {!isReviewed && notes !== (artifact.payload as NotesPayload)?.notes && (
+          <button
+            onClick={handleSave}
+            disabled={isSaving || !notes.trim()}
+            className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isSaving ? 'Saving...' : 'Save Notes'}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Notes Review Checkbox Component (handles saving on review)
+function NotesReviewCheckbox({
+  artifact,
+  isUpdating,
+  onReviewToggle,
+  currentNotes,
+}: {
+  artifact: AnalyticArtifact;
+  isUpdating: boolean;
+  onReviewToggle: (notesContent?: string) => void;
+  currentNotes?: string;
+}) {
+  const payload = artifact.payload as NotesPayload;
+  // Use current notes from state if available, otherwise fall back to payload
+  const notes = currentNotes !== undefined ? currentNotes : (payload?.notes || '');
+
+  const handleChange = () => {
+    // When checking "Reviewed and accepted", save the notes content
+    // Use current notes from textarea state, not just saved payload
+    if (!artifact.reviewed && notes.trim()) {
+      onReviewToggle(notes);
+    } else {
+      onReviewToggle();
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-2">
+      <label className="flex items-center gap-2 cursor-pointer group">
+        <input
+          type="checkbox"
+          checked={artifact.reviewed}
+          onChange={handleChange}
+          disabled={isUpdating}
+          className="w-4 h-4 rounded border-stone-600 text-accent focus:ring-accent focus:ring-offset-stone-900"
+        />
+        <span className="text-sm text-stone-400 group-hover:text-stone-300 transition-colors duration-200">
+          Reviewed and accepted
+        </span>
+      </label>
+      {artifact.reviewed && (
+        <span className="text-xs text-amber-400 ml-2">
+          Consider rerunning analysis to incorporate these notes
+        </span>
+      )}
+    </div>
+  );
+}
+
 // Summary Display Component
 function SummaryDisplay({ payload }: { payload: SummaryPayload }) {
   return (
     <div className="space-y-3">
+      {payload.warning && (
+        <div className="bg-amber-900/20 border border-amber-800/50 rounded-lg p-3 mb-3">
+          <p className="text-xs text-amber-400 flex items-start gap-2">
+            <span className="mt-0.5">⚠</span>
+            <span>{payload.warning}</span>
+          </p>
+        </div>
+      )}
       <div>
         <h5 className="text-xs font-semibold text-stone-400 uppercase mb-1">Overview</h5>
         <p className="text-sm text-stone-300 leading-relaxed">{payload.summary}</p>
@@ -233,6 +392,14 @@ function EntityDisplay({ payload }: { payload: EntityExtractionPayload }) {
 
   return (
     <div className="space-y-4">
+      {payload.warning && (
+        <div className="bg-amber-900/20 border border-amber-800/50 rounded-lg p-3 mb-3">
+          <p className="text-xs text-amber-400 flex items-start gap-2">
+            <span className="mt-0.5">⚠</span>
+            <span>{payload.warning}</span>
+          </p>
+        </div>
+      )}
       {renderEntityGroup('People', payload.people)}
       {renderEntityGroup('Organizations', payload.organizations)}
       {renderEntityGroup('Locations', payload.locations)}
@@ -260,6 +427,14 @@ function KeyFactsDisplay({ payload }: { payload: KeyFactsPayload }) {
 
   return (
     <div className="space-y-3">
+      {payload.warning && (
+        <div className="bg-amber-900/20 border border-amber-800/50 rounded-lg p-3 mb-3">
+          <p className="text-xs text-amber-400 flex items-start gap-2">
+            <span className="mt-0.5">⚠</span>
+            <span>{payload.warning}</span>
+          </p>
+        </div>
+      )}
       {payload.facts && payload.facts.length > 0 ? (
         <ul className="space-y-3">
           {payload.facts.map((fact, index) => (
@@ -329,6 +504,26 @@ function TopicSummaryDisplay({ payload }: { payload: TopicSummaryPayload }) {
         </div>
       )}
 
+      {payload.corroboratedClaims && payload.corroboratedClaims.length > 0 && (
+        <div>
+          <h5 className="text-xs font-semibold text-green-400 uppercase mb-2">✓ Corroborated Claims</h5>
+          <p className="text-xs text-stone-400 mb-2">
+            The following analysis or claims are mentioned by multiple sources, indicating corroboration:
+          </p>
+          <ul className="space-y-3">
+            {payload.corroboratedClaims.map((item, index) => (
+              <li key={index} className="p-3 bg-green-900/20 border border-green-800/50 rounded-lg">
+                <p className="text-sm text-green-300 font-medium mb-1.5">{item.claim}</p>
+                <div className="flex items-center gap-2 text-xs text-green-400/80">
+                  <span className="font-medium">Mentioned by {item.sourceCount} source{item.sourceCount !== 1 ? 's' : ''}:</span>
+                  <span className="text-green-300">{item.sources.join(', ')}</span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {payload.conflictingPerspectives && payload.conflictingPerspectives.length > 0 && (
         <div>
           <h5 className="text-xs font-semibold text-stone-400 uppercase mb-2">Conflicting Perspectives</h5>
@@ -368,6 +563,28 @@ function TopicSummaryDisplay({ payload }: { payload: TopicSummaryPayload }) {
               </li>
             ))}
           </ul>
+        </div>
+      )}
+
+      {payload.unreviewedRecords && payload.unreviewedRecords.length > 0 && (
+        <div>
+          <h5 className="text-xs font-semibold text-amber-400 uppercase mb-2">⚠ Unreviewed Source Records</h5>
+          <div className="bg-amber-900/20 border border-amber-800/50 rounded-lg p-3 mb-3">
+            <p className="text-xs text-amber-300 mb-2">
+              The following source records are linked to this topic but were excluded from analysis because they have no reviewed artifacts:
+            </p>
+            <ul className="space-y-2">
+              {payload.unreviewedRecords.map((record, index) => (
+                <li key={index} className="text-xs text-amber-200">
+                  <span className="font-medium">"{record.title}"</span> from <span className="font-medium">{record.sourceName}</span>
+                  <p className="text-amber-400/80 mt-0.5 ml-4">{record.note}</p>
+                </li>
+              ))}
+            </ul>
+            <p className="text-xs text-amber-300 mt-3">
+              Please review artifacts for these records and re-run the topic summary to include them.
+            </p>
+          </div>
         </div>
       )}
 
@@ -457,6 +674,14 @@ function ToneDisplay({ payload, sourceReliability }: { payload: ToneAnalysisPayl
 
   return (
     <div className="space-y-4">
+      {payload.warning && (
+        <div className="bg-amber-900/20 border border-amber-800/50 rounded-lg p-3 mb-3">
+          <p className="text-xs text-amber-400 flex items-start gap-2">
+            <span className="mt-0.5">⚠</span>
+            <span>{payload.warning}</span>
+          </p>
+        </div>
+      )}
       <div className="flex flex-wrap gap-3">
         <div>
           <span className="text-xs text-stone-400 block mb-1">Overall Tone</span>

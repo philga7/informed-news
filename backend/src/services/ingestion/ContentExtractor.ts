@@ -46,33 +46,72 @@ export interface ExtractedContent {
   headings: string[]; // NEW: Extracted headings from HTML
 }
 
+export interface ExtractionResult {
+  content: ExtractedContent | null;
+  errorCode?: number; // HTTP status code if extraction failed (e.g., 403, 404)
+}
+
 export class ContentExtractor {
   private timeout: number = 15000; // 15 seconds
   private maxContentLength: number = 100000; // 100KB max
 
   /**
    * Extract clean article content from a URL
+   * Returns extraction result with error code if extraction failed
    */
-  async extractFromUrl(url: string): Promise<ExtractedContent | null> {
+  async extractFromUrl(url: string): Promise<ExtractionResult> {
     try {
-      // Fetch the HTML
-      const { data: html } = await axios.get(url, {
+      // Fetch the HTML with better headers to avoid some bot detection
+      const response = await axios.get(url, {
         headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; NewsAggregatorBot/1.0)',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.5',
+          'Accept-Encoding': 'gzip, deflate, br',
+          'Connection': 'keep-alive',
+          'Upgrade-Insecure-Requests': '1',
         },
         timeout: this.timeout,
         maxContentLength: this.maxContentLength,
+        validateStatus: (status) => status < 500, // Don't throw on 403, 404, etc.
       });
 
+      // Check for error status codes
+      if (response.status === 403) {
+        console.warn(`Content extraction blocked for ${url}: HTTP 403 - Site may require authentication or block automated access`);
+        return { content: null, errorCode: 403 };
+      }
+      if (response.status === 404) {
+        console.warn(`Content extraction failed for ${url}: HTTP 404 - Page not found`);
+        return { content: null, errorCode: 404 };
+      }
+      if (response.status >= 400) {
+        console.warn(`Content extraction failed for ${url}: HTTP ${response.status}`);
+        return { content: null, errorCode: response.status };
+      }
+
       // Parse with Readability
-      return await this.extractFromHtml(html, url);
+      const extracted = await this.extractFromHtml(response.data, url);
+      return { content: extracted };
     } catch (error) {
       if (axios.isAxiosError(error)) {
-        console.warn(`Content extraction failed for ${url}:`, error.message);
+        const statusCode = error.response?.status;
+        if (statusCode === 403) {
+          console.warn(`Content extraction blocked for ${url}: HTTP 403 - Site may require authentication or block automated access`);
+          return { content: null, errorCode: 403 };
+        } else if (statusCode === 404) {
+          console.warn(`Content extraction failed for ${url}: HTTP 404 - Page not found`);
+          return { content: null, errorCode: 404 };
+        } else if (statusCode) {
+          console.warn(`Content extraction failed for ${url}: HTTP ${statusCode}`);
+          return { content: null, errorCode: statusCode };
+        } else {
+          console.warn(`Content extraction failed for ${url}:`, error.message);
+        }
       } else {
         console.warn(`Content extraction error for ${url}:`, error);
       }
-      return null;
+      return { content: null };
     }
   }
 
