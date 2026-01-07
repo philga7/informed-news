@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Clock, Target, Link as LinkIcon, AlertCircle, CheckCircle } from 'lucide-react';
+import { Clock, Target, Link as LinkIcon, AlertCircle, CheckCircle, Archive, Trash2 } from 'lucide-react';
 import { useOrganization } from '../../context/OrganizationContext';
+import { useToast } from '../../context/ToastContext';
 import { sourceRecordsService } from '../../services/sourceRecords.service';
+import { retentionService } from '../../services/retention.service';
 import { osintTopicsService } from '../../services/osintTopics.service';
 import type { SourceRecord, OsintTopic } from '../../types/osint';
 
@@ -28,10 +30,12 @@ interface TopicWithCount extends OsintTopic {
 export function DailyReview() {
   const { currentOrganization } = useOrganization();
   const navigate = useNavigate();
+  const toast = useToast();
   const [unlinkedRecords, setUnlinkedRecords] = useState<SourceRecordWithDetails[]>([]);
   const [activeTopics, setActiveTopics] = useState<TopicWithCount[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [processingRecordId, setProcessingRecordId] = useState<string | null>(null);
 
   useEffect(() => {
     if (currentOrganization) {
@@ -99,6 +103,67 @@ export function DailyReview() {
     }
 
     return { status: 'fresh', message: `Updated ${daysSinceUpdate} days ago` };
+  };
+
+  const handleArchive = async (recordId: string, recordTitle: string) => {
+    if (!window.confirm(`Archive "${recordTitle}"? This can be undone.`)) {
+      return;
+    }
+
+    setProcessingRecordId(recordId);
+    try {
+      await sourceRecordsService.archive(recordId);
+      
+      // Show toast with undo
+      toast.showArchive(
+        `"${recordTitle}" archived`,
+        async () => {
+          try {
+            await retentionService.undoArchive(recordId);
+            toast.showSuccess('Record restored');
+            await loadDailyData();
+          } catch (err) {
+            toast.showError('Failed to restore record');
+          }
+        }
+      );
+
+      // Remove from list
+      setUnlinkedRecords((prev) => prev.filter((r) => r.id !== recordId));
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to archive record';
+      if (errorMessage.includes('protected')) {
+        alert('Cannot archive this record. It is linked to topics, has artifacts, or is linked to watch items.');
+      } else {
+        toast.showError(errorMessage);
+      }
+    } finally {
+      setProcessingRecordId(null);
+    }
+  };
+
+  const handleDelete = async (recordId: string, recordTitle: string) => {
+    if (!window.confirm(`Permanently delete "${recordTitle}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    setProcessingRecordId(recordId);
+    try {
+      await sourceRecordsService.delete(recordId);
+      toast.showDelete(`"${recordTitle}" deleted`);
+      
+      // Remove from list
+      setUnlinkedRecords((prev) => prev.filter((r) => r.id !== recordId));
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to delete record';
+      if (errorMessage.includes('protected')) {
+        alert('Cannot delete this record. It is linked to topics, has artifacts, or is linked to watch items.');
+      } else {
+        toast.showError(errorMessage);
+      }
+    } finally {
+      setProcessingRecordId(null);
+    }
   };
 
   if (isLoading) {
@@ -171,15 +236,39 @@ export function DailyReview() {
                       <span>{formatDate(record.publishedAt)}</span>
                     </div>
                   </div>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      navigate(`/source-records/${record.id}`);
-                    }}
-                    className="px-3 py-1 bg-accent hover:bg-accent-hover text-white text-sm rounded transition-colors whitespace-nowrap"
-                  >
-                    Link
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/source-records/${record.id}`);
+                      }}
+                      className="px-3 py-1 bg-accent hover:bg-accent-hover text-white text-sm rounded transition-colors whitespace-nowrap"
+                    >
+                      Link
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleArchive(record.id, record.title);
+                      }}
+                      disabled={processingRecordId === record.id}
+                      className="p-1.5 text-blue-400 hover:text-blue-300 hover:bg-blue-900/30 rounded transition-colors disabled:opacity-50"
+                      title="Archive"
+                    >
+                      <Archive className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDelete(record.id, record.title);
+                      }}
+                      disabled={processingRecordId === record.id}
+                      className="p-1.5 text-red-400 hover:text-red-300 hover:bg-red-900/30 rounded transition-colors disabled:opacity-50"
+                      title="Delete"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}

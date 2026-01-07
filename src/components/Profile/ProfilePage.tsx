@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Building2, Users, Plus, Edit2, Trash2, UserPlus, Shield, Check, X, Loader2 } from 'lucide-react';
+import { Building2, Users, Plus, Edit2, Trash2, Shield, Check, X, Loader2 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useOrganization } from '../../context/OrganizationContext';
 import { organizationService, authService } from '../../services';

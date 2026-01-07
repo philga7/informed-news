@@ -47,7 +47,6 @@ export class RetentionPolicyService {
    * - Linked to any topic
    * - Has any artifacts
    * - Linked to any watch item
-   * - Not dismissed (scan_status != 'dismissed')
    */
   async isRecordProtected(recordId: string): Promise<boolean> {
     try {
@@ -67,6 +66,86 @@ export class RetentionPolicyService {
       console.error('[RetentionPolicyService] Exception checking protection:', err);
       // Default to protected on error
       return true;
+    }
+  }
+
+  /**
+   * Check if a record can be archived
+   * Can archive if:
+   * - Not linked to any active (non-archived) topics
+   * - Not linked to any watch items
+   * - Has no artifacts
+   * If linked only to archived topics, archiving is allowed
+   */
+  async canArchiveRecord(recordId: string): Promise<boolean> {
+    try {
+      // Use the database function for consistency
+      const { data, error } = await (supabase as any).rpc('can_archive_record', {
+        record_id: recordId,
+      }) as { data: boolean | null; error: unknown };
+
+      if (error) {
+        console.error('[RetentionPolicyService] Error checking archive eligibility:', error);
+        // If function fails, default to not archivable (safe side)
+        return false;
+      }
+
+      return data === true;
+    } catch (err) {
+      console.error('[RetentionPolicyService] Exception checking archive eligibility:', err);
+      // Default to not archivable on error
+      return false;
+    }
+  }
+
+  /**
+   * Get detailed reasons why a record cannot be archived
+   * Returns information about active topic links, artifacts, and watch item links
+   */
+  async getArchiveBlockingReasons(recordId: string): Promise<{
+    canArchive: boolean;
+    hasActiveTopicLinks: boolean;
+    hasArtifacts: boolean;
+    hasWatchItemLinks: boolean;
+    activeTopicNames: string[];
+    artifactCount: number;
+    watchItemCount: number;
+  } | null> {
+    try {
+      const { data, error } = await (supabase as any).rpc('get_archive_blocking_reasons', {
+        record_id: recordId,
+      }) as { data: Array<{
+        can_archive: boolean;
+        has_active_topic_links: boolean;
+        has_artifacts: boolean;
+        has_watch_item_links: boolean;
+        active_topic_names: string[];
+        artifact_count: number;
+        watch_item_count: number;
+      }> | null; error: unknown };
+
+      if (error) {
+        console.error('[RetentionPolicyService] Error getting archive blocking reasons:', error);
+        return null;
+      }
+
+      if (!data || data.length === 0) {
+        return null;
+      }
+
+      const result = data[0];
+      return {
+        canArchive: result.can_archive,
+        hasActiveTopicLinks: result.has_active_topic_links,
+        hasArtifacts: result.has_artifacts,
+        hasWatchItemLinks: result.has_watch_item_links,
+        activeTopicNames: result.active_topic_names || [],
+        artifactCount: result.artifact_count || 0,
+        watchItemCount: result.watch_item_count || 0,
+      };
+    } catch (err) {
+      console.error('[RetentionPolicyService] Exception getting archive blocking reasons:', err);
+      return null;
     }
   }
 
@@ -134,7 +213,7 @@ export class RetentionPolicyService {
   /**
    * Archive a record (move to archived_source_records)
    */
-  async archiveRecord(recordId: string, reason: string): Promise<void> {
+  async archiveRecord(recordId: string, reason: string, userId?: string): Promise<void> {
     try {
       // Fetch the record
       const { data: record, error: fetchError } = await supabase
@@ -165,6 +244,13 @@ export class RetentionPolicyService {
       if (fetchError) throw fetchError;
       if (!record) throw new Error(`Record ${recordId} not found`);
 
+      // Fetch content_hash from source_records (it may not be in the select *)
+      const { data: recordWithHash } = await supabase
+        .from('source_records')
+        .select('content_hash')
+        .eq('id', recordId)
+        .single() as { data: { content_hash: string | null } | null };
+
       // Insert into archived_source_records
       // Note: archived_source_records table is not in database types, so we use type assertion
       const { error: archiveError } = await (supabase as any)
@@ -188,6 +274,7 @@ export class RetentionPolicyService {
           scan_status: record.scan_status || null,
           reviewed_at: record.reviewed_at || null,
           reviewed_by: record.reviewed_by || null,
+          content_hash: recordWithHash?.content_hash || null, // Copy content_hash to prevent re-ingestion
           archived_at: new Date().toISOString(),
           archive_reason: reason,
         } as any);
@@ -203,7 +290,7 @@ export class RetentionPolicyService {
       if (deleteError) throw deleteError;
 
       // Audit log
-      await auditService.logRecordArchived(recordId, reason);
+      await auditService.logRecordArchived(recordId, reason, userId);
     } catch (err) {
       console.error('[RetentionPolicyService] Error archiving record:', err);
       throw err;
@@ -213,7 +300,7 @@ export class RetentionPolicyService {
   /**
    * Delete a record permanently
    */
-  async deleteRecord(recordId: string, reason: string = 'retention_policy'): Promise<void> {
+  async deleteRecord(recordId: string, reason: string = 'retention_policy', userId?: string): Promise<void> {
     try {
       const { error } = await supabase
         .from('source_records')
@@ -223,7 +310,7 @@ export class RetentionPolicyService {
       if (error) throw error;
 
       // Audit log
-      await auditService.logRecordDeleted(recordId, reason);
+      await auditService.logRecordDeleted(recordId, reason, userId);
     } catch (err) {
       console.error('[RetentionPolicyService] Error deleting record:', err);
       throw err;

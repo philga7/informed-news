@@ -204,11 +204,12 @@ export function OsintSourcesTable({ sources, onUpdate, onDelete, onRefresh }: Os
                   <div className="flex items-start gap-2">
                     {isStale(source) && <StaleWarningTooltip source={source} />}
                     {source.enabled === false && (
-                      <PowerOff
-                        size={16}
-                        className="text-stone-500 mt-1 flex-shrink-0"
-                        title="Feed fetching is disabled"
-                      />
+                      <div title="Feed fetching is disabled">
+                        <PowerOff
+                          size={16}
+                          className="text-stone-500 mt-1 flex-shrink-0"
+                        />
+                      </div>
                     )}
                     <div className="flex flex-col">
                       <p className={`font-medium ${source.enabled === false ? 'text-stone-500' : 'text-stone-200'}`}>

@@ -82,11 +82,20 @@ export function KeyboardShortcutsModal({ onClose }: KeyboardShortcutsModalProps)
                 </div>
                 <div className="flex items-center justify-between py-2">
                   <div>
-                    <span className="text-stone-300">Dismiss</span>
-                    <p className="text-xs text-stone-500">Mark as reviewed and remove from scan queue</p>
+                    <span className="text-stone-300">Archive</span>
+                    <p className="text-xs text-stone-500">Soft delete (can be undone)</p>
                   </div>
-                  <kbd className="px-3 py-1.5 bg-stone-800 border border-stone-700 rounded text-sm font-mono text-stone-300">
-                    X
+                  <kbd className="px-3 py-1.5 bg-blue-900/50 border border-blue-800 rounded text-sm font-mono text-blue-300">
+                    A
+                  </kbd>
+                </div>
+                <div className="flex items-center justify-between py-2">
+                  <div>
+                    <span className="text-stone-300">Delete</span>
+                    <p className="text-xs text-stone-500">Permanent removal</p>
+                  </div>
+                  <kbd className="px-3 py-1.5 bg-red-900/50 border border-red-800 rounded text-sm font-mono text-red-300">
+                    D
                   </kbd>
                 </div>
               </div>

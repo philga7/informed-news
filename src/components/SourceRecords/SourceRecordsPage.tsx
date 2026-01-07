@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FileText, Search, Filter, RefreshCw, Plus } from 'lucide-react';
+import { FileText, Search, Filter, RefreshCw, Plus, Archive, Trash2 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useOrganization } from '../../context/OrganizationContext';
+import { useToast } from '../../context/ToastContext';
 import { sourceRecordsService } from '../../services';
+import { retentionService } from '../../services/retention.service';
 import { EmptyState } from '../UI/EmptyState';
 import { LoadingSpinner } from '../UI/LoadingSpinner';
 import { SourceRecordFilters } from './SourceRecordFilters';
@@ -11,8 +13,9 @@ import { ManualArticleInputModal } from './ManualArticleInputModal';
 import { formatSourceNameWithDomain } from '../../utils/urlUtils';
 
 export function SourceRecordsPage() {
-  const { user } = useAuth();
+  const { user: _user } = useAuth();
   const { currentOrganization } = useOrganization();
+  const toast = useToast();
   const navigate = useNavigate();
   const [records, setRecords] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -21,6 +24,7 @@ export function SourceRecordsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [showManualInput, setShowManualInput] = useState(false);
+  const [processingRecordId, setProcessingRecordId] = useState<string | null>(null);
   const [filters, setFilters] = useState({
     sourceId: '',
     linkedStatus: 'all' as 'linked' | 'unlinked' | 'all',
@@ -131,6 +135,67 @@ export function SourceRecordsPage() {
         return 'text-orange-400';
       default:
         return 'text-stone-400';
+    }
+  };
+
+  const handleArchive = async (recordId: string, recordTitle: string) => {
+    if (!window.confirm(`Archive "${recordTitle}"? This can be undone.`)) {
+      return;
+    }
+
+    setProcessingRecordId(recordId);
+    try {
+      await sourceRecordsService.archive(recordId);
+      
+      // Show toast with undo
+      toast.showArchive(
+        `"${recordTitle}" archived`,
+        async () => {
+          try {
+            await retentionService.undoArchive(recordId);
+            toast.showSuccess('Record restored');
+            await loadRecords(false, true);
+          } catch (err) {
+            toast.showError('Failed to restore record');
+          }
+        }
+      );
+
+      // Remove from list
+      setRecords((prev) => prev.filter((r) => r.id !== recordId));
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to archive record';
+      if (errorMessage.includes('protected')) {
+        alert('Cannot archive this record. It is linked to topics, has artifacts, or is linked to watch items.');
+      } else {
+        toast.showError(errorMessage);
+      }
+    } finally {
+      setProcessingRecordId(null);
+    }
+  };
+
+  const handleDelete = async (recordId: string, recordTitle: string) => {
+    if (!window.confirm(`Permanently delete "${recordTitle}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    setProcessingRecordId(recordId);
+    try {
+      await sourceRecordsService.delete(recordId);
+      toast.showDelete(`"${recordTitle}" deleted`);
+      
+      // Remove from list
+      setRecords((prev) => prev.filter((r) => r.id !== recordId));
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to delete record';
+      if (errorMessage.includes('protected')) {
+        alert('Cannot delete this record. It is linked to topics, has artifacts, or is linked to watch items.');
+      } else {
+        toast.showError(errorMessage);
+      }
+    } finally {
+      setProcessingRecordId(null);
     }
   };
 
@@ -260,21 +325,29 @@ export function SourceRecordsPage() {
                       <th className="text-left py-3 px-4 text-stone-400 text-sm font-medium">
                         Linked Topics
                       </th>
+                      <th className="text-left py-3 px-4 text-stone-400 text-sm font-medium">
+                        Actions
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {records.map((record) => (
                       <tr
                         key={record.id}
-                        onClick={() => handleRecordClick(record.id)}
-                        className="border-b border-stone-800 hover:bg-stone-800/50 cursor-pointer transition-colors duration-250"
+                        className="border-b border-stone-800 hover:bg-stone-800/50 transition-colors duration-250"
                       >
-                        <td className="py-4 px-4">
+                        <td 
+                          className="py-4 px-4 cursor-pointer"
+                          onClick={() => handleRecordClick(record.id)}
+                        >
                           <p className="text-stone-200 font-medium line-clamp-2">
                             {record.title}
                           </p>
                         </td>
-                        <td className="py-4 px-4">
+                        <td 
+                          className="py-4 px-4 cursor-pointer"
+                          onClick={() => handleRecordClick(record.id)}
+                        >
                           <div>
                             <p className="text-stone-300 text-sm">
                               {formatSourceNameWithDomain(
@@ -292,10 +365,16 @@ export function SourceRecordsPage() {
                             </p>
                           </div>
                         </td>
-                        <td className="py-4 px-4 text-stone-400 text-sm">
+                        <td 
+                          className="py-4 px-4 text-stone-400 text-sm cursor-pointer"
+                          onClick={() => handleRecordClick(record.id)}
+                        >
                           {formatDate(record.publishedAt)}
                         </td>
-                        <td className="py-4 px-4">
+                        <td 
+                          className="py-4 px-4 cursor-pointer"
+                          onClick={() => handleRecordClick(record.id)}
+                        >
                           {record.topic_source_links && record.topic_source_links.length > 0 ? (
                             <div className="flex flex-wrap gap-1">
                               {record.topic_source_links.slice(0, 2).map((link: any) => (
@@ -315,6 +394,32 @@ export function SourceRecordsPage() {
                           ) : (
                             <span className="text-stone-500 text-sm">Unlinked</span>
                           )}
+                        </td>
+                        <td className="py-4 px-4">
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleArchive(record.id, record.title);
+                              }}
+                              disabled={processingRecordId === record.id}
+                              className="p-1.5 text-blue-400 hover:text-blue-300 hover:bg-blue-900/30 rounded transition-colors disabled:opacity-50"
+                              title="Archive"
+                            >
+                              <Archive className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDelete(record.id, record.title);
+                              }}
+                              disabled={processingRecordId === record.id}
+                              className="p-1.5 text-red-400 hover:text-red-300 hover:bg-red-900/30 rounded transition-colors disabled:opacity-50"
+                              title="Delete"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}

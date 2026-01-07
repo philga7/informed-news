@@ -127,7 +127,6 @@ export function TopicTimelineChart({ timeline, bucket, onBucketChange }: TopicTi
       x: {
         grid: {
           color: 'rgba(68, 64, 60, 0.3)', // stone-700 with opacity
-          drawBorder: false,
         },
         ticks: {
           color: '#a8a29e', // stone-400
@@ -139,7 +138,6 @@ export function TopicTimelineChart({ timeline, bucket, onBucketChange }: TopicTi
         beginAtZero: true,
         grid: {
           color: 'rgba(68, 64, 60, 0.3)', // stone-700 with opacity
-          drawBorder: false,
         },
         ticks: {
           color: '#a8a29e', // stone-400

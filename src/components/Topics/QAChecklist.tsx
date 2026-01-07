@@ -6,7 +6,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { CheckCircle2, AlertCircle, XCircle } from 'lucide-react';
+import { CheckCircle2, AlertCircle } from 'lucide-react';
 import { qaService } from '../../services';
 import { LoadingSpinner } from '../UI/LoadingSpinner';
 import type { QACompleteness } from '../../types/osint';

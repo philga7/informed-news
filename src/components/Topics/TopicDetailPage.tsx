@@ -30,7 +30,7 @@ import type { TopicTimeline } from '../../types/osint';
 export function TopicDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user: _user } = useAuth();
   const { currentOrganization } = useOrganization();
   const [topic, setTopic] = useState<any>(null);
   const [timeline, setTimeline] = useState<TopicTimeline | null>(null);
@@ -132,7 +132,7 @@ export function TopicDetailPage() {
     if (!linkedRecords || linkedRecords.length === 0) return false;
     const mediaTypes = new Set(
       linkedRecords
-        .map(link => (link.source_records as any)?.media_type || 'article')
+        .map((link: any) => (link.source_records as any)?.media_type || 'article')
         .filter(Boolean)
     );
     return mediaTypes.size >= 2;
@@ -260,7 +260,7 @@ export function TopicDetailPage() {
 
   const linkedRecords = topic.topic_source_links || [];
   const editingLink = editingLinkId 
-    ? linkedRecords.find(link => link.id === editingLinkId) 
+    ? linkedRecords.find((link: any) => link.id === editingLinkId) 
     : null;
 
   return (

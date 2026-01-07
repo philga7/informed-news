@@ -112,5 +112,3 @@ Configure in Vercel Dashboard:
 | File | Changes ||------|---------|| `package.json` | Add `vercel-build` script, add `@vercel/node` dev dependency || `src/utils/apiClient.ts` | Use relative URL in production |
 
 ## Local Development
-
-Local development remains unchanged:

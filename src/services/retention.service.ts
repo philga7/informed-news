@@ -172,5 +172,12 @@ export const retentionService = {
       throw new Error(`Failed to restore record: ${response.statusText}`);
     }
   },
+
+  /**
+   * Restore an archived record (alias for restore, for consistency)
+   */
+  async undoArchive(recordId: string): Promise<void> {
+    return this.restore(recordId);
+  },
 };
 

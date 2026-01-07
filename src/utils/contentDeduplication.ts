@@ -38,7 +38,9 @@ export function deduplicateContent(content: string | null | undefined): string {
     if (seen.size > 3) {
       // Remove oldest entry (simple FIFO)
       const first = seen.values().next().value;
-      seen.delete(first);
+      if (first) {
+        seen.delete(first);
+      }
     }
 
     deduplicated.push(paragraph);

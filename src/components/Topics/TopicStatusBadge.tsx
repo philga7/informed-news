@@ -23,7 +23,7 @@ export function TopicStatusBadge({ topicId, topicName, currentStatus, onStatusCh
   const [isOpen, setIsOpen] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [showResolutionModal, setShowResolutionModal] = useState(false);
-  const [pendingResolution, setPendingResolution] = useState<{
+  const [_pendingResolution, setPendingResolution] = useState<{
     resolutionSummary: string;
     resolutionConfidence: ResolutionConfidence;
     lessonsLearned?: string;

@@ -167,7 +167,9 @@ router.get('/sources/:sourceId/status', async (req: Request, res: Response) => {
     const totalRecords = stats?.length || 0;
     const compressedCount = stats?.filter((s) => s.content_compressed).length || 0;
     const avgContentLength =
-      stats?.reduce((sum, s) => sum + (s.content_length || 0), 0) / totalRecords || 0;
+      stats && stats.length > 0
+        ? stats.reduce((sum, s) => sum + (s.content_length || 0), 0) / totalRecords
+        : 0;
 
     const contentTypeCounts = {
       full_text: stats?.filter((s) => s.content_type === 'full_text').length || 0,
