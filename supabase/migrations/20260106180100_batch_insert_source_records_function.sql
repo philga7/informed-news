@@ -29,6 +29,16 @@ BEGIN
         CONTINUE;
       END IF;
       
+      -- Check if this content_hash exists in archived_source_records (prevent re-ingestion of archived records)
+      IF EXISTS (
+        SELECT 1 FROM archived_source_records 
+        WHERE content_hash = record_item->>'content_hash'
+      ) THEN
+        -- Skip this record - it was previously archived
+        skipped := skipped + 1;
+        CONTINUE;
+      END IF;
+      
       -- Insert the record with ON CONFLICT handling
       INSERT INTO source_records (
         source_id,
@@ -107,5 +117,5 @@ $$ LANGUAGE plpgsql;
 GRANT EXECUTE ON FUNCTION batch_insert_source_records(jsonb) TO authenticated;
 
 -- Comment for documentation
-COMMENT ON FUNCTION batch_insert_source_records(jsonb) IS 'Efficiently inserts multiple source records, skipping duplicates based on content_hash unique constraint. Returns count of inserted and skipped records, plus array of inserted record IDs for audit logging.';
+COMMENT ON FUNCTION batch_insert_source_records(jsonb) IS 'Efficiently inserts multiple source records, skipping duplicates based on content_hash unique constraint. Also checks archived_source_records to prevent re-ingestion of archived records. Returns count of inserted and skipped records, plus array of inserted record IDs for audit logging.';
 

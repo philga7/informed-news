@@ -3,7 +3,9 @@ import { useSearchParams } from 'react-router-dom';
 import { Filter, RefreshCw, AlertCircle, Clock, CheckCircle, Eye, HelpCircle, Save } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useOrganization } from '../../context/OrganizationContext';
-import { scanService, scanSessionsService } from '../../services';
+import { useToast } from '../../context/ToastContext';
+import { scanService, scanSessionsService, sourceRecordsService } from '../../services';
+import { retentionService } from '../../services/retention.service';
 import { EmptyState } from '../UI/EmptyState';
 import { LoadingSpinner } from '../UI/LoadingSpinner';
 import { ScanItem } from './ScanItem';
@@ -45,6 +47,7 @@ interface ScanRecord {
 export function ScanPage() {
   const { user } = useAuth();
   const { currentOrganization } = useOrganization();
+  const toast = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   
   // State
@@ -61,7 +64,7 @@ export function ScanPage() {
   const [selectedMediaType, setSelectedMediaType] = useState<MediaType | 'all'>(
     (searchParams.get('media_type') as MediaType) || 'all'
   );
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, _setSearchQuery] = useState('');
   
   // Navigation & Selection
   const [selectedRecordIndex, setSelectedRecordIndex] = useState(0);
@@ -82,9 +85,11 @@ export function ScanPage() {
     reviewed: 0,
     linked: 0,
     watchItems: 0,
-    dismissed: 0,
+    archived: 0,
+    deleted: 0,
   });
   const [isSavingSession, setIsSavingSession] = useState(false);
+  const [_processingRecordId, setProcessingRecordId] = useState<string | null>(null);
   
   // Modals
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
@@ -240,11 +245,19 @@ export function ScanPage() {
           }
           break;
         
-        case 'x':
-          // Dismiss
+        case 'a':
+          // Archive
           e.preventDefault();
           if (records[selectedRecordIndex]) {
-            handleDismiss(records[selectedRecordIndex].id);
+            handleArchive(records[selectedRecordIndex].id, records[selectedRecordIndex].title);
+          }
+          break;
+        
+        case 'd':
+          // Delete
+          e.preventDefault();
+          if (records[selectedRecordIndex]) {
+            handleDelete(records[selectedRecordIndex].id, records[selectedRecordIndex].title);
           }
           break;
         
@@ -275,21 +288,78 @@ export function ScanPage() {
     }
   }, [selectedRecordIndex, records]);
 
-  const handleDismiss = async (recordId: string) => {
+  const handleArchive = async (recordId: string, recordTitle: string) => {
+    if (!window.confirm(`Archive "${recordTitle}"? This can be undone.`)) {
+      return;
+    }
+
+    setProcessingRecordId(recordId);
     try {
-      await scanService.dismissRecords([recordId], user?.id);
+      await sourceRecordsService.archive(recordId);
+      
+      // Show toast with undo
+      toast.showArchive(
+        `"${recordTitle}" archived`,
+        async () => {
+          try {
+            await retentionService.undoArchive(recordId);
+            toast.showSuccess('Record restored');
+            await loadRecords(false);
+          } catch (err) {
+            toast.showError('Failed to restore record');
+          }
+        }
+      );
+
       setSessionCounters(prev => ({
         ...prev,
         reviewed: prev.reviewed + 1,
-        dismissed: prev.dismissed + 1,
+        archived: prev.archived + 1,
       }));
+      
       await loadRecords(false);
     } catch (err) {
-      console.error('Error dismissing record:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to archive record';
+      if (errorMessage.includes('protected')) {
+        alert('Cannot archive this record. It is linked to topics, has artifacts, or is linked to watch items.');
+      } else {
+        toast.showError(errorMessage);
+      }
+    } finally {
+      setProcessingRecordId(null);
     }
   };
 
-  const handleLinkToTopic = async (topicId: string) => {
+  const handleDelete = async (recordId: string, recordTitle: string) => {
+    if (!window.confirm(`Permanently delete "${recordTitle}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    setProcessingRecordId(recordId);
+    try {
+      await sourceRecordsService.delete(recordId);
+      toast.showDelete(`"${recordTitle}" deleted`);
+
+      setSessionCounters(prev => ({
+        ...prev,
+        reviewed: prev.reviewed + 1,
+        deleted: prev.deleted + 1,
+      }));
+      
+      await loadRecords(false);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to delete record';
+      if (errorMessage.includes('protected')) {
+        alert('Cannot delete this record. It is linked to topics, has artifacts, or is linked to watch items.');
+      } else {
+        toast.showError(errorMessage);
+      }
+    } finally {
+      setProcessingRecordId(null);
+    }
+  };
+
+  const handleLinkToTopic = async (_topicId: string) => {
     const record = records[selectedRecordIndex];
     if (!record) return;
 
@@ -333,7 +403,8 @@ export function ScanPage() {
           itemsReviewed: sessionCounters.reviewed,
           itemsLinkedToTopics: sessionCounters.linked,
           itemsCreatedWatch: sessionCounters.watchItems,
-          itemsDismissed: sessionCounters.dismissed,
+          itemsArchived: sessionCounters.archived,
+          itemsDeleted: sessionCounters.deleted,
         },
         notes || undefined
       );
@@ -349,7 +420,8 @@ export function ScanPage() {
           reviewed: 0,
           linked: 0,
           watchItems: 0,
-          dismissed: 0,
+          archived: 0,
+          deleted: 0,
         });
       }
     } catch (err) {
@@ -440,6 +512,12 @@ export function ScanPage() {
               <div className="text-blue-400 font-medium">
                 {sessionCounters.watchItems} watch
               </div>
+              <div className="text-purple-400 font-medium">
+                {sessionCounters.archived} archived
+              </div>
+              <div className="text-red-400 font-medium">
+                {sessionCounters.deleted} deleted
+              </div>
             </div>
             
             <button
@@ -483,10 +561,6 @@ export function ScanPage() {
           <div className="flex items-center">
             <span className="text-stone-400">Linked:</span>
             <span className="ml-2 font-semibold text-green-400">{stats.linkedCount}</span>
-          </div>
-          <div className="flex items-center">
-            <span className="text-stone-400">Dismissed:</span>
-            <span className="ml-2 font-semibold text-stone-500">{stats.dismissedCount}</span>
           </div>
         </div>
       </div>
@@ -539,7 +613,8 @@ export function ScanPage() {
                   onToggleExpand={() => setExpandedRecordId(
                     expandedRecordId === record.id ? null : record.id
                   )}
-                  onDismiss={() => handleDismiss(record.id)}
+                  onArchive={() => handleArchive(record.id, record.title)}
+                  onDelete={() => handleDelete(record.id, record.title)}
                   onLinkToTopic={() => {
                     setSelectedRecordIndex(index);
                     setShowLinkToTopicModal(true);
@@ -559,7 +634,8 @@ export function ScanPage() {
           selectedRecord={records[selectedRecordIndex] || null}
           onLinkToTopic={() => setShowLinkToTopicModal(true)}
           onCreateWatchItem={() => setShowCreateWatchItemModal(true)}
-          onDismiss={() => records[selectedRecordIndex] && handleDismiss(records[selectedRecordIndex].id)}
+          onArchive={() => records[selectedRecordIndex] && handleArchive(records[selectedRecordIndex].id, records[selectedRecordIndex].title)}
+          onDelete={() => records[selectedRecordIndex] && handleDelete(records[selectedRecordIndex].id, records[selectedRecordIndex].title)}
         />
       </div>
 

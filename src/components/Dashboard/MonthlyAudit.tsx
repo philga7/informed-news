@@ -26,7 +26,7 @@ interface TopicMetrics {
 export function MonthlyAudit() {
   const { currentOrganization } = useOrganization();
   const navigate = useNavigate();
-  const [archivedTopics, setArchivedTopics] = useState<TopicWithCount[]>([]);
+  const [_archivedTopics, setArchivedTopics] = useState<TopicWithCount[]>([]);
   const [resolvedTopics, setResolvedTopics] = useState<TopicWithCount[]>([]);
   const [sourceValueReport, setSourceValueReport] = useState<SourceValueReport | null>(null);
   const [topicMetrics, setTopicMetrics] = useState<TopicMetrics | null>(null);

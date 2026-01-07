@@ -220,8 +220,8 @@ export function CorroborationMatrix({ topicId }: CorroborationMatrixProps) {
               <div>
                 <div className="text-sm font-medium text-stone-300 mb-1">
                   Evidence from {formatSourceNameWithDomain(
-                    hoveredData.sourceName,
-                    hoveredData.sourceUrl || undefined,
+                    hoveredData.sourceName || 'Unknown Source',
+                    hoveredData.sourceUrl as string | null | undefined,
                     hoveredData.scrapeExternalUrl || false
                   )}:
                 </div>

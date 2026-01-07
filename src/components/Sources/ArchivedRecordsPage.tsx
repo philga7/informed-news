@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Archive, ArrowLeft, RotateCcw, Search, Filter } from 'lucide-react';
+import { Archive, ArrowLeft, RotateCcw, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useOrganization } from '../../context/OrganizationContext';
 import { retentionService, type ArchivedRecord } from '../../services/retention.service';
@@ -13,7 +13,7 @@ export function ArchivedRecordsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedSourceId, setSelectedSourceId] = useState<string>('');
+  const [selectedSourceId, _setSelectedSourceId] = useState<string>('');
   const [selectedReason, setSelectedReason] = useState<string>('');
   const [pagination, setPagination] = useState({
     total: 0,

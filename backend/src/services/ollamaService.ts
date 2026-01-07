@@ -533,7 +533,7 @@ ${content.links.map(link =>
 Note: These links may provide additional context. Consider whether they support or contradict the main content.
 ` : ''}
 
-${content.structure?.headings.length > 0 ? `
+${content.structure?.headings && content.structure.headings.length > 0 ? `
 DOCUMENT STRUCTURE:
 ${content.structure.headings.join(' → ')}
 ` : ''}

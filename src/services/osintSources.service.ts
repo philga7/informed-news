@@ -66,6 +66,9 @@ export const osintSourcesService = {
       notes: source.notes,
       scrapeExternalUrl: source.scrape_external_url || false,
       enabled: source.enabled !== undefined ? source.enabled : true,
+      retentionMaxItems: source.retention_max_items || null,
+      retentionDays: source.retention_days || null,
+      retentionAction: source.retention_action || 'archive',
       createdAt: new Date(source.created_at),
       updatedAt: new Date(source.updated_at),
     };
@@ -159,6 +162,9 @@ export const osintSourcesService = {
       notes: source.notes,
       scrapeExternalUrl: source.scrape_external_url || false,
       enabled: source.enabled !== undefined ? source.enabled : true,
+      retentionMaxItems: source.retention_max_items || null,
+      retentionDays: source.retention_days || null,
+      retentionAction: source.retention_action || 'archive',
       createdAt: new Date(source.created_at),
       updatedAt: new Date(source.updated_at),
     };

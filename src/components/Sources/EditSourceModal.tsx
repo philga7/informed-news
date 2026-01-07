@@ -37,7 +37,7 @@ export function EditSourceModal({ source, onSave, onClose }: EditSourceModalProp
     retentionDays: source.retentionDays,
     action: source.retentionAction || 'archive',
   });
-  const [isLoadingPolicy, setIsLoadingPolicy] = useState(false);
+  const [_isLoadingPolicy, setIsLoadingPolicy] = useState(false);
   const [preview, setPreview] = useState<RetentionPreview | null>(null);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
   const [showPreview, setShowPreview] = useState(false);

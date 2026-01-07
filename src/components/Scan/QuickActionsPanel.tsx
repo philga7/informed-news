@@ -1,4 +1,4 @@
-import { Link2, Eye, X, ExternalLink } from 'lucide-react';
+import { Link2, Eye, Archive, Trash2, ExternalLink } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import type { WatchItemCategory } from '../../types/osint';
 
@@ -14,14 +14,16 @@ interface QuickActionsPanelProps {
   } | null;
   onLinkToTopic: () => void;
   onCreateWatchItem: () => void;
-  onDismiss: () => void;
+  onArchive: () => void;
+  onDelete: () => void;
 }
 
 export function QuickActionsPanel({
   selectedRecord,
   onLinkToTopic,
   onCreateWatchItem,
-  onDismiss,
+  onArchive,
+  onDelete,
 }: QuickActionsPanelProps) {
   if (!selectedRecord) {
     return (
@@ -98,17 +100,31 @@ export function QuickActionsPanel({
           </button>
 
           <button
-            onClick={onDismiss}
-            className="w-full flex items-center justify-between px-4 py-3 bg-stone-800 text-stone-200 rounded-lg hover:bg-stone-700 transition-colors duration-250"
+            onClick={onArchive}
+            className="w-full flex items-center justify-between px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-250"
           >
             <div className="flex items-center">
-              <X className="w-5 h-5 mr-3" />
+              <Archive className="w-5 h-5 mr-3" />
               <div className="text-left">
-                <div className="font-medium">Dismiss</div>
-                <div className="text-xs text-stone-400">Mark as reviewed</div>
+                <div className="font-medium">Archive</div>
+                <div className="text-xs text-blue-200">Soft delete (can undo)</div>
               </div>
             </div>
-            <kbd className="px-2 py-1 bg-stone-700 rounded text-xs">X</kbd>
+            <kbd className="px-2 py-1 bg-blue-700 rounded text-xs">A</kbd>
+          </button>
+
+          <button
+            onClick={onDelete}
+            className="w-full flex items-center justify-between px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors duration-250"
+          >
+            <div className="flex items-center">
+              <Trash2 className="w-5 h-5 mr-3" />
+              <div className="text-left">
+                <div className="font-medium">Delete</div>
+                <div className="text-xs text-red-200">Permanent removal</div>
+              </div>
+            </div>
+            <kbd className="px-2 py-1 bg-red-700 rounded text-xs">D</kbd>
           </button>
         </div>
 

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Eye, Plus, Search, RefreshCw, AlertTriangle, Filter, List, Archive } from 'lucide-react';
+import { Eye, Plus, Search, RefreshCw, List, Archive } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useOrganization } from '../../context/OrganizationContext';
 import { watchItemsService } from '../../services';
@@ -26,7 +26,7 @@ interface WatchItemWithSignals {
 }
 
 export function WatchListPage() {
-  const { user } = useAuth();
+  const { user: _user } = useAuth();
   const { currentOrganization } = useOrganization();
   const [watchItems, setWatchItems] = useState<WatchItemWithSignals[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -89,7 +89,7 @@ export function WatchListPage() {
     }
 
     try {
-      const newItem = await watchItemsService.create({
+      await watchItemsService.create({
         organizationId: currentOrganization.id,
         ...itemData,
       });

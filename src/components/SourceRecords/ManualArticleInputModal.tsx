@@ -3,7 +3,6 @@ import { X, Loader2, MapPin, Film } from 'lucide-react';
 import { marked } from 'marked';
 import type { MediaType } from '../../types/osint';
 import { sourceRecordsService } from '../../services';
-import { LoadingSpinner } from '../UI/LoadingSpinner';
 import { useAuth } from '../../hooks/useAuth';
 
 interface ManualArticleInputModalProps {
@@ -241,10 +240,7 @@ export function ManualArticleInputModal({
       // Convert Markdown to plain text
       const plainTextContent = markdownToPlainText(formData.content);
 
-      // Prepare geographic indicators
-      const geoIndicators = formData.geographicIndicators
-        ? formData.geographicIndicators.split(',').map(s => s.trim()).filter(Boolean)
-        : detectedGeoIndicators;
+      // Prepare geographic indicators (stored in formData.geographicIndicators or detectedGeoIndicators)
 
       // Call service to create manual article
       await sourceRecordsService.createManual(organizationId, {

@@ -147,7 +147,7 @@ export function TopicToneAggregate({ topicId }: TopicToneAggregateProps) {
             <h4 className="text-sm font-semibold text-stone-400 uppercase mb-3">Tone Distribution</h4>
             <div className="space-y-2">
               {Object.entries(aggregate.toneDistribution)
-                .sort((a, b) => b[1] - a[1])
+                .sort((a, b) => (b[1] as number) - (a[1] as number))
                 .map(([tone, count]) => (
                   <div key={tone} className="flex items-center gap-3">
                     <div className="w-24 text-sm text-stone-300">{tone}</div>

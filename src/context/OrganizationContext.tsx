@@ -53,9 +53,10 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
       // If user has no organizations, create a "Personal" one
       if (userOrgs.length === 0) {
         console.log('👤 No organizations found, creating Personal organization...');
+        const userName = (user as any).name || user.email || 'User';
         const personalOrg = await organizationService.createOrganization(
-          `${user.name || user.email}'s Workspace`,
-          slugify(`${user.name || user.email}-workspace-${Date.now()}`),
+          `${userName}'s Workspace`,
+          slugify(`${userName}-workspace-${Date.now()}`),
           user.id
         );
         userOrgs.push(personalOrg);

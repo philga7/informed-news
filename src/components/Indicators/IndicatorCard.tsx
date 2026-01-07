@@ -7,7 +7,6 @@ import {
   RotateCcw, 
   ExternalLink,
   Clock,
-  ZapOff
 } from 'lucide-react';
 import { indicatorsService } from '../../services';
 import { IndicatorForm } from './IndicatorForm';

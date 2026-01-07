@@ -1,4 +1,4 @@
-import { ExternalLink, Link2, Eye, X, ChevronDown, ChevronRight } from 'lucide-react';
+import { ExternalLink, Link2, Eye, Archive, Trash2, ChevronDown, ChevronRight } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import type { WatchItemCategory, ScanStatus } from '../../types/osint';
 
@@ -26,7 +26,8 @@ interface ScanItemProps {
   dataIndex: number;
   onSelect: () => void;
   onToggleExpand: () => void;
-  onDismiss: () => void;
+  onArchive: () => void;
+  onDelete: () => void;
   onLinkToTopic: () => void;
   onCreateWatchItem: () => void;
 }
@@ -38,7 +39,8 @@ export function ScanItem({
   dataIndex,
   onSelect,
   onToggleExpand,
-  onDismiss,
+  onArchive,
+  onDelete,
   onLinkToTopic,
   onCreateWatchItem,
 }: ScanItemProps) {
@@ -186,12 +188,22 @@ export function ScanItem({
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                onDismiss();
+                onArchive();
               }}
-              className="p-2 text-stone-400 hover:bg-stone-800 rounded-lg transition-colors duration-250"
-              title="Dismiss (X)"
+              className="p-2 text-blue-400 hover:bg-blue-900/30 rounded-lg transition-colors duration-250"
+              title="Archive (A)"
             >
-              <X className="w-4 h-4" />
+              <Archive className="w-4 h-4" />
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete();
+              }}
+              className="p-2 text-red-400 hover:bg-red-900/30 rounded-lg transition-colors duration-250"
+              title="Delete (D)"
+            >
+              <Trash2 className="w-4 h-4" />
             </button>
           </div>
         )}

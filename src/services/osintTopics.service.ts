@@ -1,4 +1,4 @@
-import type { OsintTopic, TopicSourceLink, TopicTimeline, RelatedTopic, NarrativeBucket, TopicStatus, QACompleteness, CollectionPlan } from '../types/osint';
+import type { OsintTopic, TopicSourceLink, TopicTimeline, RelatedTopic, NarrativeBucket, TopicStatus, CollectionPlan } from '../types/osint';
 
 // Use relative URL in production (Vercel), localhost in development
 const API_BASE = import.meta.env.PROD 

@@ -1,10 +1,19 @@
 import type { SourceRecord } from '../types/osint';
 import { deduplicateContentComprehensive } from '../utils/contentDeduplication';
+import { supabase } from '../utils/supabase';
 
 // Use relative URL in production (Vercel), localhost in development
 const API_BASE = import.meta.env.PROD 
   ? (import.meta.env.VITE_API_URL || '')
   : (import.meta.env.VITE_API_URL || 'http://localhost:3001');
+
+/**
+ * Get current user ID from Supabase session
+ */
+async function getCurrentUserId(): Promise<string | undefined> {
+  const { data: { session } } = await supabase.auth.getSession();
+  return session?.user?.id;
+}
 
 interface SourceRecordWithDetails extends SourceRecord {
   sources: any;
@@ -205,6 +214,57 @@ export const sourceRecordsService = {
       success: result.success,
       record: result.result?.record,
     };
+  },
+
+  /**
+   * Archive a source record (soft delete - move to archived_source_records)
+   */
+  async archive(recordId: string): Promise<void> {
+    const userId = await getCurrentUserId();
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (userId) {
+      headers['x-user-id'] = userId;
+    }
+
+    const response = await fetch(`${API_BASE}/api/source-records/${recordId}/archive`, {
+      method: 'POST',
+      headers,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+      // Prefer the detailed message field over the error field
+      const errorMessage = error.message || error.error || `Failed to archive record: ${response.statusText}`;
+      const archiveError = new Error(errorMessage);
+      // Attach the full error response for detailed error handling
+      (archiveError as any).response = error;
+      throw archiveError;
+    }
+  },
+
+  /**
+   * Permanently delete a source record
+   */
+  async delete(recordId: string): Promise<void> {
+    const userId = await getCurrentUserId();
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (userId) {
+      headers['x-user-id'] = userId;
+    }
+
+    const response = await fetch(`${API_BASE}/api/source-records/${recordId}`, {
+      method: 'DELETE',
+      headers,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+      throw new Error(error.error || error.message || `Failed to delete record: ${response.statusText}`);
+    }
   },
 };
 

@@ -13,7 +13,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionUrl: true,
+    detectSessionInUrl: true,
   },
 });
 
@@ -32,7 +32,7 @@ export async function testConnection(): Promise<{
     const { data: session } = await supabase.auth.getSession();
     
     // Test 2: Try a simple query (this will fail if tables don't exist)
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('profiles')
       .select('count')
       .limit(1);

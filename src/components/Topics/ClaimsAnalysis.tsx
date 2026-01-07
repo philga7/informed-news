@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, CheckCircle2, AlertTriangle, HelpCircle, XCircle, Edit2, Trash2 } from 'lucide-react';
+import { Plus, CheckCircle2, AlertTriangle, HelpCircle, XCircle, Trash2 } from 'lucide-react';
 import { claimsService } from '../../services/claims.service';
 import type { ClaimWithEvidence, ClaimType } from '../../types/osint';
 

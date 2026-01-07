@@ -12,7 +12,8 @@ export interface ScanSession {
   itemsReviewed: number;
   itemsLinkedToTopics: number;
   itemsCreatedWatch: number;
-  itemsDismissed: number;
+  itemsArchived: number;
+  itemsDeleted: number;
   notes: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -23,7 +24,8 @@ export interface ScanSessionStats {
   totalItemsReviewed: number;
   totalLinked: number;
   totalWatchItems: number;
-  totalDismissed: number;
+  totalArchived: number;
+  totalDeleted: number;
   avgItemsPerSession: number;
   avgSessionDurationMinutes: number;
 }
@@ -68,7 +70,8 @@ export const scanSessionsService = {
       itemsReviewed?: number;
       itemsLinkedToTopics?: number;
       itemsCreatedWatch?: number;
-      itemsDismissed?: number;
+      itemsArchived?: number;
+      itemsDeleted?: number;
       notes?: string;
     }
   ): Promise<ScanSession> {
@@ -82,7 +85,8 @@ export const scanSessionsService = {
         items_reviewed: updates.itemsReviewed,
         items_linked_to_topics: updates.itemsLinkedToTopics,
         items_created_watch: updates.itemsCreatedWatch,
-        items_dismissed: updates.itemsDismissed,
+        items_archived: updates.itemsArchived,
+        items_deleted: updates.itemsDeleted,
         notes: updates.notes,
       }),
     });
@@ -156,7 +160,8 @@ export const scanSessionsService = {
       totalItemsReviewed: parseInt(stats.total_items_reviewed || '0', 10),
       totalLinked: parseInt(stats.total_linked || '0', 10),
       totalWatchItems: parseInt(stats.total_watch_items || '0', 10),
-      totalDismissed: parseInt(stats.total_dismissed || '0', 10),
+      totalArchived: parseInt(stats.total_archived || '0', 10),
+      totalDeleted: parseInt(stats.total_deleted || '0', 10),
       avgItemsPerSession: parseFloat(stats.avg_items_per_session || '0'),
       avgSessionDurationMinutes: parseFloat(stats.avg_session_duration_minutes || '0'),
     };
@@ -171,7 +176,8 @@ export const scanSessionsService = {
       itemsReviewed: number;
       itemsLinkedToTopics: number;
       itemsCreatedWatch: number;
-      itemsDismissed: number;
+      itemsArchived: number;
+      itemsDeleted: number;
     },
     notes?: string
   ): Promise<ScanSession> {
@@ -210,7 +216,8 @@ function mapSessionFromApi(session: any): ScanSession {
     itemsReviewed: session.items_reviewed || 0,
     itemsLinkedToTopics: session.items_linked_to_topics || 0,
     itemsCreatedWatch: session.items_created_watch || 0,
-    itemsDismissed: session.items_dismissed || 0,
+    itemsArchived: session.items_archived || 0,
+    itemsDeleted: session.items_deleted || 0,
     notes: session.notes || null,
     createdAt: new Date(session.created_at),
     updatedAt: new Date(session.updated_at),

@@ -509,8 +509,109 @@ router.patch('/:id/scan-status', async (req: Request, res: Response) => {
 });
 
 /**
+ * POST /api/source-records/:id/archive
+ * Archive a source record (soft delete - move to archived_source_records)
+ * Checks if record can be archived (not linked to active topics, no artifacts, no watch items)
+ * NOTE: Records linked only to archived topics can be archived
+ * NOTE: This route must come BEFORE GET /:id to avoid route matching conflicts
+ */
+router.post('/:id/archive', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const userId = req.headers['x-user-id'] as string | undefined;
+    const { RetentionPolicyService } = await import('../services/retention/RetentionPolicyService.js');
+    const retentionService = new RetentionPolicyService();
+
+    // Check if record can be archived - use direct queries for better debugging
+    const { data: activeTopics, error: topicsError } = await supabase
+      .from('topic_source_links')
+      .select(`
+        osint_topics!inner (
+          id,
+          name,
+          status
+        )
+      `)
+      .eq('source_record_id', id);
+    
+    const { count: artifactCount, error: artifactsError } = await supabase
+      .from('analytic_artifacts')
+      .select('*', { count: 'exact', head: true })
+      .eq('source_record_id', id);
+    
+    const { count: watchItemCount, error: watchItemsError } = await supabase
+      .from('watch_item_records')
+      .select('*', { count: 'exact', head: true })
+      .eq('source_record_id', id);
+    
+    // Filter to only active (non-archived) topics
+    const activeTopicLinks = (activeTopics || []).filter((link: any) => 
+      link.osint_topics && link.osint_topics.status !== 'archived'
+    );
+    
+    const hasActiveTopics = activeTopicLinks.length > 0;
+    const hasArtifacts = (artifactCount || 0) > 0;
+    const hasWatchItems = (watchItemCount || 0) > 0;
+    
+    if (hasActiveTopics || hasArtifacts || hasWatchItems) {
+      const reasons: string[] = [];
+      if (hasActiveTopics) {
+        const topicNames = activeTopicLinks.map((link: any) => link.osint_topics.name).join(', ');
+        reasons.push(`linked to active topics: ${topicNames}`);
+      }
+      if (hasArtifacts) {
+        reasons.push(`has ${artifactCount} artifact(s)`);
+      }
+      if (hasWatchItems) {
+        reasons.push(`linked to ${watchItemCount} watch item(s)`);
+      }
+      
+      const message = `Cannot archive: ${reasons.join('; ')}. Unlink these relationships or archive the associated topics before archiving.`;
+      
+      console.log('[Archive] Blocking reasons:', {
+        recordId: id,
+        hasActiveTopics,
+        activeTopicNames: activeTopicLinks.map((link: any) => link.osint_topics.name),
+        hasArtifacts,
+        artifactCount,
+        hasWatchItems,
+        watchItemCount,
+      });
+      
+      return res.status(403).json({
+        error: 'Cannot archive protected record',
+        message,
+        details: {
+          hasActiveTopics,
+          activeTopicNames: activeTopicLinks.map((link: any) => link.osint_topics.name),
+          hasArtifacts,
+          artifactCount,
+          hasWatchItems,
+          watchItemCount,
+        },
+      });
+    }
+
+    // Archive the record
+    await retentionService.archiveRecord(id, 'manual', userId);
+
+    res.json({
+      success: true,
+      message: 'Record archived successfully',
+    });
+  } catch (error) {
+    console.error('Error archiving source record:', error);
+    res.status(500).json({
+      error: 'Failed to archive source record',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+/**
  * GET /api/source-records/:id
  * Get source record detail with linked topics
+ * NOTE: This route comes AFTER POST /:id/archive to avoid route matching conflicts
  */
 router.get('/:id', async (req: Request, res: Response) => {
   try {
@@ -565,6 +666,44 @@ router.get('/:id', async (req: Request, res: Response) => {
     console.error('Error fetching source record:', error);
     res.status(500).json({
       error: 'Failed to fetch source record',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+/**
+ * DELETE /api/source-records/:id
+ * Permanently delete a source record
+ * Checks if record is protected before deleting
+ * NOTE: This route comes AFTER GET /:id to avoid route matching conflicts
+ */
+router.delete('/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const userId = req.headers['x-user-id'] as string | undefined;
+    const { RetentionPolicyService } = await import('../services/retention/RetentionPolicyService.js');
+    const retentionService = new RetentionPolicyService();
+
+    // Check if record is protected
+    const isProtected = await retentionService.isRecordProtected(id);
+    if (isProtected) {
+      return res.status(403).json({
+        error: 'Cannot delete protected record',
+        message: 'This record is linked to topics, has artifacts, or is linked to watch items. Unlink these relationships before deleting.',
+      });
+    }
+
+    // Delete the record
+    await retentionService.deleteRecord(id, 'manual', userId);
+
+    res.json({
+      success: true,
+      message: 'Record deleted successfully',
+    });
+  } catch (error) {
+    console.error('Error deleting source record:', error);
+    res.status(500).json({
+      error: 'Failed to delete source record',
       message: error instanceof Error ? error.message : 'Unknown error',
     });
   }

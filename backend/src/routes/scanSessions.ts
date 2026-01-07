@@ -29,7 +29,8 @@ router.post('/', async (req: Request, res: Response) => {
         items_reviewed: 0,
         items_linked_to_topics: 0,
         items_created_watch: 0,
-        items_dismissed: 0,
+        items_archived: 0,
+        items_deleted: 0,
       } as any)
       .select()
       .single();
@@ -52,7 +53,7 @@ router.post('/', async (req: Request, res: Response) => {
 /**
  * PATCH /api/scan-sessions/:id
  * Update a scan session (typically to end it or update counters)
- * Body: { ended_at?, items_reviewed?, items_linked_to_topics?, items_created_watch?, items_dismissed?, notes? }
+ * Body: { ended_at?, items_reviewed?, items_linked_to_topics?, items_created_watch?, items_archived?, items_deleted?, notes? }
  */
 router.patch('/:id', async (req: Request, res: Response) => {
   try {
@@ -62,7 +63,8 @@ router.patch('/:id', async (req: Request, res: Response) => {
       items_reviewed, 
       items_linked_to_topics, 
       items_created_watch, 
-      items_dismissed,
+      items_archived,
+      items_deleted,
       notes 
     } = req.body;
 
@@ -74,7 +76,8 @@ router.patch('/:id', async (req: Request, res: Response) => {
     if (items_reviewed !== undefined) updates.items_reviewed = items_reviewed;
     if (items_linked_to_topics !== undefined) updates.items_linked_to_topics = items_linked_to_topics;
     if (items_created_watch !== undefined) updates.items_created_watch = items_created_watch;
-    if (items_dismissed !== undefined) updates.items_dismissed = items_dismissed;
+    if (items_archived !== undefined) updates.items_archived = items_archived;
+    if (items_deleted !== undefined) updates.items_deleted = items_deleted;
     if (notes !== undefined) updates.notes = notes;
 
     const { data: session, error } = await supabase
@@ -195,7 +198,8 @@ router.get('/stats/:organizationId', async (req: Request, res: Response) => {
           total_items_reviewed: number;
           total_linked: number;
           total_watch_items: number;
-          total_dismissed: number;
+          total_archived: number;
+          total_deleted: number;
           avg_items_per_session: number;
           avg_session_duration_minutes: number;
         }> | null;
@@ -212,7 +216,8 @@ router.get('/stats/:organizationId', async (req: Request, res: Response) => {
       total_items_reviewed: 0,
       total_linked: 0,
       total_watch_items: 0,
-      total_dismissed: 0,
+      total_archived: 0,
+      total_deleted: 0,
       avg_items_per_session: 0,
       avg_session_duration_minutes: 0,
     };

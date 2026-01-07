@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, ExternalLink, Calendar, Database, Link as LinkIcon, Sparkles, FileText, Users, MessageSquare, ListChecks, Loader2, FileEdit, ChevronDown } from 'lucide-react';
+import { ArrowLeft, ExternalLink, Calendar, Database, Link as LinkIcon, Sparkles, FileText, Users, MessageSquare, ListChecks, Loader2, FileEdit, ChevronDown, Archive, Trash2 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useOrganization } from '../../context/OrganizationContext';
+import { useToast } from '../../context/ToastContext';
 import { sourceRecordsService } from '../../services';
+import { retentionService } from '../../services/retention.service';
 import { analysisService, type AnalyticArtifact } from '../../services/analysis.service';
 import { LoadingSpinner } from '../UI/LoadingSpinner';
 import { EmptyState } from '../UI/EmptyState';
@@ -13,8 +15,9 @@ import { ArtifactCard } from './ArtifactCard';
 export function SourceRecordDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user: _user } = useAuth();
   const { currentOrganization } = useOrganization();
+  const toast = useToast();
   const [record, setRecord] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -23,6 +26,7 @@ export function SourceRecordDetailPage() {
   const [isLoadingArtifacts, setIsLoadingArtifacts] = useState(false);
   const [analysisLoading, setAnalysisLoading] = useState<string | null>(null);
   const [newArtifactIds, setNewArtifactIds] = useState<Set<string>>(new Set());
+  const [isProcessing, setIsProcessing] = useState(false);
   // Initialize summaryContentSource from localStorage, defaulting to 'stored'
   const [summaryContentSource, setSummaryContentSource] = useState<'stored' | 'fresh'>(() => {
     const saved = localStorage.getItem('informed-news:summaryContentSource');
@@ -166,10 +170,89 @@ export function SourceRecordDetailPage() {
     }
   };
 
-  const handleLinkToTopics = async (topicIds: string[]) => {
+  const handleLinkToTopics = async (_topicIds: string[]) => {
     // Reload the record to get updated linked topics after linking
     // The modal will close itself after onLink completes
     await loadRecord();
+  };
+
+  const handleArchive = async () => {
+    if (!id || !record) return;
+
+    setIsProcessing(true);
+    try {
+      // Archive the record
+      await sourceRecordsService.archive(id);
+      
+      // Show toast with undo after successful archive (like Delete)
+      toast.showArchive(
+        `"${record.title}" archived`,
+        async () => {
+          try {
+            await retentionService.undoArchive(id);
+            toast.showSuccess('Record restored');
+            await loadRecord();
+          } catch (err) {
+            toast.showError('Failed to restore record');
+          }
+        }
+      );
+
+      // Navigate back to source records list after a short delay to allow toast to be visible
+      setTimeout(() => {
+        navigate('/source-records');
+      }, 100);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to archive record';
+      if (errorMessage.includes('protected') || errorMessage.includes('Cannot archive')) {
+        // Try to extract detailed message from error response
+        let detailedMessage = 'Cannot archive this record. It is linked to active topics, has artifacts, or is linked to watch items. Unlink these relationships or archive the associated topics before archiving.';
+        
+        if (err instanceof Error && 'response' in err) {
+          try {
+            const response = (err as any).response;
+            if (response && typeof response === 'object' && 'message' in response) {
+              detailedMessage = response.message || detailedMessage;
+            }
+          } catch (e) {
+            // Ignore parsing errors
+          }
+        }
+        
+        alert(detailedMessage);
+      } else {
+        toast.showError(errorMessage);
+      }
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!id || !record) return;
+    
+    if (!window.confirm(`Permanently delete "${record.title}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    setIsProcessing(true);
+    try {
+      await sourceRecordsService.delete(id);
+      
+      toast.showDelete(`"${record.title}" deleted`);
+      
+      // Navigate back to source records list
+      navigate('/source-records');
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to delete record';
+      if (errorMessage.includes('protected')) {
+        alert('Cannot delete this record. It is linked to topics, has artifacts, or is linked to watch items.');
+      } else {
+        toast.showError(errorMessage);
+      }
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const formatDate = (date: Date | null) => {
@@ -273,6 +356,24 @@ export function SourceRecordDetailPage() {
                 View Source
               </a>
             )}
+            <div className="flex items-center gap-2 ml-auto">
+              <button
+                onClick={handleArchive}
+                disabled={isProcessing}
+                className="p-1.5 text-blue-400 hover:text-blue-300 hover:bg-blue-900/30 rounded transition-colors disabled:opacity-50"
+                title="Archive"
+              >
+                <Archive className="w-4 h-4" />
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={isProcessing}
+                className="p-1.5 text-red-400 hover:text-red-300 hover:bg-red-900/30 rounded transition-colors disabled:opacity-50"
+                title="Delete"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
           </div>
 
           {/* Content */}

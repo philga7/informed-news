@@ -10,7 +10,7 @@ import { TopicCard } from './TopicCard';
 import { TopicForm } from './TopicForm';
 
 export function TopicsPage() {
-  const { user } = useAuth();
+  const { user: _user } = useAuth();
   const { currentOrganization } = useOrganization();
   const navigate = useNavigate();
   const [topics, setTopics] = useState<any[]>([]);
