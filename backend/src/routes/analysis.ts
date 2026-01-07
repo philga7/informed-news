@@ -375,10 +375,11 @@ async function createClaimsFromKeyFacts(artifact: any) {
       }
 
       // Create the claim
+      const linkTyped = link as any;
       const { data: newClaim, error: createError } = await supabase
         .from('claims')
         .insert({
-          topic_id: link.topic_id,
+          topic_id: linkTyped.topic_id,
           claim_text: claimFact.fact.trim(),
           claim_type: 'factual', // Default to 'factual' for claims extracted from key facts
           is_falsifiable: true,
@@ -386,26 +387,28 @@ async function createClaimsFromKeyFacts(artifact: any) {
         .select()
         .single();
 
-      if (createError) {
-        console.error(`Error creating claim for topic ${link.topic_id}:`, createError);
+      if (createError || !newClaim) {
+        console.error(`Error creating claim for topic ${linkTyped.topic_id}:`, createError);
         continue;
       }
+
+      const newClaimTyped = newClaim as any;
 
       // Create evidence linking the claim to the source record via the topic-source link
       const { error: evidenceError } = await supabase
         .from('claim_evidence')
         .insert({
-          claim_id: newClaim.id,
-          link_id: link.id, // Use the topic_source_links.id
+          claim_id: newClaimTyped.id,
+          link_id: linkTyped.id, // Use the topic_source_links.id
           supports: true, // By default, key facts support the claim
           evidence_excerpt: claimFact.fact.trim(),
           analyst_notes: `Auto-created from reviewed key facts analysis. Confidence: ${(claimFact.confidence * 100).toFixed(0)}%`,
         });
 
       if (evidenceError) {
-        console.error(`Error creating claim evidence for claim ${newClaim.id}:`, evidenceError);
+        console.error(`Error creating claim evidence for claim ${newClaimTyped.id}:`, evidenceError);
       } else {
-        console.log(`Created claim "${claimFact.fact.substring(0, 50)}..." for topic ${link.topic_id} with evidence from source record ${artifact.source_record_id}`);
+        console.log(`Created claim "${claimFact.fact.substring(0, 50)}..." for topic ${linkTyped.topic_id} with evidence from source record ${artifact.source_record_id}`);
       }
     }
   }
@@ -451,7 +454,8 @@ async function addEntitiesToLinkedTopics(artifact: any) {
   // Update each topic's keywords by merging entities (avoiding duplicates)
   for (const link of links) {
     // Handle both single object and array formats (for safety)
-    const topicData = link.osint_topics as any;
+    const linkTyped = link as any;
+    const topicData = linkTyped.osint_topics as any;
     const topic = Array.isArray(topicData) ? topicData[0] : topicData;
     
     if (!topic || !topic.id) continue;
@@ -524,13 +528,14 @@ router.patch('/artifacts/:id', async (req: Request, res: Response) => {
 
     // Audit log: artifact reviewed (only when marking as reviewed)
     if (reviewed) {
-      await auditService.logArtifactReviewed(id, artifact as any);
+      const artifactTyped = artifact as any;
+      await auditService.logArtifactReviewed(id, artifactTyped);
       
       // If this is a reviewed entity extraction artifact, add entities to linked topics' keywords
       // This runs asynchronously without blocking the response (fire-and-forget for Vercel compatibility)
-      if (artifact.type === 'entity_extraction' && artifact.source_record_id) {
+      if (artifactTyped.type === 'entity_extraction' && artifactTyped.source_record_id) {
         // Don't await - let it run in background to avoid blocking response or hitting Vercel timeouts
-        addEntitiesToLinkedTopics(artifact as any).catch((err) => {
+        addEntitiesToLinkedTopics(artifactTyped).catch((err) => {
           // Log error but don't fail the request
           console.error('Error adding entities to linked topics:', err);
         });
@@ -538,9 +543,9 @@ router.patch('/artifacts/:id', async (req: Request, res: Response) => {
 
       // If this is a reviewed key facts artifact, create claims for facts with category='claim'
       // This runs asynchronously without blocking the response (fire-and-forget for Vercel compatibility)
-      if (artifact.type === 'key_facts' && artifact.source_record_id) {
+      if (artifactTyped.type === 'key_facts' && artifactTyped.source_record_id) {
         // Don't await - let it run in background to avoid blocking response or hitting Vercel timeouts
-        createClaimsFromKeyFacts(artifact as any).catch((err) => {
+        createClaimsFromKeyFacts(artifactTyped).catch((err) => {
           // Log error but don't fail the request
           console.error('Error creating claims from key facts:', err);
         });

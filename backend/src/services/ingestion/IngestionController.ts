@@ -188,9 +188,10 @@ export class IngestionController {
         }
       }
 
+      // @ts-ignore - Supabase RPC type inference issue
       const { data: functionResult, error: rpcError } = await supabase.rpc(
         'batch_insert_source_records',
-        { records: recordsJson as any } as any
+        { records: recordsJson }
       );
 
       if (rpcError) {
