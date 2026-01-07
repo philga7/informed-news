@@ -45,7 +45,7 @@ router.post('/organizations/all/apply', async (req: Request, res: Response) => {
     // Fetch all organizations
     const { data: organizations, error } = await supabase
       .from('organizations')
-      .select('id, name');
+      .select('id, name') as { data: Array<{ id: string; name: string }> | null; error: unknown };
 
     if (error) throw error;
     if (!organizations || organizations.length === 0) {
@@ -153,7 +153,14 @@ router.get('/sources/:sourceId/status', async (req: Request, res: Response) => {
     const { data: stats, error } = await supabase
       .from('source_records')
       .select('content_type, content_compressed, content_length')
-      .eq('source_id', sourceId);
+      .eq('source_id', sourceId) as { 
+        data: Array<{
+          content_type: string;
+          content_compressed: boolean;
+          content_length: number | null;
+        }> | null; 
+        error: unknown 
+      };
 
     if (error) throw error;
 

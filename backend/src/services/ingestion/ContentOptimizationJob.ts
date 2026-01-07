@@ -58,7 +58,7 @@ export class ContentOptimizationJob {
       const { data: sources, error: sourcesError } = await supabase
         .from('sources')
         .select('id')
-        .eq('organization_id', organizationId);
+        .eq('organization_id', organizationId) as { data: Array<{ id: string }> | null; error: unknown };
 
       if (sourcesError) throw sourcesError;
       if (!sources || sources.length === 0) {
@@ -179,7 +179,10 @@ export class ContentOptimizationJob {
         .from('source_records')
         .select('id, content, content_compressed')
         .eq('id', recordId)
-        .single();
+        .single() as { 
+          data: { id: string; content: string | null; content_compressed: boolean } | null; 
+          error: unknown 
+        };
 
       if (fetchError) throw fetchError;
       if (!record || !record.content) {
