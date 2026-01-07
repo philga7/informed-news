@@ -122,7 +122,8 @@ router.put('/sources/:sourceId/policy', async (req: Request, res: Response) => {
 
     const { data: updatedSource, error } = await supabase
       .from('sources')
-      .update(updateData)
+      // @ts-ignore - Supabase type inference issue in serverless environment
+      .update(updateData as any)
       .eq('id', sourceId)
       .select()
       .single() as {
