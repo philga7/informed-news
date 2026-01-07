@@ -27,13 +27,26 @@ router.get('/sources/:sourceId/policy', async (req: Request, res: Response) => {
       .from('sources')
       .select('id, name, retention_max_items, retention_days, retention_action')
       .eq('id', sourceId)
-      .single();
+      .single() as {
+        data: {
+          id: string;
+          name: string;
+          retention_max_items: number | null;
+          retention_days: number | null;
+          retention_action: 'delete' | 'archive';
+        } | null;
+        error: unknown;
+      };
 
     if (error) {
-      if (error.code === 'PGRST116') {
+      if ((error as { code?: string }).code === 'PGRST116') {
         return res.status(404).json({ error: 'Source not found' });
       }
       throw error;
+    }
+
+    if (!source) {
+      return res.status(404).json({ error: 'Source not found' });
     }
 
     res.json({
@@ -79,13 +92,26 @@ router.put('/sources/:sourceId/policy', async (req: Request, res: Response) => {
       .from('sources')
       .select('id, name, retention_max_items, retention_days, retention_action')
       .eq('id', sourceId)
-      .single();
+      .single() as {
+        data: {
+          id: string;
+          name: string;
+          retention_max_items: number | null;
+          retention_days: number | null;
+          retention_action: 'delete' | 'archive';
+        } | null;
+        error: unknown;
+      };
 
     if (fetchError) {
-      if (fetchError.code === 'PGRST116') {
+      if ((fetchError as { code?: string }).code === 'PGRST116') {
         return res.status(404).json({ error: 'Source not found' });
       }
       throw fetchError;
+    }
+
+    if (!currentSource) {
+      return res.status(404).json({ error: 'Source not found' });
     }
 
     // Update policy
@@ -99,7 +125,17 @@ router.put('/sources/:sourceId/policy', async (req: Request, res: Response) => {
       .update(updateData)
       .eq('id', sourceId)
       .select()
-      .single();
+      .single() as {
+        data: {
+          id: string;
+          name: string;
+          retention_max_items: number | null;
+          retention_days: number | null;
+          retention_action: 'delete' | 'archive';
+          [key: string]: unknown;
+        } | null;
+        error: unknown;
+      };
 
     if (error) throw error;
     if (!updatedSource) {
@@ -291,7 +327,15 @@ router.get('/sources/:sourceId/preview', async (req: Request, res: Response) => 
       .from('sources')
       .select('id, retention_max_items, retention_days, retention_action')
       .eq('id', sourceId)
-      .single();
+      .single() as {
+        data: {
+          id: string;
+          retention_max_items: number | null;
+          retention_days: number | null;
+          retention_action: 'delete' | 'archive';
+        } | null;
+        error: unknown;
+      };
 
     if (sourceError) {
       if ((sourceError as { code?: string }).code === 'PGRST116') {
