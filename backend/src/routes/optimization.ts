@@ -7,7 +7,7 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { supabase } from '../utils/supabase.js';
-import { ContentOptimizationJob } from '../services/ingestion/ContentOptimizationJob.js';
+import { ContentOptimizationJob, type OptimizationResult } from '../services/ingestion/ContentOptimizationJob.js';
 
 const router = Router();
 const optimizationJob = new ContentOptimizationJob();
@@ -66,7 +66,7 @@ router.post('/organizations/all/apply', async (req: Request, res: Response) => {
     const allResults: Array<{
       organizationId: string;
       organizationName: string;
-      result: import('../services/ingestion/ContentOptimizationJob.js').OptimizationResult;
+      result: OptimizationResult;
     }> = [];
 
     // Process each organization

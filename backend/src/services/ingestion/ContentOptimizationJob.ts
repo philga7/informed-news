@@ -16,7 +16,7 @@ const gunzip = promisify(zlib.gunzip);
 // TYPES
 // ============================================================================
 
-interface OptimizationResult {
+export interface OptimizationResult {
   processed: number;
   compressed: number;
   contentTypeUpdated: number;

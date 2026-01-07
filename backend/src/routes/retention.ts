@@ -445,9 +445,14 @@ router.post('/archived/:id/restore', async (req: Request, res: Response) => {
       throw fetchError;
     }
 
+    if (!archivedRecord) {
+      return res.status(404).json({ error: 'Archived record not found' });
+    }
+
     // Insert back into source_records
     const { data: restoredRecord, error: restoreError } = await supabase
       .from('source_records')
+      // @ts-expect-error - Supabase type inference issue, archived_record fields match source_records
       .insert({
         id: archivedRecord.id,
         source_id: archivedRecord.source_id,
@@ -467,7 +472,7 @@ router.post('/archived/:id/restore', async (req: Request, res: Response) => {
         scan_status: archivedRecord.scan_status,
         reviewed_at: archivedRecord.reviewed_at,
         reviewed_by: archivedRecord.reviewed_by,
-      })
+      } as any)
       .select()
       .single();
 
