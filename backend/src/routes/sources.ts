@@ -49,10 +49,10 @@ router.get('/', async (req: Request, res: Response) => {
     const sourceIds = sources.map((s: any) => s.id);
     
     // Get all metrics in one query using SQL aggregation
-    // @ts-ignore - Supabase type inference issue with RPC functions
     const { data: metricsData, error: metricsError } = await supabase.rpc('get_source_metrics', {
       p_source_ids: sourceIds,
-    } as any);
+      // @ts-ignore - Supabase type inference issue with RPC functions
+    } as any) as { data: any; error: any };
 
     if (metricsError) {
       console.error('Error fetching source metrics:', metricsError);
@@ -68,7 +68,7 @@ router.get('/', async (req: Request, res: Response) => {
     }>();
 
     if (metricsData && Array.isArray(metricsData)) {
-      metricsData.forEach((metric: any) => {
+      (metricsData as any[]).forEach((metric: any) => {
         metricsMap.set(metric.source_id, {
           record_count: metric.record_count || 0,
           linked_count: metric.linked_count || 0,
