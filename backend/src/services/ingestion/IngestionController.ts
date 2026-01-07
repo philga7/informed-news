@@ -191,7 +191,7 @@ export class IngestionController {
       // @ts-ignore - Supabase RPC type inference issue
       const { data: functionResult, error: rpcError } = await supabase.rpc(
         'batch_insert_source_records',
-        { records: recordsJson }
+        { records: recordsJson } as any
       );
 
       if (rpcError) {
@@ -202,7 +202,7 @@ export class IngestionController {
         console.error('Error details:', JSON.stringify(rpcError, null, 2));
         console.error('Falling back to direct insert method');
         // Fall through to direct insert fallback below
-      } else if (functionResult && Array.isArray(functionResult) && functionResult.length > 0) {
+      } else if (functionResult && Array.isArray(functionResult) && (functionResult as any[]).length > 0) {
         // Success: function handled duplicates and returned counts + IDs
         const functionData = functionResult[0] as { 
           inserted_count: number; 

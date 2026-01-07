@@ -378,12 +378,13 @@ async function createClaimsFromKeyFacts(artifact: any) {
       const linkTyped = link as any;
       const { data: newClaim, error: createError } = await supabase
         .from('claims')
+        // @ts-ignore - Supabase type inference issue
         .insert({
           topic_id: linkTyped.topic_id,
           claim_text: claimFact.fact.trim(),
           claim_type: 'factual', // Default to 'factual' for claims extracted from key facts
           is_falsifiable: true,
-        })
+        } as any)
         .select()
         .single();
 
@@ -397,13 +398,14 @@ async function createClaimsFromKeyFacts(artifact: any) {
       // Create evidence linking the claim to the source record via the topic-source link
       const { error: evidenceError } = await supabase
         .from('claim_evidence')
+        // @ts-ignore - Supabase type inference issue
         .insert({
           claim_id: newClaimTyped.id,
           link_id: linkTyped.id, // Use the topic_source_links.id
           supports: true, // By default, key facts support the claim
           evidence_excerpt: claimFact.fact.trim(),
           analyst_notes: `Auto-created from reviewed key facts analysis. Confidence: ${(claimFact.confidence * 100).toFixed(0)}%`,
-        });
+        } as any);
 
       if (evidenceError) {
         console.error(`Error creating claim evidence for claim ${newClaimTyped.id}:`, evidenceError);
@@ -479,7 +481,8 @@ async function addEntitiesToLinkedTopics(artifact: any) {
       // Update topic keywords
       const { error: updateError } = await supabase
         .from('osint_topics')
-        .update({ keywords: updatedKeywords as any })
+        // @ts-ignore - Supabase type inference issue
+        .update({ keywords: updatedKeywords as any } as any)
         .eq('id', topic.id);
 
       if (updateError) {
