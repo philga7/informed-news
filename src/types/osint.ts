@@ -88,6 +88,7 @@ export interface Source {
   notes: string | null;
   domain: WatchItemCategory | null; // Phase 6: Domain categorization for scan view
   scrapeExternalUrl: boolean; // Enable scraping of original URLs from aggregator sites
+  enabled: boolean; // When false, source will be skipped during automated feed ingestion
   createdAt: Date;
   updatedAt: Date;
   // Phase 1: Retention policy configuration

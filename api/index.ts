@@ -44,6 +44,10 @@ async function loadRoutes() {
   const claimsRouter = (await import('../backend/src/routes/claims.js')).default;
   const watchItemsRouter = (await import('../backend/src/routes/watchItems.js')).default;
   const indicatorsRouter = (await import('../backend/src/routes/indicators.js')).default;
+  const scanSessionsRouter = (await import('../backend/src/routes/scanSessions.js')).default;
+  const retentionRouter = (await import('../backend/src/routes/retention.js')).default;
+  const optimizationRouter = (await import('../backend/src/routes/optimization.js')).default;
+  const schedulerRouter = (await import('../backend/src/routes/scheduler.js')).default;
 
   // API Routes
   app.use('/api/organizations', organizationsRouter);
@@ -57,6 +61,10 @@ async function loadRoutes() {
   app.use('/api/claims', claimsRouter);
   app.use('/api/watch-items', watchItemsRouter);
   app.use('/api/indicators', indicatorsRouter);
+  app.use('/api/scan-sessions', scanSessionsRouter);
+  app.use('/api/retention', retentionRouter);
+  app.use('/api/optimization', optimizationRouter);
+  app.use('/api/scheduler', schedulerRouter);
   // Note: /api/feeds routes are deprecated in favor of /api/ingest
   app.use('/api/feeds', (_req, res) => {
     res.status(503).json({

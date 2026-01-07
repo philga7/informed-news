@@ -88,6 +88,7 @@ interface SourceData {
   reliability_rating?: string | null;
   value_rating?: number | null;
   domain?: string | null;
+  enabled?: boolean;
   record_count?: number;
   retention_max_items?: number | null;
   retention_days?: number | null;
@@ -369,6 +370,7 @@ export const auditService = {
         source_type: source.source_type,
         reliability_rating: source.reliability_rating,
         domain: source.domain,
+        enabled: source.enabled !== undefined ? source.enabled : true,
       },
     });
   },
@@ -391,11 +393,13 @@ export const auditService = {
         name: before.name,
         reliability_rating: before.reliability_rating,
         value_rating: before.value_rating,
+        enabled: before.enabled !== undefined ? before.enabled : true,
       },
       afterState: {
         name: after.name,
         reliability_rating: after.reliability_rating,
         value_rating: after.value_rating,
+        enabled: after.enabled !== undefined ? after.enabled : true,
       },
     });
   },

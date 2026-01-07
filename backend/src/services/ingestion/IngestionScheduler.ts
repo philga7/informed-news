@@ -65,12 +65,13 @@ class IngestionScheduler {
     try {
       console.log(`🔄 Running scheduled ingestion for organization ${organizationId}...`);
 
-      // Fetch all RSS sources for this organization
+      // Fetch all enabled RSS sources for this organization
       const { data: sources, error } = await supabase
         .from('sources')
         .select('*')
         .eq('organization_id', organizationId)
-        .eq('source_type', 'rss');
+        .eq('source_type', 'rss')
+        .eq('enabled', true);
 
       if (error || !sources || sources.length === 0) {
         console.log(`No RSS sources to ingest for organization ${organizationId}`);

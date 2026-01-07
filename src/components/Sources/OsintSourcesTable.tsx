@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Edit2, FileText, AlertTriangle, Link2, Trash2, RefreshCw } from 'lucide-react';
+import { Edit2, FileText, AlertTriangle, Link2, Trash2, RefreshCw, PowerOff } from 'lucide-react';
 import type { Source } from '../../types/osint';
 import { EditSourceModal } from './EditSourceModal';
 import { SourceValueRating } from './SourceValueRating';
@@ -203,8 +203,17 @@ export function OsintSourcesTable({ sources, onUpdate, onDelete, onRefresh }: Os
                 <td className="py-4 px-4 pr-2">
                   <div className="flex items-start gap-2">
                     {isStale(source) && <StaleWarningTooltip source={source} />}
+                    {source.enabled === false && (
+                      <PowerOff
+                        size={16}
+                        className="text-stone-500 mt-1 flex-shrink-0"
+                        title="Feed fetching is disabled"
+                      />
+                    )}
                     <div className="flex flex-col">
-                      <p className="text-stone-200 font-medium">{source.name}</p>
+                      <p className={`font-medium ${source.enabled === false ? 'text-stone-500' : 'text-stone-200'}`}>
+                        {source.name}
+                      </p>
                       {source.url && (
                         <p className="text-stone-500 text-xs mt-1 truncate max-w-xs" title={source.url}>
                           {source.url}
