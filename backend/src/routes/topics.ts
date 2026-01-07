@@ -943,10 +943,10 @@ router.get('/:id/narrative-timeline', async (req: Request, res: Response) => {
         if (!bucketMap.has(bucketKey)) {
           bucketMap.set(bucketKey, { facts: [], recordCount: 0 });
         }
-        const bucket = bucketMap.get(bucketKey)!;
-        bucket.facts.push(record.fact);
+        const bucketData = bucketMap.get(bucketKey)!;
+        bucketData.facts.push(record.fact);
         // Count unique source records per bucket (would need to track this separately)
-        bucket.recordCount = Math.max(bucket.recordCount, 1); // Simplified: at least 1 record per fact
+        bucketData.recordCount = Math.max(bucketData.recordCount, 1); // Simplified: at least 1 record per fact
       });
     } else {
       // Fall back to title-based extraction

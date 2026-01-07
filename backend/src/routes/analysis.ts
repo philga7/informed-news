@@ -356,11 +356,12 @@ async function createClaimsFromKeyFacts(artifact: any) {
   // Create claims for each topic
   for (const link of links) {
     for (const claimFact of claimFacts) {
+      const linkTyped = link as any;
       // Check if claim already exists for this topic (avoid duplicates)
       const { data: existingClaim, error: checkError } = await supabase
         .from('claims')
         .select('id')
-        .eq('topic_id', link.topic_id)
+        .eq('topic_id', linkTyped.topic_id)
         .eq('claim_text', claimFact.fact.trim())
         .maybeSingle();
 

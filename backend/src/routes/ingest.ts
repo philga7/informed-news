@@ -383,7 +383,7 @@ router.post('/rss/all', async (req: Request, res: Response) => {
           console.log(`  🔍 Starting ingestion...`);
           
           // Check if this is a Nitter URL and use appropriate service
-          let service: RssIngestionService | NitterScrapingService;
+          let service: RssIngestionService;
           
           if (isNitterUrl(source.url)) {
             console.log(`  🐦 Detected Nitter URL, using scraping service`);
@@ -537,7 +537,7 @@ router.post('/rss', async (req: Request, res: Response) => {
     }
 
     // Check if this is a Nitter URL and use appropriate service
-    let service: RssIngestionService | NitterScrapingService;
+    let service: RssIngestionService;
     
     if (isNitterUrl(source.url)) {
       console.log(`  🐦 Detected Nitter URL, using scraping service`);
