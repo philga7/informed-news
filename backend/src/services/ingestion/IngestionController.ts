@@ -152,8 +152,9 @@ export class IngestionController {
           .limit(1);
         
         if (!checkError && existingRecord && existingRecord.length > 0) {
+          const existing = existingRecord[0] as any;
           console.log(`    🔍 Sample hash ${sampleHash.substring(0, 16)}... already exists in database:`);
-          console.log(`       Existing record: "${existingRecord[0].title}" (ingested: ${existingRecord[0].ingested_at})`);
+          console.log(`       Existing record: "${existing.title}" (ingested: ${existing.ingested_at})`);
           console.log(`       New record: "${validBatch[0].dto.title}"`);
         } else {
           console.log(`    ✅ Sample hash ${sampleHash.substring(0, 16)}... is new (not found in database)`);
@@ -179,16 +180,17 @@ export class IngestionController {
             console.error(`      ✗ Test insert failed: ${testError.message} (code: ${testError.code})`);
           }
         } else if (testInsert) {
-          console.log(`      ✓ Test insert succeeded: Record inserted with ID ${testInsert.id}`);
+          const testRecord = testInsert as any;
+          console.log(`      ✓ Test insert succeeded: Record inserted with ID ${testRecord.id}`);
           // Delete the test record
-          await supabase.from('source_records').delete().eq('id', testInsert.id);
+          await supabase.from('source_records').delete().eq('id', testRecord.id);
           console.log(`      🗑️  Test record deleted`);
         }
       }
 
       const { data: functionResult, error: rpcError } = await supabase.rpc(
         'batch_insert_source_records',
-        { records: recordsJson as any }
+        { records: recordsJson as any } as any
       );
 
       if (rpcError) {
@@ -199,7 +201,7 @@ export class IngestionController {
         console.error('Error details:', JSON.stringify(rpcError, null, 2));
         console.error('Falling back to direct insert method');
         // Fall through to direct insert fallback below
-      } else if (functionResult && functionResult.length > 0) {
+      } else if (functionResult && Array.isArray(functionResult) && functionResult.length > 0) {
         // Success: function handled duplicates and returned counts + IDs
         const functionData = functionResult[0] as { 
           inserted_count: number; 
@@ -227,7 +229,7 @@ export class IngestionController {
               .limit(1);
             
             if (!hashCheckError && existingHash && existingHash.length > 0) {
-              const existing = existingHash[0];
+              const existing = existingHash[0] as any;
               const matchingItems = validBatch.filter(item => item.contentHash === hash);
               console.warn(`   ✓ Hash ${hash.substring(0, 16)}... EXISTS in DB: "${existing.title}" (source: ${existing.source_id})`);
               console.warn(`     Trying to insert ${matchingItems.length} item(s) with this hash:`);

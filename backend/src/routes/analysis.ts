@@ -475,7 +475,7 @@ async function addEntitiesToLinkedTopics(artifact: any) {
       // Update topic keywords
       const { error: updateError } = await supabase
         .from('osint_topics')
-        .update({ keywords: updatedKeywords })
+        .update({ keywords: updatedKeywords as any })
         .eq('id', topic.id);
 
       if (updateError) {
@@ -518,9 +518,13 @@ router.patch('/artifacts/:id', async (req: Request, res: Response) => {
       throw error;
     }
 
+    if (!artifact) {
+      return res.status(404).json({ error: 'Artifact not found' });
+    }
+
     // Audit log: artifact reviewed (only when marking as reviewed)
     if (reviewed) {
-      await auditService.logArtifactReviewed(id, artifact);
+      await auditService.logArtifactReviewed(id, artifact as any);
       
       // If this is a reviewed entity extraction artifact, add entities to linked topics' keywords
       // This runs asynchronously without blocking the response (fire-and-forget for Vercel compatibility)
