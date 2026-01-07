@@ -187,10 +187,10 @@ export function LinkToTopicModal({
   const isSingleMode = mode === 'single';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-stone-900 border border-stone-800 rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-stone-800">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="bg-stone-900 border border-stone-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden">
+        {/* Header - Fixed */}
+        <div className="flex-shrink-0 flex items-center justify-between px-6 py-4 border-b border-stone-800">
           <div>
             <h2 className="text-xl font-bold text-stone-100">
               {isSingleMode ? 'Quick Link to Topic' : 'Link to Topics'}
@@ -208,8 +208,8 @@ export function LinkToTopicModal({
           </button>
         </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-hidden flex flex-col p-6">
+        {/* Content - Scrollable */}
+        <div className="flex-1 overflow-y-auto min-h-0 p-6">
           {error && (
             <div className="mb-4 p-4 bg-red-900/30 border border-red-800 rounded-lg text-red-200">
               {error}
@@ -217,7 +217,7 @@ export function LinkToTopicModal({
           )}
 
           {showCreateForm ? (
-            <div className="flex-1 overflow-y-auto">
+            <div>
               <div className="mb-4 flex items-center justify-between">
                 <h3 className="text-lg font-semibold text-stone-200">Create New Topic</h3>
                 <button
@@ -243,7 +243,7 @@ export function LinkToTopicModal({
               />
             </div>
           ) : (
-            <form onSubmit={!isSingleMode ? handleSubmit : undefined} className="flex-1 flex flex-col">
+            <form onSubmit={!isSingleMode ? handleSubmit : undefined} className="flex flex-col">
               {/* Search and Create Button */}
               <div className="mb-4 space-y-3">
                 <div className="relative">
@@ -269,7 +269,7 @@ export function LinkToTopicModal({
               </div>
 
               {/* Topics List */}
-              <div className="flex-1 overflow-y-auto">
+              <div>
                 {isLoading ? (
                   <div className="flex items-center justify-center py-12">
                     <LoadingSpinner />
@@ -351,7 +351,7 @@ export function LinkToTopicModal({
 
               {/* Actions (only for multi mode) */}
               {!isSingleMode && (
-                <div className="flex items-center justify-end gap-3 pt-6 border-t border-stone-800 mt-6">
+                <div className="flex items-center justify-end gap-3 pt-4 border-t border-stone-800 mt-4">
                   <button
                     type="button"
                     onClick={onClose}
@@ -374,9 +374,9 @@ export function LinkToTopicModal({
           )}
         </div>
 
-        {/* Footer for single mode */}
+        {/* Footer for single mode - Fixed */}
         {isSingleMode && !showCreateForm && (
-          <div className="px-6 py-4 bg-stone-800 border-t border-stone-700 rounded-b-lg flex justify-between items-center">
+          <div className="flex-shrink-0 px-6 py-4 bg-stone-800 border-t border-stone-700 rounded-b-lg flex justify-between items-center">
             <p className="text-sm text-stone-400">
               Click on a topic to link this record
             </p>
