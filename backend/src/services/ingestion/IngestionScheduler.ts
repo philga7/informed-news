@@ -91,7 +91,7 @@ class IngestionScheduler {
               sourceId: source.id,
               feedUrl: source.url,
               scrapeExternalUrl: false, // TODO: Add this field to sources table
-              extractFullContent: true, // Extract full article content for AI analysis
+              extractFullContent: false, // Ingestion uses feed content only; analysis can fetch full text later
             });
 
             // Create controller and ingest

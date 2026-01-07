@@ -1,25 +1,41 @@
-import { useState } from 'react';
-import { AlertTriangle, Trash2, CheckCircle, Circle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Trash2, CheckCircle, Circle } from 'lucide-react';
 import type { AnalyticArtifact, SummaryPayload, EntityExtractionPayload, ToneAnalysisPayload, KeyFactsPayload, TopicSummaryPayload, MediaComparisonPayload } from '../../services/analysis.service';
 import { MediaComparisonCard } from '../Topics/MediaComparisonCard';
 import { analysisService } from '../../services/analysis.service';
 
 interface ArtifactCardProps {
   artifact: AnalyticArtifact;
+  isNew?: boolean;
   onUpdate?: () => void;
+  sourceReliability?: string; // Source reliability rating for tone analysis display
 }
 
-export function ArtifactCard({ artifact, onUpdate }: ArtifactCardProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
+export function ArtifactCard({ artifact, isNew = false, onUpdate, sourceReliability }: ArtifactCardProps) {
+  const [isExpanded, setIsExpanded] = useState(isNew);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [localArtifact, setLocalArtifact] = useState<AnalyticArtifact>(artifact);
+
+  // Update local artifact when prop changes
+  useEffect(() => {
+    setLocalArtifact(artifact);
+  }, [artifact]);
 
   const handleReviewToggle = async () => {
+    const newReviewedState = !localArtifact.reviewed;
+    
+    // Optimistically update local state
+    setLocalArtifact(prev => ({ ...prev, reviewed: newReviewedState }));
+    
     try {
       setIsUpdating(true);
-      await analysisService.updateArtifactReview(artifact.id, !artifact.reviewed);
+      await analysisService.updateArtifactReview(localArtifact.id, newReviewedState);
+      // Silently update parent without full reload
       onUpdate?.();
     } catch (error) {
       console.error('Error updating review status:', error);
+      // Revert on error
+      setLocalArtifact(prev => ({ ...prev, reviewed: !newReviewedState }));
       alert('Failed to update review status');
     } finally {
       setIsUpdating(false);
@@ -33,7 +49,7 @@ export function ArtifactCard({ artifact, onUpdate }: ArtifactCardProps) {
 
     try {
       setIsUpdating(true);
-      await analysisService.deleteArtifact(artifact.id);
+      await analysisService.deleteArtifact(localArtifact.id);
       onUpdate?.();
     } catch (error) {
       console.error('Error deleting artifact:', error);
@@ -77,58 +93,43 @@ export function ArtifactCard({ artifact, onUpdate }: ArtifactCardProps) {
   };
 
   const renderPayload = () => {
-    switch (artifact.type) {
+    switch (localArtifact.type) {
       case 'summary':
         // Check if this is a topic summary (has topic_id) or source record summary
-        if (artifact.topic_id) {
-          return <TopicSummaryDisplay payload={artifact.payload as TopicSummaryPayload} />;
+        if (localArtifact.topic_id) {
+          return <TopicSummaryDisplay payload={localArtifact.payload as TopicSummaryPayload} />;
         }
-        return <SummaryDisplay payload={artifact.payload as SummaryPayload} />;
+        return <SummaryDisplay payload={localArtifact.payload as SummaryPayload} />;
       case 'entity_extraction':
-        return <EntityDisplay payload={artifact.payload as EntityExtractionPayload} />;
+        return <EntityDisplay payload={localArtifact.payload as EntityExtractionPayload} />;
       case 'tone_analysis':
-        return <ToneDisplay payload={artifact.payload as ToneAnalysisPayload} />;
+        return <ToneDisplay payload={localArtifact.payload as ToneAnalysisPayload} sourceReliability={sourceReliability} />;
       case 'key_facts':
-        return <KeyFactsDisplay payload={artifact.payload as KeyFactsPayload} />;
+        return <KeyFactsDisplay payload={localArtifact.payload as KeyFactsPayload} />;
       case 'media_comparison':
-        return <MediaComparisonCard payload={artifact.payload as MediaComparisonPayload} />;
+        return <MediaComparisonCard payload={localArtifact.payload as MediaComparisonPayload} />;
       default:
-        return <pre className="text-xs text-stone-400 whitespace-pre-wrap">{JSON.stringify(artifact.payload, null, 2)}</pre>;
+        return <pre className="text-xs text-stone-400 whitespace-pre-wrap">{JSON.stringify(localArtifact.payload, null, 2)}</pre>;
     }
   };
 
   return (
     <div className="bg-stone-800 border border-stone-700 rounded-lg overflow-hidden">
-      {/* Header with warning */}
-      <div className="bg-amber-900/20 border-b border-amber-800/30 px-4 py-3">
-        <div className="flex items-start gap-3">
-          <AlertTriangle className="text-amber-500 flex-shrink-0 mt-0.5" size={20} />
-          <div className="flex-1 min-w-0">
-            <h4 className="text-sm font-semibold text-amber-400">
-              AI-Assisted {getTypeLabel(artifact.type)} – Requires Human Verification
-            </h4>
-            <p className="text-xs text-amber-300/70 mt-0.5">
-              This analysis was generated by AI and may contain inaccuracies. Always verify before taking action.
-            </p>
-          </div>
-        </div>
-      </div>
-
       {/* Toggle header */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
         className="w-full px-4 py-3 flex items-center justify-between hover:bg-stone-700/50 transition-colors duration-200"
       >
         <div className="flex items-center gap-3">
-          <div className={`transition-colors duration-200 ${artifact.reviewed ? 'text-green-500' : 'text-stone-500'}`}>
-            {artifact.reviewed ? <CheckCircle size={18} /> : <Circle size={18} />}
+          <div className={`transition-colors duration-200 ${localArtifact.reviewed ? 'text-green-500' : 'text-stone-500'}`}>
+            {localArtifact.reviewed ? <CheckCircle size={18} /> : <Circle size={18} />}
           </div>
           <div className="text-left">
             <div className="text-sm font-medium text-stone-200">
-              {getTypeLabel(artifact.type)}
+              {getTypeLabel(localArtifact.type)}
             </div>
             <div className="text-xs text-stone-500 mt-0.5">
-              {formatDate(artifact.created_at)} • {artifact.model_name}
+              {formatDate(localArtifact.created_at)} • {localArtifact.model_name}
             </div>
           </div>
         </div>
@@ -158,7 +159,7 @@ export function ArtifactCard({ artifact, onUpdate }: ArtifactCardProps) {
             <label className="flex items-center gap-2 cursor-pointer group">
               <input
                 type="checkbox"
-                checked={artifact.reviewed}
+                checked={localArtifact.reviewed}
                 onChange={handleReviewToggle}
                 disabled={isUpdating}
                 className="w-4 h-4 rounded border-stone-600 text-accent focus:ring-accent focus:ring-offset-stone-900"
@@ -397,7 +398,7 @@ function TopicSummaryDisplay({ payload }: { payload: TopicSummaryPayload }) {
 }
 
 // Tone Display Component
-function ToneDisplay({ payload }: { payload: ToneAnalysisPayload }) {
+function ToneDisplay({ payload, sourceReliability }: { payload: ToneAnalysisPayload; sourceReliability?: string }) {
   const getToneColor = (tone: string) => {
     switch (tone) {
       case 'factual':
@@ -429,6 +430,31 @@ function ToneDisplay({ payload }: { payload: ToneAnalysisPayload }) {
     }
   };
 
+  const getReliabilityMultiplier = (rating?: string): number => {
+    switch (rating?.toUpperCase()) {
+      case 'HIGH': return 1.0;
+      case 'MEDIUM': return 0.8;
+      case 'LOW': return 0.6;
+      case 'UNKNOWN':
+      default: return 0.7;
+    }
+  };
+
+  const getReliabilityColor = (rating?: string) => {
+    switch (rating?.toUpperCase()) {
+      case 'HIGH': return 'text-green-400';
+      case 'MEDIUM': return 'text-yellow-400';
+      case 'LOW': return 'text-red-400';
+      case 'UNKNOWN':
+      default: return 'text-stone-400';
+    }
+  };
+
+  const multiplier = getReliabilityMultiplier(sourceReliability);
+  const rawConfidence = payload.rawConfidence ?? payload.confidence;
+  const hasWeighting = payload.rawConfidence !== undefined && sourceReliability;
+  const adjustment = hasWeighting ? (payload.confidence - rawConfidence) * 100 : 0;
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-3">
@@ -444,12 +470,41 @@ function ToneDisplay({ payload }: { payload: ToneAnalysisPayload }) {
             {payload.sentiment}
           </span>
         </div>
-        <div>
-          <span className="text-xs text-stone-400 block mb-1">Confidence</span>
-          <span className="px-3 py-1 rounded border text-sm font-medium bg-stone-800 text-stone-300 border-stone-700">
-            {(payload.confidence * 100).toFixed(0)}%
+        <div className="relative group">
+          <span className="text-xs text-stone-400 block mb-1">
+            Confidence
+            {hasWeighting && (
+              <span className="ml-1 text-xs text-stone-500" title="Weighted by source reliability">
+                ⓘ
+              </span>
+            )}
           </span>
+          <div className="flex items-center gap-2">
+            <span className="px-3 py-1 rounded border text-sm font-medium bg-stone-800 text-stone-300 border-stone-700">
+              {(payload.confidence * 100).toFixed(0)}%
+            </span>
+            {hasWeighting && adjustment !== 0 && (
+              <span className={`text-xs ${adjustment < 0 ? 'text-red-400' : 'text-green-400'}`} title={`Raw confidence: ${(rawConfidence * 100).toFixed(0)}%, Adjusted by ${(adjustment).toFixed(0)}% due to ${sourceReliability} reliability`}>
+                {adjustment > 0 ? '↑' : '↓'} {Math.abs(adjustment).toFixed(0)}%
+              </span>
+            )}
+          </div>
+          {hasWeighting && (
+            <div className="absolute bottom-full left-0 mb-2 p-2 bg-stone-900 border border-stone-700 rounded text-xs text-stone-300 opacity-0 group-hover:opacity-100 pointer-events-none z-10 whitespace-nowrap transition-opacity">
+              <div>Raw: {(rawConfidence * 100).toFixed(0)}%</div>
+              <div className={getReliabilityColor(sourceReliability)}>Source: {sourceReliability} ({multiplier * 100}%)</div>
+              <div>Weighted: {(payload.confidence * 100).toFixed(0)}%</div>
+            </div>
+          )}
         </div>
+        {sourceReliability && (
+          <div>
+            <span className="text-xs text-stone-400 block mb-1">Source Reliability</span>
+            <span className={`px-3 py-1 rounded border text-sm font-medium bg-stone-800 border-stone-700 ${getReliabilityColor(sourceReliability)}`}>
+              {sourceReliability}
+            </span>
+          </div>
+        )}
       </div>
 
       {payload.indicators && payload.indicators.length > 0 && (

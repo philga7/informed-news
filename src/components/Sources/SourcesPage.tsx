@@ -95,13 +95,13 @@ export function SourcesPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [currentOrganization]);
+  }, [currentOrganization?.id]);
 
   useEffect(() => {
-    if (currentOrganization) {
+    if (currentOrganization?.id) {
       loadSources();
     }
-  }, [currentOrganization, loadSources]);
+  }, [currentOrganization?.id, loadSources]);
 
   const handleUpdateSource = async (sourceId: string, updates: SourceUpdateParams) => {
     try {

@@ -35,7 +35,8 @@ export interface EntityExtractionPayload {
 
 export interface ToneAnalysisPayload {
   overallTone: 'neutral' | 'opinion' | 'propaganda' | 'factual' | 'sensational';
-  confidence: number;
+  confidence: number; // Weighted confidence (0.0 to 1.0)
+  rawConfidence?: number; // Original confidence before weighting (for reference)
   indicators: string[];
   sentiment: 'positive' | 'negative' | 'neutral' | 'mixed';
   biasSignals: string[];
@@ -149,6 +150,29 @@ class AnalysisService {
    */
   async deleteArtifact(artifactId: string): Promise<void> {
     await apiClient.delete(`${this.baseUrl}/artifacts/${artifactId}`);
+  }
+
+  /**
+   * Get aggregated tone analysis for a topic (combines all linked source records)
+   */
+  async getTopicToneAggregate(topicId: string): Promise<{
+    topicId: string;
+    aggregate: {
+      overallTone: string;
+      toneDistribution: Record<string, number>;
+      sentiment: string;
+      sentimentDistribution: Record<string, number>;
+      confidence: number;
+      rawConfidence: number;
+      indicators: string[];
+      biasSignals: string[];
+      sourceRecordCount: number;
+      analysisCount: number;
+    } | null;
+    message?: string;
+  }> {
+    const response = await apiClient.get(`${this.baseUrl}/topics/${topicId}/tone-aggregate`);
+    return response;
   }
 
   /**

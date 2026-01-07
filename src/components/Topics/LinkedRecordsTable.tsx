@@ -2,6 +2,7 @@ import { ExternalLink, Trash2, TrendingUp, Edit2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { ConfidenceBadge } from '../UI/ConfidenceBadge';
 import { LinkReviewStatusBadge } from './LinkReviewStatusBadge';
+import { formatSourceNameWithDomain } from '../../utils/urlUtils';
 
 interface LinkedRecordsTableProps {
   links: Array<{
@@ -20,6 +21,7 @@ interface LinkedRecordsTableProps {
       sources: {
         name: string;
         reliability_rating: string;
+        scrape_external_url?: boolean;
       };
     };
   }>;
@@ -111,7 +113,13 @@ export function LinkedRecordsTable({ links, onUnlink, onEdit }: LinkedRecordsTab
               </td>
               <td className="py-4 px-4">
                 <div>
-                  <p className="text-stone-300 text-sm">{link.source_records.sources.name}</p>
+                  <p className="text-stone-300 text-sm">
+                    {formatSourceNameWithDomain(
+                      link.source_records.sources.name,
+                      link.source_records.url,
+                      link.source_records.sources.scrape_external_url || false
+                    )}
+                  </p>
                   <span
                     className={`inline-block px-2 py-0.5 text-xs rounded mt-1 ${getReliabilityBadgeColor(
                       link.source_records.sources.reliability_rating

@@ -16,6 +16,7 @@ import { TopicForm } from './TopicForm';
 import { TopicTimelineChart } from './TopicTimelineChart';
 import { TimelineStats } from './TimelineStats';
 import { ConfidenceStats } from './ConfidenceStats';
+import { TopicToneAggregate } from './TopicToneAggregate';
 import { RelatedTopicsWidget } from './RelatedTopicsWidget';
 import { CoordinationSection } from './CoordinationSection';
 import { NarrativeEvolutionTimeline } from './NarrativeEvolutionTimeline';
@@ -539,6 +540,13 @@ export function TopicDetailPage() {
                 {linkedRecords.length > 0 && (
                   <div className="mb-6">
                     <ConfidenceStats links={linkedRecords} />
+                  </div>
+                )}
+
+                {/* Topic-Level Tone Analysis Aggregate */}
+                {linkedRecords.length > 0 && id && (
+                  <div className="mb-6">
+                    <TopicToneAggregate topicId={id} />
                   </div>
                 )}
               </div>

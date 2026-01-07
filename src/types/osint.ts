@@ -298,6 +298,8 @@ export interface CorroborationMatrixCell {
   linkId: string | null;
   sourceRecordId: string | null;
   sourceName: string | null;
+  sourceUrl: string | null;
+  scrapeExternalUrl: boolean;
   supports: boolean | null;
   evidenceExcerpt: string | null;
 }
@@ -313,6 +315,8 @@ export interface CorroborationMatrix {
     linkId: string;
     sourceRecordId: string;
     sourceName: string;
+    sourceUrl: string | null;
+    scrapeExternalUrl: boolean;
   }>;
   matrix: CorroborationMatrixCell[];
 }

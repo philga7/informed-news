@@ -11,7 +11,6 @@ import {
   IngestionController,
   RssIngestionService,
   ManualInputService,
-  NitterScrapingService,
 } from '../services/ingestion/index.js';
 
 const router = Router();
@@ -35,9 +34,59 @@ function isNitterUrl(url: string): boolean {
 }
 
 /**
+ * Process sources in parallel with a concurrency limit
+ * Uses a semaphore pattern to limit concurrent executions
+ */
+async function processSourcesInParallel<T, R>(
+  items: T[],
+  processor: (item: T, index: number) => Promise<R>,
+  concurrency: number = 5
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  const executing: Array<{ promise: Promise<void>; index: number }> = [];
+
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    
+    // Create a promise that processes the item
+    const promise = processor(item, i).then(result => {
+      results[i] = result;
+    }).then(() => {
+      // Remove self from executing array when done
+      const idx = executing.findIndex(e => e.index === i);
+      if (idx >= 0) {
+        executing.splice(idx, 1);
+      }
+    });
+
+    executing.push({ promise, index: i });
+
+    // When we hit the concurrency limit, wait for one to finish
+    if (executing.length >= concurrency) {
+      await Promise.race(executing.map(e => e.promise));
+    }
+  }
+
+  // Wait for all remaining promises
+  await Promise.all(executing.map(e => e.promise));
+
+  return results;
+}
+
+/**
  * POST /api/ingest/rss/all
- * Trigger RSS ingestion for all RSS sources in an organization (one at a time)
+ * Trigger RSS ingestion for all RSS sources in an organization (parallel, max 5 concurrent)
  * If organization_id is "all", processes all organizations
+ * 
+ * NOTE: Vercel serverless functions have timeout limits:
+ * - Free tier: 10 seconds
+ * - Pro tier: 60 seconds
+ * - Enterprise: 300 seconds (5 minutes)
+ * 
+ * For large ingestion jobs (>60 seconds), consider:
+ * - Using a background job queue (e.g., GitHub Actions, cron jobs)
+ * - Splitting into smaller batches
+ * - Using the scheduler endpoint instead of manual triggers
  * 
  * Body:
  *   - organization_id: string (required) - organization ID or "all" for all organizations
@@ -157,15 +206,16 @@ router.post('/rss/all', async (req: Request, res: Response) => {
 
             try {
               const service = isNitterUrl(source.url)
-                ? new NitterScrapingService({
-                    sourceId: source.id,
-                    nitterUrl: source.url,
-                  })
+                ? (() => {
+                    throw new Error(
+                      'Nitter HTML scraping ingestion is disabled for speed/safety. Please use an RSS feed URL for this source (or ingest via manual input), and reserve scraping for AI analysis.'
+                    );
+                  })()
                 : new RssIngestionService({
                     sourceId: source.id,
                     feedUrl: source.url,
                     scrapeExternalUrl: source.scrape_external_url || false,
-                    extractFullContent: true,
+                    extractFullContent: false,
                   });
 
               const controller = new IngestionController(service);
@@ -276,11 +326,11 @@ router.post('/rss/all', async (req: Request, res: Response) => {
       });
     }
 
-    // Process sources sequentially (one at a time)
+    // Process sources in parallel with concurrency limit (5 at a time)
     console.log(`\n🔄 Starting RSS ingestion for organization ${organization_id}`);
-    console.log(`📋 Found ${sources.length} RSS source(s) to process\n`);
+    console.log(`📋 Found ${sources.length} RSS source(s) to process (parallel, max 5 concurrent)\n`);
 
-    const results: Array<{
+    type SourceResult = {
       source_id: string;
       source_name: string;
       success: boolean;
@@ -288,129 +338,114 @@ router.post('/rss/all', async (req: Request, res: Response) => {
       skipped: number;
       errors: number;
       error?: string;
-    }> = [];
+    };
 
-    let totalAdded = 0;
-    let totalSkipped = 0;
-    let totalErrors = 0;
+    const results: SourceResult[] = [];
 
-    for (let i = 0; i < sources.length; i++) {
-      const source = sources[i];
-      const sourceNum = i + 1;
-      
-      console.log(`[${sourceNum}/${sources.length}] Processing source: "${source.name}" (${source.id})`);
-      console.log(`  📡 Feed URL: ${source.url}`);
-      if (!source.url) {
-        console.log(`  ⚠️  Skipping: Source missing URL`);
-        results.push({
+    // Process sources in parallel with concurrency limit
+    const processedResults = await processSourcesInParallel(
+      sources,
+      async (source, index) => {
+        const sourceNum = index + 1;
+        const result: SourceResult = {
           source_id: source.id,
           source_name: source.name,
           success: false,
           added: 0,
           skipped: 0,
           errors: 0,
-          error: 'Source missing URL',
-        });
-        continue;
-      }
+        };
 
-      // Verify source still exists before processing
-      const { data: sourceCheck, error: sourceCheckError } = await supabase
-        .from('sources')
-        .select('id')
-        .eq('id', source.id)
-        .single();
-
-      if (sourceCheckError || !sourceCheck) {
-        console.log(`  ❌ Skipping: Source no longer exists in database`);
-        results.push({
-          source_id: source.id,
-          source_name: source.name,
-          success: false,
-          added: 0,
-          skipped: 0,
-          errors: 0,
-          error: 'Source no longer exists in database',
-        });
-        continue;
-      }
-
-      try {
-        const startTime = Date.now();
-        console.log(`  🔍 Starting ingestion...`);
+        console.log(`[${sourceNum}/${sources.length}] Processing source: "${source.name}" (${source.id})`);
+        console.log(`  📡 Feed URL: ${source.url}`);
         
-        // Check if this is a Nitter URL and use appropriate service
-        let service: RssIngestionService | NitterScrapingService;
-        
-        if (isNitterUrl(source.url)) {
-          console.log(`  🐦 Detected Nitter URL, using scraping service`);
-          service = new NitterScrapingService({
-            sourceId: source.id,
-            nitterUrl: source.url,
-          });
-        } else {
-          // Create RSS ingestion service with scrapeExternalUrl from source config
-          service = new RssIngestionService({
-            sourceId: source.id,
-            feedUrl: source.url,
-            scrapeExternalUrl: source.scrape_external_url || false,
-            extractFullContent: true,
-          });
+        if (!source.url) {
+          console.log(`  ⚠️  Skipping: Source missing URL`);
+          result.error = 'Source missing URL';
+          return result;
         }
 
-        // Create controller and ingest
-        const controller = new IngestionController(service);
-        const result = await controller.ingest();
-        
-        const duration = ((Date.now() - startTime) / 1000).toFixed(2);
-
-        // Update source updated_at timestamp
-        await supabase
+        // Verify source still exists before processing
+        const { data: sourceCheck, error: sourceCheckError } = await supabase
           .from('sources')
-          // @ts-expect-error - Supabase type inference issue in serverless environment
-          .update({ updated_at: new Date().toISOString() })
-          .eq('id', source.id);
+          .select('id')
+          .eq('id', source.id)
+          .single();
 
-        totalAdded += result.added;
-        totalSkipped += result.skipped;
-        totalErrors += result.errors.length;
-
-        console.log(`  ✅ Completed in ${duration}s: +${result.added} new, ~${result.skipped} duplicates, ❌${result.errors.length} errors`);
-        if (result.errors.length > 0) {
-          console.log(`  ⚠️  Errors encountered:`);
-          result.errors.slice(0, 3).forEach((err, idx) => {
-            console.log(`     ${idx + 1}. ${err}`);
-          });
-          if (result.errors.length > 3) {
-            console.log(`     ... and ${result.errors.length - 3} more`);
-          }
+        if (sourceCheckError || !sourceCheck) {
+          console.log(`  ❌ Skipping: Source no longer exists in database`);
+          result.error = 'Source no longer exists in database';
+          return result;
         }
 
-        results.push({
-          source_id: source.id,
-          source_name: source.name,
-          success: true,
-          added: result.added,
-          skipped: result.skipped,
-          errors: result.errors.length,
-        });
-      } catch (error) {
-        const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-        console.log(`  ❌ Failed: ${errorMsg}`);
-        totalErrors++;
-        results.push({
-          source_id: source.id,
-          source_name: source.name,
-          success: false,
-          added: 0,
-          skipped: 0,
-          errors: 1,
-          error: errorMsg,
-        });
-      }
-      
-      console.log(''); // Empty line between sources
-    }
+        try {
+          const startTime = Date.now();
+          console.log(`  🔍 Starting ingestion...`);
+          
+          // Check if this is a Nitter URL and use appropriate service
+          let service: RssIngestionService;
+          
+          if (isNitterUrl(source.url)) {
+            console.log(`  🐦 Detected Nitter URL, using scraping service`);
+            throw new Error(
+              'Nitter HTML scraping ingestion is disabled for speed/safety. Please use an RSS feed URL for this source (or ingest via manual input), and reserve scraping for AI analysis.'
+            );
+          } else {
+            // Create RSS ingestion service with scrapeExternalUrl from source config
+            service = new RssIngestionService({
+              sourceId: source.id,
+              feedUrl: source.url,
+              scrapeExternalUrl: source.scrape_external_url || false,
+              extractFullContent: false,
+            });
+          }
+
+          // Create controller and ingest
+          const controller = new IngestionController(service);
+          const ingestResult = await controller.ingest();
+          
+          const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+
+          // Update source updated_at timestamp
+          await supabase
+            .from('sources')
+            // @ts-expect-error - Supabase type inference issue in serverless environment
+            .update({ updated_at: new Date().toISOString() })
+            .eq('id', source.id);
+
+          result.success = true;
+          result.added = ingestResult.added;
+          result.skipped = ingestResult.skipped;
+          result.errors = ingestResult.errors.length;
+
+          console.log(`  ✅ Completed in ${duration}s: +${ingestResult.added} new, ~${ingestResult.skipped} duplicates, ❌${ingestResult.errors.length} errors`);
+          if (ingestResult.errors.length > 0) {
+            console.log(`  ⚠️  Errors encountered:`);
+            ingestResult.errors.slice(0, 3).forEach((err, idx) => {
+              console.log(`     ${idx + 1}. ${err}`);
+            });
+            if (ingestResult.errors.length > 3) {
+              console.log(`     ... and ${ingestResult.errors.length - 3} more`);
+            }
+          }
+        } catch (error) {
+          const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+          console.log(`  ❌ Failed: ${errorMsg}`);
+          result.errors = 1;
+          result.error = errorMsg;
+        }
+        
+        console.log(''); // Empty line between sources
+        return result;
+      },
+      5 // Concurrency limit: 5 sources at a time
+    );
+
+    // Collect results and calculate totals
+    results.push(...processedResults);
+    const totalAdded = results.reduce((sum, r) => sum + r.added, 0);
+    const totalSkipped = results.reduce((sum, r) => sum + r.skipped, 0);
+    const totalErrors = results.reduce((sum, r) => sum + r.errors, 0);
 
     console.log(`\n📊 Ingestion Summary for organization ${organization_id}:`);
     console.log(`  Total sources: ${sources.length}`);
@@ -502,21 +537,20 @@ router.post('/rss', async (req: Request, res: Response) => {
     }
 
     // Check if this is a Nitter URL and use appropriate service
-    let service: RssIngestionService | NitterScrapingService;
+    let service: RssIngestionService;
     
     if (isNitterUrl(source.url)) {
       console.log(`  🐦 Detected Nitter URL, using scraping service`);
-      service = new NitterScrapingService({
-        sourceId: source.id,
-        nitterUrl: source.url,
-      });
+      throw new Error(
+        'Nitter HTML scraping ingestion is disabled for speed/safety. Please use an RSS feed URL for this source (or ingest via manual input), and reserve scraping for AI analysis.'
+      );
     } else {
       // Create RSS ingestion service with scrapeExternalUrl from source config
       service = new RssIngestionService({
         sourceId: source.id,
         feedUrl: source.url,
         scrapeExternalUrl: source.scrape_external_url || false,
-        extractFullContent: true, // Extract full article content for AI analysis
+        extractFullContent: false, // Ingestion uses feed content only; analysis can fetch full text later
       });
     }
 
