@@ -270,7 +270,7 @@ export class IngestionController {
 
           if (!fetchError && insertedRecords) {
             // Audit log each inserted record (fire and forget)
-            insertedRecords.forEach((record) => {
+            insertedRecords.forEach((record: any) => {
               void auditService.logSourceRecordCreated(
                 record.id,
                 {
@@ -375,7 +375,7 @@ export class IngestionController {
 
         // Audit log for inserted records (fire and forget)
         if (insertedRecords && insertedRecords.length > 0) {
-          insertedRecords.forEach((record) => {
+          insertedRecords.forEach((record: any) => {
             const originalItem = validBatch.find(item => item.contentHash === record.content_hash);
             if (originalItem) {
               void auditService.logSourceRecordCreated(

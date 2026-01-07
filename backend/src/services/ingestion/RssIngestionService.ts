@@ -150,7 +150,7 @@ export class RssIngestionService implements IngestionService {
           raw_metadata: rawMetadata,
           // Phase 1: Content optimization and media types
           media_type: mediaType,
-          content_type: 'full_text',
+          content_type: 'full_text' as const,
           content_compressed: false,
           content_length: contentLength,
         };
