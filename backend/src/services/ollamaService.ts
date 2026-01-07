@@ -22,7 +22,8 @@ export interface EntityExtractionResponse {
 
 export interface ToneAnalysisResponse {
   overallTone: 'neutral' | 'opinion' | 'propaganda' | 'factual' | 'sensational';
-  confidence: number;
+  confidence: number; // Weighted confidence (0.0 to 1.0)
+  rawConfidence?: number; // Original confidence before weighting (for reference)
   indicators: string[];
   sentiment: 'positive' | 'negative' | 'neutral' | 'mixed';
   biasSignals: string[];
@@ -290,9 +291,19 @@ Be explicit about uncertainty. Base assessment only on the text provided.`;
       const response = await this.callWithTimeout(prompt);
       const parsed = this.parseJsonResponse(response);
 
+      // Get raw confidence from model (0.0 to 1.0)
+      const rawConfidence = typeof parsed.confidence === 'number' 
+        ? Math.max(0, Math.min(1, parsed.confidence)) // Clamp to [0, 1]
+        : 0.5;
+
+      // Weight confidence by source reliability
+      const reliabilityMultiplier = this.getReliabilityMultiplier(sourceMetadata?.reliabilityRating);
+      const weightedConfidence = rawConfidence * reliabilityMultiplier;
+
       return {
         overallTone: parsed.overallTone || 'neutral',
-        confidence: typeof parsed.confidence === 'number' ? parsed.confidence : 0.5,
+        confidence: weightedConfidence, // Now weighted by source reliability
+        rawConfidence, // Store original confidence for reference
         indicators: Array.isArray(parsed.indicators) ? parsed.indicators : [],
         sentiment: parsed.sentiment || 'neutral',
         biasSignals: Array.isArray(parsed.biasSignals) ? parsed.biasSignals : [],
@@ -300,6 +311,24 @@ Be explicit about uncertainty. Base assessment only on the text provided.`;
     } catch (error) {
       console.error('Tone analysis error:', error);
       throw new Error(`Tone analysis failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Get reliability multiplier for confidence weighting
+   * HIGH = 1.0x (full confidence), MEDIUM = 0.8x, LOW = 0.6x, UNKNOWN = 0.7x
+   */
+  private getReliabilityMultiplier(reliabilityRating?: string): number {
+    switch (reliabilityRating?.toUpperCase()) {
+      case 'HIGH':
+        return 1.0;
+      case 'MEDIUM':
+        return 0.8;
+      case 'LOW':
+        return 0.6;
+      case 'UNKNOWN':
+      default:
+        return 0.7;
     }
   }
 

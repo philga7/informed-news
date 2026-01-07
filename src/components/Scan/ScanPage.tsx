@@ -10,7 +10,7 @@ import { ScanItem } from './ScanItem';
 import { ScanSidebar } from './ScanSidebar';
 import { QuickActionsPanel } from './QuickActionsPanel';
 import { KeyboardShortcutsModal } from './KeyboardShortcutsModal';
-import { QuickLinkToTopicModal } from './QuickLinkToTopicModal';
+import { LinkToTopicModal } from '../Topics/LinkToTopicModal';
 import { CreateWatchItemModal } from './CreateWatchItemModal';
 import type { WatchItemCategory, ScanStatus, MediaType } from '../../types/osint';
 import type { ScanSession } from '../../services/scanSessions.service';
@@ -569,10 +569,15 @@ export function ScanPage() {
       )}
 
       {showLinkToTopicModal && records[selectedRecordIndex] && (
-        <QuickLinkToTopicModal
-          record={records[selectedRecordIndex]}
+        <LinkToTopicModal
+          sourceRecordId={records[selectedRecordIndex].id}
+          recordTitle={records[selectedRecordIndex].title}
+          mode="single"
+          filterActiveOnly={true}
+          onLink={async (topicIds) => {
+            await handleLinkToTopic(topicIds[0]);
+          }}
           onClose={() => setShowLinkToTopicModal(false)}
-          onLinked={handleLinkToTopic}
         />
       )}
 

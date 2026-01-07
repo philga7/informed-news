@@ -846,51 +846,187 @@ router.get('/:id/narrative-timeline', async (req: Request, res: Response) => {
 
     if (linksError) throw linksError;
 
-    // Extract records
-    const records = links?.map((link: any) => ({
-      title: link.source_records.title,
-      date: link.source_records.published_at || link.source_records.ingested_at,
-    })) || [];
+    if (!links || links.length === 0) {
+      return res.json({
+        success: true,
+        topic_id: id,
+        buckets: [],
+      });
+    }
 
-    // Filter by date range
-    const filteredRecords = records.filter((record: any) => {
-      const recordDate = new Date(record.date);
-      if (start_date && recordDate < new Date(start_date as string)) return false;
-      if (end_date && recordDate > new Date(end_date as string)) return false;
-      return true;
-    });
+    const sourceRecordIds = links.map((link: any) => link.source_records.id);
 
-    // Group by time bucket
-    const bucketMap = new Map<string, any[]>();
-    filteredRecords.forEach((record: any) => {
-      const date = new Date(record.date);
-      let bucketKey: string;
+    // Fetch reviewed key facts artifacts for these source records
+    const { data: keyFactsArtifacts, error: artifactsError } = await supabase
+      .from('analytic_artifacts')
+      .select(`
+        id,
+        source_record_id,
+        payload,
+        created_at,
+        source_records!inner (
+          id,
+          published_at,
+          ingested_at
+        )
+      `)
+      .eq('type', 'key_facts')
+      .eq('reviewed', true)
+      .in('source_record_id', sourceRecordIds);
 
-      if (bucket === 'day') {
-        bucketKey = date.toISOString().split('T')[0];
-      } else if (bucket === 'week') {
-        const startOfWeek = new Date(date);
-        startOfWeek.setDate(date.getDate() - date.getDay());
-        bucketKey = startOfWeek.toISOString().split('T')[0];
-      } else {
-        bucketKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-01`;
-      }
+    if (artifactsError) {
+      console.error('Error fetching key facts artifacts:', artifactsError);
+      // Fall back to title-based extraction if artifacts fetch fails
+    }
 
-      if (!bucketMap.has(bucketKey)) {
-        bucketMap.set(bucketKey, []);
-      }
-      bucketMap.get(bucketKey)!.push(record.title);
-    });
+    // Extract non-claim facts (events, quotes, statistics) from reviewed key facts
+    const factRecords: Array<{
+      fact: string;
+      category: 'event' | 'quote' | 'statistic';
+      date: string;
+    }> = [];
 
-    // Extract key phrases for each bucket
+    if (keyFactsArtifacts && keyFactsArtifacts.length > 0) {
+      keyFactsArtifacts.forEach((artifact: any) => {
+        const payload = artifact.payload as { facts?: Array<{ fact: string; category?: 'event' | 'quote' | 'statistic' | 'claim' }> };
+        if (!payload.facts) return;
+
+        // Extract only non-claim facts (events, quotes, statistics)
+        const nonClaimFacts = payload.facts.filter(
+          f => f.category && ['event', 'quote', 'statistic'].includes(f.category) && f.fact
+        );
+
+        const recordDate = artifact.source_records.published_at || artifact.source_records.ingested_at || artifact.created_at;
+
+        nonClaimFacts.forEach((fact: any) => {
+          factRecords.push({
+            fact: fact.fact.trim(),
+            category: fact.category as 'event' | 'quote' | 'statistic',
+            date: recordDate,
+          });
+        });
+      });
+    }
+
+    // Fall back to title-based extraction if no key facts available
+    const records: Array<{ title: string; date: string }> = [];
+    if (factRecords.length === 0) {
+      links.forEach((link: any) => {
+        records.push({
+          title: link.source_records.title,
+          date: link.source_records.published_at || link.source_records.ingested_at,
+        });
+      });
+    }
+
+    // Filter by date range and group by time bucket
+    const bucketMap = new Map<string, { facts: string[]; recordCount: number }>();
+
+    // Use key facts if available, otherwise fall back to titles
+    if (factRecords.length > 0) {
+      factRecords.forEach((record: any) => {
+        const recordDate = new Date(record.date);
+        if (start_date && recordDate < new Date(start_date as string)) return;
+        if (end_date && recordDate > new Date(end_date as string)) return;
+
+        let bucketKey: string;
+        if (bucket === 'day') {
+          bucketKey = recordDate.toISOString().split('T')[0];
+        } else if (bucket === 'week') {
+          const startOfWeek = new Date(recordDate);
+          startOfWeek.setDate(recordDate.getDate() - recordDate.getDay());
+          bucketKey = startOfWeek.toISOString().split('T')[0];
+        } else {
+          bucketKey = `${recordDate.getFullYear()}-${String(recordDate.getMonth() + 1).padStart(2, '0')}-01`;
+        }
+
+        if (!bucketMap.has(bucketKey)) {
+          bucketMap.set(bucketKey, { facts: [], recordCount: 0 });
+        }
+        const bucket = bucketMap.get(bucketKey)!;
+        bucket.facts.push(record.fact);
+        // Count unique source records per bucket (would need to track this separately)
+        bucket.recordCount = Math.max(bucket.recordCount, 1); // Simplified: at least 1 record per fact
+      });
+    } else {
+      // Fall back to title-based extraction
+      records.forEach((record: any) => {
+        const recordDate = new Date(record.date);
+        if (start_date && recordDate < new Date(start_date as string)) return;
+        if (end_date && recordDate > new Date(end_date as string)) return;
+
+        let bucketKey: string;
+        if (bucket === 'day') {
+          bucketKey = recordDate.toISOString().split('T')[0];
+        } else if (bucket === 'week') {
+          const startOfWeek = new Date(recordDate);
+          startOfWeek.setDate(recordDate.getDate() - recordDate.getDay());
+          bucketKey = startOfWeek.toISOString().split('T')[0];
+        } else {
+          bucketKey = `${recordDate.getFullYear()}-${String(recordDate.getMonth() + 1).padStart(2, '0')}-01`;
+        }
+
+        if (!bucketMap.has(bucketKey)) {
+          bucketMap.set(bucketKey, { facts: [], recordCount: 0 });
+        }
+        const bucketData = bucketMap.get(bucketKey)!;
+        // For title-based, extract phrases
+        const phrases = extractKeyPhrases([record.title]);
+        bucketData.facts.push(...phrases);
+        bucketData.recordCount += 1;
+      });
+    }
+
+    // Count unique source records per bucket
+    // For key facts, count unique source_record_ids
+    const recordCountMap = new Map<string, Set<string>>();
+    if (factRecords.length > 0 && keyFactsArtifacts) {
+      keyFactsArtifacts.forEach((artifact: any) => {
+        const recordDate = artifact.source_records.published_at || artifact.source_records.ingested_at || artifact.created_at;
+        const recordDateObj = new Date(recordDate);
+        
+        let bucketKey: string;
+        if (bucket === 'day') {
+          bucketKey = recordDateObj.toISOString().split('T')[0];
+        } else if (bucket === 'week') {
+          const startOfWeek = new Date(recordDateObj);
+          startOfWeek.setDate(recordDateObj.getDate() - recordDateObj.getDay());
+          bucketKey = startOfWeek.toISOString().split('T')[0];
+        } else {
+          bucketKey = `${recordDateObj.getFullYear()}-${String(recordDateObj.getMonth() + 1).padStart(2, '0')}-01`;
+        }
+
+        if (!recordCountMap.has(bucketKey)) {
+          recordCountMap.set(bucketKey, new Set());
+        }
+        recordCountMap.get(bucketKey)!.add(artifact.source_record_id);
+      });
+    }
+
+    // Build buckets with deduplicated facts/phrases
     const buckets = Array.from(bucketMap.entries())
-      .map(([date, titles]) => {
-        // Simple phrase extraction: most common 2-3 word sequences
-        const phrases = extractKeyPhrases(titles);
+      .map(([date, data]) => {
+        // Deduplicate facts/phrases and get top ones
+        const phraseFreq = new Map<string, number>();
+        data.facts.forEach(fact => {
+          phraseFreq.set(fact, (phraseFreq.get(fact) || 0) + 1);
+        });
+
+        // Sort by frequency and take top 5
+        const topPhrases = Array.from(phraseFreq.entries())
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 5)
+          .map(([phrase]) => phrase);
+
+        // Get accurate record count
+        const recordCount = recordCountMap.has(date) 
+          ? recordCountMap.get(date)!.size 
+          : data.recordCount;
+
         return {
           date,
-          record_count: titles.length,
-          key_phrases: phrases.slice(0, 5), // Top 5 phrases
+          record_count: recordCount,
+          key_phrases: topPhrases,
         };
       })
       .sort((a, b) => a.date.localeCompare(b.date));

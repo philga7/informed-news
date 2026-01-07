@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FileText, Search, Filter, RefreshCw, Plus } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
@@ -8,6 +8,7 @@ import { EmptyState } from '../UI/EmptyState';
 import { LoadingSpinner } from '../UI/LoadingSpinner';
 import { SourceRecordFilters } from './SourceRecordFilters';
 import { ManualArticleInputModal } from './ManualArticleInputModal';
+import { formatSourceNameWithDomain } from '../../utils/urlUtils';
 
 export function SourceRecordsPage() {
   const { user } = useAuth();
@@ -31,6 +32,7 @@ export function SourceRecordsPage() {
     limit: 50,
     offset: 0,
   });
+  const isInitialLoad = useRef(true);
 
   const loadRecords = async (showSpinner = true, resetOffset = false) => {
     if (!currentOrganization) {
@@ -59,6 +61,11 @@ export function SourceRecordsPage() {
 
       setRecords(result.records);
       setPagination(result.pagination);
+      
+      // Mark initial load as complete after first successful load
+      if (isInitialLoad.current) {
+        isInitialLoad.current = false;
+      }
     } catch (err) {
       console.error('Error loading records:', err);
       setError(err instanceof Error ? err.message : 'Failed to load source records');
@@ -68,15 +75,37 @@ export function SourceRecordsPage() {
     }
   };
 
+  // Initial load or organization change - show full loading state
   useEffect(() => {
     if (currentOrganization) {
-      loadRecords();
+      isInitialLoad.current = true;
+      loadRecords(true, false);
     }
-  }, [currentOrganization?.id, filters, pagination.offset]);
+  }, [currentOrganization?.id]);
 
-  const handleSearch = () => {
+  // Filter changes - only refresh records listing (after initial load)
+  useEffect(() => {
+    if (currentOrganization && !isInitialLoad.current) {
+      // Only refresh if this is not the initial load (filters changed)
+      loadRecords(false, true);
+    }
+  }, [filters.sourceId, filters.linkedStatus, filters.dateFrom, filters.dateTo]);
+
+  // Pagination changes - only refresh records listing (after initial load)
+  useEffect(() => {
+    if (currentOrganization && !isInitialLoad.current && pagination.offset > 0) {
+      // Only refresh if this is not the initial load and we're actually paginating
+      loadRecords(false, false);
+    }
+  }, [pagination.offset]);
+
+  const handleSearch = (e?: React.MouseEvent | React.KeyboardEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     setPagination({ ...pagination, offset: 0 });
-    loadRecords(true, true);
+    loadRecords(false, true); // Use isRefreshing instead of full loading state
   };
 
   const handleRecordClick = (recordId: string) => {
@@ -175,12 +204,19 @@ export function SourceRecordsPage() {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                placeholder="Search by title or content..."
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleSearch(e);
+                  }
+                }}
+                placeholder="Search by title, content, or source..."
                 className="w-full pl-10 pr-4 py-3 bg-stone-900 border border-stone-800 rounded-lg text-stone-200 placeholder-stone-500 focus:outline-none focus:border-blue-600"
               />
             </div>
             <button
+              type="button"
               onClick={handleSearch}
               className="px-6 py-3 bg-accent hover:bg-accent-hover text-white rounded-lg transition-colors duration-250"
             >
@@ -240,7 +276,13 @@ export function SourceRecordsPage() {
                         </td>
                         <td className="py-4 px-4">
                           <div>
-                            <p className="text-stone-300 text-sm">{record.sources?.name}</p>
+                            <p className="text-stone-300 text-sm">
+                              {formatSourceNameWithDomain(
+                                record.sources?.name || 'Unknown',
+                                record.url,
+                                record.sources?.scrape_external_url || false
+                              )}
+                            </p>
                             <p
                               className={`text-xs mt-1 ${getReliabilityColor(
                                 record.sources?.reliability_rating

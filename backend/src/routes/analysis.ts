@@ -322,6 +322,172 @@ router.get('/source-records/:id/artifacts', async (req: Request, res: Response) 
 });
 
 /**
+ * Helper function: Create claims from reviewed key facts artifact
+ * Only creates claims for facts with category='claim', other facts remain as key facts only
+ */
+async function createClaimsFromKeyFacts(artifact: any) {
+  if (!artifact.source_record_id || artifact.type !== 'key_facts') {
+    return;
+  }
+
+  const payload = artifact.payload as { facts?: Array<{ fact: string; confidence: number; category?: 'event' | 'quote' | 'statistic' | 'claim'; supportingLinks?: string[] }> };
+  
+  if (!payload.facts || payload.facts.length === 0) {
+    return; // No facts to process
+  }
+
+  // Extract only facts with category='claim'
+  const claimFacts = payload.facts.filter(f => f.category === 'claim');
+
+  if (claimFacts.length === 0) {
+    return; // No claim facts to create
+  }
+
+  // Find all topics linked to this source record
+  const { data: links, error: linksError } = await supabase
+    .from('topic_source_links')
+    .select('topic_id, id')
+    .eq('source_record_id', artifact.source_record_id);
+
+  if (linksError || !links || links.length === 0) {
+    return; // No linked topics
+  }
+
+  // Create claims for each topic
+  for (const link of links) {
+    for (const claimFact of claimFacts) {
+      // Check if claim already exists for this topic (avoid duplicates)
+      const { data: existingClaim, error: checkError } = await supabase
+        .from('claims')
+        .select('id')
+        .eq('topic_id', link.topic_id)
+        .eq('claim_text', claimFact.fact.trim())
+        .maybeSingle();
+
+      if (checkError) {
+        console.error(`Error checking for existing claim:`, checkError);
+        continue;
+      }
+
+      if (existingClaim) {
+        // Claim already exists, skip creation
+        continue;
+      }
+
+      // Create the claim
+      const { data: newClaim, error: createError } = await supabase
+        .from('claims')
+        .insert({
+          topic_id: link.topic_id,
+          claim_text: claimFact.fact.trim(),
+          claim_type: 'factual', // Default to 'factual' for claims extracted from key facts
+          is_falsifiable: true,
+        })
+        .select()
+        .single();
+
+      if (createError) {
+        console.error(`Error creating claim for topic ${link.topic_id}:`, createError);
+        continue;
+      }
+
+      // Create evidence linking the claim to the source record via the topic-source link
+      const { error: evidenceError } = await supabase
+        .from('claim_evidence')
+        .insert({
+          claim_id: newClaim.id,
+          link_id: link.id, // Use the topic_source_links.id
+          supports: true, // By default, key facts support the claim
+          evidence_excerpt: claimFact.fact.trim(),
+          analyst_notes: `Auto-created from reviewed key facts analysis. Confidence: ${(claimFact.confidence * 100).toFixed(0)}%`,
+        });
+
+      if (evidenceError) {
+        console.error(`Error creating claim evidence for claim ${newClaim.id}:`, evidenceError);
+      } else {
+        console.log(`Created claim "${claimFact.fact.substring(0, 50)}..." for topic ${link.topic_id} with evidence from source record ${artifact.source_record_id}`);
+      }
+    }
+  }
+}
+
+/**
+ * Helper function: Add entities from reviewed entity extraction artifact to linked topics' keywords
+ */
+async function addEntitiesToLinkedTopics(artifact: any) {
+  if (!artifact.source_record_id || artifact.type !== 'entity_extraction') {
+    return;
+  }
+
+  // Extract all entities from the payload
+  const payload = artifact.payload as { people?: string[]; organizations?: string[]; locations?: string[]; dates?: string[] };
+  const entities: string[] = [
+    ...(payload.people || []),
+    ...(payload.organizations || []),
+    ...(payload.locations || []),
+    ...(payload.dates || []),
+  ].filter(Boolean); // Remove any null/undefined/empty values
+
+  if (entities.length === 0) {
+    return; // No entities to add
+  }
+
+  // Find all topics linked to this source record
+  const { data: links, error: linksError } = await supabase
+    .from('topic_source_links')
+    .select(`
+      topic_id,
+      osint_topics!inner (
+        id,
+        keywords
+      )
+    `)
+    .eq('source_record_id', artifact.source_record_id);
+
+  if (linksError || !links || links.length === 0) {
+    return; // No linked topics
+  }
+
+  // Update each topic's keywords by merging entities (avoiding duplicates)
+  for (const link of links) {
+    // Handle both single object and array formats (for safety)
+    const topicData = link.osint_topics as any;
+    const topic = Array.isArray(topicData) ? topicData[0] : topicData;
+    
+    if (!topic || !topic.id) continue;
+
+    const currentKeywords = Array.isArray(topic.keywords) ? topic.keywords : [];
+    const keywordSet = new Set(currentKeywords.map((k: string) => k.toLowerCase().trim()));
+    
+    // Add new entities that aren't already in keywords (case-insensitive)
+    const newKeywords = entities.filter(entity => {
+      const normalizedEntity = entity.toLowerCase().trim();
+      if (!normalizedEntity || keywordSet.has(normalizedEntity)) {
+        return false;
+      }
+      keywordSet.add(normalizedEntity);
+      return true;
+    });
+
+    if (newKeywords.length > 0) {
+      const updatedKeywords = [...currentKeywords, ...newKeywords];
+      
+      // Update topic keywords
+      const { error: updateError } = await supabase
+        .from('osint_topics')
+        .update({ keywords: updatedKeywords })
+        .eq('id', topic.id);
+
+      if (updateError) {
+        console.error(`Error updating keywords for topic ${topic.id}:`, updateError);
+      } else {
+        console.log(`Added ${newKeywords.length} entities to topic ${topic.id} keywords`);
+      }
+    }
+  }
+}
+
+/**
  * PATCH /api/analysis/artifacts/:id
  * Update artifact review status
  */
@@ -355,6 +521,26 @@ router.patch('/artifacts/:id', async (req: Request, res: Response) => {
     // Audit log: artifact reviewed (only when marking as reviewed)
     if (reviewed) {
       await auditService.logArtifactReviewed(id, artifact);
+      
+      // If this is a reviewed entity extraction artifact, add entities to linked topics' keywords
+      // This runs asynchronously without blocking the response (fire-and-forget for Vercel compatibility)
+      if (artifact.type === 'entity_extraction' && artifact.source_record_id) {
+        // Don't await - let it run in background to avoid blocking response or hitting Vercel timeouts
+        addEntitiesToLinkedTopics(artifact as any).catch((err) => {
+          // Log error but don't fail the request
+          console.error('Error adding entities to linked topics:', err);
+        });
+      }
+
+      // If this is a reviewed key facts artifact, create claims for facts with category='claim'
+      // This runs asynchronously without blocking the response (fire-and-forget for Vercel compatibility)
+      if (artifact.type === 'key_facts' && artifact.source_record_id) {
+        // Don't await - let it run in background to avoid blocking response or hitting Vercel timeouts
+        createClaimsFromKeyFacts(artifact as any).catch((err) => {
+          // Log error but don't fail the request
+          console.error('Error creating claims from key facts:', err);
+        });
+      }
     }
 
     res.json({
@@ -884,6 +1070,176 @@ router.post('/topics/:id/compare-media', async (req: Request, res: Response) => 
     console.error('Error comparing media types:', error);
     res.status(500).json({
       error: 'Failed to compare media types',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+/**
+ * GET /api/analysis/topics/:topicId/tone-aggregate
+ * Aggregate tone analysis from all linked source records for a topic
+ * Returns weighted average tone, confidence, and sentiment across all linked records
+ */
+router.get('/topics/:topicId/tone-aggregate', async (req: Request, res: Response) => {
+  try {
+    const { topicId } = req.params;
+
+    // Fetch all linked source records for this topic
+    const { data: links, error: linksError } = await supabase
+      .from('topic_source_links')
+      .select(`
+        source_record_id,
+        source_records!inner (
+          id,
+          sources!inner (
+            reliability_rating
+          )
+        )
+      `)
+      .eq('topic_id', topicId);
+
+    if (linksError) throw linksError;
+    if (!links || links.length === 0) {
+      return res.json({
+        success: true,
+        topicId,
+        aggregate: null,
+        message: 'No linked source records found for this topic',
+      });
+    }
+
+    const sourceRecordIds = links.map((link: any) => link.source_records.id);
+
+    // Fetch all tone analysis artifacts for these source records
+    const { data: artifacts, error: artifactsError } = await supabase
+      .from('analytic_artifacts')
+      .select('*')
+      .eq('type', 'tone_analysis')
+      .in('source_record_id', sourceRecordIds)
+      .eq('reviewed', true); // Only include reviewed analyses
+
+    if (artifactsError) throw artifactsError;
+
+    if (!artifacts || artifacts.length === 0) {
+      return res.json({
+        success: true,
+        topicId,
+        aggregate: null,
+        message: 'No reviewed tone analyses found for linked source records',
+      });
+    }
+
+    // Create a map of source record ID to reliability rating
+    const reliabilityMap = new Map<string, string>();
+    links.forEach((link: any) => {
+      reliabilityMap.set(link.source_records.id, link.source_records.sources.reliability_rating);
+    });
+
+    // Calculate reliability multipliers
+    const getReliabilityWeight = (rating?: string): number => {
+      switch (rating?.toUpperCase()) {
+        case 'HIGH': return 1.0;
+        case 'MEDIUM': return 0.8;
+        case 'LOW': return 0.6;
+        case 'UNKNOWN':
+        default: return 0.7;
+      }
+    };
+
+    // Aggregate tone analyses
+    const toneCounts: Record<string, number> = {};
+    const sentimentCounts: Record<string, number> = {};
+    let totalWeightedConfidence = 0;
+    let totalWeight = 0;
+    let totalRawConfidence = 0;
+    const allIndicators: string[] = [];
+    const allBiasSignals: string[] = [];
+
+    artifacts.forEach((artifact: any) => {
+      const payload = artifact.payload;
+      if (!payload) return;
+
+      const reliabilityRating = reliabilityMap.get(artifact.source_record_id) || 'UNKNOWN';
+      const reliabilityWeight = getReliabilityWeight(reliabilityRating);
+      const rawConfidence = payload.rawConfidence ?? payload.confidence ?? 0.5;
+      const weightedConfidence = payload.confidence ?? rawConfidence * reliabilityWeight;
+
+      // Count tones
+      if (payload.overallTone) {
+        toneCounts[payload.overallTone] = (toneCounts[payload.overallTone] || 0) + 1;
+      }
+
+      // Count sentiments
+      if (payload.sentiment) {
+        sentimentCounts[payload.sentiment] = (sentimentCounts[payload.sentiment] || 0) + 1;
+      }
+
+      // Weighted confidence average
+      totalWeightedConfidence += weightedConfidence * reliabilityWeight;
+      totalWeight += reliabilityWeight;
+      totalRawConfidence += rawConfidence;
+
+      // Collect indicators and bias signals
+      if (Array.isArray(payload.indicators)) {
+        allIndicators.push(...payload.indicators);
+      }
+      if (Array.isArray(payload.biasSignals)) {
+        allBiasSignals.push(...payload.biasSignals);
+      }
+    });
+
+    // Calculate dominant tone and sentiment
+    const dominantTone = Object.entries(toneCounts).reduce((a, b) => 
+      toneCounts[a[0]] > toneCounts[b[0]] ? a : b, ['neutral', 0]
+    )[0] as string;
+
+    const dominantSentiment = Object.entries(sentimentCounts).reduce((a, b) =>
+      sentimentCounts[a[0]] > sentimentCounts[b[0]] ? a : b, ['neutral', 0]
+    )[0] as string;
+
+    // Calculate average confidence
+    const avgWeightedConfidence = totalWeight > 0 ? totalWeightedConfidence / totalWeight : 0;
+    const avgRawConfidence = artifacts.length > 0 ? totalRawConfidence / artifacts.length : 0;
+
+    // Get unique indicators and bias signals (top 10 most common)
+    const indicatorFreq: Record<string, number> = {};
+    allIndicators.forEach(ind => {
+      indicatorFreq[ind] = (indicatorFreq[ind] || 0) + 1;
+    });
+    const topIndicators = Object.entries(indicatorFreq)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([ind]) => ind);
+
+    const biasSignalFreq: Record<string, number> = {};
+    allBiasSignals.forEach(signal => {
+      biasSignalFreq[signal] = (biasSignalFreq[signal] || 0) + 1;
+    });
+    const topBiasSignals = Object.entries(biasSignalFreq)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([signal]) => signal);
+
+    res.json({
+      success: true,
+      topicId,
+      aggregate: {
+        overallTone: dominantTone,
+        toneDistribution: toneCounts,
+        sentiment: dominantSentiment,
+        sentimentDistribution: sentimentCounts,
+        confidence: avgWeightedConfidence,
+        rawConfidence: avgRawConfidence,
+        indicators: topIndicators,
+        biasSignals: topBiasSignals,
+        sourceRecordCount: sourceRecordIds.length,
+        analysisCount: artifacts.length,
+      },
+    });
+  } catch (error) {
+    console.error('Error aggregating tone analysis:', error);
+    res.status(500).json({
+      error: 'Failed to aggregate tone analysis',
       message: error instanceof Error ? error.message : 'Unknown error',
     });
   }

@@ -148,7 +148,7 @@ export function QAChecklist({ topicId }: QAChecklistProps) {
           checks.allArtifactsReviewed,
           checks.allArtifactsReviewed
             ? undefined
-            : `${summary.artifactsUnreviewed} artifact(s) need human verification`
+            : `${summary.artifactsUnreviewed} artifact(s) pending review`
         )}
       </div>
 

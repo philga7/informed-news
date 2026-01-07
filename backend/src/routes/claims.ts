@@ -421,9 +421,11 @@ router.get('/topic/:topicId/matrix', async (req: Request, res: Response) => {
         source_record_id,
         source_records (
           id,
+          url,
           sources (
             id,
-            name
+            name,
+            scrape_external_url
           )
         )
       `)
@@ -458,6 +460,8 @@ router.get('/topic/:topicId/matrix', async (req: Request, res: Response) => {
           link_id: link.id,
           source_record_id: link.source_record_id,
           source_name: link.source_records?.sources?.name || 'Unknown',
+          source_url: link.source_records?.url || null,
+          scrape_external_url: link.source_records?.sources?.scrape_external_url || false,
           supports: evidence ? evidence.supports : null,
           evidence_excerpt: evidence ? evidence.evidence_excerpt : null,
         });
@@ -469,6 +473,8 @@ router.get('/topic/:topicId/matrix', async (req: Request, res: Response) => {
       link_id: link.id,
       source_record_id: link.source_record_id,
       source_name: link.source_records?.sources?.name || 'Unknown',
+      source_url: link.source_records?.url || null,
+      scrape_external_url: link.source_records?.sources?.scrape_external_url || false,
     })) || [];
 
     res.json({

@@ -11,6 +11,10 @@ interface SourceWithMetrics extends Source {
   days_since_last_link?: number;
 }
 
+interface StaleWarningTooltipProps {
+  source: SourceWithMetrics;
+}
+
 interface OsintSourcesTableProps {
   sources: SourceWithMetrics[];
   onUpdate: (sourceId: string, updates: any) => Promise<void>;
@@ -102,6 +106,70 @@ export function OsintSourcesTable({ sources, onUpdate, onDelete, onRefresh }: Os
     return (source.days_since_last_link || 0) > 90 && source.record_count > 0;
   };
 
+  function StaleWarningTooltip({ source }: StaleWarningTooltipProps) {
+    const [showTooltip, setShowTooltip] = useState(false);
+    const daysSinceLastLink = source.days_since_last_link || 0;
+    const recordCount = source.record_count || 0;
+    const linkedCount = source.linked_count || 0;
+    const hasNeverBeenLinked = linkedCount === 0 && recordCount > 0;
+
+    return (
+      <div
+        className="relative"
+        onMouseEnter={() => setShowTooltip(true)}
+        onMouseLeave={() => setShowTooltip(false)}
+      >
+        <AlertTriangle
+          size={16}
+          className="text-red-500 mt-1 flex-shrink-0 cursor-help"
+        />
+        {showTooltip && (
+          <div className="absolute left-0 top-6 z-50 w-72 p-3 bg-stone-800 border border-red-800/50 rounded-lg shadow-xl">
+            <div className="flex items-start gap-2 mb-2">
+              <AlertTriangle size={16} className="text-red-500 mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <div className="text-sm font-semibold text-red-400 mb-1">Stale Feed</div>
+                <div className="text-xs text-stone-300 space-y-1">
+                  {hasNeverBeenLinked ? (
+                    <p>
+                      This source has <span className="font-semibold text-red-400">never been linked</span> to any topics.
+                      Records have been accumulating for{' '}
+                      <span className="font-semibold text-red-400">{Math.floor(daysSinceLastLink)} days</span>.
+                    </p>
+                  ) : (
+                    <p>
+                      No records from this source have been linked to topics in{' '}
+                      <span className="font-semibold text-red-400">{Math.floor(daysSinceLastLink)} days</span>.
+                    </p>
+                  )}
+                  <div className="pt-2 border-t border-stone-700 mt-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-stone-400">Records:</span>
+                      <span className="text-stone-200 font-medium">{recordCount}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs mt-1">
+                      <span className="text-stone-400">Linked to topics:</span>
+                      <span className="text-stone-200 font-medium">{linkedCount}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs mt-1">
+                      <span className="text-stone-400">Signal effectiveness:</span>
+                      <span className="text-orange-400 font-medium">
+                        {(source.signal_effectiveness || 0).toFixed(1)}%
+                      </span>
+                    </div>
+                  </div>
+                  <p className="text-stone-400 italic mt-2 pt-2 border-t border-stone-700">
+                    💡 Tip: Review records in Scan view or consider disabling this source if it's no longer useful.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <>
       <div className="overflow-x-auto">
@@ -134,13 +202,7 @@ export function OsintSourcesTable({ sources, onUpdate, onDelete, onRefresh }: Os
               >
                 <td className="py-4 px-4 pr-2">
                   <div className="flex items-start gap-2">
-                    {isStale(source) && (
-                      <AlertTriangle 
-                        size={16} 
-                        className="text-red-500 mt-1 flex-shrink-0" 
-                        title="No links in 90+ days"
-                      />
-                    )}
+                    {isStale(source) && <StaleWarningTooltip source={source} />}
                     <div className="flex flex-col">
                       <p className="text-stone-200 font-medium">{source.name}</p>
                       {source.url && (

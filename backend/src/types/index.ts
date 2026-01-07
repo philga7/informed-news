@@ -37,6 +37,12 @@ export interface RSSFeedItem {
   title: string;
   description: string;
   link: string;
+  /**
+   * Original RSS item link prior to any optional "external URL" resolution.
+   * Used to preserve the feed-provided URL while still supporting
+   * aggregator-style sources that reference third-party sites.
+   */
+  original_link?: string;
   pubDate: string;
   author?: string;
   content?: string;

@@ -7,7 +7,7 @@ import { sourceRecordsService } from '../../services';
 import { analysisService, type AnalyticArtifact } from '../../services/analysis.service';
 import { LoadingSpinner } from '../UI/LoadingSpinner';
 import { EmptyState } from '../UI/EmptyState';
-import { LinkToTopicModal } from './LinkToTopicModal';
+import { LinkToTopicModal } from '../Topics/LinkToTopicModal';
 import { ArtifactCard } from './ArtifactCard';
 
 export function SourceRecordDetailPage() {
@@ -22,6 +22,7 @@ export function SourceRecordDetailPage() {
   const [artifacts, setArtifacts] = useState<AnalyticArtifact[]>([]);
   const [isLoadingArtifacts, setIsLoadingArtifacts] = useState(false);
   const [analysisLoading, setAnalysisLoading] = useState<string | null>(null);
+  const [newArtifactIds, setNewArtifactIds] = useState<Set<string>>(new Set());
 
   const loadRecord = async () => {
     if (!id) return;
@@ -39,11 +40,13 @@ export function SourceRecordDetailPage() {
     }
   };
 
-  const loadArtifacts = async () => {
+  const loadArtifacts = async (showSpinner = false) => {
     if (!id) return;
 
     try {
-      setIsLoadingArtifacts(true);
+      if (showSpinner) {
+        setIsLoadingArtifacts(true);
+      }
       const fetchedArtifacts = await analysisService.getArtifactsForSourceRecord(id);
       setArtifacts(fetchedArtifacts);
     } catch (err) {
@@ -56,13 +59,16 @@ export function SourceRecordDetailPage() {
   useEffect(() => {
     loadRecord();
     loadArtifacts();
+    // Clear new artifact IDs when navigating to a different record
+    setNewArtifactIds(new Set());
   }, [id]);
 
   const handleGenerateSummary = async () => {
     if (!id) return;
     try {
       setAnalysisLoading('summary');
-      await analysisService.generateSummary(id);
+      const newArtifact = await analysisService.generateSummary(id);
+      setNewArtifactIds(prev => new Set(prev).add(newArtifact.id));
       await loadArtifacts();
     } catch (err) {
       console.error('Error generating summary:', err);
@@ -76,7 +82,8 @@ export function SourceRecordDetailPage() {
     if (!id) return;
     try {
       setAnalysisLoading('entities');
-      await analysisService.extractEntities(id);
+      const newArtifact = await analysisService.extractEntities(id);
+      setNewArtifactIds(prev => new Set(prev).add(newArtifact.id));
       await loadArtifacts();
     } catch (err) {
       console.error('Error extracting entities:', err);
@@ -90,7 +97,8 @@ export function SourceRecordDetailPage() {
     if (!id) return;
     try {
       setAnalysisLoading('tone');
-      await analysisService.analyzeTone(id);
+      const newArtifact = await analysisService.analyzeTone(id);
+      setNewArtifactIds(prev => new Set(prev).add(newArtifact.id));
       await loadArtifacts();
     } catch (err) {
       console.error('Error analyzing tone:', err);
@@ -104,7 +112,8 @@ export function SourceRecordDetailPage() {
     if (!id) return;
     try {
       setAnalysisLoading('key_facts');
-      await analysisService.extractKeyFacts(id);
+      const newArtifact = await analysisService.extractKeyFacts(id);
+      setNewArtifactIds(prev => new Set(prev).add(newArtifact.id));
       await loadArtifacts();
     } catch (err) {
       console.error('Error extracting key facts:', err);
@@ -317,80 +326,60 @@ export function SourceRecordDetailPage() {
           </div>
 
           <p className="text-sm text-stone-400 mb-4">
-            Generate AI-powered analysis to assist with source evaluation. All outputs require human verification.
+            Generate AI-powered analysis to assist with source evaluation.
           </p>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
             <button
               onClick={handleGenerateSummary}
               disabled={analysisLoading !== null}
-              className="flex items-center justify-center gap-2 px-4 py-3 bg-stone-800 hover:bg-stone-700 border border-stone-700 hover:border-stone-600 text-stone-200 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-stone-800 hover:bg-stone-700 border border-stone-700 hover:border-stone-600 text-stone-200 text-sm rounded-lg transition-colors duration-200 disabled:cursor-not-allowed"
             >
               {analysisLoading === 'summary' ? (
-                <>
-                  <LoadingSpinner />
-                  <span>Generating...</span>
-                </>
+                <LoadingSpinner />
               ) : (
-                <>
-                  <FileText size={18} />
-                  <span>Generate Summary</span>
-                </>
+                <FileText size={16} />
               )}
+              <span>Generate Summary</span>
             </button>
 
             <button
               onClick={handleExtractEntities}
               disabled={analysisLoading !== null}
-              className="flex items-center justify-center gap-2 px-4 py-3 bg-stone-800 hover:bg-stone-700 border border-stone-700 hover:border-stone-600 text-stone-200 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-stone-800 hover:bg-stone-700 border border-stone-700 hover:border-stone-600 text-stone-200 text-sm rounded-lg transition-colors duration-200 disabled:cursor-not-allowed"
             >
               {analysisLoading === 'entities' ? (
-                <>
-                  <LoadingSpinner />
-                  <span>Extracting...</span>
-                </>
+                <LoadingSpinner />
               ) : (
-                <>
-                  <Users size={18} />
-                  <span>Extract Entities</span>
-                </>
+                <Users size={16} />
               )}
+              <span>Extract Entities</span>
             </button>
 
             <button
               onClick={handleAnalyzeTone}
               disabled={analysisLoading !== null}
-              className="flex items-center justify-center gap-2 px-4 py-3 bg-stone-800 hover:bg-stone-700 border border-stone-700 hover:border-stone-600 text-stone-200 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-stone-800 hover:bg-stone-700 border border-stone-700 hover:border-stone-600 text-stone-200 text-sm rounded-lg transition-colors duration-200 disabled:cursor-not-allowed"
             >
               {analysisLoading === 'tone' ? (
-                <>
-                  <LoadingSpinner />
-                  <span>Analyzing...</span>
-                </>
+                <LoadingSpinner />
               ) : (
-                <>
-                  <MessageSquare size={18} />
-                  <span>Analyze Tone</span>
-                </>
+                <MessageSquare size={16} />
               )}
+              <span>Analyze Tone</span>
             </button>
 
             <button
               onClick={handleExtractKeyFacts}
               disabled={analysisLoading !== null}
-              className="flex items-center justify-center gap-2 px-4 py-3 bg-stone-800 hover:bg-stone-700 border border-stone-700 hover:border-stone-600 text-stone-200 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-stone-800 hover:bg-stone-700 border border-stone-700 hover:border-stone-600 text-stone-200 text-sm rounded-lg transition-colors duration-200 disabled:cursor-not-allowed"
             >
               {analysisLoading === 'key_facts' ? (
-                <>
-                  <LoadingSpinner />
-                  <span>Extracting...</span>
-                </>
+                <LoadingSpinner />
               ) : (
-                <>
-                  <ListChecks size={18} />
-                  <span>Extract Key Facts</span>
-                </>
+                <ListChecks size={16} />
               )}
+              <span>Extract Key Facts</span>
             </button>
           </div>
 
@@ -409,7 +398,9 @@ export function SourceRecordDetailPage() {
                   <ArtifactCard
                     key={artifact.id}
                     artifact={artifact}
-                    onUpdate={loadArtifacts}
+                    isNew={newArtifactIds.has(artifact.id)}
+                    onUpdate={() => loadArtifacts(false)}
+                    sourceReliability={record?.sources?.reliability_rating}
                   />
                 ))}
               </div>
@@ -426,7 +417,9 @@ export function SourceRecordDetailPage() {
       {showLinkModal && currentOrganization && (
         <LinkToTopicModal
           sourceRecordId={id!}
+          recordTitle={record?.title}
           organizationId={currentOrganization.id}
+          mode="multi"
           onLink={handleLinkToTopics}
           onClose={() => setShowLinkModal(false)}
         />

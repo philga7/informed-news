@@ -44,7 +44,8 @@ router.get('/', async (req: Request, res: Response) => {
           organization_id,
           name,
           source_type,
-          reliability_rating
+          reliability_rating,
+          scrape_external_url
         ),
         topic_source_links (
           id,
@@ -74,11 +75,24 @@ router.get('/', async (req: Request, res: Response) => {
 
     // Full-text search
     if (search) {
-      // Use PostgreSQL full-text search
-      query = query.textSearch('title', search as string, {
-        type: 'websearch',
-        config: 'english',
-      });
+      // Search in both title and source name using OR logic
+      // Step 1: Find sources that match the search term
+      const { data: matchingSources, error: sourcesError } = await supabase
+        .from('sources')
+        .select('id')
+        .eq('organization_id', organization_id as string)
+        .ilike('name', `%${search}%`);
+
+      const matchingSourceIds = matchingSources?.map((s: any) => s.id) || [];
+
+      // Step 2: Search records where title matches OR source_id is in matching sources
+      if (matchingSourceIds.length > 0) {
+        // Use OR to match either title OR source_id
+        query = query.or(`title.ilike.%${search}%,source_id.in.(${matchingSourceIds.join(',')})`);
+      } else {
+        // No matching sources, just search title
+        query = query.ilike('title', `%${search}%`);
+      }
     }
 
     // Order and pagination
@@ -167,7 +181,8 @@ router.get('/scan', async (req: Request, res: Response) => {
           name,
           domain,
           source_type,
-          reliability_rating
+          reliability_rating,
+          scrape_external_url
         ),
         topic_source_links (
           id,
@@ -482,7 +497,8 @@ router.get('/:id', async (req: Request, res: Response) => {
           source_type,
           url,
           reliability_rating,
-          notes
+          notes,
+          scrape_external_url
         ),
         topic_source_links (
           id,

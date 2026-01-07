@@ -9,25 +9,54 @@ on:
 jobs:
   ingest:
     runs-on: ubuntu-latest
+    timeout-minutes: 30  # GitHub Actions default is 6 hours; set reasonable timeout
     steps:
       - name: Trigger RSS Ingestion for All Organizations
         env:
           API_URL: ${{ secrets.VITE_API_URL || 'https://your-api-url.vercel.app' }}
         run: |
           echo "🔄 Starting RSS ingestion for all organizations..."
+          echo "📡 API URL: $API_URL"
           
+          # Make request with extended timeout (Vercel serverless functions have timeout limits)
+          # Free tier: 10s, Pro: 60s, Enterprise: 300s
+          # Using 300s (5 min) timeout for curl to handle large ingestion jobs
           response=$(curl -X POST \
             "$API_URL/api/ingest/rss/all" \
             -H "Content-Type: application/json" \
             -d '{"organization_id": "all"}' \
-            -w "\n%{http_code}")
+            -w "\n%{http_code}" \
+            --max-time 300 \
+            --connect-timeout 30)
           
           http_code=$(echo "$response" | tail -n1)
           body=$(echo "$response" | head -n-1)
           
           if [ "$http_code" -eq 200 ]; then
-            echo "✅ RSS ingestion completed"
-            echo "$body" | jq '.summary'
+            echo "✅ RSS ingestion request completed (HTTP $http_code)"
+            
+            # Parse summary from response
+            summary=$(echo "$body" | jq -r '.summary // empty')
+            if [ -n "$summary" ]; then
+              echo "📊 Ingestion Summary:"
+              echo "$summary" | jq '.'
+              
+              # Check for errors in summary (endpoint returns 200 even with partial failures)
+              errors=$(echo "$summary" | jq -r '.errors // 0')
+              if [ "$errors" -gt 0 ]; then
+                echo "⚠️  Warning: $errors source(s) had errors during ingestion"
+                echo "💡 Check the 'results' array in the response for details"
+                # Don't fail the workflow for partial failures, but log warning
+              fi
+              
+              # Show success metrics
+              added=$(echo "$summary" | jq -r '.added // 0')
+              skipped=$(echo "$summary" | jq -r '.skipped // 0')
+              processed=$(echo "$summary" | jq -r '.processed // 0')
+              echo "✨ Successfully processed $processed source(s): +$added new, ~$skipped duplicates"
+            else
+              echo "$body" | jq '.'
+            fi
           else
             echo "❌ RSS ingestion failed (HTTP $http_code)"
             echo "$body"

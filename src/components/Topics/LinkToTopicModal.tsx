@@ -1,18 +1,20 @@
 import { useState, useEffect } from 'react';
-import { X, Search, Link2, Loader2, Plus } from 'lucide-react';
+import { X, Search, Link as LinkIcon, Plus, Loader2, Link2 } from 'lucide-react';
 import { useOrganization } from '../../context/OrganizationContext';
 import { osintTopicsService } from '../../services';
 import { LoadingSpinner } from '../UI/LoadingSpinner';
 import { EmptyState } from '../UI/EmptyState';
 
-interface QuickLinkToTopicModalProps {
-  record: {
-    id: string;
-    title: string;
-    sourceName: string;
-  };
+export type LinkToTopicModalMode = 'single' | 'multi';
+
+interface LinkToTopicModalProps {
+  sourceRecordId: string;
+  recordTitle?: string; // Optional: for display in header (Scan page)
+  organizationId?: string; // Optional: will use currentOrganization if not provided
+  mode?: LinkToTopicModalMode; // 'single' (auto-link on click) or 'multi' (select then link)
+  filterActiveOnly?: boolean; // Filter to active topics only (default: false)
+  onLink: (topicIds: string[]) => Promise<void>; // Called when linking is complete
   onClose: () => void;
-  onLinked: (topicId: string) => Promise<void>;
 }
 
 interface Topic {
@@ -23,23 +25,32 @@ interface Topic {
   status: string;
 }
 
-export function QuickLinkToTopicModal({
-  record,
+export function LinkToTopicModal({
+  sourceRecordId,
+  recordTitle,
+  organizationId,
+  mode = 'multi',
+  filterActiveOnly = false,
+  onLink,
   onClose,
-  onLinked,
-}: QuickLinkToTopicModalProps) {
+}: LinkToTopicModalProps) {
   const { currentOrganization } = useOrganization();
+  const orgId = organizationId || currentOrganization?.id;
+  
   const [topics, setTopics] = useState<Topic[]>([]);
   const [filteredTopics, setFilteredTopics] = useState<Topic[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedTopicIds, setSelectedTopicIds] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
 
   useEffect(() => {
-    loadTopics();
-  }, [currentOrganization?.id]);
+    if (orgId) {
+      loadTopics();
+    }
+  }, [orgId]);
 
   useEffect(() => {
     if (searchQuery.trim() === '') {
@@ -58,16 +69,17 @@ export function QuickLinkToTopicModal({
   }, [searchQuery, topics]);
 
   const loadTopics = async () => {
-    if (!currentOrganization) return;
+    if (!orgId) return;
 
     try {
       setIsLoading(true);
       setError(null);
-      const fetchedTopics = await osintTopicsService.getAll(currentOrganization.id);
-      // Filter to active topics only
-      const activeTopics = fetchedTopics.filter(t => t.status === 'active');
-      setTopics(activeTopics);
-      setFilteredTopics(activeTopics);
+      const fetchedTopics = await osintTopicsService.getAll(orgId);
+      const filtered = filterActiveOnly 
+        ? fetchedTopics.filter((t: Topic) => t.status === 'active')
+        : fetchedTopics;
+      setTopics(filtered);
+      setFilteredTopics(filtered);
     } catch (err) {
       console.error('Error loading topics:', err);
       setError(err instanceof Error ? err.message : 'Failed to load topics');
@@ -77,17 +89,34 @@ export function QuickLinkToTopicModal({
   };
 
   const handleLinkToTopic = async (topicId: string) => {
-    setIsSubmitting(true);
-    setError(null);
+    if (mode === 'single') {
+      // Single mode: link immediately and close
+      setIsSubmitting(true);
+      setError(null);
 
-    try {
-      await osintTopicsService.linkRecord(topicId, record.id);
-      await onLinked(topicId);
-    } catch (err) {
-      console.error('Error linking to topic:', err);
-      setError(err instanceof Error ? err.message : 'Failed to link to topic');
-      setIsSubmitting(false);
+      try {
+        await osintTopicsService.linkRecord(topicId, sourceRecordId);
+        await onLink([topicId]);
+        onClose();
+      } catch (err) {
+        console.error('Error linking to topic:', err);
+        setError(err instanceof Error ? err.message : 'Failed to link to topic');
+        setIsSubmitting(false);
+      }
+    } else {
+      // Multi mode: toggle selection
+      toggleTopic(topicId);
     }
+  };
+
+  const toggleTopic = (topicId: string) => {
+    const newSelected = new Set(selectedTopicIds);
+    if (newSelected.has(topicId)) {
+      newSelected.delete(topicId);
+    } else {
+      newSelected.add(topicId);
+    }
+    setSelectedTopicIds(newSelected);
   };
 
   const handleCreateTopic = async (topicData: {
@@ -99,7 +128,7 @@ export function QuickLinkToTopicModal({
     keyIndicators?: string[];
     resolutionCriteria?: string;
   }) => {
-    if (!currentOrganization) {
+    if (!orgId) {
       throw new Error('No organization selected');
     }
 
@@ -107,24 +136,55 @@ export function QuickLinkToTopicModal({
       setIsSubmitting(true);
       setError(null);
       
-      // Create the new topic
-      const newTopic = await osintTopicsService.create(currentOrganization.id, topicData);
-      
-      // Reload topics list to include the new one
+      const newTopic = await osintTopicsService.create(orgId, topicData);
       await loadTopics();
       
-      // Automatically link the record to the newly created topic
-      await handleLinkToTopic(newTopic.id);
-      
-      // Note: setShowCreateForm(false) is not needed here because handleLinkToTopic
-      // will call onLinked which closes the modal
+      if (mode === 'single') {
+        // Single mode: auto-link and close
+        await handleLinkToTopic(newTopic.id);
+      } else {
+        // Multi mode: select the new topic
+        setSelectedTopicIds(new Set([...selectedTopicIds, newTopic.id]));
+        setShowCreateForm(false);
+        setSearchQuery('');
+        setIsSubmitting(false);
+      }
     } catch (err) {
       console.error('Error creating topic:', err);
       setError(err instanceof Error ? err.message : 'Failed to create topic');
       setIsSubmitting(false);
-      throw err; // Re-throw so TopicForm can handle it
+      throw err;
     }
   };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (selectedTopicIds.size === 0) {
+      setError('Please select at least one topic');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      await Promise.all(
+        Array.from(selectedTopicIds).map((topicId) =>
+          osintTopicsService.linkRecord(topicId, sourceRecordId)
+        )
+      );
+      await onLink(Array.from(selectedTopicIds));
+      onClose();
+    } catch (err) {
+      console.error('Error linking to topics:', err);
+      setError(err instanceof Error ? err.message : 'Failed to link to topics');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const isSingleMode = mode === 'single';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
@@ -132,8 +192,12 @@ export function QuickLinkToTopicModal({
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-stone-800">
           <div>
-            <h2 className="text-xl font-bold text-stone-100">Quick Link to Topic</h2>
-            <p className="text-sm text-stone-400 mt-1 line-clamp-1">{record.title}</p>
+            <h2 className="text-xl font-bold text-stone-100">
+              {isSingleMode ? 'Quick Link to Topic' : 'Link to Topics'}
+            </h2>
+            {recordTitle && (
+              <p className="text-sm text-stone-400 mt-1 line-clamp-1">{recordTitle}</p>
+            )}
           </div>
           <button
             onClick={onClose}
@@ -153,11 +217,11 @@ export function QuickLinkToTopicModal({
           )}
 
           {showCreateForm ? (
-            /* Create Topic Form - Inline Version */
             <div className="flex-1 overflow-y-auto">
               <div className="mb-4 flex items-center justify-between">
                 <h3 className="text-lg font-semibold text-stone-200">Create New Topic</h3>
                 <button
+                  type="button"
                   onClick={() => {
                     setShowCreateForm(false);
                     setError(null);
@@ -179,7 +243,7 @@ export function QuickLinkToTopicModal({
               />
             </div>
           ) : (
-            <>
+            <form onSubmit={!isSingleMode ? handleSubmit : undefined} className="flex-1 flex flex-col">
               {/* Search and Create Button */}
               <div className="mb-4 space-y-3">
                 <div className="relative">
@@ -194,6 +258,7 @@ export function QuickLinkToTopicModal({
                   />
                 </div>
                 <button
+                  type="button"
                   onClick={() => setShowCreateForm(true)}
                   disabled={isSubmitting}
                   className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-250 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -203,88 +268,137 @@ export function QuickLinkToTopicModal({
                 </button>
               </div>
 
-          {/* Topics List */}
-          <div className="flex-1 overflow-y-auto">
-            {isLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <LoadingSpinner />
-              </div>
-            ) : filteredTopics.length === 0 ? (
-              <EmptyState
-                icon={<Link2 size={64} className="text-stone-600" />}
-                title={searchQuery ? 'No topics found' : 'No active topics'}
-                description={
-                  searchQuery
-                    ? 'Try a different search term'
-                    : 'Create a topic first to link records to it'
-                }
-              />
-            ) : (
-              <div className="space-y-2">
-                {filteredTopics.map((topic) => (
-                  <button
-                    key={topic.id}
-                    onClick={() => handleLinkToTopic(topic.id)}
-                    disabled={isSubmitting}
-                    className="w-full text-left p-4 border border-stone-700 rounded-lg hover:border-blue-500 hover:bg-blue-900/20 transition-colors duration-250 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-stone-100 mb-1">{topic.name}</h3>
-                        {topic.description && (
-                          <p className="text-sm text-stone-400 line-clamp-2">
-                            {topic.description}
-                          </p>
-                        )}
-                        {topic.keywords.length > 0 && (
-                          <div className="mt-2 flex flex-wrap gap-1">
-                            {topic.keywords.slice(0, 5).map((keyword, idx) => (
-                              <span
-                                key={idx}
-                                className="px-2 py-0.5 bg-stone-800 text-stone-300 text-xs rounded border border-stone-700"
-                              >
-                                {keyword}
-                              </span>
-                            ))}
-                            {topic.keywords.length > 5 && (
-                              <span className="px-2 py-0.5 text-stone-500 text-xs">
-                                +{topic.keywords.length - 5} more
-                              </span>
-                            )}
+              {/* Topics List */}
+              <div className="flex-1 overflow-y-auto">
+                {isLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <LoadingSpinner />
+                  </div>
+                ) : filteredTopics.length === 0 ? (
+                  <EmptyState
+                    icon={<Link2 size={64} className="text-stone-600" />}
+                    title={searchQuery ? 'No topics found' : `No ${filterActiveOnly ? 'active ' : ''}topics`}
+                    description={
+                      searchQuery
+                        ? 'Try a different search term'
+                        : 'Create a topic first to link records to it'
+                    }
+                  />
+                ) : (
+                  <div className="space-y-2">
+                    {!isSingleMode && (
+                      <p className="text-sm text-stone-400 mb-2">
+                        Select one or more topics ({selectedTopicIds.size} selected)
+                      </p>
+                    )}
+                    {filteredTopics.map((topic) => {
+                      const isSelected = selectedTopicIds.has(topic.id);
+                      return (
+                        <button
+                          key={topic.id}
+                          type={isSingleMode ? 'button' : 'button'}
+                          onClick={() => handleLinkToTopic(topic.id)}
+                          disabled={isSubmitting}
+                          className={`w-full text-left p-4 border rounded-lg transition-all duration-250 disabled:opacity-50 disabled:cursor-not-allowed ${
+                            isSingleMode
+                              ? 'border-stone-700 hover:border-blue-500 hover:bg-blue-900/20'
+                              : isSelected
+                              ? 'border-blue-600 bg-blue-900/20'
+                              : 'border-stone-800 hover:border-stone-700'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <h3 className="font-semibold text-stone-100">{topic.name}</h3>
+                                {isSelected && !isSingleMode && (
+                                  <LinkIcon size={16} className="text-blue-500 flex-shrink-0" />
+                                )}
+                                {isSingleMode && (
+                                  <Link2 className="w-5 h-5 text-stone-400 ml-auto flex-shrink-0" />
+                                )}
+                              </div>
+                              {topic.description && (
+                                <p className="text-sm text-stone-400 line-clamp-2">
+                                  {topic.description}
+                                </p>
+                              )}
+                              {topic.keywords.length > 0 && (
+                                <div className="mt-2 flex flex-wrap gap-1">
+                                  {topic.keywords.slice(0, 5).map((keyword, idx) => (
+                                    <span
+                                      key={idx}
+                                      className="px-2 py-0.5 bg-stone-800 text-stone-300 text-xs rounded border border-stone-700"
+                                    >
+                                      {keyword}
+                                    </span>
+                                  ))}
+                                  {topic.keywords.length > 5 && (
+                                    <span className="px-2 py-0.5 text-stone-500 text-xs">
+                                      +{topic.keywords.length - 5} more
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
                           </div>
-                        )}
-                      </div>
-                      <Link2 className="w-5 h-5 text-stone-400 ml-3 flex-shrink-0" />
-                    </div>
-                  </button>
-                ))}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-            </>
+
+              {/* Actions (only for multi mode) */}
+              {!isSingleMode && (
+                <div className="flex items-center justify-end gap-3 pt-6 border-t border-stone-800 mt-6">
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="px-4 py-2 bg-stone-800 hover:bg-stone-700 text-stone-300 rounded-lg transition-colors duration-250"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmitting || selectedTopicIds.size === 0}
+                    className="px-4 py-2 bg-accent hover:bg-accent-hover text-white rounded-lg transition-colors duration-250 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isSubmitting
+                      ? 'Linking...'
+                      : `Link to ${selectedTopicIds.size} Topic${selectedTopicIds.size !== 1 ? 's' : ''}`}
+                  </button>
+                </div>
+              )}
+            </form>
           )}
         </div>
 
-        {/* Footer */}
-        <div className="px-6 py-4 bg-stone-800 border-t border-stone-700 rounded-b-lg flex justify-between items-center">
-          <p className="text-sm text-stone-400">
-            Click on a topic to link this record
-          </p>
-          <button
-            onClick={onClose}
-            disabled={isSubmitting}
-            className="px-4 py-2 text-stone-300 hover:bg-stone-700 rounded-md transition-colors duration-250 disabled:opacity-50"
-          >
-            Cancel
-          </button>
-        </div>
+        {/* Footer for single mode */}
+        {isSingleMode && !showCreateForm && (
+          <div className="px-6 py-4 bg-stone-800 border-t border-stone-700 rounded-b-lg flex justify-between items-center">
+            <p className="text-sm text-stone-400">
+              Click on a topic to link this record
+            </p>
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isSubmitting}
+              className="px-4 py-2 text-stone-300 hover:bg-stone-700 rounded-md transition-colors duration-250 disabled:opacity-50"
+            >
+              Cancel
+            </button>
+          </div>
+        )}
 
         {/* Loading Overlay */}
         {isSubmitting && (
           <div className="absolute inset-0 bg-stone-900/75 flex items-center justify-center rounded-lg">
             <div className="text-center">
               <Loader2 className="w-8 h-8 text-blue-400 animate-spin mx-auto mb-2" />
-              <p className="text-sm text-stone-300">Linking to topic...</p>
+              <p className="text-sm text-stone-300">
+                {isSingleMode ? 'Linking to topic...' : 'Linking to topics...'}
+              </p>
             </div>
           </div>
         )}
@@ -293,7 +407,7 @@ export function QuickLinkToTopicModal({
   );
 }
 
-// Inline Topic Creation Form (simplified version for quick create)
+// Inline Topic Creation Form
 interface CreateTopicInlineFormProps {
   initialName?: string;
   onSubmit: (data: {
@@ -312,7 +426,6 @@ function CreateTopicInlineForm({ initialName = '', onSubmit, onCancel, isSubmitt
   const [keywordInput, setKeywordInput] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  // Update name when initialName changes (if user goes back and changes search query)
   useEffect(() => {
     if (initialName) {
       setName(initialName);
@@ -360,7 +473,6 @@ function CreateTopicInlineForm({ initialName = '', onSubmit, onCancel, isSubmitt
         </div>
       )}
 
-      {/* Name */}
       <div>
         <label htmlFor="topic-name" className="block text-sm font-medium text-stone-300 mb-2">
           Topic Name *
@@ -378,7 +490,6 @@ function CreateTopicInlineForm({ initialName = '', onSubmit, onCancel, isSubmitt
         />
       </div>
 
-      {/* Description */}
       <div>
         <label htmlFor="topic-description" className="block text-sm font-medium text-stone-300 mb-2">
           Description (optional)
@@ -394,7 +505,6 @@ function CreateTopicInlineForm({ initialName = '', onSubmit, onCancel, isSubmitt
         />
       </div>
 
-      {/* Keywords */}
       <div>
         <label htmlFor="topic-keywords" className="block text-sm font-medium text-stone-300 mb-2">
           Keywords (optional)
@@ -446,7 +556,6 @@ function CreateTopicInlineForm({ initialName = '', onSubmit, onCancel, isSubmitt
         )}
       </div>
 
-      {/* Actions */}
       <div className="flex justify-end gap-3 pt-4 border-t border-stone-800">
         <button
           type="button"
@@ -469,7 +578,7 @@ function CreateTopicInlineForm({ initialName = '', onSubmit, onCancel, isSubmitt
           ) : (
             <>
               <Plus className="w-4 h-4" />
-              <span>Create & Link</span>
+              <span>Create & Continue</span>
             </>
           )}
         </button>

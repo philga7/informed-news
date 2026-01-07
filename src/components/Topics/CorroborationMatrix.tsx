@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { CheckCircle2, XCircle, HelpCircle, Minus } from 'lucide-react';
 import { claimsService } from '../../services/claims.service';
 import type { CorroborationMatrix as CorroborationMatrixType } from '../../types/osint';
+import { formatSourceNameWithDomain } from '../../utils/urlUtils';
 
 interface CorroborationMatrixProps {
   topicId: string;
@@ -163,7 +164,11 @@ export function CorroborationMatrix({ topicId }: CorroborationMatrixProps) {
                 {matrix.sources.map((source) => (
                   <th key={source.linkId} className="p-2">
                     <div className="text-xs font-medium text-stone-400 max-w-[120px] truncate text-center">
-                      {source.sourceName}
+                      {formatSourceNameWithDomain(
+                        source.sourceName,
+                        source.sourceUrl || undefined,
+                        source.scrapeExternalUrl || false
+                      )}
                     </div>
                   </th>
                 ))}
@@ -214,7 +219,11 @@ export function CorroborationMatrix({ topicId }: CorroborationMatrixProps) {
               )}
               <div>
                 <div className="text-sm font-medium text-stone-300 mb-1">
-                  Evidence from {hoveredData.sourceName}:
+                  Evidence from {formatSourceNameWithDomain(
+                    hoveredData.sourceName,
+                    hoveredData.sourceUrl || undefined,
+                    hoveredData.scrapeExternalUrl || false
+                  )}:
                 </div>
                 <div className="text-sm text-stone-400 italic">
                   "{hoveredData.evidenceExcerpt}"

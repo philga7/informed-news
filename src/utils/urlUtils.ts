@@ -33,3 +33,31 @@ export function extractDomain(url: string): string {
   }
 }
 
+/**
+ * Format source name with referenced domain for aggregator sources
+ * For sources that scrape external URLs (like Citizen Free Press), 
+ * appends the referenced domain to the source name
+ * 
+ * @param sourceName The name of the source (e.g., "Citizen Free Press")
+ * @param recordUrl The resolved URL from the source record (external site URL for aggregators)
+ * @param scrapeExternalUrl Whether the source scrapes external URLs
+ * @returns Formatted string like "Citizen Free Press (reuters.com)" or just the source name
+ */
+export function formatSourceNameWithDomain(
+  sourceName: string,
+  recordUrl: string | null | undefined,
+  scrapeExternalUrl: boolean
+): string {
+  if (!scrapeExternalUrl || !recordUrl) {
+    return sourceName;
+  }
+
+  try {
+    const domain = extractDomain(recordUrl);
+    return `${sourceName} (${domain})`;
+  } catch {
+    // If domain extraction fails, return just the source name
+    return sourceName;
+  }
+}
+

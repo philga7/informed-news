@@ -45,114 +45,63 @@ router.get('/', async (req: Request, res: Response) => {
       });
     }
 
-    // Process each source individually to get accurate metrics
-    const sourcesWithCounts = await Promise.all(sources.map(async (source: any) => {
-      // Get record count for this source
-      const { count: recordCount, error: countError } = await supabase
-        .from('source_records')
-        .select('*', { count: 'exact', head: true })
-        .eq('source_id', source.id);
-      
-      if (countError) {
-        console.error(`Error counting records for source ${source.id}:`, countError);
-      }
+    // Use SQL aggregations to calculate all metrics efficiently in a single query
+    const sourceIds = sources.map((s: any) => s.id);
+    
+    // Get all metrics in one query using SQL aggregation
+    // @ts-ignore - Supabase type inference issue with RPC functions
+    const { data: metricsData, error: metricsError } = await supabase.rpc('get_source_metrics', {
+      p_source_ids: sourceIds,
+    } as any);
 
-      const recordCountValue = recordCount || 0;
+    if (metricsError) {
+      console.error('Error fetching source metrics:', metricsError);
+      // Fallback to empty metrics if RPC fails
+    }
 
-      // Get all record IDs for this source
-      const { data: records, error: recordsError } = await supabase
-        .from('source_records')
-        .select('id')
-        .eq('source_id', source.id);
+    // Create a map of metrics by source ID
+    const metricsMap = new Map<string, {
+      record_count: number;
+      linked_count: number;
+      oldest_record_date: string | null;
+      most_recent_link_date: string | null;
+    }>();
 
-      if (recordsError) {
-        console.error(`Error fetching records for source ${source.id}:`, recordsError);
-      }
-
-      const recordIds = (records || []).map((r: any) => r.id).filter((id: string) => id);
-      
-      // Query links only for records belonging to this source
-      let linksByRecordId: Record<string, Array<{ created_at: string }>> = {};
-      let linkedCount = 0;
-      let mostRecentLinkDate: Date | null = null;
-
-      if (recordIds.length > 0) {
-        // Query in batches if needed (Supabase limit is ~100 items per .in() query)
-        const batchSize = 100;
-        for (let i = 0; i < recordIds.length; i += batchSize) {
-          const batch = recordIds.slice(i, i + batchSize);
-          
-          // Fetch topic_source_links for this batch
-          const { data: topicLinksData, error: topicLinksError } = await supabase
-            .from('topic_source_links')
-            .select('source_record_id, linked_at')
-            .in('source_record_id', batch);
-
-          if (topicLinksError) {
-            console.error(`Error fetching topic links for source ${source.id}:`, topicLinksError);
-          } else if (topicLinksData) {
-            topicLinksData.forEach((link: any) => {
-              const recordId = link.source_record_id;
-              if (!linksByRecordId[recordId]) {
-                linksByRecordId[recordId] = [];
-              }
-              linksByRecordId[recordId].push({ created_at: link.linked_at });
-            });
-          }
-
-          // Fetch watch_item_records links for this batch
-          const { data: watchItemLinksData, error: watchItemLinksError } = await supabase
-            .from('watch_item_records')
-            .select('source_record_id, linked_at')
-            .in('source_record_id', batch);
-
-          if (watchItemLinksError) {
-            console.error(`Error fetching watch item links for source ${source.id}:`, watchItemLinksError);
-          } else if (watchItemLinksData) {
-            watchItemLinksData.forEach((link: any) => {
-              const recordId = link.source_record_id;
-              if (!linksByRecordId[recordId]) {
-                linksByRecordId[recordId] = [];
-              }
-              linksByRecordId[recordId].push({ created_at: link.linked_at });
-            });
-          }
-        }
-
-        // Count linked records and find most recent link date
-        recordIds.forEach((recordId: string) => {
-          const links = linksByRecordId[recordId] || [];
-          if (links.length > 0) {
-            linkedCount++;
-            
-            // Check for most recent link date
-            links.forEach((link: any) => {
-              if (link && link.created_at) {
-                try {
-                  const linkDate = new Date(link.created_at);
-                  if (!isNaN(linkDate.getTime())) {
-                    if (!mostRecentLinkDate || linkDate > mostRecentLinkDate) {
-                      mostRecentLinkDate = linkDate;
-                    }
-                  }
-                } catch (e) {
-                  // Skip invalid dates
-                }
-              }
-            });
-          }
+    if (metricsData) {
+      metricsData.forEach((metric: any) => {
+        metricsMap.set(metric.source_id, {
+          record_count: metric.record_count || 0,
+          linked_count: metric.linked_count || 0,
+          oldest_record_date: metric.oldest_record_date,
+          most_recent_link_date: metric.most_recent_link_date,
         });
-      }
-      
+      });
+    }
+
+    // Map sources with their metrics
+    const sourcesWithCounts = sources.map((source: any) => {
+      const metrics = metricsMap.get(source.id) || {
+        record_count: 0,
+        linked_count: 0,
+        oldest_record_date: null,
+        most_recent_link_date: null,
+      };
+
       // Calculate days since last link
       let daysSinceLastLink: number;
-      if (mostRecentLinkDate) {
-        daysSinceLastLink = Math.floor((Date.now() - mostRecentLinkDate.getTime()) / (1000 * 60 * 60 * 24));
+      if (metrics.most_recent_link_date) {
+        // Has links: calculate days since most recent link
+        const linkDate = new Date(metrics.most_recent_link_date);
+        daysSinceLastLink = Math.floor((Date.now() - linkDate.getTime()) / (1000 * 60 * 60 * 24));
+      } else if (metrics.record_count > 0 && metrics.oldest_record_date) {
+        // No links but has records: calculate days since oldest record was ingested
+        const oldestDate = new Date(metrics.oldest_record_date);
+        daysSinceLastLink = Math.floor((Date.now() - oldestDate.getTime()) / (1000 * 60 * 60 * 24));
       } else {
-        daysSinceLastLink = recordCountValue > 0 ? 999 : 0; // 999 if has records but never linked
+        // No records at all: 0 days
+        daysSinceLastLink = 0;
       }
 
-      
       return {
         id: source.id,
         organization_id: source.organization_id,
@@ -166,11 +115,11 @@ router.get('/', async (req: Request, res: Response) => {
         scrape_external_url: source.scrape_external_url || false,
         created_at: source.created_at,
         updated_at: source.updated_at,
-        record_count: recordCountValue,
-        linked_count: linkedCount,
+        record_count: metrics.record_count,
+        linked_count: metrics.linked_count,
         days_since_last_link: daysSinceLastLink,
       };
-    }));
+    });
 
     res.json({
       success: true,

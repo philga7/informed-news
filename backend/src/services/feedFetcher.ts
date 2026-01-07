@@ -179,19 +179,21 @@ async function resolveArticleURL(articleUrl: string, source: NewsSource): Promis
     sourceDomain = source.url.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
   }
 
-  // If scraping is enabled, try scraping first
+  /**
+   * Ingestion speed policy:
+   * - Do NOT follow redirects for normal ingestion. We want the feed's immediate URL/content.
+   * - Exception: for aggregator-style sources that *don't* link the referenced article directly
+   *   (e.g., Citizen Free Press), allow "external URL scraping" to find the referenced site URL.
+   *
+   * NOTE: We intentionally do NOT follow redirects here either; redirect-following is reserved
+   * for downstream enrichment/analysis, not ingestion.
+   */
   if (source.scrapeExternalUrl) {
     const scrapedUrl = await scrapeOriginalURL(articleUrl, sourceDomain);
-    // If scraping found a different URL, use it; otherwise fallback to redirect following
-    if (scrapedUrl !== articleUrl) {
-      return scrapedUrl;
-    }
-    // If scraping didn't find external link, fallback to redirect following
-    return followRedirects(articleUrl);
+    return scrapedUrl;
   }
 
-  // If scraping is disabled, use redirect following
-  return followRedirects(articleUrl);
+  return articleUrl;
 }
 
 /**
@@ -225,14 +227,13 @@ export async function parseRSSFeed(url: string, source?: NewsSource): Promise<RS
     const feed = await parser.parseString(preprocessedXML);
     const items: RSSFeedItem[] = [];
 
-    // Process items and resolve URLs (scraping or redirects) based on source configuration
+    // Process items and (optionally) resolve referenced URLs (scrapeExternalUrl only).
+    // Redirect-following is intentionally disabled for ingestion speed.
     const itemsWithResolvedUrls = await Promise.all(
       feed.items.map(async (item) => {
         if (item.title && item.link) {
-          // Resolve URL using scraping or redirect following based on source config
-          const finalUrl = source
-            ? await resolveArticleURL(item.link, source)
-            : await followRedirects(item.link); // Fallback if no source provided
+          const originalLink = item.link;
+          const finalUrl = source ? await resolveArticleURL(originalLink, source) : originalLink;
           
           // Type assertion to access potentially missing properties
           const itemAny = item as any;
@@ -240,6 +241,7 @@ export async function parseRSSFeed(url: string, source?: NewsSource): Promise<RS
             title: item.title,
             description: item.contentSnippet || item.content || itemAny.description || '',
             link: finalUrl, // Use the final resolved URL
+            original_link: originalLink,
             pubDate: item.pubDate || item.isoDate || new Date().toISOString(),
             author: item.creator || itemAny.author || undefined,
             content: item.content || itemAny['content:encoded'] || undefined,
