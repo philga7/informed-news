@@ -52,9 +52,9 @@ export class RetentionPolicyService {
   async isRecordProtected(recordId: string): Promise<boolean> {
     try {
       // Use the database function for consistency
-      const { data, error } = await supabase.rpc('is_record_protected', {
+      const { data, error } = await (supabase as any).rpc('is_record_protected', {
         record_id: recordId,
-      });
+      }) as { data: boolean | null; error: unknown };
 
       if (error) {
         console.error('[RetentionPolicyService] Error checking protection:', error);
@@ -166,7 +166,8 @@ export class RetentionPolicyService {
       if (!record) throw new Error(`Record ${recordId} not found`);
 
       // Insert into archived_source_records
-      const { error: archiveError } = await supabase
+      // Note: archived_source_records table is not in database types, so we use type assertion
+      const { error: archiveError } = await (supabase as any)
         .from('archived_source_records')
         .insert({
           id: record.id,
@@ -189,7 +190,7 @@ export class RetentionPolicyService {
           reviewed_by: record.reviewed_by || null,
           archived_at: new Date().toISOString(),
           archive_reason: reason,
-        });
+        } as any);
 
       if (archiveError) throw archiveError;
 

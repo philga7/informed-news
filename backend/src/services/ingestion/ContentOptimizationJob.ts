@@ -109,7 +109,7 @@ export class ContentOptimizationJob {
         .from('sources')
         .select('id, value_rating')
         .eq('id', sourceId)
-        .single();
+        .single() as { data: Source | null; error: unknown };
 
       if (sourceError) throw sourceError;
       if (!source) throw new Error(`Source ${sourceId} not found`);
@@ -118,7 +118,7 @@ export class ContentOptimizationJob {
       const { data: records, error: recordsError } = await supabase
         .from('source_records')
         .select('id, content, content_type, content_compressed, content_length')
-        .eq('source_id', sourceId);
+        .eq('source_id', sourceId) as { data: SourceRecord[] | null; error: unknown };
 
       if (recordsError) throw recordsError;
       if (!records || records.length === 0) {
@@ -197,11 +197,12 @@ export class ContentOptimizationJob {
       // Update record
       const { error: updateError } = await supabase
         .from('source_records')
+        // @ts-expect-error - Supabase type inference issue in serverless environment
         .update({
           content: compressed.toString('base64'), // Store as base64
           content_compressed: true,
           storage_optimized_at: new Date().toISOString(),
-        })
+        } as any)
         .eq('id', recordId);
 
       if (updateError) throw updateError;
@@ -221,7 +222,7 @@ export class ContentOptimizationJob {
         .from('sources')
         .select('id, value_rating')
         .eq('id', sourceId)
-        .single();
+        .single() as { data: Source | null; error: unknown };
 
       if (sourceError) throw sourceError;
       if (!source) throw new Error(`Source ${sourceId} not found`);
@@ -230,7 +231,7 @@ export class ContentOptimizationJob {
       const { data: records, error: recordsError } = await supabase
         .from('source_records')
         .select('id, content_type, content_length')
-        .eq('source_id', sourceId);
+        .eq('source_id', sourceId) as { data: SourceRecord[] | null; error: unknown };
 
       if (recordsError) throw recordsError;
       if (!records || records.length === 0) {
@@ -290,10 +291,11 @@ export class ContentOptimizationJob {
 
     const { error } = await supabase
       .from('source_records')
+      // @ts-expect-error - Supabase type inference issue in serverless environment
       .update({
         content_type: newContentType,
         storage_optimized_at: new Date().toISOString(),
-      })
+      } as any)
       .eq('id', recordId);
 
     if (error) throw error;
