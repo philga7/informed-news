@@ -422,7 +422,8 @@ router.patch('/batch/scan-status', async (req: Request, res: Response) => {
     if (scan_status === 'reviewed') {
       const { error: linksError } = await supabase
         .from('topic_source_links')
-        .update({ review_status: 'reviewed' } as any)
+        // @ts-ignore - Supabase type inference issue
+        .update({ review_status: 'reviewed' })
         .in('source_record_id', record_ids)
         .eq('review_status', 'pending'); // Only update pending links
 
@@ -483,7 +484,8 @@ router.patch('/:id/scan-status', async (req: Request, res: Response) => {
     if (scan_status === 'reviewed') {
       const { error: linksError } = await supabase
         .from('topic_source_links')
-        .update({ review_status: 'reviewed' } as any)
+        // @ts-ignore - Supabase type inference issue
+        .update({ review_status: 'reviewed' })
         .eq('source_record_id', id)
         .eq('review_status', 'pending'); // Only update pending links
 

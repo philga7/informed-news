@@ -410,7 +410,8 @@ router.get('/:id', async (req: Request, res: Response) => {
       if (linksNeedingPromotion.length > 0) {
         const { error: promoteError } = await supabase
           .from('topic_source_links')
-          .update({ review_status: 'reviewed' } as any)
+          // @ts-ignore - Supabase type inference issue
+          .update({ review_status: 'reviewed' })
           .in('id', linksNeedingPromotion)
           .eq('review_status', 'pending');
 
@@ -501,13 +502,14 @@ router.patch('/:topicId/links/:linkId', async (req: Request, res: Response) => {
         .single();
       
       if (linkById && !linkByIdError) {
+        const linkData = linkById as { id: string; topic_id: string };
         console.log(`[PATCH /topics/:topicId/links/:linkId] Link exists but topic_id mismatch:`, {
           requestedTopicId: topicId,
-          actualTopicId: linkById.topic_id,
+          actualTopicId: linkData.topic_id,
         });
         return res.status(404).json({ 
           error: 'Link not found',
-          details: `Link exists but belongs to a different topic (expected: ${topicId}, actual: ${linkById.topic_id})`
+          details: `Link exists but belongs to a different topic (expected: ${topicId}, actual: ${linkData.topic_id})`
         });
       }
       
@@ -530,6 +532,7 @@ router.patch('/:topicId/links/:linkId', async (req: Request, res: Response) => {
 
     const { data: updatedLink, error: updateError } = await supabase
       .from('topic_source_links')
+      // @ts-ignore - Supabase type inference issue
       .update(updates)
       .eq('id', linkId)
       .eq('topic_id', topicId)
@@ -544,8 +547,6 @@ router.patch('/:topicId/links/:linkId', async (req: Request, res: Response) => {
     // Audit log: link updated
     await auditService.logLinkUpdated(
       (updatedLink as any).id,
-      topicId,
-      (updatedLink as any).source_record_id,
       beforeLink as any,
       updatedLink as any
     );
@@ -746,7 +747,8 @@ router.post('/:id/links', async (req: Request, res: Response) => {
     // - Else, if the record has no artifacts OR all artifacts are reviewed → mark as reviewed
     // - Otherwise leave undefined (DB default 'pending')
     let reviewStatus: 'reviewed' | undefined = undefined;
-    if (sourceRecord?.scan_status === 'reviewed') {
+    const sourceRecordData = sourceRecord as { scan_status: string; reviewed_at: string | null } | null;
+    if (sourceRecordData?.scan_status === 'reviewed') {
       reviewStatus = 'reviewed';
     } else {
       try {
