@@ -320,7 +320,7 @@ router.get('/:id', async (req: Request, res: Response) => {
             )
           )
         ),
-        collection_plans (
+        collection_plans!left (
           id,
           topic_id,
           source_types_needed,
@@ -433,10 +433,28 @@ router.get('/:id', async (req: Request, res: Response) => {
     }
 
     // Extract collection_plan from array (should be 0 or 1)
+    // If nested query didn't work, try fetching separately
+    let collectionPlan = topicData.collection_plans?.[0] || null;
+    
+    // Fallback: If nested query didn't return collection_plan, fetch it separately
+    if (!collectionPlan) {
+      const { data: planData, error: planError } = await supabase
+        .from('collection_plans')
+        .select('*')
+        .eq('topic_id', id)
+        .maybeSingle();
+      
+      if (!planError && planData) {
+        collectionPlan = planData;
+      } else if (planError && planError.code !== 'PGRST116') {
+        console.warn(`[topics] Error fetching collection plan for topic ${id}:`, planError);
+      }
+    }
+    
     const topicWithPlan: any = {
       ...topicData,
       topic_source_links: linksWithArtifactStatus,
-      collection_plan: topicData.collection_plans?.[0] || null,
+      collection_plan: collectionPlan,
     };
     delete topicWithPlan.collection_plans;
 
@@ -1517,11 +1535,16 @@ router.post('/:id/collection-plan', async (req: Request, res: Response) => {
     }
 
     // Check if collection plan already exists
-    const { data: existingPlan } = await supabase
+    const { data: existingPlan, error: checkError } = await supabase
       .from('collection_plans')
       .select('*')
       .eq('topic_id', id)
-      .single();
+      .maybeSingle();
+
+    // PGRST116 means "not found" - that's fine, we'll create a new plan
+    if (checkError && checkError.code !== 'PGRST116') {
+      throw checkError;
+    }
 
     let collectionPlan;
 
@@ -1549,8 +1572,12 @@ router.post('/:id/collection-plan', async (req: Request, res: Response) => {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error(`[topics] Error updating collection plan for topic ${id}:`, error);
+        throw error;
+      }
       collectionPlan = data;
+      console.log(`[topics] Successfully updated collection plan for topic ${id}`);
     } else {
       // Create new plan
       const insertData: {
@@ -1576,8 +1603,12 @@ router.post('/:id/collection-plan', async (req: Request, res: Response) => {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error(`[topics] Error creating collection plan for topic ${id}:`, error);
+        throw error;
+      }
       collectionPlan = data;
+      console.log(`[topics] Successfully created collection plan for topic ${id}`);
     }
 
     res.json({

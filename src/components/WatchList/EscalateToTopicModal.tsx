@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, TrendingUp, Plus, AlertCircle } from 'lucide-react';
-import { watchItemsService } from '../../services';
+import { watchItemsService, analysisService } from '../../services';
 import type { WatchItemCategory } from '../../types/osint';
 
 interface EscalateToTopicModalProps {
@@ -76,6 +76,21 @@ export function EscalateToTopicModal({ watchItem, onClose, onSuccess }: Escalate
       });
 
       onSuccess();
+      
+      // If topic has 2+ linked records, optionally generate collection plan suggestions
+      if (watchItem.signalCount >= 2) {
+        const shouldGenerate = window.confirm(
+          `This topic has ${watchItem.signalCount} linked source records. Would you like to generate Collection Plan suggestions?`
+        );
+        
+        if (shouldGenerate) {
+          // Generate suggestions asynchronously (non-blocking)
+          analysisService.generateCollectionPlanSuggestions(newTopic.id).catch((err) => {
+            // Non-blocking error - just log, don't show to user
+            console.warn('Failed to generate collection plan suggestions:', err);
+          });
+        }
+      }
       
       // Navigate to the new topic
       navigate(`/topics/${newTopic.id}`);

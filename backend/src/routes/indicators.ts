@@ -1,6 +1,9 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { supabase } from '../utils/supabase.js';
+import { ollamaService } from '../services/ollamaService.js';
+import { auditService } from '../services/auditService.js';
+import { contentPreparer, type PreparedContent } from '../services/analysis/ContentPreparer.js';
 
 const router = Router();
 
@@ -372,6 +375,141 @@ router.post('/:id/check', async (req: Request, res: Response) => {
 });
 
 /**
+ * Helper function to asynchronously generate collection plan suggestions for a topic
+ * Runs in background without blocking the response
+ */
+async function generateCollectionPlanSuggestionsAsync(topicId: string, userId: string | null = null): Promise<void> {
+  try {
+    // Check if Ollama service is available
+    if (!ollamaService.isAvailable()) {
+      console.warn(`Ollama service not available, skipping collection plan suggestions for topic ${topicId}`);
+      return;
+    }
+
+    // Fetch the topic with metadata
+    const { data: topic, error: topicError } = await supabase
+      .from('osint_topics')
+      .select('id, name, description, decision_question, keywords, organization_id')
+      .eq('id', topicId)
+      .single() as any;
+
+    if (topicError || !topic) {
+      console.warn(`Topic ${topicId} not found for collection plan suggestions`);
+      return;
+    }
+
+    // Fetch all linked source records
+    const { data: links, error: linksError } = await supabase
+      .from('topic_source_links')
+      .select(`
+        source_record_id,
+        source_records!inner (
+          id,
+          title,
+          sources!inner (
+            name,
+            reliability_rating
+          )
+        )
+      `)
+      .eq('topic_id', topicId);
+
+    if (linksError) {
+      console.warn(`Error fetching links for topic ${topicId}:`, linksError);
+      return;
+    }
+
+    // Only generate if 2+ linked records (as per plan requirements)
+    if (!links || links.length < 2) {
+      console.log(`Topic ${topicId} has ${links?.length || 0} linked records, skipping collection plan suggestions (requires 2+)`);
+      return;
+    }
+
+    // Prepare content for each linked record
+    const preparedContents: Array<PreparedContent & { sourceRecordTitle: string; sourceName: string }> = [];
+
+    for (const link of links) {
+      try {
+        const recordId = (link as any).source_record_id;
+        const record = (link as any).source_records;
+        const sourceInfo = record.sources;
+        const recordTitle = record.title || 'Untitled';
+
+        // Prepare content using content preparer (no fresh content fetching for suggestions)
+        const prepared = await contentPreparer.prepareForAnalysis(recordId);
+
+        preparedContents.push({
+          ...prepared,
+          sourceRecordTitle: recordTitle,
+          sourceName: sourceInfo.name,
+        });
+      } catch (prepError) {
+        console.warn(`Failed to prepare content for record ${(link as any).source_record_id}:`, prepError);
+        // Continue with other records
+      }
+    }
+
+    if (preparedContents.length === 0) {
+      console.warn(`No valid content available for topic ${topicId} collection plan suggestions`);
+      return;
+    }
+
+    // Fetch existing collection plan (if any)
+    const { data: existingPlanData } = await supabase
+      .from('collection_plans')
+      .select('source_types_needed, claims_to_verify, coverage_gaps, sources_to_avoid')
+      .eq('topic_id', topicId)
+      .maybeSingle() as any;
+
+    const existingPlan = existingPlanData ? {
+      sourceTypesNeeded: existingPlanData.source_types_needed || [],
+      claimsToVerify: existingPlanData.claims_to_verify || [],
+      coverageGaps: existingPlanData.coverage_gaps || [],
+      sourcesToAvoid: existingPlanData.sources_to_avoid || [],
+    } : undefined;
+
+    // Build topic context
+    const topicContext = {
+      name: topic.name,
+      description: topic.description || undefined,
+      decisionQuestion: topic.decision_question || undefined,
+      keywords: topic.keywords || undefined,
+    };
+
+    // Call Ollama service to generate suggestions
+    const suggestions = await ollamaService.generateCollectionPlanSuggestions(
+      preparedContents,
+      topicContext,
+      existingPlan
+    );
+
+    // Audit log: collection plan suggestions generated
+    await auditService.logAction({
+      action: 'collection_plan_suggestions_generated',
+      entityType: 'topic',
+      entityId: topicId,
+      userId: userId,
+      metadata: {
+        linkedRecordsCount: preparedContents.length,
+        hasExistingPlan: !!existingPlan,
+        suggestionsCount: {
+          sourceTypes: suggestions.sourceTypesNeeded.length,
+          claims: suggestions.claimsToVerify.length,
+          gaps: suggestions.coverageGaps.length,
+          avoid: suggestions.sourcesToAvoid.length,
+        },
+        triggeredBy: 'indicator',
+      },
+    });
+
+    console.log(`Successfully generated collection plan suggestions for topic ${topicId}`);
+  } catch (error) {
+    // Non-blocking error - just log, don't throw
+    console.warn(`Failed to generate collection plan suggestions for topic ${topicId}:`, error);
+  }
+}
+
+/**
  * POST /api/indicators/:id/trigger
  * Trigger an indicator and optionally create a topic
  * Body: { topic_name?, topic_description?, topic_keywords? }
@@ -417,6 +555,13 @@ router.post('/:id/trigger', async (req: Request, res: Response) => {
 
       if (topicError) throw topicError;
       topic = topicData;
+
+      // Asynchronously generate collection plan suggestions if topic has 2+ linked records
+      // This runs in background and doesn't block the response
+      generateCollectionPlanSuggestionsAsync(topicId, (req as any).user?.id || null).catch((err) => {
+        // Already handled in the function, but catch here to prevent unhandled promise rejection
+        console.warn(`Background collection plan generation failed for topic ${topicId}:`, err);
+      });
     }
 
     res.json({
