@@ -1,6 +1,7 @@
-import { useState } from 'react';
-import { Edit2, Save, X, Plus, Target, AlertCircle, Ban } from 'lucide-react';
-import type { CollectionPlan } from '../../types/osint';
+import { useState, useEffect } from 'react';
+import { Edit2, Save, X, Plus, Target, AlertCircle, Ban, Sparkles } from 'lucide-react';
+import type { CollectionPlan, CollectionPlanSuggestions } from '../../types/osint';
+import { analysisService } from '../../services/analysis.service';
 
 interface CollectionPlanCardProps {
   topicId: string;
@@ -11,6 +12,7 @@ interface CollectionPlanCardProps {
 export function CollectionPlanCard({ topicId, collectionPlan, onSave }: CollectionPlanCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Editable state
@@ -35,6 +37,17 @@ export function CollectionPlanCard({ topicId, collectionPlan, onSave }: Collecti
   const [avoidInput, setAvoidInput] = useState('');
   
   const [notes, setNotes] = useState(collectionPlan?.notes || '');
+
+  // Sync state when collectionPlan prop changes
+  useEffect(() => {
+    if (collectionPlan) {
+      setSourceTypesNeeded(collectionPlan.sourceTypesNeeded || []);
+      setClaimsToVerify(collectionPlan.claimsToVerify || []);
+      setCoverageGaps(collectionPlan.coverageGaps || []);
+      setSourcesToAvoid(collectionPlan.sourcesToAvoid || []);
+      setNotes(collectionPlan.notes || '');
+    }
+  }, [collectionPlan]);
 
   const handleEdit = () => {
     setIsEditing(true);
@@ -95,6 +108,39 @@ export function CollectionPlanCard({ topicId, collectionPlan, onSave }: Collecti
     setter(items.filter((_, i) => i !== index));
   };
 
+  const handleGenerateSuggestions = async () => {
+    setIsGenerating(true);
+    setError(null);
+
+    try {
+      const suggestions: CollectionPlanSuggestions = await analysisService.generateCollectionPlanSuggestions(topicId);
+      
+      // Phase 2: Basic direct population (merge to avoid duplicates)
+      // Phase 3 will add merge/replace/add dialog
+      setSourceTypesNeeded((prev) => {
+        const combined = [...prev, ...suggestions.sourceTypesNeeded];
+        return Array.from(new Set(combined)); // Remove duplicates
+      });
+      setClaimsToVerify((prev) => {
+        const combined = [...prev, ...suggestions.claimsToVerify];
+        return Array.from(new Set(combined)); // Remove duplicates
+      });
+      setCoverageGaps((prev) => {
+        const combined = [...prev, ...suggestions.coverageGaps];
+        return Array.from(new Set(combined)); // Remove duplicates
+      });
+      setSourcesToAvoid((prev) => {
+        const combined = [...prev, ...suggestions.sourcesToAvoid];
+        return Array.from(new Set(combined)); // Remove duplicates
+      });
+    } catch (err) {
+      console.error('Error generating collection plan suggestions:', err);
+      setError(err instanceof Error ? err.message : 'Failed to generate suggestions');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   const hasContent = collectionPlan && (
     sourceTypesNeeded.length > 0 ||
     claimsToVerify.length > 0 ||
@@ -142,6 +188,25 @@ export function CollectionPlanCard({ topicId, collectionPlan, onSave }: Collecti
       {error && (
         <div className="mb-4 p-3 bg-red-900/30 border border-red-800 rounded-lg text-red-200 text-sm">
           {error}
+        </div>
+      )}
+
+      {isEditing && (
+        <div className="mb-4">
+          <button
+            type="button"
+            onClick={handleGenerateSuggestions}
+            disabled={isGenerating}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-900/50 hover:bg-blue-900/70 border border-blue-800 text-blue-200 rounded-lg transition-colors duration-250 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+          >
+            <Sparkles size={16} className={isGenerating ? 'animate-pulse' : ''} />
+            {isGenerating ? 'Generating Suggestions...' : 'Generate Suggestions'}
+          </button>
+          {isGenerating && (
+            <p className="mt-2 text-xs text-stone-500">
+              Analyzing topic and linked records to suggest collection plan items...
+            </p>
+          )}
         </div>
       )}
 

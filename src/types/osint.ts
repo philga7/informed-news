@@ -237,6 +237,14 @@ export interface CollectionPlan {
   updatedAt: Date;
 }
 
+// Phase 2: Collection Plan Suggestions (GenAI-generated)
+export interface CollectionPlanSuggestions {
+  sourceTypesNeeded: string[];
+  claimsToVerify: string[];
+  coverageGaps: string[];
+  sourcesToAvoid: string[];
+}
+
 // ============================================================================
 // CLAIMS TYPES (Phase 3)
 // ============================================================================
