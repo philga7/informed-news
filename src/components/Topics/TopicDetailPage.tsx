@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Edit2, FileText, Plus, Sparkles, Film, AlertTriangle, Trash2, Archive } from 'lucide-react';
+import { ArrowLeft, Edit2, FileText, Plus, Sparkles, Film, AlertTriangle, Trash2, Archive, Loader2 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useOrganization } from '../../context/OrganizationContext';
 import { osintTopicsService } from '../../services';
@@ -579,38 +579,32 @@ export function TopicDetailPage() {
                       <button
                         onClick={handleGenerateTopicSummary}
                         disabled={analysisLoading !== null || linkedRecords.length === 0}
-                        className="flex items-center justify-center gap-2 px-4 py-3 bg-stone-800 hover:bg-stone-700 border border-stone-700 hover:border-stone-600 text-stone-200 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="flex items-center justify-center gap-2 px-4 py-2 bg-stone-800 hover:bg-stone-700 border border-stone-700 hover:border-stone-600 text-stone-200 text-xs rounded-lg transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        {analysisLoading === 'topic_summary' ? (
-                          <>
-                            <LoadingSpinner />
-                            <span>Generating Topic Summary...</span>
-                          </>
-                        ) : (
-                          <>
-                            <FileText size={18} />
-                            <span>Generate Topic Summary</span>
-                          </>
-                        )}
+                        <div className="w-4 h-4 flex items-center justify-center">
+                          {analysisLoading === 'topic_summary' ? (
+                            <Loader2 size={16} className="animate-spin" />
+                          ) : (
+                            <FileText size={16} />
+                          )}
+                        </div>
+                        <span>Generate Topic Summary</span>
                       </button>
 
                       {hasMultipleMediaTypes() && (
                         <button
                           onClick={handleCompareMediaTypes}
                           disabled={analysisLoading !== null || linkedRecords.length === 0}
-                          className="flex items-center justify-center gap-2 px-4 py-3 bg-stone-800 hover:bg-stone-700 border border-stone-700 hover:border-stone-600 text-stone-200 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="flex items-center justify-center gap-2 px-4 py-2 bg-stone-800 hover:bg-stone-700 border border-stone-700 hover:border-stone-600 text-stone-200 text-xs rounded-lg transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                          {analysisLoading === 'media_comparison' ? (
-                            <>
-                              <LoadingSpinner />
-                              <span>Comparing Media Types...</span>
-                            </>
-                          ) : (
-                            <>
-                              <Film size={18} />
-                              <span>Compare Media Types</span>
-                            </>
-                          )}
+                          <div className="w-4 h-4 flex items-center justify-center">
+                            {analysisLoading === 'media_comparison' ? (
+                              <Loader2 size={16} className="animate-spin" />
+                            ) : (
+                              <Film size={16} />
+                            )}
+                          </div>
+                          <span>Compare Media Types</span>
                         </button>
                       )}
                     </div>
