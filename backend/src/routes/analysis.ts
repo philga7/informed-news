@@ -971,8 +971,10 @@ router.post('/detect-duplicates', async (req: Request, res: Response) => {
             id,
             title,
             content,
+            content_compressed,
             published_at,
             ingested_at,
+            media_type,
             sources!inner (
               id,
               name
@@ -981,17 +983,59 @@ router.post('/detect-duplicates', async (req: Request, res: Response) => {
         `)
         .eq('topic_id', topic_id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('[detect-duplicates] Error fetching topic links:', error);
+        throw error;
+      }
 
-      records = links?.map((link: any) => ({
-        id: link.source_records.id,
-        title: link.source_records.title,
-        content: link.source_records.content,
-        published_at: link.source_records.published_at,
-        ingested_at: link.source_records.ingested_at,
-        source_name: link.source_records.sources.name,
-        source_id: link.source_records.sources.id,
-      })) || [];
+      console.log(`[detect-duplicates] Found ${links?.length || 0} links for topic ${topic_id}`);
+
+      if (!links || links.length === 0) {
+        console.log(`[detect-duplicates] No linked records found for topic ${topic_id}`);
+        return res.json({
+          success: true,
+          duplicate_groups: [],
+        });
+      }
+
+      // Decompress content if needed
+      const { gunzip } = await import('zlib');
+      const { promisify } = await import('util');
+      const gunzipAsync = promisify(gunzip);
+
+      records = await Promise.all(
+        (links || []).map(async (link: any) => {
+          let content = link.source_records.content || '';
+          
+          // For videos, use title only (no content)
+          if (link.source_records.media_type === 'video') {
+            content = link.source_records.title || '';
+          } else if (link.source_records.content_compressed && content) {
+            // Decompress if needed
+            try {
+              const compressedBuffer = Buffer.from(content, 'base64');
+              const decompressed = await gunzipAsync(compressedBuffer);
+              content = decompressed.toString('utf-8');
+            } catch (decompressError) {
+              console.warn(`[detect-duplicates] Failed to decompress content for record ${link.source_records.id}:`, decompressError);
+              // Continue with compressed content - it might still be readable
+            }
+          }
+
+          return {
+            id: link.source_records.id,
+            title: link.source_records.title || '',
+            content: content,
+            published_at: link.source_records.published_at,
+            ingested_at: link.source_records.ingested_at,
+            source_name: link.source_records.sources.name,
+            source_id: link.source_records.sources.id,
+            media_type: link.source_records.media_type || 'article',
+          };
+        })
+      );
+      
+      console.log(`[detect-duplicates] Processed ${records.length} records for topic ${topic_id}`);
     } else {
       // Fetch all records for organization (via sources)
       const { data: sources, error: sourcesError } = await supabase
@@ -1036,8 +1080,20 @@ router.post('/detect-duplicates', async (req: Request, res: Response) => {
       }
     }
 
+    console.log(`[detect-duplicates] Total records to analyze: ${records.length}`);
+    
+    if (records.length < 2) {
+      console.log(`[detect-duplicates] Not enough records (${records.length}) to detect duplicates - need at least 2`);
+      return res.json({
+        success: true,
+        duplicate_groups: [],
+      });
+    }
+    
     // Detect duplicates using text similarity
     const duplicateGroups = detectDuplicates(records);
+    
+    console.log(`[detect-duplicates] Found ${duplicateGroups.length} duplicate groups from ${records.length} records`);
 
     res.json({
       success: true,
@@ -1878,6 +1934,123 @@ router.post('/coordination-assessments', async (req: Request, res: Response) => 
     console.error('Error saving coordination assessment:', error);
     res.status(500).json({
       error: 'Failed to save coordination assessment',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+/**
+ * POST /api/analysis/coordination-analysis
+ * Perform AI-powered coordination analysis on a duplicate group
+ * Body: { duplicate_group_hash, record_ids, topic_id, organization_id }
+ */
+router.post('/coordination-analysis', async (req: Request, res: Response) => {
+  try {
+    const { duplicate_group_hash, record_ids, topic_id, organization_id } = req.body;
+
+    if (!duplicate_group_hash || !organization_id) {
+      return res.status(400).json({
+        error: 'duplicate_group_hash and organization_id are required',
+      });
+    }
+
+    if (!record_ids || !Array.isArray(record_ids) || record_ids.length < 2) {
+      return res.status(400).json({
+        error: 'record_ids array with at least 2 records is required',
+      });
+    }
+
+    if (!ollamaService.isAvailable()) {
+      return res.status(503).json({
+        error: 'AI analysis service not available',
+        message: 'OLLAMA_API_KEY not configured',
+      });
+    }
+
+    // Fetch source records with source information
+    const { data: records, error: recordsError } = await supabase
+      .from('source_records')
+      .select(`
+        id,
+        title,
+        url,
+        content,
+        published_at,
+        ingested_at,
+        media_type,
+        sources!inner (
+          id,
+          name,
+          reliability_rating,
+          organization_id
+        )
+      `)
+      .in('id', record_ids)
+      .eq('sources.organization_id', organization_id) as any;
+
+    if (recordsError) throw recordsError;
+
+    if (!records || records.length < 2) {
+      return res.status(400).json({
+        error: 'Could not fetch at least 2 source records for analysis',
+      });
+    }
+
+    // Prepare content for each record
+    const preparedRecords = await Promise.all(
+      records.map(async (record: any) => {
+        const prepared = await contentPreparer.prepareForAnalysis(record.id);
+        return {
+          ...prepared,
+          sourceRecordId: record.id,
+          sourceName: record.sources.name,
+          publishedAt: record.published_at ? new Date(record.published_at) : undefined,
+        };
+      })
+    );
+
+    // Call Ollama service for coordination analysis
+    const analysisResult = await ollamaService.analyzeCoordination(
+      preparedRecords,
+      duplicate_group_hash
+    );
+
+    // Store as analytic artifact
+    const { data: artifact, error: insertError } = await supabase
+      .from('analytic_artifacts')
+      .insert({
+        organization_id,
+        topic_id: topic_id || null,
+        type: 'coordination_check',
+        payload: {
+          duplicate_group_hash,
+          record_ids,
+          ...analysisResult,
+        } as any,
+        model_name: ollamaService.getModelName(),
+        created_by: 'system:ollama',
+        reviewed: false,
+      } as any)
+      .select()
+      .single();
+
+    if (insertError) throw insertError;
+
+    if (!artifact) {
+      return res.status(500).json({ error: 'Failed to create artifact' });
+    }
+
+    // Audit log: artifact created
+    await auditService.logArtifactCreated((artifact as any).id, artifact as any);
+
+    res.json({
+      success: true,
+      artifact,
+    });
+  } catch (error) {
+    console.error('Error performing coordination analysis:', error);
+    res.status(500).json({
+      error: 'Failed to perform coordination analysis',
       message: error instanceof Error ? error.message : 'Unknown error',
     });
   }

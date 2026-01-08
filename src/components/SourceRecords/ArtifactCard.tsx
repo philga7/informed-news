@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Trash2, CheckCircle, Circle } from 'lucide-react';
-import type { AnalyticArtifact, SummaryPayload, EntityExtractionPayload, ToneAnalysisPayload, KeyFactsPayload, TopicSummaryPayload, MediaComparisonPayload } from '../../services/analysis.service';
+import type { AnalyticArtifact, SummaryPayload, EntityExtractionPayload, ToneAnalysisPayload, KeyFactsPayload, TopicSummaryPayload, MediaComparisonPayload, CoordinationAnalysisPayload } from '../../services/analysis.service';
 import { MediaComparisonCard } from '../Topics/MediaComparisonCard';
 import { analysisService } from '../../services/analysis.service';
 
@@ -98,6 +98,8 @@ export function ArtifactCard({ artifact, isNew = false, onUpdate, sourceReliabil
         return 'Network Graph';
       case 'media_comparison':
         return 'Media Comparison';
+      case 'coordination_check':
+        return 'Coordination Analysis';
       case 'notes':
         return 'Notes';
       default:
@@ -121,6 +123,8 @@ export function ArtifactCard({ artifact, isNew = false, onUpdate, sourceReliabil
         return <KeyFactsDisplay payload={localArtifact.payload as KeyFactsPayload} />;
       case 'media_comparison':
         return <MediaComparisonCard payload={localArtifact.payload as MediaComparisonPayload} />;
+      case 'coordination_check':
+        return <CoordinationAnalysisDisplay payload={localArtifact.payload as CoordinationAnalysisPayload} />;
       case 'notes':
         return <NotesDisplay artifact={localArtifact} onUpdate={onUpdate} onNotesChange={setCurrentNotes} />;
       default:
@@ -754,6 +758,116 @@ function ToneDisplay({ payload, sourceReliability }: { payload: ToneAnalysisPayl
               <li key={index} className="flex gap-2 text-sm text-stone-300">
                 <span className="text-amber-500 mt-1">⚠</span>
                 <span className="flex-1">{signal}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Coordination Analysis Display Component
+function CoordinationAnalysisDisplay({ payload }: { payload: CoordinationAnalysisPayload }) {
+  const getAssessmentColor = (assessment: string) => {
+    switch (assessment) {
+      case 'coordinated':
+        return 'bg-red-900/30 text-red-400 border-red-800/50';
+      case 'syndicated':
+        return 'bg-blue-900/30 text-blue-400 border-blue-800/50';
+      case 'coincidental':
+        return 'bg-green-900/30 text-green-400 border-green-800/50';
+      case 'unclear':
+      default:
+        return 'bg-stone-800 text-stone-400 border-stone-700';
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Assessment */}
+      <div className="flex items-center gap-3">
+        <span className="text-xs font-semibold text-stone-400 uppercase">Assessment:</span>
+        <span className={`px-3 py-1 rounded border text-sm font-medium ${getAssessmentColor(payload.coordinationAssessment)}`}>
+          {payload.coordinationAssessment.charAt(0).toUpperCase() + payload.coordinationAssessment.slice(1)}
+        </span>
+        <span className="text-xs text-stone-500">
+          (Confidence: {(payload.confidence * 100).toFixed(0)}%)
+        </span>
+      </div>
+
+      {/* Semantic Similarity */}
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-xs font-semibold text-stone-400 uppercase">Semantic Similarity</span>
+          <span className="text-sm text-stone-300">{(payload.semanticSimilarity * 100).toFixed(0)}%</span>
+        </div>
+        <div className="w-full bg-stone-800 rounded-full h-2">
+          <div
+            className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+            style={{ width: `${payload.semanticSimilarity * 100}%` }}
+          />
+        </div>
+      </div>
+
+      {/* Conclusion */}
+      {payload.conclusion && (
+        <div>
+          <h5 className="text-xs font-semibold text-stone-400 uppercase mb-2">Conclusion</h5>
+          <p className="text-sm text-stone-300">{payload.conclusion}</p>
+        </div>
+      )}
+
+      {/* Timing Pattern */}
+      {payload.timingPattern && (
+        <div className={`p-3 rounded-lg border ${payload.timingPattern.suggestsCoordination ? 'bg-orange-900/20 border-orange-800/50' : 'bg-stone-800 border-stone-700'}`}>
+          <h5 className="text-xs font-semibold text-orange-400 uppercase mb-1">Timing Pattern</h5>
+          <p className="text-sm text-stone-300">{payload.timingPattern.description}</p>
+          {payload.timingPattern.suggestsCoordination && (
+            <span className="inline-block mt-2 px-2 py-0.5 bg-orange-900/50 text-orange-300 text-xs rounded">
+              Suggests Coordination
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Narrative Pattern */}
+      {payload.narrativePattern && (
+        <div className={`p-3 rounded-lg border ${payload.narrativePattern.suggestsCoordination ? 'bg-orange-900/20 border-orange-800/50' : 'bg-stone-800 border-stone-700'}`}>
+          <h5 className="text-xs font-semibold text-orange-400 uppercase mb-1">Narrative Pattern</h5>
+          <p className="text-sm text-stone-300">{payload.narrativePattern.description}</p>
+          {payload.narrativePattern.suggestsCoordination && (
+            <span className="inline-block mt-2 px-2 py-0.5 bg-orange-900/50 text-orange-300 text-xs rounded">
+              Suggests Coordination
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Coordination Indicators */}
+      {payload.coordinationIndicators && payload.coordinationIndicators.length > 0 && (
+        <div>
+          <h5 className="text-xs font-semibold text-stone-400 uppercase mb-2">Coordination Indicators</h5>
+          <ul className="space-y-1.5">
+            {payload.coordinationIndicators.map((indicator, index) => (
+              <li key={index} className="flex gap-2 text-sm text-stone-300">
+                <span className="text-orange-400 mt-1">•</span>
+                <span className="flex-1">{indicator}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Reasoning */}
+      {payload.reasoning && payload.reasoning.length > 0 && (
+        <div>
+          <h5 className="text-xs font-semibold text-stone-400 uppercase mb-2">Reasoning</h5>
+          <ul className="space-y-1.5">
+            {payload.reasoning.map((point, index) => (
+              <li key={index} className="flex gap-2 text-sm text-stone-300">
+                <span className="text-blue-400 mt-1">→</span>
+                <span className="flex-1">{point}</span>
               </li>
             ))}
           </ul>
