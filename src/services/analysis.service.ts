@@ -255,6 +255,7 @@ class AnalysisService {
 
   /**
    * Generate topic-level summary across all linked source records
+   * Uses stored content from linked source records (no fresh content fetching)
    */
   async generateTopicSummary(topicId: string): Promise<AnalyticArtifact> {
     const response = await apiClient.post(

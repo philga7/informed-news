@@ -1274,6 +1274,7 @@ router.post('/topics/:id/summarize', async (req: Request, res: Response) => {
 
     for (const { link, recordId, sourceInfo } of recordsWithReviewed) {
       try {
+        // Use stored content from linked source records (no fresh content fetching for topic summaries)
         const prepared = await contentPreparer.prepareForAnalysis(recordId);
         
         // Get the source record title from the link data (already fetched)
