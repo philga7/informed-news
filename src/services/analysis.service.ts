@@ -6,7 +6,7 @@
  */
 
 import { apiClient } from '../utils/apiClient';
-import type { DuplicateGroup } from '../types/osint';
+import type { DuplicateGroup, CollectionPlanSuggestions } from '../types/osint';
 
 export interface AnalyticArtifact {
   id: string;
@@ -294,6 +294,21 @@ class AnalysisService {
       { notes }
     );
     return response.artifact;
+  }
+
+  /**
+   * Generate AI-powered Collection Plan suggestions for a topic
+   * Analyzes topic metadata and linked source records to suggest:
+   * - Source types needed
+   * - Claims to verify
+   * - Coverage gaps
+   * - Sources to avoid
+   */
+  async generateCollectionPlanSuggestions(topicId: string): Promise<CollectionPlanSuggestions> {
+    const response = await apiClient.post(
+      `${this.baseUrl}/topics/${topicId}/collection-plan-suggestions`
+    );
+    return response.suggestions;
   }
 }
 
