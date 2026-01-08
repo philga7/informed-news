@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Edit2, FileText, Plus, Sparkles, Film } from 'lucide-react';
+import { ArrowLeft, Edit2, FileText, Plus, Sparkles, Film, AlertTriangle, Trash2, Archive } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useOrganization } from '../../context/OrganizationContext';
 import { osintTopicsService } from '../../services';
@@ -45,6 +45,9 @@ export function TopicDetailPage() {
   const [topicArtifacts, setTopicArtifacts] = useState<AnalyticArtifact[]>([]);
   const [isLoadingArtifacts, setIsLoadingArtifacts] = useState(false);
   const [analysisLoading, setAnalysisLoading] = useState<string | null>(null);
+  const [brokenLinks, setBrokenLinks] = useState<any[]>([]);
+  const [archivedLinks, setArchivedLinks] = useState<any[]>([]);
+  const [isCleaningLinks, setIsCleaningLinks] = useState(false);
 
   const loadTopic = async () => {
     if (!id) return;
@@ -54,11 +57,52 @@ export function TopicDetailPage() {
       setError(null);
       const fetchedTopic = await osintTopicsService.getById(id);
       setTopic(fetchedTopic);
+      // Validate links after loading topic
+      await validateLinks();
     } catch (err) {
       console.error('Error loading topic:', err);
       setError(err instanceof Error ? err.message : 'Failed to load topic');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const validateLinks = async () => {
+    if (!id) return;
+    
+    try {
+      const validation = await osintTopicsService.validateLinks(id);
+      setBrokenLinks(validation.brokenLinks || []);
+      setArchivedLinks(validation.archivedLinks || []);
+    } catch (err) {
+      console.error('Error validating links:', err);
+      // Don't block the page if validation fails
+    }
+  };
+
+  const handleCleanupLinks = async (includeArchived: boolean = false) => {
+    if (!id) return;
+    
+    if (!confirm(
+      includeArchived
+        ? `Are you sure you want to remove ${brokenLinks.length + archivedLinks.length} broken link(s)? This will remove links to both missing and archived records.`
+        : `Are you sure you want to remove ${brokenLinks.length} broken link(s)? This will only remove links to completely missing records (archived records will be kept).`
+    )) {
+      return;
+    }
+
+    try {
+      setIsCleaningLinks(true);
+      const result = await osintTopicsService.cleanupLinks(id, includeArchived);
+      alert(`Cleaned up ${result.deleted} orphaned link(s)`);
+      // Reload topic and revalidate links
+      await loadTopic();
+      await validateLinks();
+    } catch (err) {
+      console.error('Error cleaning up links:', err);
+      alert(err instanceof Error ? err.message : 'Failed to clean up links');
+    } finally {
+      setIsCleaningLinks(false);
     }
   };
 
@@ -330,6 +374,111 @@ export function TopicDetailPage() {
             <span>Updated {new Date(topic.updatedAt).toLocaleDateString()}</span>
           </div>
         </div>
+
+        {/* Broken Links Warning */}
+        {(brokenLinks.length > 0 || archivedLinks.length > 0) && (
+          <div className="bg-yellow-900/30 border border-yellow-800 rounded-lg p-4 mb-6">
+            <div className="flex items-start justify-between mb-3">
+              <div className="flex items-start gap-3">
+                <AlertTriangle size={20} className="text-yellow-500 mt-0.5 flex-shrink-0" />
+                <div>
+                  <h3 className="text-yellow-400 font-semibold mb-1">Broken or Archived Links Detected</h3>
+                  <p className="text-yellow-300/80 text-sm">
+                    {brokenLinks.length > 0 && (
+                      <>
+                        {brokenLinks.length} link{brokenLinks.length !== 1 ? 's' : ''} point{brokenLinks.length !== 1 ? '' : 's'} to source records that no longer exist.
+                      </>
+                    )}
+                    {brokenLinks.length > 0 && archivedLinks.length > 0 && ' '}
+                    {archivedLinks.length > 0 && (
+                      <>
+                        {archivedLinks.length} link{archivedLinks.length !== 1 ? 's' : ''} point{archivedLinks.length !== 1 ? '' : 's'} to archived source records.
+                      </>
+                    )}
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex flex-wrap gap-2 mt-3">
+              {brokenLinks.length > 0 && (
+                <button
+                  onClick={() => handleCleanupLinks(false)}
+                  disabled={isCleaningLinks}
+                  className="flex items-center gap-2 px-3 py-2 bg-yellow-800/50 hover:bg-yellow-800/70 text-yellow-200 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                >
+                  {isCleaningLinks ? (
+                    <>
+                      <LoadingSpinner />
+                      <span>Cleaning up...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 size={16} />
+                      <span>Remove {brokenLinks.length} Broken Link{brokenLinks.length !== 1 ? 's' : ''}</span>
+                    </>
+                  )}
+                </button>
+              )}
+              {archivedLinks.length > 0 && (
+                <button
+                  onClick={() => handleCleanupLinks(true)}
+                  disabled={isCleaningLinks}
+                  className="flex items-center gap-2 px-3 py-2 bg-orange-800/50 hover:bg-orange-800/70 text-orange-200 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                >
+                  {isCleaningLinks ? (
+                    <>
+                      <LoadingSpinner />
+                      <span>Cleaning up...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Archive size={16} />
+                      <span>Remove All Broken + Archived Links ({brokenLinks.length + archivedLinks.length})</span>
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
+
+            {/* Show details */}
+            {(brokenLinks.length > 0 || archivedLinks.length > 0) && (
+              <div className="mt-4 pt-4 border-t border-yellow-800/50">
+                <details className="text-sm">
+                  <summary className="text-yellow-400 cursor-pointer hover:text-yellow-300">
+                    View Details ({brokenLinks.length + archivedLinks.length} link{brokenLinks.length + archivedLinks.length !== 1 ? 's' : ''})
+                  </summary>
+                  <div className="mt-3 space-y-2">
+                    {brokenLinks.length > 0 && (
+                      <div>
+                        <h4 className="text-yellow-500 font-medium mb-2">Broken Links ({brokenLinks.length})</h4>
+                        <div className="space-y-1 pl-4">
+                          {brokenLinks.map((link) => (
+                            <div key={link.id} className="text-yellow-300/80 text-xs">
+                              • Link ID: {link.id} | Source Record ID: {link.source_record_id} | Linked: {new Date(link.linked_at).toLocaleString()}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {archivedLinks.length > 0 && (
+                      <div>
+                        <h4 className="text-orange-400 font-medium mb-2">Archived Links ({archivedLinks.length})</h4>
+                        <div className="space-y-1 pl-4">
+                          {archivedLinks.map((link) => (
+                            <div key={link.id} className="text-orange-300/80 text-xs">
+                              • Link ID: {link.id} | Source Record ID: {link.source_record_id} | Linked: {new Date(link.linked_at).toLocaleString()}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </details>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Tabs Navigation */}
         <div className="bg-stone-900 border border-stone-800 rounded-lg mb-6">

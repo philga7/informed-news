@@ -379,9 +379,11 @@ router.get('/:id', async (req: Request, res: Response) => {
     const linksWithArtifactStatus = links.map((link: any) => {
       const recordId = link.source_record_id;
       const artifactStatus = artifactsByRecord.get(recordId);
+      // Only consider "all reviewed" if there ARE artifacts AND they're all reviewed
+      // If no artifacts exist, we should NOT auto-promote (analysis hasn't happened yet)
       const allArtifactsReviewed = artifactStatus
         ? artifactStatus.total > 0 && artifactStatus.reviewed === artifactStatus.total
-        : true; // If no artifacts, consider it "all reviewed" (nothing to review)
+        : false; // Changed: If no artifacts, DON'T consider it "all reviewed"
 
       return {
         ...link,
@@ -743,26 +745,35 @@ router.post('/:id/links', async (req: Request, res: Response) => {
     }
 
     // Determine initial review_status:
-    // - If source record scan_status is 'reviewed' → mark link as reviewed
-    // - Else, if the record has no artifacts OR all artifacts are reviewed → mark as reviewed
+    // - If source record scan_status is 'reviewed' → mark link as reviewed (explicit scan review)
+    // - Else, if the record HAS artifacts AND all artifacts are reviewed → mark as reviewed (analysis complete)
     // - Otherwise leave undefined (DB default 'pending')
+    // NOTE: We do NOT auto-mark as reviewed if there are no artifacts - that means analysis hasn't happened yet!
     let reviewStatus: 'reviewed' | undefined = undefined;
     const sourceRecordData = sourceRecord as { scan_status: string; reviewed_at: string | null } | null;
     if (sourceRecordData?.scan_status === 'reviewed') {
+      // Explicit review in scan view - mark link as reviewed
       reviewStatus = 'reviewed';
+      console.log(`[topics] Auto-marking link as reviewed: source_record ${source_record_id} has scan_status='reviewed'`);
     } else {
+      // Check artifacts - only auto-review if artifacts exist AND are all reviewed
       try {
         const { data: artifacts, error: artifactsError } = await supabase
           .from('analytic_artifacts')
           .select('reviewed')
           .eq('source_record_id', source_record_id);
         
-        if (!artifactsError) {
-          const noArtifacts = !artifacts || artifacts.length === 0;
-          const allReviewed = !noArtifacts && artifacts.every((a: any) => a.reviewed === true);
-          if (noArtifacts || allReviewed) {
+        if (!artifactsError && artifacts && artifacts.length > 0) {
+          const allReviewed = artifacts.every((a: any) => a.reviewed === true);
+          if (allReviewed) {
             reviewStatus = 'reviewed';
+            console.log(`[topics] Auto-marking link as reviewed: source_record ${source_record_id} has ${artifacts.length} artifacts, all reviewed`);
+          } else {
+            console.log(`[topics] Not auto-reviewing link: source_record ${source_record_id} has ${artifacts.length} artifacts, but ${artifacts.filter((a: any) => !a.reviewed).length} are not reviewed`);
           }
+        } else {
+          // No artifacts - don't auto-review (analysis hasn't happened yet)
+          console.log(`[topics] Not auto-reviewing link: source_record ${source_record_id} has no artifacts yet`);
         }
       } catch (e) {
         console.warn('[topics] Unable to inspect artifacts for initial link review status:', e);
@@ -859,6 +870,218 @@ router.delete('/:topicId/links/:linkId', async (req: Request, res: Response) => 
     console.error('Error unlinking source record:', error);
     res.status(500).json({
       error: 'Failed to unlink source record',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+/**
+ * GET /api/topics/:id/validate-links
+ * Validate all links for a topic and identify broken ones (orphaned links)
+ * Returns links where source_record_id doesn't exist in source_records
+ */
+router.get('/:id/validate-links', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    // Fetch all links for this topic
+    const { data: links, error: linksError } = await supabase
+      .from('topic_source_links')
+      .select('*')
+      .eq('topic_id', id)
+      .order('linked_at', { ascending: false }); // Order by linked_at to see newest first
+
+    if (linksError) throw linksError;
+
+    console.log(`[validate-links] Found ${links?.length || 0} links for topic ${id}`);
+    if (links && links.length > 0) {
+      console.log(`[validate-links] Link IDs and source_record_ids:`, links.map((l: any) => ({ link_id: l.id, source_record_id: l.source_record_id, linked_at: l.linked_at })));
+    }
+
+    if (!links || links.length === 0) {
+      return res.json({
+        success: true,
+        brokenLinks: [],
+        archivedLinks: [],
+        validLinks: 0,
+        totalLinks: 0,
+      });
+    }
+
+    // Check each link to see if source record exists
+    const brokenLinks: any[] = [];
+    const archivedLinks: any[] = [];
+    const recordIds = links.map((link: any) => link.source_record_id);
+    console.log(`[validate-links] Checking ${recordIds.length} unique source_record_ids:`, recordIds);
+
+    // Check if records exist in source_records
+    const { data: existingRecords, error: recordsError } = await supabase
+      .from('source_records')
+      .select('id')
+      .in('id', recordIds);
+
+    if (recordsError) throw recordsError;
+
+    const existingRecordIds = new Set((existingRecords || []).map((r: any) => r.id));
+
+    // Check archived records for the missing ones
+    const missingRecordIds = recordIds.filter((id: string) => !existingRecordIds.has(id));
+    let archivedRecordIds = new Set<string>();
+
+    if (missingRecordIds.length > 0) {
+      const { data: archivedRecords, error: archivedError } = await supabase
+        .from('archived_source_records')
+        .select('id, title, url, archived_at, archive_reason')
+        .in('id', missingRecordIds);
+
+      if (archivedError) {
+        console.error('[validate-links] Error checking archived_source_records:', archivedError);
+        // Don't throw - continue with validation
+      } else if (archivedRecords) {
+        archivedRecordIds = new Set(archivedRecords.map((r: any) => r.id));
+      }
+    }
+
+    // Categorize links
+    links.forEach((link: any) => {
+      if (!existingRecordIds.has(link.source_record_id)) {
+        if (archivedRecordIds.has(link.source_record_id)) {
+          // Link points to archived record
+          archivedLinks.push({
+            ...link,
+            archived: true,
+          });
+        } else {
+          // Link is orphaned (record doesn't exist anywhere)
+          brokenLinks.push({
+            ...link,
+            archived: false,
+          });
+        }
+      }
+    });
+
+    console.log(`[validate-links] Validation complete: ${brokenLinks.length} broken, ${archivedLinks.length} archived, ${links.length - brokenLinks.length - archivedLinks.length} valid out of ${links.length} total`);
+
+    res.json({
+      success: true,
+      brokenLinks, // Orphaned links (record doesn't exist)
+      archivedLinks, // Links pointing to archived records
+      validLinks: links.length - brokenLinks.length - archivedLinks.length,
+      totalLinks: links.length,
+    });
+  } catch (error) {
+    console.error('Error validating links:', error);
+    res.status(500).json({
+      error: 'Failed to validate links',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+/**
+ * POST /api/topics/:id/cleanup-links
+ * Clean up orphaned links (links where source_record_id doesn't exist)
+ * Optionally include archived links in cleanup
+ * Body: { includeArchived?: boolean }
+ */
+router.post('/:id/cleanup-links', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { includeArchived = false } = req.body;
+
+    // Fetch all links for this topic
+    const { data: links, error: linksError } = await supabase
+      .from('topic_source_links')
+      .select('*')
+      .eq('topic_id', id);
+
+    if (linksError) throw linksError;
+
+    if (!links || links.length === 0) {
+      return res.json({
+        success: true,
+        deleted: 0,
+        message: 'No links to clean up',
+      });
+    }
+
+    const recordIds = links.map((link: any) => link.source_record_id);
+
+    // Check if records exist in source_records
+    const { data: existingRecords, error: recordsError } = await supabase
+      .from('source_records')
+      .select('id')
+      .in('id', recordIds);
+
+    if (recordsError) throw recordsError;
+
+    const existingRecordIds = new Set((existingRecords || []).map((r: any) => r.id));
+
+    // Determine which links to delete
+    const linksToDelete: string[] = [];
+    let archivedRecordIds = new Set<string>();
+
+    if (includeArchived) {
+      // Check archived records too
+      const missingRecordIds = recordIds.filter((id: string) => !existingRecordIds.has(id));
+      if (missingRecordIds.length > 0) {
+        const { data: archivedRecords, error: archivedError } = await supabase
+          .from('archived_source_records')
+          .select('id')
+          .in('id', missingRecordIds);
+
+        if (!archivedError && archivedRecords) {
+          archivedRecordIds = new Set(archivedRecords.map((r: any) => r.id));
+        }
+      }
+    }
+
+    links.forEach((link: any) => {
+      if (!existingRecordIds.has(link.source_record_id)) {
+        // If includeArchived is false, only delete truly orphaned links
+        // If includeArchived is true, delete both orphaned and archived links
+        if (!includeArchived && archivedRecordIds.has(link.source_record_id)) {
+          // Skip archived links if includeArchived is false
+          return;
+        }
+        linksToDelete.push(link.id);
+      }
+    });
+
+    if (linksToDelete.length === 0) {
+      return res.json({
+        success: true,
+        deleted: 0,
+        message: 'No orphaned links to clean up',
+      });
+    }
+
+    // Delete orphaned links
+    for (const linkId of linksToDelete) {
+      const link = links.find((l: any) => l.id === linkId);
+      if (link) {
+        // Audit log before deletion
+        await auditService.logLinkRemoved(linkId, link);
+      }
+    }
+
+    const { error: deleteError } = await supabase
+      .from('topic_source_links')
+      .delete()
+      .in('id', linksToDelete);
+
+    if (deleteError) throw deleteError;
+
+    res.json({
+      success: true,
+      deleted: linksToDelete.length,
+      message: `Cleaned up ${linksToDelete.length} orphaned link(s)`,
+    });
+  } catch (error) {
+    console.error('Error cleaning up links:', error);
+    res.status(500).json({
+      error: 'Failed to clean up links',
       message: error instanceof Error ? error.message : 'Unknown error',
     });
   }
