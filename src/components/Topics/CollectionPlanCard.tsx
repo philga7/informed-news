@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Edit2, Save, X, Plus, Target, AlertCircle, Ban, Sparkles } from 'lucide-react';
+import { Edit2, Save, X, Plus, Target, AlertCircle, Ban, Sparkles, RefreshCw, GitMerge, ArrowRight } from 'lucide-react';
 import type { CollectionPlan, CollectionPlanSuggestions } from '../../types/osint';
 import { analysisService } from '../../services/analysis.service';
 
@@ -9,11 +9,15 @@ interface CollectionPlanCardProps {
   onSave: (plan: Partial<CollectionPlan>) => Promise<void>;
 }
 
+type MergeOption = 'replace' | 'merge' | 'add';
+
 export function CollectionPlanCard({ topicId, collectionPlan, onSave }: CollectionPlanCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [suggestions, setSuggestions] = useState<CollectionPlanSuggestions | null>(null);
+  const [showMergeDialog, setShowMergeDialog] = useState(false);
 
   // Editable state
   const [sourceTypesNeeded, setSourceTypesNeeded] = useState<string[]>(
@@ -63,6 +67,9 @@ export function CollectionPlanCard({ topicId, collectionPlan, onSave }: Collecti
     setNotes(collectionPlan?.notes || '');
     setIsEditing(false);
     setError(null);
+    // Clear any pending suggestions
+    setSuggestions(null);
+    setShowMergeDialog(false);
   };
 
   const handleSave = async () => {
@@ -113,31 +120,83 @@ export function CollectionPlanCard({ topicId, collectionPlan, onSave }: Collecti
     setError(null);
 
     try {
-      const suggestions: CollectionPlanSuggestions = await analysisService.generateCollectionPlanSuggestions(topicId);
+      const generatedSuggestions: CollectionPlanSuggestions = await analysisService.generateCollectionPlanSuggestions(topicId);
+      setSuggestions(generatedSuggestions);
       
-      // Phase 2: Basic direct population (merge to avoid duplicates)
-      // Phase 3 will add merge/replace/add dialog
-      setSourceTypesNeeded((prev) => {
-        const combined = [...prev, ...suggestions.sourceTypesNeeded];
-        return Array.from(new Set(combined)); // Remove duplicates
-      });
-      setClaimsToVerify((prev) => {
-        const combined = [...prev, ...suggestions.claimsToVerify];
-        return Array.from(new Set(combined)); // Remove duplicates
-      });
-      setCoverageGaps((prev) => {
-        const combined = [...prev, ...suggestions.coverageGaps];
-        return Array.from(new Set(combined)); // Remove duplicates
-      });
-      setSourcesToAvoid((prev) => {
-        const combined = [...prev, ...suggestions.sourcesToAvoid];
-        return Array.from(new Set(combined)); // Remove duplicates
-      });
+      // Check if plan exists - if so, show merge dialog; otherwise apply directly
+      const hasExistingPlan = collectionPlan && (
+        (collectionPlan.sourceTypesNeeded?.length ?? 0) > 0 ||
+        (collectionPlan.claimsToVerify?.length ?? 0) > 0 ||
+        (collectionPlan.coverageGaps?.length ?? 0) > 0 ||
+        (collectionPlan.sourcesToAvoid?.length ?? 0) > 0
+      );
+
+      if (hasExistingPlan) {
+        // Show merge/replace/add dialog
+        setShowMergeDialog(true);
+      } else {
+        // No existing plan - apply directly (merge behavior)
+        applySuggestions(generatedSuggestions, 'merge');
+      }
     } catch (err) {
       console.error('Error generating collection plan suggestions:', err);
-      setError(err instanceof Error ? err.message : 'Failed to generate suggestions');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to generate suggestions';
+      
+      // Enhanced error handling with specific messages
+      if (errorMessage.includes('not found')) {
+        setError('Topic not found. Please refresh the page.');
+      } else if (errorMessage.includes('No linked') || errorMessage.includes('linked records')) {
+        setError('No linked source records found. Link at least 1 record before generating suggestions.');
+      } else if (errorMessage.includes('not available') || errorMessage.includes('503')) {
+        setError('AI analysis service is temporarily unavailable. Please try again later.');
+      } else {
+        setError(errorMessage);
+      }
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  const applySuggestions = (suggestionsToApply: CollectionPlanSuggestions, option: MergeOption) => {
+    if (option === 'replace') {
+      // Replace all fields with suggestions
+      setSourceTypesNeeded(suggestionsToApply.sourceTypesNeeded);
+      setClaimsToVerify(suggestionsToApply.claimsToVerify);
+      setCoverageGaps(suggestionsToApply.coverageGaps);
+      setSourcesToAvoid(suggestionsToApply.sourcesToAvoid);
+    } else if (option === 'merge') {
+      // Merge: combine arrays, remove duplicates
+      setSourceTypesNeeded((prev) => {
+        const combined = [...prev, ...suggestionsToApply.sourceTypesNeeded];
+        return Array.from(new Set(combined));
+      });
+      setClaimsToVerify((prev) => {
+        const combined = [...prev, ...suggestionsToApply.claimsToVerify];
+        return Array.from(new Set(combined));
+      });
+      setCoverageGaps((prev) => {
+        const combined = [...prev, ...suggestionsToApply.coverageGaps];
+        return Array.from(new Set(combined));
+      });
+      setSourcesToAvoid((prev) => {
+        const combined = [...prev, ...suggestionsToApply.sourcesToAvoid];
+        return Array.from(new Set(combined));
+      });
+    } else if (option === 'add') {
+      // Add: append all suggestions (may include duplicates)
+      setSourceTypesNeeded((prev) => [...prev, ...suggestionsToApply.sourceTypesNeeded]);
+      setClaimsToVerify((prev) => [...prev, ...suggestionsToApply.claimsToVerify]);
+      setCoverageGaps((prev) => [...prev, ...suggestionsToApply.coverageGaps]);
+      setSourcesToAvoid((prev) => [...prev, ...suggestionsToApply.sourcesToAvoid]);
+    }
+    
+    setShowMergeDialog(false);
+    setSuggestions(null);
+  };
+
+  const handleMergeOption = (option: MergeOption) => {
+    if (suggestions) {
+      applySuggestions(suggestions, option);
     }
   };
 
@@ -199,14 +258,123 @@ export function CollectionPlanCard({ topicId, collectionPlan, onSave }: Collecti
             disabled={isGenerating}
             className="flex items-center gap-2 px-4 py-2 bg-blue-900/50 hover:bg-blue-900/70 border border-blue-800 text-blue-200 rounded-lg transition-colors duration-250 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
           >
-            <Sparkles size={16} className={isGenerating ? 'animate-pulse' : ''} />
-            {isGenerating ? 'Generating Suggestions...' : 'Generate Suggestions'}
+            {isGenerating ? (
+              <>
+                <Sparkles size={16} className="animate-pulse" />
+                Generating Suggestions...
+              </>
+            ) : (
+              <>
+                <Sparkles size={16} />
+                Generate Suggestions
+              </>
+            )}
           </button>
           {isGenerating && (
-            <p className="mt-2 text-xs text-stone-500">
-              Analyzing topic and linked records to suggest collection plan items...
-            </p>
+            <div className="mt-2 space-y-1">
+              <p className="text-xs text-stone-500">
+                Analyzing topic and linked records to suggest collection plan items...
+              </p>
+              <div className="w-full bg-stone-800 rounded-full h-1.5">
+                <div className="bg-blue-600 h-1.5 rounded-full animate-pulse" style={{ width: '60%' }}></div>
+              </div>
+            </div>
           )}
+        </div>
+      )}
+
+      {/* Merge/Replace/Add Dialog */}
+      {showMergeDialog && suggestions && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-stone-900 border border-stone-700 rounded-lg p-6 max-w-md w-full shadow-xl">
+            <div className="flex items-center gap-2 mb-4">
+              <Sparkles size={20} className="text-blue-400" />
+              <h3 className="text-lg font-semibold text-stone-200">Collection Plan Suggestions Generated</h3>
+            </div>
+            
+            <p className="text-sm text-stone-400 mb-6">
+              You have an existing collection plan. How would you like to apply the AI suggestions?
+            </p>
+
+            <div className="space-y-3 mb-6">
+              <button
+                onClick={() => handleMergeOption('replace')}
+                className="w-full flex items-center gap-3 p-4 bg-stone-800 hover:bg-stone-700 border border-stone-700 hover:border-stone-600 rounded-lg transition-colors duration-200 text-left"
+              >
+                <RefreshCw size={20} className="text-red-400 flex-shrink-0" />
+                <div className="flex-1">
+                  <div className="font-medium text-stone-200 mb-1">Replace Existing Plan</div>
+                  <div className="text-xs text-stone-500">Overwrite all fields with suggestions</div>
+                </div>
+                <ArrowRight size={16} className="text-stone-500" />
+              </button>
+
+              <button
+                onClick={() => handleMergeOption('merge')}
+                className="w-full flex items-center gap-3 p-4 bg-stone-800 hover:bg-stone-700 border border-blue-700 hover:border-blue-600 rounded-lg transition-colors duration-200 text-left"
+              >
+                <GitMerge size={20} className="text-blue-400 flex-shrink-0" />
+                <div className="flex-1">
+                  <div className="font-medium text-stone-200 mb-1">Merge Suggestions (Recommended)</div>
+                  <div className="text-xs text-stone-500">Add new items, keep existing, remove duplicates</div>
+                </div>
+                <ArrowRight size={16} className="text-blue-400" />
+              </button>
+
+              <button
+                onClick={() => handleMergeOption('add')}
+                className="w-full flex items-center gap-3 p-4 bg-stone-800 hover:bg-stone-700 border border-stone-700 hover:border-stone-600 rounded-lg transition-colors duration-200 text-left"
+              >
+                <Plus size={20} className="text-green-400 flex-shrink-0" />
+                <div className="flex-1">
+                  <div className="font-medium text-stone-200 mb-1">Add to Existing</div>
+                  <div className="text-xs text-stone-500">Append all suggestions to existing items</div>
+                </div>
+                <ArrowRight size={16} className="text-stone-500" />
+              </button>
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  setShowMergeDialog(false);
+                  setSuggestions(null);
+                }}
+                className="flex-1 px-4 py-2 bg-stone-800 hover:bg-stone-700 text-stone-300 rounded-lg transition-colors duration-200 text-sm"
+              >
+                Cancel
+              </button>
+            </div>
+
+            {/* Preview of suggestions */}
+            <details className="mt-4 pt-4 border-t border-stone-800">
+              <summary className="text-sm text-stone-400 cursor-pointer hover:text-stone-300">
+                Preview suggestions ({suggestions.sourceTypesNeeded.length + suggestions.claimsToVerify.length + suggestions.coverageGaps.length + suggestions.sourcesToAvoid.length} items)
+              </summary>
+              <div className="mt-3 space-y-2 text-xs text-stone-500">
+                {suggestions.sourceTypesNeeded.length > 0 && (
+                  <div>
+                    <span className="font-medium text-stone-400">Source Types:</span> {suggestions.sourceTypesNeeded.length}
+                  </div>
+                )}
+                {suggestions.claimsToVerify.length > 0 && (
+                  <div>
+                    <span className="font-medium text-stone-400">Claims:</span> {suggestions.claimsToVerify.length}
+                  </div>
+                )}
+                {suggestions.coverageGaps.length > 0 && (
+                  <div>
+                    <span className="font-medium text-stone-400">Gaps:</span> {suggestions.coverageGaps.length}
+                  </div>
+                )}
+                {suggestions.sourcesToAvoid.length > 0 && (
+                  <div>
+                    <span className="font-medium text-stone-400">Sources to Avoid:</span> {suggestions.sourcesToAvoid.length}
+                  </div>
+                )}
+              </div>
+            </details>
+          </div>
         </div>
       )}
 

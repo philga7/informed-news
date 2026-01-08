@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Edit2, FileText, Plus, Sparkles, Film, AlertTriangle, Trash2, Archive, Loader2 } from 'lucide-react';
+import { ArrowLeft, Edit2, FileText, Plus, Sparkles, Film, AlertTriangle, Trash2, Archive, Loader2, X, Lightbulb } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useOrganization } from '../../context/OrganizationContext';
 import { osintTopicsService } from '../../services';
@@ -25,7 +25,7 @@ import { QAChecklist } from './QAChecklist';
 import { CollectionPlanCard } from './CollectionPlanCard';
 import { ClaimsAnalysis } from './ClaimsAnalysis';
 import { CorroborationMatrix } from './CorroborationMatrix';
-import type { TopicTimeline } from '../../types/osint';
+import type { TopicTimeline, OsintTopic, CollectionPlan } from '../../types/osint';
 
 export function TopicDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -48,6 +48,7 @@ export function TopicDetailPage() {
   const [brokenLinks, setBrokenLinks] = useState<any[]>([]);
   const [archivedLinks, setArchivedLinks] = useState<any[]>([]);
   const [isCleaningLinks, setIsCleaningLinks] = useState(false);
+  const [showCollectionPlanPrompt, setShowCollectionPlanPrompt] = useState(false);
 
   const loadTopic = async () => {
     if (!id) return;
@@ -59,12 +60,69 @@ export function TopicDetailPage() {
       setTopic(fetchedTopic);
       // Validate links after loading topic
       await validateLinks();
+      // Check if we should show collection plan prompt
+      checkCollectionPlanPrompt(fetchedTopic);
     } catch (err) {
       console.error('Error loading topic:', err);
       setError(err instanceof Error ? err.message : 'Failed to load topic');
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const checkCollectionPlanPrompt = (topicData: any) => {
+    if (!id || !topicData) return;
+    
+    // Check localStorage for dismissal
+    const dismissed = localStorage.getItem(`collection-plan-prompt-dismissed-${id}`);
+    if (dismissed) {
+      setShowCollectionPlanPrompt(false);
+      return;
+    }
+
+    const linkedRecords = topicData.topic_source_links || [];
+    const collectionPlan = topicData.collection_plan as CollectionPlan | null;
+    
+    // Show if:
+    // - No collection plan exists
+    // - 2+ linked source records
+    // - Topic is active or monitoring
+    // - Topic has decision question or description (shows it's a real requirement)
+    const shouldShow = (
+      !collectionPlan &&
+      linkedRecords.length >= 2 &&
+      ['active', 'monitoring'].includes(topicData.status || 'active') &&
+      (topicData.decision_question || topicData.description)
+    );
+
+    setShowCollectionPlanPrompt(shouldShow);
+  };
+
+  const handleDismissPrompt = () => {
+    if (!id) return;
+    localStorage.setItem(`collection-plan-prompt-dismissed-${id}`, 'true');
+    setShowCollectionPlanPrompt(false);
+  };
+
+  const handleGenerateFromPrompt = () => {
+    if (!id) return;
+    
+    // Scroll to Collection Plan Card section
+    const collectionPlanCard = document.getElementById('collection-plan-card');
+    if (collectionPlanCard) {
+      collectionPlanCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      // Highlight the card briefly
+      collectionPlanCard.classList.add('ring-2', 'ring-blue-500', 'ring-opacity-50');
+      setTimeout(() => {
+        collectionPlanCard.classList.remove('ring-2', 'ring-blue-500', 'ring-opacity-50');
+      }, 2000);
+    }
+    
+    // Dismiss the prompt after a brief delay to allow scrolling
+    setTimeout(() => {
+      setShowCollectionPlanPrompt(false);
+      localStorage.setItem(`collection-plan-prompt-dismissed-${id}`, 'true');
+    }, 500);
   };
 
   const validateLinks = async () => {
@@ -241,6 +299,7 @@ export function TopicDetailPage() {
       await loadTopic();
       // Refresh timeline to reflect changes
       await loadTimeline();
+      // Prompt check will happen in loadTopic -> checkCollectionPlanPrompt
     } catch (err) {
       console.error('Error linking record:', err);
       throw err;
@@ -268,6 +327,8 @@ export function TopicDetailPage() {
       const savedPlan = await osintTopicsService.saveCollectionPlan(id, plan);
       // Update topic state with new collection plan
       setTopic({ ...topic, collection_plan: savedPlan });
+      // Hide prompt if it was showing (plan now exists)
+      setShowCollectionPlanPrompt(false);
     } catch (err) {
       console.error('Error saving collection plan:', err);
       throw err;
@@ -637,13 +698,55 @@ export function TopicDetailPage() {
                   </div>
                 )}
 
+                {/* Smart Collection Plan Prompt Banner */}
+                {showCollectionPlanPrompt && id && (
+                  <div className="bg-blue-900/20 border border-blue-800/50 rounded-lg p-4 mb-6">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-start gap-3 flex-1">
+                        <Lightbulb size={20} className="text-blue-400 mt-0.5 flex-shrink-0" />
+                        <div className="flex-1">
+                          <h3 className="text-blue-300 font-semibold mb-1">Generate Collection Plan Suggestions</h3>
+                          <p className="text-blue-200/80 text-sm mb-3">
+                            You have {linkedRecords.length} linked record{linkedRecords.length !== 1 ? 's' : ''}. 
+                            Generate AI-powered suggestions for source types needed, claims to verify, coverage gaps, and sources to avoid.
+                          </p>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={handleGenerateFromPrompt}
+                              className="flex items-center gap-2 px-3 py-1.5 bg-blue-800/50 hover:bg-blue-800/70 border border-blue-700 text-blue-200 rounded-lg transition-colors duration-200 text-sm"
+                            >
+                              <Sparkles size={14} />
+                              Go to Collection Plan
+                            </button>
+                            <button
+                              onClick={handleDismissPrompt}
+                              className="px-3 py-1.5 bg-stone-800/50 hover:bg-stone-800/70 border border-stone-700 text-stone-300 rounded-lg transition-colors duration-200 text-sm"
+                            >
+                              Dismiss
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        onClick={handleDismissPrompt}
+                        className="text-blue-400/60 hover:text-blue-400 transition-colors duration-200 flex-shrink-0"
+                        aria-label="Dismiss prompt"
+                      >
+                        <X size={18} />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {/* Collection Plan Card - Planning tool, should come before linking sources */}
                 {id && (
-                  <CollectionPlanCard
-                    topicId={id}
-                    collectionPlan={topic.collection_plan || null}
-                    onSave={handleSaveCollectionPlan}
-                  />
+                  <div id="collection-plan-card">
+                    <CollectionPlanCard
+                      topicId={id}
+                      collectionPlan={topic.collection_plan || null}
+                      onSave={handleSaveCollectionPlan}
+                    />
+                  </div>
                 )}
 
                 {/* Linked Source Records Section - Collection phase, needs to be early */}
