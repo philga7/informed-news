@@ -1,4 +1,4 @@
-import { ExternalLink, Trash2, TrendingUp, Edit2 } from 'lucide-react';
+import { ExternalLink, Trash2, TrendingUp, Edit2, AlertTriangle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { ConfidenceBadge } from '../UI/ConfidenceBadge';
 import { LinkReviewStatusBadge } from './LinkReviewStatusBadge';
@@ -28,7 +28,8 @@ interface LinkedRecordsTableProps {
         reliability_rating: string;
         scrape_external_url?: boolean;
       };
-    };
+    } | null;
+    source_record_id?: string; // Fallback for broken links
   }>;
   onUnlink: (linkId: string) => void;
   onEdit?: (linkId: string) => void;
@@ -37,8 +38,10 @@ interface LinkedRecordsTableProps {
 export function LinkedRecordsTable({ links, onUnlink, onEdit }: LinkedRecordsTableProps) {
   const navigate = useNavigate();
 
-  const handleViewRecord = (recordId: string) => {
-    navigate(`/source-records/${recordId}`);
+  const handleViewRecord = (recordId: string | undefined) => {
+    if (recordId) {
+      navigate(`/source-records/${recordId}`);
+    }
   };
 
   const handleUnlink = (e: React.MouseEvent, linkId: string) => {
@@ -84,25 +87,54 @@ export function LinkedRecordsTable({ links, onUnlink, onEdit }: LinkedRecordsTab
           </tr>
         </thead>
         <tbody>
-          {links.map((link) => (
+          {links.map((link) => {
+            const isBroken = !link.source_records;
+            const recordId = link.source_records?.id || link.source_record_id;
+            
+            return (
             <tr
               key={link.id}
-              className="border-b border-stone-800 hover:bg-stone-800/50 cursor-pointer transition-colors duration-250"
-              onClick={() => handleViewRecord(link.source_records.id)}
+              className={`border-b border-stone-800 transition-colors duration-250 ${
+                isBroken 
+                  ? 'bg-yellow-900/10 hover:bg-yellow-900/20' 
+                  : 'hover:bg-stone-800/50 cursor-pointer'
+              }`}
+              onClick={() => !isBroken && handleViewRecord(recordId)}
             >
               <td className="py-4 px-4">
                 <div className="flex items-start gap-2">
+                  {isBroken && (
+                    <AlertTriangle size={18} className="text-yellow-500 mt-0.5 flex-shrink-0" />
+                  )}
                   <div className="flex-1 min-w-0">
-                    <p className="text-stone-200 font-medium line-clamp-2">
-                      {link.source_records.title}
-                    </p>
-                    {link.analystNotes && (
-                      <p className="text-stone-500 text-sm mt-1 line-clamp-1">
-                        Note: {link.analystNotes}
-                      </p>
+                    {isBroken ? (
+                      <div>
+                        <p className="text-yellow-400 font-medium line-clamp-2">
+                          Source Record Missing
+                        </p>
+                        <p className="text-yellow-500/70 text-xs mt-1">
+                          Record ID: {recordId || 'Unknown'} • Linked: {formatDate(link.linkedAt)}
+                        </p>
+                        {link.analystNotes && (
+                          <p className="text-stone-500 text-sm mt-2 line-clamp-2 italic">
+                            Note: {link.analystNotes}
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <>
+                        <p className="text-stone-200 font-medium line-clamp-2">
+                          {link.source_records?.title || 'Unknown'}
+                        </p>
+                        {link.analystNotes && (
+                          <p className="text-stone-500 text-sm mt-1 line-clamp-1">
+                            Note: {link.analystNotes}
+                          </p>
+                        )}
+                      </>
                     )}
                   </div>
-                  {link.source_records.url && (
+                  {!isBroken && link.source_records?.url && (
                     <a
                       href={link.source_records.url}
                       target="_blank"
@@ -117,25 +149,33 @@ export function LinkedRecordsTable({ links, onUnlink, onEdit }: LinkedRecordsTab
                 </div>
               </td>
               <td className="py-4 px-4">
-                <div>
-                  <p className="text-stone-300 text-sm">
-                    {formatSourceNameWithDomain(
-                      link.source_records.sources.name,
-                      link.source_records.url,
-                      link.source_records.sources.scrape_external_url || false
-                    )}
-                  </p>
-                  <span
-                    className={`inline-block px-2 py-0.5 text-xs rounded mt-1 ${getReliabilityBadgeColor(
-                      link.source_records.sources.reliability_rating
-                    )}`}
-                  >
-                    {link.source_records.sources.reliability_rating}
-                  </span>
-                </div>
+                {isBroken ? (
+                  <span className="text-yellow-500/70 text-sm italic">N/A</span>
+                ) : (
+                  <div>
+                    <p className="text-stone-300 text-sm">
+                      {formatSourceNameWithDomain(
+                        link.source_records!.sources.name,
+                        link.source_records!.url,
+                        link.source_records!.sources.scrape_external_url || false
+                      )}
+                    </p>
+                    <span
+                      className={`inline-block px-2 py-0.5 text-xs rounded mt-1 ${getReliabilityBadgeColor(
+                        link.source_records!.sources.reliability_rating
+                      )}`}
+                    >
+                      {link.source_records!.sources.reliability_rating}
+                    </span>
+                  </div>
+                )}
               </td>
               <td className="py-4 px-4 text-stone-400 text-sm">
-                {formatDate(link.source_records.publishedAt)}
+                {isBroken ? (
+                  <span className="text-yellow-500/70 italic">N/A</span>
+                ) : (
+                  formatDate(link.source_records!.publishedAt)
+                )}
               </td>
               <td className="py-4 px-4">
                 {link.artifactReviewStatus && link.artifactReviewStatus.total > 0 && !link.artifactReviewStatus.allReviewed ? (
@@ -198,7 +238,8 @@ export function LinkedRecordsTable({ links, onUnlink, onEdit }: LinkedRecordsTab
                 </div>
               </td>
             </tr>
-          ))}
+            );
+          })}
         </tbody>
       </table>
     </div>

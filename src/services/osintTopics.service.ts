@@ -89,6 +89,7 @@ export const osintTopicsService = {
         reviewStatus: link.review_status || 'pending',
         linkedByUserId: link.linked_by_user_id,
         linkedAt: new Date(link.linked_at),
+        source_record_id: link.source_record_id, // Include for broken links
         artifactReviewStatus: link.artifactReviewStatus ? {
           total: link.artifactReviewStatus.total,
           reviewed: link.artifactReviewStatus.reviewed,
@@ -541,6 +542,68 @@ export const osintTopicsService = {
       notes: collectionPlan.notes || null,
       createdAt: new Date(collectionPlan.created_at),
       updatedAt: new Date(collectionPlan.updated_at),
+    };
+  },
+
+  /**
+   * Validate links for a topic - identify broken and archived links
+   */
+  async validateLinks(topicId: string): Promise<{
+    brokenLinks: any[];
+    archivedLinks: any[];
+    validLinks: number;
+    totalLinks: number;
+  }> {
+    const response = await fetch(`${API_BASE}/api/topics/${topicId}/validate-links`);
+    
+    if (!response.ok) {
+      throw new Error(`Failed to validate links: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    
+    return {
+      brokenLinks: (data.brokenLinks || []).map((link: any) => ({
+        ...link,
+        linkedAt: new Date(link.linked_at),
+      })),
+      archivedLinks: (data.archivedLinks || []).map((link: any) => ({
+        ...link,
+        linkedAt: new Date(link.linked_at),
+      })),
+      validLinks: data.validLinks || 0,
+      totalLinks: data.totalLinks || 0,
+    };
+  },
+
+  /**
+   * Clean up orphaned links for a topic
+   * @param topicId - The topic ID
+   * @param includeArchived - If true, also remove links to archived records
+   */
+  async cleanupLinks(topicId: string, includeArchived: boolean = false): Promise<{
+    deleted: number;
+    message: string;
+  }> {
+    const response = await fetch(`${API_BASE}/api/topics/${topicId}/cleanup-links`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        includeArchived,
+      }),
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || `Failed to clean up links: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    return {
+      deleted: data.deleted || 0,
+      message: data.message || 'Links cleaned up',
     };
   },
 };
