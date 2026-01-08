@@ -66,7 +66,7 @@ export const osintTopicsService = {
     const topic = data.topic;
     
     // Convert dates
-    return {
+    const mappedTopic: TopicDetail = {
       ...topic,
       keywords: topic.keywords || [],
       relatedTopics: topic.related_topics || [],
@@ -119,6 +119,20 @@ export const osintTopicsService = {
         updatedAt: new Date(topic.collection_plan.updated_at),
       } : null,
     };
+
+    // Fallback: if collection_plan is missing, fetch it separately
+    if (!mappedTopic.collection_plan) {
+      try {
+        const collectionPlan = await this.getCollectionPlan(topicId);
+        if (collectionPlan) {
+          mappedTopic.collection_plan = collectionPlan;
+        }
+      } catch (err) {
+        console.warn('[osintTopicsService] Failed to fetch collection plan fallback:', err);
+      }
+    }
+
+    return mappedTopic;
   },
 
   /**

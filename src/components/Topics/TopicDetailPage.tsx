@@ -57,13 +57,19 @@ export function TopicDetailPage() {
       setIsLoading(true);
       setError(null);
       const fetchedTopic = await osintTopicsService.getById(id);
+      console.log('[TopicDetailPage] Topic loaded:', {
+        id: fetchedTopic.id,
+        name: fetchedTopic.name,
+        hasCollectionPlan: !!fetchedTopic.collection_plan,
+        collectionPlan: fetchedTopic.collection_plan,
+      });
       setTopic(fetchedTopic);
       // Validate links after loading topic
       await validateLinks();
       // Check if we should show collection plan prompt
       checkCollectionPlanPrompt(fetchedTopic);
     } catch (err) {
-      console.error('Error loading topic:', err);
+      console.error('[TopicDetailPage] Error loading topic:', err);
       setError(err instanceof Error ? err.message : 'Failed to load topic');
     } finally {
       setIsLoading(false);
@@ -324,13 +330,18 @@ export function TopicDetailPage() {
     if (!id) return;
 
     try {
+      console.log('[TopicDetailPage] Saving collection plan for topic:', id, plan);
       const savedPlan = await osintTopicsService.saveCollectionPlan(id, plan);
-      // Update topic state with new collection plan
-      setTopic({ ...topic, collection_plan: savedPlan });
+      console.log('[TopicDetailPage] Collection plan saved successfully:', savedPlan);
+      
+      // Reload topic from database to ensure we have the latest data
+      await loadTopic();
+      console.log('[TopicDetailPage] Topic reloaded after saving collection plan');
+      
       // Hide prompt if it was showing (plan now exists)
       setShowCollectionPlanPrompt(false);
     } catch (err) {
-      console.error('Error saving collection plan:', err);
+      console.error('[TopicDetailPage] Error saving collection plan:', err);
       throw err;
     }
   };
