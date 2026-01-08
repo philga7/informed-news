@@ -1518,6 +1518,154 @@ router.post('/topics/:id/compare-media', async (req: Request, res: Response) => 
 });
 
 /**
+ * POST /api/analysis/topics/:id/collection-plan-suggestions
+ * Generate AI-powered Collection Plan suggestions for a topic
+ */
+router.post('/topics/:id/collection-plan-suggestions', async (req: Request, res: Response) => {
+  try {
+    const { id: topicId } = req.params;
+
+    if (!ollamaService.isAvailable()) {
+      return res.status(503).json({
+        error: 'AI analysis service not available',
+        message: 'OLLAMA_API_KEY not configured',
+      });
+    }
+
+    // Fetch the topic with metadata
+    const { data: topic, error: topicError } = await supabase
+      .from('osint_topics')
+      .select('id, name, description, decision_question, keywords, organization_id')
+      .eq('id', topicId)
+      .single() as any;
+
+    if (topicError || !topic) {
+      return res.status(404).json({ error: 'Topic not found' });
+    }
+
+    // Fetch all linked source records
+    const { data: links, error: linksError } = await supabase
+      .from('topic_source_links')
+      .select(`
+        source_record_id,
+        source_records!inner (
+          id,
+          title,
+          sources!inner (
+            name,
+            reliability_rating
+          )
+        )
+      `)
+      .eq('topic_id', topicId);
+
+    if (linksError) throw linksError;
+
+    if (!links || links.length === 0) {
+      return res.status(400).json({ 
+        error: 'No linked source records',
+        message: 'Link at least 1 record before generating suggestions. 2+ records recommended for better results.'
+      });
+    }
+
+    // Prepare content for each linked record
+    const preparedContents: Array<PreparedContent & { sourceRecordTitle: string; sourceName: string }> = [];
+
+    for (const link of links) {
+      try {
+        const recordId = (link as any).source_record_id;
+        const record = (link as any).source_records;
+        const sourceInfo = record.sources;
+        const recordTitle = record.title || 'Untitled';
+
+        // Prepare content using content preparer (no fresh content fetching for suggestions)
+        const prepared = await contentPreparer.prepareForAnalysis(recordId);
+
+        preparedContents.push({
+          ...prepared,
+          sourceRecordTitle: recordTitle,
+          sourceName: sourceInfo.name,
+        });
+      } catch (prepError) {
+        console.warn(`Failed to prepare content for record ${(link as any).source_record_id}:`, prepError);
+        // Continue with other records
+      }
+    }
+
+    if (preparedContents.length === 0) {
+      return res.status(400).json({ 
+        error: 'No valid content available',
+        message: 'All linked records failed content preparation'
+      });
+    }
+
+    // Fetch existing collection plan (if any)
+    const { data: existingPlanData, error: planError } = await supabase
+      .from('collection_plans')
+      .select('source_types_needed, claims_to_verify, coverage_gaps, sources_to_avoid')
+      .eq('topic_id', topicId)
+      .maybeSingle() as any;
+
+    // Don't fail if plan doesn't exist - it's optional
+    const existingPlan = existingPlanData ? {
+      sourceTypesNeeded: existingPlanData.source_types_needed || [],
+      claimsToVerify: existingPlanData.claims_to_verify || [],
+      coverageGaps: existingPlanData.coverage_gaps || [],
+      sourcesToAvoid: existingPlanData.sources_to_avoid || [],
+    } : undefined;
+
+    // Build topic context
+    const topicContext = {
+      name: topic.name,
+      description: topic.description || undefined,
+      decisionQuestion: topic.decision_question || undefined,
+      keywords: topic.keywords || undefined,
+    };
+
+    // Call Ollama service to generate suggestions
+    const suggestions = await ollamaService.generateCollectionPlanSuggestions(
+      preparedContents,
+      topicContext,
+      existingPlan
+    );
+
+    // Audit log: collection plan suggestions generated
+    await auditService.logAction({
+      action: 'collection_plan_suggestions_generated',
+      entityType: 'topic',
+      entityId: topicId,
+      userId: (req as any).user?.id || null,
+      metadata: {
+        linkedRecordsCount: preparedContents.length,
+        hasExistingPlan: !!existingPlan,
+        suggestionsCount: {
+          sourceTypes: suggestions.sourceTypesNeeded.length,
+          claims: suggestions.claimsToVerify.length,
+          gaps: suggestions.coverageGaps.length,
+          avoid: suggestions.sourcesToAvoid.length,
+        },
+      },
+    });
+
+    res.json({
+      success: true,
+      suggestions,
+      metadata: {
+        topicId,
+        linkedRecordsCount: preparedContents.length,
+        hasExistingPlan: !!existingPlan,
+      },
+    });
+  } catch (error) {
+    console.error('Error generating collection plan suggestions:', error);
+    res.status(500).json({
+      error: 'Failed to generate collection plan suggestions',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+/**
  * GET /api/analysis/topics/:topicId/tone-aggregate
  * Aggregate tone analysis from all linked source records for a topic
  * Returns weighted average tone, confidence, and sentiment across all linked records

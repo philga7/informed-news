@@ -31,7 +31,8 @@ export type AuditAction =
   | 'retention_policy_updated'
   | 'record_archived'
   | 'record_deleted'
-  | 'record_restored';
+  | 'record_restored'
+  | 'collection_plan_suggestions_generated';
 
 export type EntityType = 'topic' | 'source_record' | 'link' | 'artifact' | 'source';
 

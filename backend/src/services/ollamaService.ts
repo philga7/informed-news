@@ -88,6 +88,19 @@ export interface MediaComparisonResponse {
   };
 }
 
+export interface CollectionPlanSuggestionsResponse {
+  sourceTypesNeeded: string[];
+  claimsToVerify: string[];
+  coverageGaps: string[];
+  sourcesToAvoid: string[];
+  confidence?: {
+    sourceTypes: number;
+    claims: number;
+    gaps: number;
+    avoid: number;
+  };
+}
+
 class OllamaService {
   private client: Ollama | null = null;
   private model: string = 'gpt-oss:120b';
@@ -818,6 +831,214 @@ Respond with a JSON object in this exact format:
     }
   }
 }`;
+  }
+
+  /**
+   * Generate Collection Plan suggestions by analyzing topic context and linked source records
+   */
+  async generateCollectionPlanSuggestions(
+    records: Array<PreparedContent & { sourceRecordTitle?: string; sourceName?: string }>,
+    topicContext: {
+      name: string;
+      description?: string;
+      decisionQuestion?: string;
+      keywords?: string[];
+    },
+    existingPlan?: {
+      sourceTypesNeeded: string[];
+      claimsToVerify: string[];
+      coverageGaps: string[];
+      sourcesToAvoid: string[];
+    }
+  ): Promise<CollectionPlanSuggestionsResponse> {
+    if (!this.client) {
+      throw new Error('Ollama service not available - API key not configured');
+    }
+
+    if (!records || records.length === 0) {
+      throw new Error('Cannot generate collection plan suggestions with no source records');
+    }
+
+    const prompt = this.buildCollectionPlanPrompt(records, topicContext, existingPlan);
+
+    try {
+      const response = await this.callWithTimeout(prompt);
+      const parsed = this.parseJsonResponse(response);
+
+      return {
+        sourceTypesNeeded: Array.isArray(parsed.sourceTypesNeeded) ? parsed.sourceTypesNeeded : [],
+        claimsToVerify: Array.isArray(parsed.claimsToVerify) ? parsed.claimsToVerify : [],
+        coverageGaps: Array.isArray(parsed.coverageGaps) ? parsed.coverageGaps : [],
+        sourcesToAvoid: Array.isArray(parsed.sourcesToAvoid) ? parsed.sourcesToAvoid : [],
+        confidence: parsed.confidence ? {
+          sourceTypes: typeof parsed.confidence.sourceTypes === 'number' 
+            ? Math.max(0, Math.min(1, parsed.confidence.sourceTypes)) 
+            : 0.5,
+          claims: typeof parsed.confidence.claims === 'number'
+            ? Math.max(0, Math.min(1, parsed.confidence.claims))
+            : 0.5,
+          gaps: typeof parsed.confidence.gaps === 'number'
+            ? Math.max(0, Math.min(1, parsed.confidence.gaps))
+            : 0.5,
+          avoid: typeof parsed.confidence.avoid === 'number'
+            ? Math.max(0, Math.min(1, parsed.confidence.avoid))
+            : 0.5,
+        } : undefined,
+      };
+    } catch (error) {
+      console.error('Collection plan suggestions generation error:', error);
+      throw new Error(`Collection plan suggestions generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Build Collection Plan suggestions prompt
+   */
+  private buildCollectionPlanPrompt(
+    records: Array<PreparedContent & { sourceRecordTitle?: string; sourceName?: string }>,
+    topicContext: {
+      name: string;
+      description?: string;
+      decisionQuestion?: string;
+      keywords?: string[];
+    },
+    existingPlan?: {
+      sourceTypesNeeded: string[];
+      claimsToVerify: string[];
+      coverageGaps: string[];
+      sourcesToAvoid: string[];
+    }
+  ): string {
+    // Build records summary
+    const recordsText = records.map((record, index) => {
+      const mediaNote = record.mediaType === 'video' ? ' (VIDEO - title only)' : '';
+      const recordTitle = record.sourceRecordTitle || record.metadata.siteName || record.text.substring(0, 100) || 'Untitled';
+      const sourceName = record.sourceName || record.metadata.siteName || 'Unknown Source';
+      return `
+--- SOURCE ${index + 1}${mediaNote} ---
+Title: "${recordTitle}"
+Source: ${sourceName}
+Published: ${record.metadata.publishedAt?.toISOString() || 'Unknown'}
+URL: ${record.metadata.url}
+Media Type: ${record.mediaType}
+${record.text.length > 1500 ? record.text.substring(0, 1500) + '...(truncated)' : record.text}
+`;
+    }).join('\n');
+
+    // Analyze source diversity
+    const sourceTypes = new Set<string>();
+    const reliabilityRatings = new Set<string>();
+    records.forEach(record => {
+      if (record.metadata.siteName) {
+        // Infer source type from domain or metadata
+        const domain = record.metadata.url ? new URL(record.metadata.url).hostname : '';
+        if (domain.includes('.gov')) sourceTypes.add('government');
+        else if (domain.includes('.edu') || domain.includes('academic')) sourceTypes.add('academic');
+        else if (record.mediaType === 'video' || record.mediaType === 'podcast') sourceTypes.add('media');
+        else sourceTypes.add('news');
+      }
+    });
+
+    // Extract claims from content (simplified - could be enhanced)
+    const allText = records.map(r => r.text).join(' ');
+    
+    // Analyze temporal coverage
+    const dates = records
+      .map(r => r.metadata.publishedAt)
+      .filter((d): d is Date => d !== null && d !== undefined)
+      .sort((a, b) => a.getTime() - b.getTime());
+    
+    const dateRange = dates.length > 0
+      ? `${dates[0].toISOString().split('T')[0]} to ${dates[dates.length - 1].toISOString().split('T')[0]}`
+      : 'Unknown';
+
+    // Build existing plan context
+    const existingPlanText = existingPlan
+      ? `
+EXISTING COLLECTION PLAN:
+- Source Types Needed: ${existingPlan.sourceTypesNeeded.join(', ') || '(none)'}
+- Claims to Verify: ${existingPlan.claimsToVerify.length > 0 ? existingPlan.claimsToVerify.map(c => `"${c}"`).join(', ') : '(none)'}
+- Coverage Gaps: ${existingPlan.coverageGaps.join(', ') || '(none)'}
+- Sources to Avoid: ${existingPlan.sourcesToAvoid.join(', ') || '(none)'}
+
+IMPORTANT: Do not duplicate items that are already in the existing plan. Focus on NEW suggestions that complement the existing plan.
+`
+      : '';
+
+    return `You are analyzing an OSINT intelligence topic to generate collection plan suggestions. A collection plan identifies what evidence is needed to answer the intelligence question.
+
+TOPIC CONTEXT:
+- Name: "${topicContext.name}"
+${topicContext.description ? `- Description: ${topicContext.description}` : ''}
+${topicContext.decisionQuestion ? `- Intelligence Question: ${topicContext.decisionQuestion}` : ''}
+${topicContext.keywords && topicContext.keywords.length > 0 ? `- Keywords: ${topicContext.keywords.join(', ')}` : ''}
+
+CURRENT SOURCE RECORDS (${records.length} total):
+${recordsText}
+
+CURRENT SOURCE ANALYSIS:
+- Source Types Present: ${Array.from(sourceTypes).join(', ') || 'mixed'}
+- Date Range: ${dateRange}
+- Media Types: ${Array.from(new Set(records.map(r => r.mediaType))).join(', ')}
+
+${existingPlanText}
+
+COLLECTION PLAN ANALYSIS TASK:
+
+Based on the topic context and current source records, generate intelligent suggestions for:
+
+1. **Source Types Needed** (array of strings):
+   - What types of sources would provide complementary or more authoritative information?
+   - Examples: 'government', 'academic', 'primary', 'expert_analysis', 'financial', 'legal', 'technical', 'social_media', etc.
+   - Consider what source types are MISSING that would strengthen the analysis
+   - Avoid duplicating existing plan items
+
+2. **Claims to Verify** (array of strings):
+   - Extract specific factual claims, assertions, or statements from the content that need corroboration
+   - Each claim should be a complete, verifiable statement
+   - Focus on claims that are critical to answering the intelligence question
+   - Avoid duplicating existing plan items
+
+3. **Coverage Gaps** (array of strings):
+   - Identify what areas, perspectives, or aspects are NOT adequately covered
+   - Temporal gaps (missing time periods)
+   - Geographic gaps (missing regions/locations)
+   - Perspective gaps (missing viewpoints)
+   - Evidence type gaps (missing types of evidence)
+   - Avoid duplicating existing plan items
+
+4. **Sources to Avoid** (array of strings):
+   - Identify source characteristics or domains that should be avoided due to:
+     - Known bias or unreliable reporting
+     - Conflicts of interest
+     - Propaganda or misinformation patterns
+     - Low reliability ratings
+   - Be specific (e.g., "partisan political blogs", "unverified social media accounts")
+   - Avoid duplicating existing plan items
+
+GUIDELINES:
+- Base suggestions on actual content analysis, not generic recommendations
+- Be specific and actionable - vague suggestions are not helpful
+- Consider the intelligence question and decision context when prioritizing
+- If existing plan is provided, suggest NEW items that complement it (not duplicates)
+- Quality over quantity - 3-5 excellent suggestions per category is better than 10 generic ones
+- If insufficient data, be conservative and state what you can confidently suggest
+
+Respond with a JSON object in this exact format:
+{
+  "sourceTypesNeeded": ["government sources on X", "academic research on Y"],
+  "claimsToVerify": ["Claim 1 that needs verification", "Claim 2 that needs verification"],
+  "coverageGaps": ["Gap description 1", "Gap description 2"],
+  "sourcesToAvoid": ["Source characteristic or domain to avoid 1", "Source characteristic 2"],
+  "confidence": {
+    "sourceTypes": 0.85,
+    "claims": 0.75,
+    "gaps": 0.80,
+    "avoid": 0.70
+  }
+}
+
+Note: confidence scores are optional (0.0 to 1.0), but recommended to indicate how confident you are in each category of suggestions.`;
   }
 
   /**
