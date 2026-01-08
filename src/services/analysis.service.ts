@@ -13,7 +13,7 @@ export interface AnalyticArtifact {
   source_record_id: string | null;
   topic_id: string | null;
   organization_id: string;
-  type: 'summary' | 'entity_extraction' | 'tone_analysis' | 'sentiment' | 'key_facts' | 'timeline' | 'network_graph' | 'media_comparison' | 'notes';
+  type: 'summary' | 'entity_extraction' | 'tone_analysis' | 'sentiment' | 'key_facts' | 'timeline' | 'network_graph' | 'media_comparison' | 'coordination_check' | 'notes';
   payload: any;
   model_name: string;
   reviewed: boolean;
@@ -103,6 +103,25 @@ export interface MediaComparisonPayload {
       podcasts: string[];
     };
   };
+}
+
+export interface CoordinationAnalysisPayload {
+  duplicate_group_hash: string;
+  record_ids: string[];
+  coordinationAssessment: 'coordinated' | 'syndicated' | 'coincidental' | 'unclear';
+  confidence: number;
+  semanticSimilarity: number;
+  coordinationIndicators: string[];
+  timingPattern?: {
+    description: string;
+    suggestsCoordination: boolean;
+  };
+  narrativePattern?: {
+    description: string;
+    suggestsCoordination: boolean;
+  };
+  conclusion: string;
+  reasoning: string[];
 }
 
 class AnalysisService {
@@ -218,7 +237,14 @@ class AnalysisService {
         organization_id: params.organizationId,
       }
     );
-    return response.duplicate_groups || [];
+    // Handle both direct response and nested response structures
+    if (response.duplicate_groups) {
+      return response.duplicate_groups;
+    }
+    if (response.data?.duplicate_groups) {
+      return response.data.duplicate_groups;
+    }
+    return [];
   }
 
   /**
@@ -270,6 +296,27 @@ class AnalysisService {
   async compareMediaTypes(topicId: string): Promise<AnalyticArtifact> {
     const response = await apiClient.post(
       `${this.baseUrl}/topics/${topicId}/compare-media`
+    );
+    return response.artifact;
+  }
+
+  /**
+   * Perform AI-powered coordination analysis on a duplicate group
+   */
+  async analyzeCoordination(params: {
+    duplicateGroupHash: string;
+    recordIds: string[];
+    topicId?: string;
+    organizationId: string;
+  }): Promise<AnalyticArtifact> {
+    const response = await apiClient.post(
+      `${this.baseUrl}/coordination-analysis`,
+      {
+        duplicate_group_hash: params.duplicateGroupHash,
+        record_ids: params.recordIds,
+        topic_id: params.topicId,
+        organization_id: params.organizationId,
+      }
     );
     return response.artifact;
   }

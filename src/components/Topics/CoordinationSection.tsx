@@ -1,7 +1,8 @@
-import { useState } from 'react';
-import { AlertTriangle, Clock, Save, Search } from 'lucide-react';
-import { analysisService } from '../../services';
+import { useState, useEffect } from 'react';
+import { AlertTriangle, Clock, Save, Search, Sparkles, Loader2 } from 'lucide-react';
+import { analysisService, type AnalyticArtifact } from '../../services';
 import { LoadingSpinner } from '../UI/LoadingSpinner';
+import { ArtifactCard } from '../SourceRecords/ArtifactCard';
 import type { DuplicateGroup } from '../../types/osint';
 import { format } from 'date-fns';
 
@@ -17,6 +18,8 @@ export function CoordinationSection({ topicId, organizationId }: CoordinationSec
   const [error, setError] = useState<string | null>(null);
   const [assessments, setAssessments] = useState<Map<string, string>>(new Map());
   const [savingGroup, setSavingGroup] = useState<string | null>(null);
+  const [analysisLoading, setAnalysisLoading] = useState<string | null>(null); // Group hash being analyzed
+  const [coordinationArtifacts, setCoordinationArtifacts] = useState<Map<string, AnalyticArtifact>>(new Map()); // Group hash -> artifact
 
   const handleScan = async () => {
     try {
@@ -26,11 +29,14 @@ export function CoordinationSection({ topicId, organizationId }: CoordinationSec
         topicId,
         organizationId,
       });
-      setDuplicateGroups(groups);
+      console.log('Detected duplicate groups:', groups);
+      setDuplicateGroups(groups || []);
       setHasScanned(true);
     } catch (err) {
       console.error('Error detecting duplicates:', err);
-      setError(err instanceof Error ? err.message : 'Failed to detect duplicates');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to detect duplicates';
+      setError(errorMessage);
+      alert(errorMessage);
     } finally {
       setIsScanning(false);
     }
@@ -68,6 +74,60 @@ export function CoordinationSection({ topicId, organizationId }: CoordinationSec
     }
   };
 
+  const handleAnalyzeCoordination = async (group: DuplicateGroup) => {
+    try {
+      setAnalysisLoading(group.group_hash);
+      setError(null);
+      const recordIds = group.records.map(r => r.id);
+      const artifact = await analysisService.analyzeCoordination({
+        duplicateGroupHash: group.group_hash,
+        recordIds,
+        topicId,
+        organizationId,
+      });
+      
+      // Store artifact for this group
+      const newArtifacts = new Map(coordinationArtifacts);
+      newArtifacts.set(group.group_hash, artifact);
+      setCoordinationArtifacts(newArtifacts);
+    } catch (err) {
+      console.error('Error analyzing coordination:', err);
+      alert(err instanceof Error ? err.message : 'Failed to analyze coordination');
+    } finally {
+      setAnalysisLoading(null);
+    }
+  };
+
+  // Load existing coordination artifacts for displayed groups
+  useEffect(() => {
+    const loadArtifacts = async () => {
+      if (duplicateGroups.length === 0) return;
+
+      try {
+        // Fetch artifacts for this topic with coordination_check type
+        const artifacts = await analysisService.getTopicArtifacts(topicId);
+        const coordinationArtifactsMap = new Map<string, AnalyticArtifact>();
+
+        // Match artifacts to groups by duplicate_group_hash in payload
+        artifacts
+          .filter(a => a.type === 'coordination_check' && a.payload?.duplicate_group_hash)
+          .forEach(artifact => {
+            const groupHash = artifact.payload.duplicate_group_hash;
+            coordinationArtifactsMap.set(groupHash, artifact);
+          });
+
+        setCoordinationArtifacts(coordinationArtifactsMap);
+      } catch (err) {
+        console.error('Error loading coordination artifacts:', err);
+        // Don't block UI if artifact loading fails
+      }
+    };
+
+    if (hasScanned && duplicateGroups.length > 0) {
+      loadArtifacts();
+    }
+  }, [hasScanned, duplicateGroups, topicId]);
+
   return (
     <div className="bg-stone-900 border border-stone-800 rounded-lg p-6">
       <div className="flex items-center justify-between mb-6">
@@ -78,19 +138,16 @@ export function CoordinationSection({ topicId, organizationId }: CoordinationSec
         <button
           onClick={handleScan}
           disabled={isScanning}
-          className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent-hover text-white rounded-lg transition-colors duration-250 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex items-center justify-center gap-2 px-4 py-2 bg-stone-800 hover:bg-stone-700 border border-stone-700 hover:border-stone-600 text-stone-200 text-xs rounded-lg transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {isScanning ? (
-            <>
-              <LoadingSpinner />
-              Scanning...
-            </>
-          ) : (
-            <>
-              <Search size={18} />
-              Detect Near-Duplicates
-            </>
-          )}
+          <div className="w-4 h-4 flex items-center justify-center">
+            {isScanning ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <Search size={16} />
+            )}
+          </div>
+          <span>Detect Near-Duplicates</span>
         </button>
       </div>
 
@@ -168,6 +225,52 @@ export function CoordinationSection({ topicId, organizationId }: CoordinationSec
                     </div>
                   </div>
                 ))}
+              </div>
+
+              {/* AI Analysis Button */}
+              <div className="mb-4 border-t border-stone-700 pt-4">
+                {coordinationArtifacts.has(group.group_hash) ? (
+                  <div className="space-y-2">
+                    <h5 className="text-sm font-medium text-stone-300 mb-2">AI Analysis Result</h5>
+                    <ArtifactCard
+                      artifact={coordinationArtifacts.get(group.group_hash)!}
+                      onUpdate={() => {
+                        // Reload artifacts if updated
+                        const loadArtifacts = async () => {
+                          try {
+                            const artifacts = await analysisService.getTopicArtifacts(topicId);
+                            const coordinationArtifactsMap = new Map<string, AnalyticArtifact>();
+                            artifacts
+                              .filter(a => a.type === 'coordination_check' && a.payload?.duplicate_group_hash)
+                              .forEach(artifact => {
+                                const groupHash = artifact.payload.duplicate_group_hash;
+                                coordinationArtifactsMap.set(groupHash, artifact);
+                              });
+                            setCoordinationArtifacts(coordinationArtifactsMap);
+                          } catch (err) {
+                            console.error('Error reloading artifacts:', err);
+                          }
+                        };
+                        loadArtifacts();
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => handleAnalyzeCoordination(group)}
+                    disabled={analysisLoading !== null}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-blue-900/50 hover:bg-blue-900/70 border border-blue-800 text-blue-200 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                  >
+                    <div className="w-4 h-4 flex items-center justify-center">
+                      {analysisLoading === group.group_hash ? (
+                        <Loader2 size={16} className="animate-spin" />
+                      ) : (
+                        <Sparkles size={16} />
+                      )}
+                    </div>
+                    <span>AI Analysis</span>
+                  </button>
+                )}
               </div>
 
               {/* Analyst Notes */}
