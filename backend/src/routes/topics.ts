@@ -827,6 +827,8 @@ router.post('/:id/links', async (req: Request, res: Response) => {
       return res.status(500).json({ error: 'Failed to create link' });
     }
 
+    console.log(`[POST /api/topics/:id/links] Successfully created link ${(link as any).id} between topic ${topicId} and source_record ${source_record_id}`);
+
     // Audit log: link added
     await auditService.logLinkAdded(
       (link as any).id,

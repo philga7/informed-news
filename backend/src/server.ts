@@ -16,6 +16,7 @@ import indicatorsRouter from './routes/indicators.js';
 import scanSessionsRouter from './routes/scanSessions.js';
 import retentionRouter from './routes/retention.js';
 import optimizationRouter from './routes/optimization.js';
+import xcomRateLimitRouter from './routes/xcomRateLimit.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -45,6 +46,7 @@ app.use('/api/indicators', indicatorsRouter);
 app.use('/api/scan-sessions', scanSessionsRouter);
 app.use('/api/retention', retentionRouter);
 app.use('/api/optimization', optimizationRouter);
+app.use('/api/xcom-rate-limit', xcomRateLimitRouter);
 
 // Error handling middleware
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

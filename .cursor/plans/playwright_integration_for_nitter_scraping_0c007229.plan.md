@@ -85,8 +85,6 @@ flowchart TD
     D -->|Parse HTML| G
 ```
 
-
-
 ## Implementation Steps
 
 ### Phase 1: Setup & Dependencies (1-2 hours)
@@ -105,9 +103,6 @@ flowchart TD
       npx playwright install chromium
    ```
 
-
-
-
 2. Update `backend/package.json`:
    ```json
       {
@@ -119,9 +114,6 @@ flowchart TD
         }
       }
    ```
-
-
-
 
 3. Configure Vercel for larger functions:
 
@@ -179,8 +171,6 @@ await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
 await page.waitForSelector('.timeline-item', { timeout: 15000 });
 ```
 
-
-
 ### Phase 3: Vercel Configuration (1 hour)
 
 **File:** `vercel.json`**Updates:**
@@ -196,9 +186,6 @@ await page.waitForSelector('.timeline-item', { timeout: 15000 });
         }
       }
    ```
-
-
-
 
 2. Ensure Playwright binaries are included in deployment:
 

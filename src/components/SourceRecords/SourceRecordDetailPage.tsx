@@ -170,10 +170,22 @@ export function SourceRecordDetailPage() {
     }
   };
 
-  const handleLinkToTopics = async (_topicIds: string[]) => {
+  const handleLinkToTopics = async (topicIds: string[]) => {
     // Reload the record to get updated linked topics after linking
     // The modal will close itself after onLink completes
-    await loadRecord();
+    try {
+      // Small delay to ensure database transaction has committed
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      // Load the record - this will update the state
+      await loadRecord();
+      
+      // Show success message
+      toast.success(`Successfully linked to ${topicIds.length} topic${topicIds.length > 1 ? 's' : ''}`);
+    } catch (err) {
+      console.error('Error refreshing record after linking:', err);
+      toast.error('Link created but failed to refresh. Please reload the page to see the link.');
+    }
   };
 
   const handleArchive = async () => {

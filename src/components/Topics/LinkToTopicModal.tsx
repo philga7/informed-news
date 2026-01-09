@@ -41,6 +41,7 @@ export function LinkToTopicModal({
   const [filteredTopics, setFilteredTopics] = useState<Topic[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTopicIds, setSelectedTopicIds] = useState<Set<string>>(new Set());
+  const [alreadyLinkedTopicIds, setAlreadyLinkedTopicIds] = useState<Set<string>>(new Set()); // Topics already linked to this source record
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,8 +50,9 @@ export function LinkToTopicModal({
   useEffect(() => {
     if (orgId) {
       loadTopics();
+      loadAlreadyLinkedTopics();
     }
-  }, [orgId]);
+  }, [orgId, sourceRecordId]);
 
   useEffect(() => {
     if (searchQuery.trim() === '') {
@@ -88,6 +90,35 @@ export function LinkToTopicModal({
     }
   };
 
+  const loadAlreadyLinkedTopics = async () => {
+    if (!sourceRecordId) return;
+
+    try {
+      // Use the same API base URL pattern as the services
+      const API_BASE = import.meta.env.PROD 
+        ? (import.meta.env.VITE_API_URL || '')
+        : (import.meta.env.VITE_API_URL || 'http://localhost:3001');
+      
+      // Fetch the source record to get its linked topics
+      const response = await fetch(`${API_BASE}/api/source-records/${sourceRecordId}`);
+      if (!response.ok) {
+        console.warn('Failed to fetch source record for linked topics');
+        return;
+      }
+      
+      const data = await response.json();
+      const links = data.record?.topic_source_links || [];
+      const linkedTopicIds = new Set(links.map((link: any) => link.topic_id || link.osint_topics?.id).filter(Boolean));
+      
+      setAlreadyLinkedTopicIds(linkedTopicIds);
+      // Pre-select already linked topics
+      setSelectedTopicIds(linkedTopicIds);
+    } catch (err) {
+      console.error('Error loading already linked topics:', err);
+      // Don't show error to user - this is just for UX enhancement
+    }
+  };
+
   const handleLinkToTopic = async (topicId: string) => {
     if (mode === 'single') {
       // Single mode: link immediately and close
@@ -110,6 +141,12 @@ export function LinkToTopicModal({
   };
 
   const toggleTopic = (topicId: string) => {
+    // Prevent deselection of already-linked topics (when linking from Source Record page)
+    if (alreadyLinkedTopicIds.has(topicId) && selectedTopicIds.has(topicId)) {
+      // Topic is already linked - don't allow deselection
+      return;
+    }
+    
     const newSelected = new Set(selectedTopicIds);
     if (newSelected.has(topicId)) {
       newSelected.delete(topicId);
@@ -143,11 +180,29 @@ export function LinkToTopicModal({
         // Single mode: auto-link and close
         await handleLinkToTopic(newTopic.id);
       } else {
-        // Multi mode: select the new topic
-        setSelectedTopicIds(new Set([...selectedTopicIds, newTopic.id]));
-        setShowCreateForm(false);
-        setSearchQuery('');
-        setIsSubmitting(false);
+        // Multi mode: auto-link the newly created topic immediately
+        // This makes sense because if you're creating a topic to link it, you want it linked right away
+        try {
+          await osintTopicsService.linkRecord(newTopic.id, sourceRecordId);
+          // Refresh the parent to show the new link
+          await onLink([newTopic.id]);
+          // Also add it to selected topics for visual feedback (in case user wants to link more)
+          setSelectedTopicIds(new Set([...selectedTopicIds, newTopic.id]));
+          setShowCreateForm(false);
+          setSearchQuery('');
+          setIsSubmitting(false);
+          // Clear any previous errors
+          setError(null);
+        } catch (linkError) {
+          console.error('Error linking newly created topic:', linkError);
+          // If linking fails, still select it so user can try again via submit button
+          setSelectedTopicIds(new Set([...selectedTopicIds, newTopic.id]));
+          setShowCreateForm(false);
+          setSearchQuery('');
+          setIsSubmitting(false);
+          setError(linkError instanceof Error ? linkError.message : 'Topic created but failed to link. You can try linking it manually using the "Link to Topics" button.');
+          // Don't throw - let user try to link via submit button
+        }
       }
     } catch (err) {
       console.error('Error creating topic:', err);
@@ -169,13 +224,57 @@ export function LinkToTopicModal({
     setError(null);
 
     try {
-      await Promise.all(
-        Array.from(selectedTopicIds).map((topicId) =>
+      // Filter out already-linked topics - they don't need to be linked again
+      const topicsToLink = Array.from(selectedTopicIds).filter(
+        topicId => !alreadyLinkedTopicIds.has(topicId)
+      );
+      
+      // If all selected topics are already linked, just refresh and close
+      if (topicsToLink.length === 0) {
+        await onLink(Array.from(selectedTopicIds));
+        onClose();
+        return;
+      }
+
+      // Link all selected topics that aren't already linked, but handle "already linked" errors gracefully
+      const results = await Promise.allSettled(
+        topicsToLink.map((topicId) =>
           osintTopicsService.linkRecord(topicId, sourceRecordId)
         )
       );
-      await onLink(Array.from(selectedTopicIds));
-      onClose();
+
+      // Separate successful links from errors
+      // Start with already-linked topics (they're already successful)
+      const successful: string[] = Array.from(selectedTopicIds).filter(
+        topicId => alreadyLinkedTopicIds.has(topicId)
+      );
+      const errors: string[] = [];
+      
+      results.forEach((result, index) => {
+        const topicId = topicsToLink[index];
+        if (result.status === 'fulfilled') {
+          successful.push(topicId);
+        } else {
+          const error = result.reason;
+          // Ignore "already linked" errors - these are fine (shouldn't happen since we filtered, but just in case)
+          if (error instanceof Error && error.message.includes('already linked')) {
+            successful.push(topicId); // Treat as success
+          } else {
+            errors.push(error instanceof Error ? error.message : 'Unknown error');
+          }
+        }
+      });
+
+      // Show error only if there were real failures (not just "already linked")
+      if (errors.length > 0) {
+        setError(`Failed to link some topics: ${errors.join(', ')}`);
+      }
+
+      // Refresh parent and close if we have any successful links (including already-linked ones)
+      if (successful.length > 0) {
+        await onLink(successful);
+        onClose();
+      }
     } catch (err) {
       console.error('Error linking to topics:', err);
       setError(err instanceof Error ? err.message : 'Failed to link to topics');
@@ -293,26 +392,39 @@ export function LinkToTopicModal({
                     )}
                     {filteredTopics.map((topic) => {
                       const isSelected = selectedTopicIds.has(topic.id);
+                      const isAlreadyLinked = alreadyLinkedTopicIds.has(topic.id);
+                      const canDeselect = !isAlreadyLinked || !isSelected;
                       return (
                         <button
                           key={topic.id}
                           type={isSingleMode ? 'button' : 'button'}
                           onClick={() => handleLinkToTopic(topic.id)}
                           disabled={isSubmitting}
-                          className={`w-full text-left p-4 border rounded-lg transition-all duration-250 disabled:opacity-50 disabled:cursor-not-allowed ${
+                          title={isAlreadyLinked && isSelected ? 'Already linked - cannot be deselected here. Unlink from the Topic page instead.' : undefined}
+                          className={`w-full text-left p-4 border rounded-lg transition-all duration-250 disabled:opacity-50 ${
                             isSingleMode
-                              ? 'border-stone-700 hover:border-blue-500 hover:bg-blue-900/20'
+                              ? 'border-stone-700 hover:border-blue-500 hover:bg-blue-900/20 disabled:cursor-not-allowed'
                               : isSelected
-                              ? 'border-blue-600 bg-blue-900/20'
-                              : 'border-stone-800 hover:border-stone-700'
-                          }`}
+                              ? isAlreadyLinked
+                                ? 'border-green-600 bg-green-900/20 cursor-default' // Already linked - different color
+                                : 'border-blue-600 bg-blue-900/20 cursor-pointer'
+                              : 'border-stone-800 hover:border-stone-700 cursor-pointer'
+                          } ${!canDeselect && isSelected ? 'opacity-75' : ''}`}
                         >
                           <div className="flex items-start justify-between">
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 mb-1">
                                 <h3 className="font-semibold text-stone-100">{topic.name}</h3>
                                 {isSelected && !isSingleMode && (
-                                  <LinkIcon size={16} className="text-blue-500 flex-shrink-0" />
+                                  <LinkIcon 
+                                    size={16} 
+                                    className={`flex-shrink-0 ${isAlreadyLinked ? 'text-green-500' : 'text-blue-500'}`} 
+                                  />
+                                )}
+                                {isAlreadyLinked && isSelected && (
+                                  <span className="text-xs text-green-400 bg-green-900/30 px-2 py-0.5 rounded border border-green-700">
+                                    Already Linked
+                                  </span>
                                 )}
                                 {isSingleMode && (
                                   <Link2 className="w-5 h-5 text-stone-400 ml-auto flex-shrink-0" />
