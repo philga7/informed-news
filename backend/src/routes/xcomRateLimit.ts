@@ -11,6 +11,23 @@ import { supabase } from '../utils/supabase.js';
 
 const router = Router();
 
+// Type definitions for RPC function return types
+interface CheckRateLimitResult {
+  can_proceed: boolean;
+  current_count: number;
+  max_requests: number;
+  reset_at: string;
+  requests_remaining: number;
+}
+
+interface IncrementRateLimitResult {
+  id: string;
+  hour_window: string;
+  request_count: number;
+  last_request_at: string | null;
+  can_proceed: boolean;
+}
+
 /**
  * GET /api/xcom-rate-limit/check
  * Check if scraping can proceed without incrementing counter
@@ -20,7 +37,10 @@ const router = Router();
 router.get('/check', async (_req: Request, res: Response) => {
   try {
     // Call the database function to check rate limit
-    const { data, error } = await supabase.rpc('check_xcom_rate_limit');
+    const { data, error } = await supabase.rpc('check_xcom_rate_limit') as {
+      data: CheckRateLimitResult[] | null;
+      error: any;
+    };
 
     if (error) {
       console.error('Error checking X.com rate limit:', error);
@@ -68,7 +88,10 @@ router.get('/check', async (_req: Request, res: Response) => {
 router.post('/increment', async (_req: Request, res: Response) => {
   try {
     // Call the database function to increment and check
-    const { data, error } = await supabase.rpc('increment_xcom_rate_limit');
+    const { data, error } = await supabase.rpc('increment_xcom_rate_limit') as {
+      data: IncrementRateLimitResult[] | null;
+      error: any;
+    };
 
     if (error) {
       console.error('Error incrementing X.com rate limit:', error);
