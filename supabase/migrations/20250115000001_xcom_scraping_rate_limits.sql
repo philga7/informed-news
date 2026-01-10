@@ -35,6 +35,9 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- Drop trigger if it exists (for idempotent migrations)
+DROP TRIGGER IF EXISTS update_xcom_rate_limits_updated_at ON xcom_scraping_rate_limits;
+
 CREATE TRIGGER update_xcom_rate_limits_updated_at
   BEFORE UPDATE ON xcom_scraping_rate_limits
   FOR EACH ROW
@@ -58,7 +61,7 @@ BEGIN
   -- Try to get existing record
   SELECT * INTO limit_record
   FROM xcom_scraping_rate_limits
-  WHERE hour_window = current_hour;
+  WHERE xcom_scraping_rate_limits.hour_window = current_hour;
   
   -- If no record exists, create one
   IF NOT FOUND THEN
@@ -90,6 +93,7 @@ DECLARE
   current_hour TIMESTAMPTZ;
   limit_record xcom_scraping_rate_limits%ROWTYPE;
   max_requests INTEGER := 300;
+  updated_record xcom_scraping_rate_limits%ROWTYPE;
 BEGIN
   -- Get the current hour window
   current_hour := date_trunc('hour', NOW());
@@ -97,7 +101,7 @@ BEGIN
   -- Get or create record
   SELECT * INTO limit_record
   FROM xcom_scraping_rate_limits
-  WHERE hour_window = current_hour;
+  WHERE xcom_scraping_rate_limits.hour_window = current_hour;
   
   -- If no record exists, create one
   IF NOT FOUND THEN
@@ -105,13 +109,15 @@ BEGIN
     VALUES (current_hour, 1, NOW())
     RETURNING * INTO limit_record;
   ELSE
-    -- Update existing record
-    UPDATE xcom_scraping_rate_limits
+    -- Update existing record with explicit table reference
+    UPDATE xcom_scraping_rate_limits AS rl
     SET 
-      request_count = request_count + 1,
+      request_count = rl.request_count + 1,
       last_request_at = NOW()
-    WHERE id = limit_record.id
-    RETURNING * INTO limit_record;
+    WHERE rl.id = limit_record.id
+    RETURNING rl.* INTO updated_record;
+    
+    limit_record := updated_record;
   END IF;
   
   -- Return record with can_proceed flag
@@ -145,7 +151,7 @@ BEGIN
   -- Get current record
   SELECT * INTO limit_record
   FROM xcom_scraping_rate_limits
-  WHERE hour_window = current_hour;
+  WHERE xcom_scraping_rate_limits.hour_window = current_hour;
   
   -- If no record exists, we can proceed
   IF NOT FOUND THEN

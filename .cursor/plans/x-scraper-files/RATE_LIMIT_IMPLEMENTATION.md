@@ -180,12 +180,43 @@ supabase migration up
 
 ### Test Rate Limit Check
 
+**Production Domain** (recommended - no authentication required):
 ```bash
 # Check current status
-curl https://your-site.vercel.app/api/xcom-rate-limit/check
+curl https://news.informedcrew.com/api/xcom-rate-limit/check
 
 # Increment and check
-curl -X POST https://your-site.vercel.app/api/xcom-rate-limit/increment
+curl -X POST https://news.informedcrew.com/api/xcom-rate-limit/increment
+```
+
+**Preview Deployments** (requires authentication bypass):
+
+If testing a preview deployment URL, you'll need to use Vercel's bypass token:
+
+1. **Get the bypass token:**
+   - Go to Vercel Dashboard → Your Project → Settings → Deployment Protection
+   - Enable "Protection Bypass for Automation"
+   - Copy the generated secret
+
+2. **Use the bypass token in requests:**
+   ```bash
+   # Option 1: Using query parameter
+   curl "https://your-preview-url.vercel.app/api/xcom-rate-limit/check?x-vercel-protection-bypass=YOUR_BYPASS_TOKEN"
+   
+   # Option 2: Using header (if available)
+   curl -H "x-vercel-protection-bypass: YOUR_BYPASS_TOKEN" \
+        https://your-preview-url.vercel.app/api/xcom-rate-limit/check
+   ```
+
+**Expected Response (Success):**
+```json
+{
+  "can_proceed": true,
+  "current_count": 45,
+  "max_requests": 300,
+  "reset_at": "2024-01-15T15:00:00Z",
+  "requests_remaining": 255
+}
 ```
 
 ### Test Manual Trigger
