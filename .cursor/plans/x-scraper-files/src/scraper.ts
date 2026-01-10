@@ -5,7 +5,8 @@
  * Implements human-like behavior with scrolling and waiting.
  */
 
-import { chromium, type ElementHandle } from 'playwright-extra';
+import { chromium } from 'playwright-extra';
+import type { ElementHandle } from 'playwright';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import { createLogger } from './utils.js';
 import { checkRateLimit, waitForDelay } from './utils.js';
@@ -56,9 +57,11 @@ async function extractTweetData(element: ElementHandle, username: string): Promi
     
     // Get tweet URL (link to the tweet)
     const timeElement = await element.$('time');
-    const timeParent = timeElement ? await timeElement.evaluateHandle((el) => el.closest('a')) : null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const timeParent = timeElement ? await timeElement.evaluateHandle((el: any) => el.closest('a')) : null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const tweetUrl = timeParent 
-      ? await timeParent.evaluate((el: HTMLAnchorElement) => el.href)
+      ? await timeParent.evaluate((el: any) => el.href as string)
       : null;
 
     if (!tweetUrl) {
@@ -75,7 +78,7 @@ async function extractTweetData(element: ElementHandle, username: string): Promi
       : new Date().toISOString();
 
     // Extract engagement metrics
-    const engagement: Tweet['raw_metadata']['engagement'] = {};
+    const engagement: NonNullable<Tweet['raw_metadata']>['engagement'] = {};
 
     // Try to get like count
     const likeButton = await element.$('[data-testid="like"]');
@@ -227,14 +230,14 @@ export async function scrapeProfile(
       await page.waitForSelector('[data-testid="tweet"]', { timeout: 15000 });
     } catch (error) {
       // Check if profile exists or is private
-      const bodyText = await page.textContent('body').catch(() => '');
-      if (bodyText.includes('This account doesn\'t exist') || bodyText.includes('doesn\'t exist')) {
+      const bodyText = await page.textContent('body').catch(() => null);
+      if (bodyText && (bodyText.includes('This account doesn\'t exist') || bodyText.includes('doesn\'t exist'))) {
         return {
           success: false,
           error: 'Profile does not exist',
         };
       }
-      if (bodyText.includes('protected') || bodyText.includes('private')) {
+      if (bodyText && (bodyText.includes('protected') || bodyText.includes('private'))) {
         return {
           success: false,
           error: 'Profile is private',
@@ -247,15 +250,15 @@ export async function scrapeProfile(
     }
 
     // Check for rate limiting or captcha
-    const pageContent = await page.textContent('body').catch(() => '');
-    if (pageContent.includes('rate limit') || pageContent.includes('Too many requests')) {
+    const pageContent = await page.textContent('body').catch(() => null);
+    if (pageContent && (pageContent.includes('rate limit') || pageContent.includes('Too many requests'))) {
       logger.error('Rate limit detected on X.com');
       return {
         success: false,
         error: 'Rate limit detected',
       };
     }
-    if (pageContent.includes('captcha') || pageContent.includes('verify')) {
+    if (pageContent && (pageContent.includes('captcha') || pageContent.includes('verify'))) {
       logger.error('Captcha detected on X.com');
       return {
         success: false,
@@ -294,7 +297,9 @@ export async function scrapeProfile(
       if (tweets.length < maxTweets) {
         logger.info(`Scrolling to load more tweets (${tweets.length}/${maxTweets})`);
         await page.evaluate(() => {
-          window.scrollBy(0, window.innerHeight);
+          // This runs in browser context where window exists
+          // @ts-expect-error - window exists in browser context of page.evaluate()
+          window.scrollBy(0, window.innerHeight || 1080);
         });
 
         // Wait for new tweets to load (human-like delay)

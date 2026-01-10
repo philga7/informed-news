@@ -11,7 +11,8 @@ import { createLogger } from './utils.js';
 import { authenticateX } from './auth.js';
 import { scrapeProfile } from './scraper.js';
 import { sendTweetsToVercel, fetchEnabledSources, incrementSupabaseRateLimit } from './utils.js';
-import type { XcomSource, ScrapeResult, ProcessingSummary } from './utils.js';
+import type { XcomSource, ProcessingSummary } from './utils.js';
+import type { ScrapeResult } from './scraper.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -184,7 +185,7 @@ app.post('/webhook', async (req: Request, res: Response) => {
             username: source.username,
             success: true,
             tweetsScraped: scrapeResult.tweets.length,
-            tweetsSent: sendResult.sent,
+            tweetsSent: sendResult.sent || 0,
             tweetsSkipped: sendResult.skipped || 0,
           });
           summary.succeeded++;
