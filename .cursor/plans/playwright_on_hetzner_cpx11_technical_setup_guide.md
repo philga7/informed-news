@@ -192,6 +192,7 @@ services:
       - X_PASSWORD=${X_PASSWORD}
       - VERCEL_API_ENDPOINT=${VERCEL_API_ENDPOINT}
       - WEBHOOK_SECRET=${WEBHOOK_SECRET}
+      - ORGANIZATION_ID=${ORGANIZATION_ID}
     volumes:
       - ./sessions:/app/sessions
       - ./logs:/app/logs
@@ -206,9 +207,15 @@ Create `.env`:
 ```env
 X_USERNAME=your_scraper_account
 X_PASSWORD=your_secure_password
-VERCEL_API_ENDPOINT=https://your-site.vercel.app/api/ingest
+VERCEL_API_ENDPOINT=https://your-site.vercel.app
 WEBHOOK_SECRET=your_webhook_secret
+ORGANIZATION_ID=your_organization_uuid
 ```
+
+**Important Notes:**
+- `VERCEL_API_ENDPOINT` should be the base URL (e.g., `https://news.informedcrew.com`) without `/api/ingest`
+- `ORGANIZATION_ID` is your Supabase organization UUID (found in your organization settings)
+- `WEBHOOK_SECRET` must match the value in GitHub Actions secrets
 
 **Secure the environment file:**
 

@@ -191,12 +191,12 @@ export interface XcomSource {
 /**
  * Fetch enabled X.com sources from Vercel API
  */
-export async function fetchEnabledSources(vercelEndpoint: string): Promise<XcomSource[]> {
+export async function fetchEnabledSources(vercelEndpoint: string, organizationId: string): Promise<XcomSource[]> {
   const logger = createLogger('utils');
   
   try {
-    const url = `${vercelEndpoint}/api/sources?source_type=xcom&enabled=true`;
-    logger.info('Fetching enabled sources', { url });
+    const url = `${vercelEndpoint}/api/sources?organization_id=${organizationId}&source_type=xcom&enabled=true`;
+    logger.info('Fetching enabled sources', { url, organizationId });
 
     const response = await fetch(url, {
       method: 'GET',
