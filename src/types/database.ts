@@ -66,7 +66,7 @@ export interface Database {
         Row: {
           id: string;
           organization_id: string;
-          source_type: 'rss' | 'api' | 'email' | 'manual';
+          source_type: 'rss' | 'api' | 'email' | 'manual' | 'xcom';
           name: string;
           url: string | null;
           reliability_rating: 'HIGH' | 'MEDIUM' | 'LOW' | 'UNKNOWN';
@@ -86,7 +86,7 @@ export interface Database {
         Insert: {
           id?: string;
           organization_id: string;
-          source_type: 'rss' | 'api' | 'email' | 'manual';
+          source_type: 'rss' | 'api' | 'email' | 'manual' | 'xcom';
           name: string;
           url?: string | null;
           reliability_rating?: 'HIGH' | 'MEDIUM' | 'LOW' | 'UNKNOWN';
@@ -106,7 +106,7 @@ export interface Database {
         Update: {
           id?: string;
           organization_id?: string;
-          source_type?: 'rss' | 'api' | 'email' | 'manual';
+          source_type?: 'rss' | 'api' | 'email' | 'manual' | 'xcom';
           name?: string;
           url?: string | null;
           reliability_rating?: 'HIGH' | 'MEDIUM' | 'LOW' | 'UNKNOWN';
@@ -308,7 +308,7 @@ export interface Database {
       [_ in never]: never;
     };
     Enums: {
-      osint_source_type: 'rss' | 'api' | 'email' | 'manual';
+      osint_source_type: 'rss' | 'api' | 'email' | 'manual' | 'xcom';
       reliability_rating: 'HIGH' | 'MEDIUM' | 'LOW' | 'UNKNOWN';
       confidence_level: 'HIGH' | 'MEDIUM' | 'LOW';
       artifact_type: 'summary' | 'entity_extraction' | 'tone_analysis' | 'sentiment' | 'key_facts' | 'timeline' | 'network_graph';
