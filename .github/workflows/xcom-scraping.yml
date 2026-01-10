@@ -15,7 +15,7 @@ jobs:
       - name: Trigger X.com Scraping on Hetzner
         env:
           HETZNER_WEBHOOK_URL: ${{ secrets.HETZNER_WEBHOOK_URL }}
-          GITHUB_WEBHOOK_SECRET: ${{ secrets.GITHUB_WEBHOOK_SECRET }}
+          WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
         run: |
           echo "🔄 Starting X.com scraping on Hetzner server..."
           echo "📡 Webhook URL: $HETZNER_WEBHOOK_URL"
@@ -27,8 +27,8 @@ jobs:
             exit 1
           fi
           
-          if [ -z "$GITHUB_WEBHOOK_SECRET" ]; then
-            echo "❌ Error: GITHUB_WEBHOOK_SECRET is not set"
+          if [ -z "$WEBHOOK_SECRET" ]; then
+            echo "❌ Error: WEBHOOK_SECRET is not set"
             echo "💡 Go to Settings → Secrets and variables → Actions to add it"
             exit 1
           fi
@@ -38,7 +38,7 @@ jobs:
           response=$(curl -X POST \
             "$HETZNER_WEBHOOK_URL" \
             -H "Content-Type: application/json" \
-            -H "x-webhook-secret: $GITHUB_WEBHOOK_SECRET" \
+            -H "x-webhook-secret: $WEBHOOK_SECRET" \
             -d "{\"triggered_by\": \"github-actions\", \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" \
             -w "\n%{http_code}" \
             --max-time 600 \
@@ -115,7 +115,7 @@ jobs:
               401)
                 echo ""
                 echo "🔐 Authentication Error: Invalid webhook secret"
-                echo "💡 Verify that GITHUB_WEBHOOK_SECRET matches the value in Hetzner .env file"
+                echo "💡 Verify that WEBHOOK_SECRET matches the value in Hetzner .env file"
                 ;;
               404)
                 echo ""
