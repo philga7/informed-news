@@ -9,7 +9,7 @@
 // ENUM TYPES
 // ============================================================================
 
-export type OsintSourceType = 'rss' | 'api' | 'email' | 'manual';
+export type OsintSourceType = 'rss' | 'api' | 'email' | 'manual' | 'xcom';
 export type ReliabilityRating = 'HIGH' | 'MEDIUM' | 'LOW' | 'UNKNOWN';
 export type ConfidenceLevel = 'HIGH' | 'MEDIUM' | 'LOW';
 export type ArtifactType =
