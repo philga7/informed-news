@@ -172,9 +172,9 @@ router.post('/', async (req: Request, res: Response) => {
     }
 
     // Validate source_type
-    if (!['rss', 'api', 'email', 'manual'].includes(source_type)) {
+    if (!['rss', 'api', 'email', 'manual', 'xcom'].includes(source_type)) {
       return res.status(400).json({
-        error: 'Invalid source_type. Must be rss, api, email, or manual',
+        error: 'Invalid source_type. Must be rss, api, email, manual, or xcom',
       });
     }
 

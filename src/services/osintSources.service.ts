@@ -1,4 +1,4 @@
-import type { Source } from '../types/osint';
+import type { Source, OsintSourceType } from '../types/osint';
 
 // Use relative URL in production (Vercel), localhost in development
 const API_BASE = import.meta.env.PROD 
@@ -19,7 +19,7 @@ export const osintSourcesService = {
     organizationId: string,
     sourceData: {
       name: string;
-      sourceType: 'rss' | 'api' | 'email' | 'manual';
+      sourceType: OsintSourceType;
       url?: string;
       domain?: string | null;
       reliabilityRating?: 'HIGH' | 'MEDIUM' | 'LOW' | 'UNKNOWN';
