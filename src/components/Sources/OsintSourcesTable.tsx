@@ -47,6 +47,7 @@ export function OsintSourcesTable({ sources, onUpdate, onDelete, onRefresh }: Os
       api: 'API',
       email: 'Email',
       manual: 'Manual',
+      xcom: 'X.com',
     };
     return labels[type] || type.toUpperCase();
   };

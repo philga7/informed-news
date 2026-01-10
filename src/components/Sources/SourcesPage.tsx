@@ -7,7 +7,7 @@ import { OsintSourcesTable } from './OsintSourcesTable';
 import { LoadingSpinner } from '../UI/LoadingSpinner';
 import { EmptyState } from '../UI/EmptyState';
 import { CreateSourceModal } from './CreateSourceModal';
-import type { Source } from '../../types/osint';
+import type { Source, OsintSourceType } from '../../types/osint';
 
 interface SourceWithMetrics extends Source {
   record_count: number;
@@ -117,7 +117,7 @@ export function SourcesPage() {
 
   const handleCreateSource = async (sourceData: {
     name: string;
-    sourceType: 'rss' | 'api' | 'email' | 'manual';
+    sourceType: OsintSourceType;
     url?: string;
     domain?: string | null;
     reliabilityRating?: 'HIGH' | 'MEDIUM' | 'LOW' | 'UNKNOWN';

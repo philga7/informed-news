@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { X } from 'lucide-react';
-import type { WatchItemCategory } from '../../types/osint';
+import type { WatchItemCategory, OsintSourceType } from '../../types/osint';
 
 interface CreateSourceModalProps {
   onSubmit: (sourceData: {
     name: string;
-    sourceType: 'rss' | 'api' | 'email' | 'manual';
+    sourceType: OsintSourceType;
     url?: string;
     domain?: WatchItemCategory | null;
     reliabilityRating?: 'HIGH' | 'MEDIUM' | 'LOW' | 'UNKNOWN';
@@ -17,7 +17,7 @@ interface CreateSourceModalProps {
 
 export function CreateSourceModal({ onSubmit, onCancel }: CreateSourceModalProps) {
   const [name, setName] = useState('');
-  const [sourceType, setSourceType] = useState<'rss' | 'api' | 'email' | 'manual'>('rss');
+  const [sourceType, setSourceType] = useState<OsintSourceType>('rss');
   const [url, setUrl] = useState('');
   const [domain, setDomain] = useState<WatchItemCategory | 'none'>('none');
   const [reliabilityRating, setReliabilityRating] = useState<'HIGH' | 'MEDIUM' | 'LOW' | 'UNKNOWN'>('UNKNOWN');
@@ -93,7 +93,7 @@ export function CreateSourceModal({ onSubmit, onCancel }: CreateSourceModalProps
               </label>
               <select
                 value={sourceType}
-                onChange={(e) => setSourceType(e.target.value as 'rss' | 'api' | 'email' | 'manual')}
+                onChange={(e) => setSourceType(e.target.value as OsintSourceType)}
                 className="w-full px-3 py-2 bg-stone-800 border border-stone-700 rounded-lg text-stone-100 focus:outline-none focus:border-blue-500"
                 required
               >
@@ -101,23 +101,27 @@ export function CreateSourceModal({ onSubmit, onCancel }: CreateSourceModalProps
                 <option value="api">API</option>
                 <option value="email">Email</option>
                 <option value="manual">Manual</option>
+                <option value="xcom">X.com (Twitter)</option>
               </select>
             </div>
 
             {/* URL */}
             <div>
               <label className="block text-sm font-medium text-stone-300 mb-2">
-                URL
+                URL {['rss', 'api', 'xcom'].includes(sourceType) && <span className="text-red-400">*</span>}
               </label>
               <input
                 type="url"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
                 className="w-full px-3 py-2 bg-stone-800 border border-stone-700 rounded-lg text-stone-100 focus:outline-none focus:border-blue-500"
-                placeholder="https://example.com/feed.xml"
+                placeholder={sourceType === 'xcom' ? 'https://x.com/username' : 'https://example.com/feed.xml'}
+                required={['rss', 'api', 'xcom'].includes(sourceType)}
               />
               <p className="mt-1 text-xs text-stone-500">
-                Required for RSS and API sources
+                {sourceType === 'xcom' 
+                  ? 'Required. Enter the X.com profile URL (e.g., https://x.com/username)'
+                  : 'Required for RSS, API, and X.com sources'}
               </p>
             </div>
 
