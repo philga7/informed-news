@@ -12,7 +12,37 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60  # Scraping can take time, especially with multiple profiles
     steps:
+      - name: Pre-flight Health Check
+        env:
+          HETZNER_WEBHOOK_URL: ${{ secrets.HETZNER_WEBHOOK_URL }}
+        run: |
+          echo "🏥 Pre-flight health check..."
+          if [ -z "$HETZNER_WEBHOOK_URL" ]; then
+            echo "❌ HETZNER_WEBHOOK_URL not set"
+            exit 1
+          fi
+          
+          # Extract base URL for health check
+          base_url=$(echo "$HETZNER_WEBHOOK_URL" | sed 's|/webhook$||')
+          health_url="$base_url/health"
+          
+          echo "Checking: $health_url"
+          health_response=$(curl -s -w "\n%{http_code}" --max-time 10 --connect-timeout 5 "$health_url" || echo "ERROR")
+          health_code=$(echo "$health_response" | tail -n1)
+          health_body=$(echo "$health_response" | head -n-1)
+          
+          if [ "$health_code" != "200" ]; then
+            echo "❌ Health check failed (HTTP $health_code)"
+            echo "Response: $health_body"
+            echo "⚠️  Hetzner server may be down or unreachable"
+            exit 1
+          fi
+          
+          echo "✅ Health check passed"
+          echo "$health_body" | jq '.' 2>/dev/null || echo "$health_body"
+
       - name: Trigger X.com Scraping on Hetzner
+        id: scrape
         env:
           HETZNER_WEBHOOK_URL: ${{ secrets.HETZNER_WEBHOOK_URL }}
           WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
@@ -35,22 +65,34 @@ jobs:
           
           # Make POST request to Hetzner webhook with secret in header
           # Using extended timeout since scraping can take time
+          echo "📤 Sending webhook request to Hetzner server..."
+          start_time=$(date +%s)
+          
           response=$(curl -X POST \
             "$HETZNER_WEBHOOK_URL" \
             -H "Content-Type: application/json" \
             -H "x-webhook-secret: $WEBHOOK_SECRET" \
-            -d "{\"triggered_by\": \"github-actions\", \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" \
+            -d "{\"triggered_by\": \"github-actions\", \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\", \"workflow_run_id\": \"${{ github.run_id }}\", \"commit_sha\": \"${{ github.sha }}\"}" \
             -w "\n%{http_code}" \
             --max-time 600 \
             --connect-timeout 30 \
             --silent \
-            --show-error)
+            --show-error \
+            --fail-with-body) || curl_exit_code=$?
           
           http_code=$(echo "$response" | tail -n1)
           body=$(echo "$response" | head -n-1)
+          end_time=$(date +%s)
+          duration=$((end_time - start_time))
+          
+          echo "Response time: ${duration}s"
           
           if [ "$http_code" -eq 200 ] || [ "$http_code" -eq 201 ]; then
             echo "✅ X.com scraping request completed (HTTP $http_code)"
+            
+            # Set output for downstream steps
+            echo "scrape_success=true" >> $GITHUB_OUTPUT
+            echo "http_code=$http_code" >> $GITHUB_OUTPUT
             
             # Parse and display summary if available
             if command -v jq &> /dev/null; then
@@ -85,18 +127,28 @@ jobs:
                   echo "$results" | jq -r '.[] | "  • \(.sourceName) (@\(.username)): \(if .success then "✅" else "❌" end) \(.tweetsScraped) tweets scraped, \(.tweetsSent) sent"'
                 fi
                 
+                # Set workflow outputs for metrics
+                echo "total_sources=$total" >> $GITHUB_OUTPUT
+                echo "succeeded_sources=$succeeded" >> $GITHUB_OUTPUT
+                echo "failed_sources=$failed" >> $GITHUB_OUTPUT
+                echo "duration_ms=$duration" >> $GITHUB_OUTPUT
+                
                 # Fail workflow if all sources failed
                 if [ "$failed" -eq "$total" ] && [ "$total" -gt 0 ]; then
                   echo ""
                   echo "❌ All sources failed to process"
+                  echo "failed_all=true" >> $GITHUB_OUTPUT
                   exit 1
                 fi
                 
-                # Warn if some sources failed
+                # Warn if some sources failed (but don't fail the workflow)
                 if [ "$failed" -gt 0 ]; then
                   echo ""
                   echo "⚠️  Warning: $failed source(s) failed during scraping"
                   echo "💡 Check the 'results' array in the response for error details"
+                  echo "partial_failure=true" >> $GITHUB_OUTPUT
+                else
+                  echo "partial_failure=false" >> $GITHUB_OUTPUT
                 fi
               else
                 echo "$body" | jq '.' 2>/dev/null || echo "$body"
@@ -107,6 +159,10 @@ jobs:
             fi
           else
             echo "❌ X.com scraping request failed (HTTP $http_code)"
+            echo "scrape_success=false" >> $GITHUB_OUTPUT
+            echo "http_code=$http_code" >> $GITHUB_OUTPUT
+            
+            echo ""
             echo "Response body:"
             echo "$body"
             
@@ -125,25 +181,78 @@ jobs:
               500)
                 echo ""
                 echo "⚠️  Server Error: Hetzner server encountered an error"
-                echo "💡 Check Hetzner server logs: docker compose logs scraper"
+                echo ""
+                echo "Common causes:"
+                echo "  1. Missing ORGANIZATION_ID in Hetzner .env file"
+                echo "  2. Vercel backend not deployed with latest changes"
+                echo "  3. Backend API endpoint returning 400 (check organization_id parameter)"
+                echo "  4. Network connectivity issues to Vercel API"
+                echo ""
+                echo "Debugging steps:"
+                echo "  1. SSH to Hetzner: ssh scraper@YOUR_SERVER_IP"
+                echo "  2. Check logs: docker compose logs scraper --tail=50"
+                echo "  3. Verify .env: cat ~/x-scraper/.env | grep ORGANIZATION_ID"
+                echo "  4. Test API manually: curl https://news.informedcrew.com/api/sources?organization_id=YOUR_ID&source_type=xcom&enabled=true"
+                ;;
+              502|503|504)
+                echo ""
+                echo "⚠️  Gateway/Service Unavailable: Hetzner server may be overloaded or restarting"
+                echo "💡 Check Hetzner server logs: docker compose logs scraper --tail=100"
+                echo "💡 Verify container is running: docker compose ps"
                 ;;
               *)
                 echo ""
-                echo "💡 Check Hetzner server status: curl $HETZNER_WEBHOOK_URL/../health"
+                echo "💡 Unexpected HTTP status: $http_code"
+                echo "💡 Check Hetzner server status: curl $(echo $HETZNER_WEBHOOK_URL | sed 's|/webhook$||')/health"
                 ;;
             esac
+            
+            # Extract error details from response body if available
+            if command -v jq &> /dev/null && [ -n "$body" ]; then
+              error_msg=$(echo "$body" | jq -r '.error // .message // empty' 2>/dev/null)
+              if [ -n "$error_msg" ]; then
+                echo ""
+                echo "Error details: $error_msg"
+              fi
+            fi
             
             exit 1
           fi
 
-      - name: Check Hetzner Server Health (on failure)
+      - name: Post-Scrape Diagnostics (on failure)
         if: failure()
         env:
           HETZNER_WEBHOOK_URL: ${{ secrets.HETZNER_WEBHOOK_URL }}
         run: |
-          if [ -n "$HETZNER_WEBHOOK_URL" ]; then
-            # Extract base URL and check health endpoint
-            base_url=$(echo "$HETZNER_WEBHOOK_URL" | sed 's|/webhook$||')
-            echo "🏥 Checking Hetzner server health: $base_url/health"
-            curl -f "$base_url/health" --max-time 10 --connect-timeout 5 || echo "⚠️  Health check failed - server may be down"
+          echo "🔍 Running post-failure diagnostics..."
+          if [ -z "$HETZNER_WEBHOOK_URL" ]; then
+            echo "⚠️  Cannot run diagnostics - HETZNER_WEBHOOK_URL not set"
+            exit 0
           fi
+          
+          # Extract base URL
+          base_url=$(echo "$HETZNER_WEBHOOK_URL" | sed 's|/webhook$||')
+          
+          echo ""
+          echo "📊 Server Status:"
+          echo "  Health endpoint: $base_url/health"
+          health_status=$(curl -s -w "\n%{http_code}" --max-time 10 --connect-timeout 5 "$base_url/health" || echo -e "ERROR\n000")
+          health_code=$(echo "$health_status" | tail -n1)
+          health_body=$(echo "$health_status" | head -n-1)
+          
+          if [ "$health_code" = "200" ]; then
+            echo "  ✅ Server is healthy"
+            echo "$health_body" | jq '.' 2>/dev/null || echo "  Response: $health_body"
+          else
+            echo "  ❌ Server health check failed (HTTP $health_code)"
+            echo "  Response: $health_body"
+          fi
+          
+          echo ""
+          echo "💡 Next steps:"
+          echo "  1. SSH to Hetzner server and check logs:"
+          echo "     docker compose logs scraper --tail=100"
+          echo "  2. Verify environment variables:"
+          echo "     docker compose exec scraper env | grep -E '(ORGANIZATION_ID|VERCEL_API|WEBHOOK)'"
+          echo "  3. Check container status:"
+          echo "     docker compose ps"
