@@ -1,0 +1,149 @@
+name: X.com Scraping
+
+on:
+  # schedule:
+  #   # Run every 4 hours (adjust as needed)
+  #   # Format: minute hour day month day-of-week
+  #   - cron: '0 */4 * * *'
+  workflow_dispatch: # Allow manual triggering from GitHub Actions UI
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60  # Scraping can take time, especially with multiple profiles
+    steps:
+      - name: Trigger X.com Scraping on Hetzner
+        env:
+          HETZNER_WEBHOOK_URL: ${{ secrets.HETZNER_WEBHOOK_URL }}
+          GITHUB_WEBHOOK_SECRET: ${{ secrets.GITHUB_WEBHOOK_SECRET }}
+        run: |
+          echo "🔄 Starting X.com scraping on Hetzner server..."
+          echo "📡 Webhook URL: $HETZNER_WEBHOOK_URL"
+          
+          # Validate required secrets
+          if [ -z "$HETZNER_WEBHOOK_URL" ]; then
+            echo "❌ Error: HETZNER_WEBHOOK_URL secret is not set"
+            echo "💡 Go to Settings → Secrets and variables → Actions to add it"
+            exit 1
+          fi
+          
+          if [ -z "$GITHUB_WEBHOOK_SECRET" ]; then
+            echo "❌ Error: GITHUB_WEBHOOK_SECRET is not set"
+            echo "💡 Go to Settings → Secrets and variables → Actions to add it"
+            exit 1
+          fi
+          
+          # Make POST request to Hetzner webhook with secret in header
+          # Using extended timeout since scraping can take time
+          response=$(curl -X POST \
+            "$HETZNER_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -H "x-webhook-secret: $GITHUB_WEBHOOK_SECRET" \
+            -d "{\"triggered_by\": \"github-actions\", \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" \
+            -w "\n%{http_code}" \
+            --max-time 600 \
+            --connect-timeout 30 \
+            --silent \
+            --show-error)
+          
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | head -n-1)
+          
+          if [ "$http_code" -eq 200 ] || [ "$http_code" -eq 201 ]; then
+            echo "✅ X.com scraping request completed (HTTP $http_code)"
+            
+            # Parse and display summary if available
+            if command -v jq &> /dev/null; then
+              summary=$(echo "$body" | jq -r '.summary // empty')
+              if [ -n "$summary" ]; then
+                echo "📊 Scraping Summary:"
+                echo "$summary" | jq '.'
+                
+                # Extract key metrics
+                total=$(echo "$summary" | jq -r '.total // 0')
+                processed=$(echo "$summary" | jq -r '.processed // 0')
+                succeeded=$(echo "$summary" | jq -r '.succeeded // 0')
+                failed=$(echo "$summary" | jq -r '.failed // 0')
+                duration=$(echo "$summary" | jq -r '.duration // 0')
+                
+                echo ""
+                echo "📈 Metrics:"
+                echo "  • Total sources: $total"
+                echo "  • Processed: $processed"
+                echo "  • Succeeded: $succeeded"
+                echo "  • Failed: $failed"
+                if [ -n "$duration" ] && [ "$duration" != "0" ]; then
+                  duration_sec=$((duration / 1000))
+                  echo "  • Duration: ${duration_sec}s"
+                fi
+                
+                # Show per-source results if available
+                results=$(echo "$summary" | jq -r '.results // []')
+                if [ "$(echo "$results" | jq 'length')" -gt 0 ]; then
+                  echo ""
+                  echo "📋 Per-Source Results:"
+                  echo "$results" | jq -r '.[] | "  • \(.sourceName) (@\(.username)): \(if .success then "✅" else "❌" end) \(.tweetsScraped) tweets scraped, \(.tweetsSent) sent"'
+                fi
+                
+                # Fail workflow if all sources failed
+                if [ "$failed" -eq "$total" ] && [ "$total" -gt 0 ]; then
+                  echo ""
+                  echo "❌ All sources failed to process"
+                  exit 1
+                fi
+                
+                # Warn if some sources failed
+                if [ "$failed" -gt 0 ]; then
+                  echo ""
+                  echo "⚠️  Warning: $failed source(s) failed during scraping"
+                  echo "💡 Check the 'results' array in the response for error details"
+                fi
+              else
+                echo "$body" | jq '.' 2>/dev/null || echo "$body"
+              fi
+            else
+              # If jq is not available, just show raw response
+              echo "$body"
+            fi
+          else
+            echo "❌ X.com scraping request failed (HTTP $http_code)"
+            echo "Response body:"
+            echo "$body"
+            
+            # Provide helpful error messages
+            case $http_code in
+              401)
+                echo ""
+                echo "🔐 Authentication Error: Invalid webhook secret"
+                echo "💡 Verify that GITHUB_WEBHOOK_SECRET matches the value in Hetzner .env file"
+                ;;
+              404)
+                echo ""
+                echo "🔍 Not Found: Webhook endpoint not found"
+                echo "💡 Verify that HETZNER_WEBHOOK_URL is correct (should end with /webhook)"
+                ;;
+              500)
+                echo ""
+                echo "⚠️  Server Error: Hetzner server encountered an error"
+                echo "💡 Check Hetzner server logs: docker compose logs scraper"
+                ;;
+              *)
+                echo ""
+                echo "💡 Check Hetzner server status: curl $HETZNER_WEBHOOK_URL/../health"
+                ;;
+            esac
+            
+            exit 1
+          fi
+
+      - name: Check Hetzner Server Health (on failure)
+        if: failure()
+        env:
+          HETZNER_WEBHOOK_URL: ${{ secrets.HETZNER_WEBHOOK_URL }}
+        run: |
+          if [ -n "$HETZNER_WEBHOOK_URL" ]; then
+            # Extract base URL and check health endpoint
+            base_url=$(echo "$HETZNER_WEBHOOK_URL" | sed 's|/webhook$||')
+            echo "🏥 Checking Hetzner server health: $base_url/health"
+            curl -f "$base_url/health" --max-time 10 --connect-timeout 5 || echo "⚠️  Health check failed - server may be down"
+          fi

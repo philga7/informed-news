@@ -658,6 +658,14 @@ router.get('/:id', async (req: Request, res: Response) => {
       throw error;
     }
 
+    // Log for debugging - check if links are being returned
+    const linksCount = (record as any)?.topic_source_links?.length || 0;
+    if (linksCount > 0) {
+      console.log(`[GET /api/source-records/:id] Found ${linksCount} topic_source_links for record ${id}`);
+    } else {
+      console.log(`[GET /api/source-records/:id] No topic_source_links found for record ${id}`);
+    }
+
     res.json({
       success: true,
       record,

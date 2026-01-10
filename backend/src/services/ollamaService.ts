@@ -486,6 +486,117 @@ Be explicit about uncertainty. Base assessment only on the text provided.`;
   }
 
   /**
+   * Parse analyst notes to extract emphasized sections
+   * Detects markdown headers, bold text, and special markers like [IMPORTANT], [FOCUS], [CRITICAL]
+   */
+  private parseNotesForEmphasis(notes: string[]): {
+    emphasizedSections: Array<{ title?: string; content: string }>;
+    regularNotes: string[];
+  } {
+    const emphasizedSections: Array<{ title?: string; content: string }> = [];
+    const regularNotes: string[] = [];
+
+    for (const note of notes) {
+      if (!note || !note.trim()) continue;
+
+      // Split note into lines for processing
+      const lines = note.split('\n');
+      let currentEmphasizedSection: { title?: string; content: string[] } | null = null;
+      let regularContent: string[] = [];
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const trimmed = line.trim();
+
+        // Check for special emphasis markers
+        const importantMatch = trimmed.match(/^\[(IMPORTANT|FOCUS|CRITICAL|KEY|PRIORITY)\]/i);
+        const markdownHeaderMatch = trimmed.match(/^(#{1,3})\s+(.+)$/);
+        const boldMatch = trimmed.match(/^\*\*(.+?)\*\*$/) || trimmed.match(/^__(.+?)__$/);
+
+        // Check if we're in an emphasized section (between markers)
+        const isInEmphasizedBlock = currentEmphasizedSection !== null;
+
+        if (importantMatch || markdownHeaderMatch || (boldMatch && trimmed.length < 100)) {
+          // Start of emphasized section
+          if (currentEmphasizedSection) {
+            // Save previous emphasized section
+            emphasizedSections.push({
+              title: currentEmphasizedSection.title,
+              content: currentEmphasizedSection.content.join('\n').trim(),
+            });
+          }
+
+          // Extract title
+          let title: string | undefined;
+          if (importantMatch) {
+            title = trimmed.replace(/^\[(IMPORTANT|FOCUS|CRITICAL|KEY|PRIORITY)\]\s*/i, '');
+            if (!title) title = importantMatch[1];
+          } else if (markdownHeaderMatch) {
+            title = markdownHeaderMatch[2];
+          } else if (boldMatch) {
+            title = boldMatch[1];
+          }
+
+          currentEmphasizedSection = { title, content: [] };
+          
+          // If there's content on the same line after the marker, include it
+          const contentAfterMarker = trimmed.replace(/^\[(IMPORTANT|FOCUS|CRITICAL|KEY|PRIORITY)\]\s*/i, '')
+            .replace(/^#{1,3}\s+/, '')
+            .replace(/^\*\*(.+?)\*\*$/, '$1');
+          if (contentAfterMarker && contentAfterMarker !== title) {
+            currentEmphasizedSection.content.push(contentAfterMarker);
+          }
+        } else if (isInEmphasizedBlock) {
+          // Continue collecting emphasized content
+          if (trimmed) {
+            currentEmphasizedSection!.content.push(line);
+          } else if (currentEmphasizedSection!.content.length > 0) {
+            // Empty line in emphasized section - keep it for formatting
+            currentEmphasizedSection!.content.push('');
+          }
+        } else {
+          // Regular content
+          regularContent.push(line);
+        }
+
+        // Check if we should end the emphasized section (blank line followed by non-emphasized content)
+        if (isInEmphasizedBlock && trimmed === '' && i < lines.length - 1) {
+          const nextLine = lines[i + 1]?.trim() || '';
+          // If next line doesn't look like emphasis, end the section
+          if (nextLine && !nextLine.match(/^\[(IMPORTANT|FOCUS|CRITICAL|KEY|PRIORITY)\]/i) 
+              && !nextLine.match(/^#{1,3}\s+/) 
+              && !nextLine.match(/^\*\*(.+?)\*\*$/)) {
+            // End emphasized section
+            if (currentEmphasizedSection && currentEmphasizedSection.content.length > 0) {
+              emphasizedSections.push({
+                title: currentEmphasizedSection.title,
+                content: currentEmphasizedSection.content.join('\n').trim(),
+              });
+            }
+            currentEmphasizedSection = null;
+          }
+        }
+      }
+
+      // Save any remaining emphasized section
+      if (currentEmphasizedSection && currentEmphasizedSection.content.length > 0) {
+        emphasizedSections.push({
+          title: currentEmphasizedSection.title,
+          content: currentEmphasizedSection.content.join('\n').trim(),
+        });
+      }
+
+      // Save regular content if any
+      const regularText = regularContent.join('\n').trim();
+      if (regularText) {
+        regularNotes.push(regularText);
+      }
+    }
+
+    return { emphasizedSections, regularNotes };
+  }
+
+  /**
    * Build enhanced analysis prompt with metadata, links, and structure
    */
   private buildAnalysisPrompt(
@@ -539,6 +650,9 @@ Be explicit about uncertainty. Base assessment only on the text provided.`;
       ? content.analystNotes 
       : [];
 
+    // Parse notes to extract emphasized sections
+    const { emphasizedSections, regularNotes } = this.parseNotesForEmphasis(allNotes);
+
     return `You are analyzing ${content.mediaType === 'video' ? 'a video title' : 'a web page/article'} for intelligence purposes.
 
 SOURCE CONTEXT:
@@ -568,17 +682,27 @@ DOCUMENT STRUCTURE:
 ${content.structure.headings.join(' → ')}
 ` : ''}
 
-${content.analystNotes && content.analystNotes.length > 0 ? `
-ANALYST NOTES (Additional Context - Not Primary Content):
-${content.analystNotes.map((note, index) => `Note ${index + 1}:\n${note}`).join('\n\n')}
+${emphasizedSections.length > 0 ? `
+⚠️ CRITICAL ANALYST INSIGHTS (HIGH PRIORITY - Pay Special Attention):
+${emphasizedSections.map((section, index) => `\n[${index + 1}] ${section.title || 'Key Insight'}:\n${section.content}`).join('\n\n')}
 
-IMPORTANT: These analyst notes provide additional context but are NOT the primary content being analyzed. Use them to inform your analysis, but base your primary assessment on the main content above.
+These sections have been explicitly marked by the analyst as requiring special attention. Give these insights significant weight in your analysis.
+` : ''}
+
+${regularNotes.length > 0 ? `
+ANALYST NOTES (Additional Context):
+${regularNotes.map((note, index) => `Note ${index + 1}:\n${note}`).join('\n\n')}
+` : ''}
+
+${content.analystNotes && content.analystNotes.length > 0 ? `
+IMPORTANT: Analyst notes provide additional context. ${emphasizedSections.length > 0 ? 'The CRITICAL ANALYST INSIGHTS section above contains information the analyst has specifically flagged for emphasis - prioritize these insights.' : 'Use them to inform your analysis, but base your primary assessment on the main content above.'}
 ` : ''}
 
 ANALYSIS TASK: ${taskDescriptions[analysisType]}
 
 INSTRUCTIONS:
 - Base analysis primarily on the provided content above
+${emphasizedSections.length > 0 ? '- CRITICALLY IMPORTANT: The analyst has marked specific sections in their notes as requiring special attention. These insights should significantly influence your analysis.' : ''}
 ${content.analystNotes && content.analystNotes.length > 0 ? '- Consider analyst notes as additional context that may inform your analysis' : ''}
 ${content.mediaType === 'video' ? '- This is a video title - analyze what the video is likely about based on the title' : ''}
 - Links are provided for reference (do not fetch them)

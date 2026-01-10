@@ -48,6 +48,7 @@ async function loadRoutes() {
   const retentionRouter = (await import('../backend/src/routes/retention.js')).default;
   const optimizationRouter = (await import('../backend/src/routes/optimization.js')).default;
   const schedulerRouter = (await import('../backend/src/routes/scheduler.js')).default;
+  const xcomRateLimitRouter = (await import('../backend/src/routes/xcomRateLimit.js')).default;
 
   // API Routes
   app.use('/api/organizations', organizationsRouter);
@@ -65,6 +66,7 @@ async function loadRoutes() {
   app.use('/api/retention', retentionRouter);
   app.use('/api/optimization', optimizationRouter);
   app.use('/api/scheduler', schedulerRouter);
+  app.use('/api/xcom-rate-limit', xcomRateLimitRouter);
   // Note: /api/feeds routes are deprecated in favor of /api/ingest
   app.use('/api/feeds', (_req, res) => {
     res.status(503).json({

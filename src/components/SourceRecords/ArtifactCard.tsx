@@ -266,13 +266,50 @@ function NotesDisplay({
         </div>
       ) : (
         // Editable textarea for unreviewed notes
-        <textarea
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          rows={12}
-          className="w-full px-3 py-2 bg-stone-800 border border-stone-700 rounded-lg text-stone-100 resize-none font-mono text-sm focus:outline-none focus:border-blue-500"
-          placeholder="Enter your notes in Markdown format..."
-        />
+        <div className="space-y-2">
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            rows={12}
+            className="w-full px-3 py-2 bg-stone-800 border border-stone-700 rounded-lg text-stone-100 resize-none font-mono text-sm focus:outline-none focus:border-blue-500"
+            placeholder="Enter your notes in Markdown format...
+
+To emphasize specific sections for AI analysis, use:
+
+[IMPORTANT] or [FOCUS] or [CRITICAL]
+Your key insight here that needs special attention
+
+# Header for Important Section
+Content that should be prioritized
+
+**Bold text** for emphasis
+
+The AI will pay special attention to sections marked this way."
+          />
+          <details className="text-xs text-stone-400">
+            <summary className="cursor-pointer hover:text-stone-300 transition-colors">
+              💡 How to emphasize sections for AI analysis
+            </summary>
+            <div className="mt-2 p-3 bg-stone-900 border border-stone-700 rounded space-y-2">
+              <p className="text-stone-300 font-semibold">The AI will give special attention to sections marked with:</p>
+              <ul className="list-disc list-inside space-y-1 ml-2 text-stone-400">
+                <li><code className="bg-stone-800 px-1 rounded">[IMPORTANT]</code>, <code className="bg-stone-800 px-1 rounded">[FOCUS]</code>, <code className="bg-stone-800 px-1 rounded">[CRITICAL]</code> markers</li>
+                <li>Markdown headers: <code className="bg-stone-800 px-1 rounded"># Header</code>, <code className="bg-stone-800 px-1 rounded">## Subheader</code></li>
+                <li>Bold text: <code className="bg-stone-800 px-1 rounded">**bold**</code> or <code className="bg-stone-800 px-1 rounded">__bold__</code></li>
+              </ul>
+              <div className="mt-3 p-2 bg-stone-800 rounded border-l-2 border-blue-500">
+                <p className="text-stone-300 font-semibold mb-1">Example:</p>
+                <pre className="text-xs text-stone-400 whitespace-pre-wrap font-mono">[IMPORTANT] Key discrepancy found
+The article claims X, but our intel suggests Y.
+
+# Critical Context
+This source has a history of...
+
+Regular notes here without emphasis.</pre>
+              </div>
+            </div>
+          </details>
+        </div>
       )}
       <div className="flex items-center justify-between">
         <span className="text-xs text-stone-500">{notes.length} characters</span>
