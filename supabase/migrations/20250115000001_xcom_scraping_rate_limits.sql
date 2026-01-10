@@ -35,6 +35,9 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- Drop trigger if it exists (for idempotent migrations)
+DROP TRIGGER IF EXISTS update_xcom_rate_limits_updated_at ON xcom_scraping_rate_limits;
+
 CREATE TRIGGER update_xcom_rate_limits_updated_at
   BEFORE UPDATE ON xcom_scraping_rate_limits
   FOR EACH ROW
