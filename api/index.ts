@@ -30,43 +30,63 @@ let routesLoaded = false;
 async function loadRoutes() {
   if (routesLoaded) return;
   
-  // Dynamically import routes
+  // Dynamically import routes with error handling
   // Note: ingest routes use cheerio/axios for basic RSS parsing (works in serverless)
   // Full content extraction uses jsdom (dynamically loaded, may fail in serverless)
-  const organizationsRouter = (await import('../backend/src/routes/organizations.js')).default;
-  const sourcesRouter = (await import('../backend/src/routes/sources.js')).default;
-  const ingestRouter = (await import('../backend/src/routes/ingest.js')).default;
-  const topicsRouter = (await import('../backend/src/routes/topics.js')).default;
-  const sourceRecordsRouter = (await import('../backend/src/routes/sourceRecords.js')).default;
-  const analysisRouter = (await import('../backend/src/routes/analysis.js')).default;
-  const auditLogsRouter = (await import('../backend/src/routes/auditLogs.js')).default;
-  const qaRouter = (await import('../backend/src/routes/qa.js')).default;
-  const claimsRouter = (await import('../backend/src/routes/claims.js')).default;
-  const watchItemsRouter = (await import('../backend/src/routes/watchItems.js')).default;
-  const indicatorsRouter = (await import('../backend/src/routes/indicators.js')).default;
-  const scanSessionsRouter = (await import('../backend/src/routes/scanSessions.js')).default;
-  const retentionRouter = (await import('../backend/src/routes/retention.js')).default;
-  const optimizationRouter = (await import('../backend/src/routes/optimization.js')).default;
-  const schedulerRouter = (await import('../backend/src/routes/scheduler.js')).default;
-  const xcomRateLimitRouter = (await import('../backend/src/routes/xcomRateLimit.js')).default;
+  try {
+    const organizationsRouter = (await import('../backend/src/routes/organizations.js')).default;
+    const sourcesRouter = (await import('../backend/src/routes/sources.js')).default;
+    const ingestRouter = (await import('../backend/src/routes/ingest.js')).default;
+    const topicsRouter = (await import('../backend/src/routes/topics.js')).default;
+    const sourceRecordsRouter = (await import('../backend/src/routes/sourceRecords.js')).default;
+    const analysisRouter = (await import('../backend/src/routes/analysis.js')).default;
+    const auditLogsRouter = (await import('../backend/src/routes/auditLogs.js')).default;
+    const qaRouter = (await import('../backend/src/routes/qa.js')).default;
+    const claimsRouter = (await import('../backend/src/routes/claims.js')).default;
+    const watchItemsRouter = (await import('../backend/src/routes/watchItems.js')).default;
+    const indicatorsRouter = (await import('../backend/src/routes/indicators.js')).default;
+    const scanSessionsRouter = (await import('../backend/src/routes/scanSessions.js')).default;
+    const retentionRouter = (await import('../backend/src/routes/retention.js')).default;
+    const optimizationRouter = (await import('../backend/src/routes/optimization.js')).default;
+    const schedulerRouter = (await import('../backend/src/routes/scheduler.js')).default;
+    
+    // API Routes
+    app.use('/api/organizations', organizationsRouter);
+    app.use('/api/sources', sourcesRouter);
+    app.use('/api/ingest', ingestRouter);
+    app.use('/api/topics', topicsRouter);
+    app.use('/api/source-records', sourceRecordsRouter);
+    app.use('/api/analysis', analysisRouter);
+    app.use('/api/audit-logs', auditLogsRouter);
+    app.use('/api/qa', qaRouter);
+    app.use('/api/claims', claimsRouter);
+    app.use('/api/watch-items', watchItemsRouter);
+    app.use('/api/indicators', indicatorsRouter);
+    app.use('/api/scan-sessions', scanSessionsRouter);
+    app.use('/api/retention', retentionRouter);
+    app.use('/api/optimization', optimizationRouter);
+    app.use('/api/scheduler', schedulerRouter);
+  } catch (error) {
+    console.error('Error loading standard routes:', error);
+    // Continue - don't block other routes
+  }
 
-  // API Routes
-  app.use('/api/organizations', organizationsRouter);
-  app.use('/api/sources', sourcesRouter);
-  app.use('/api/ingest', ingestRouter);
-  app.use('/api/topics', topicsRouter);
-  app.use('/api/source-records', sourceRecordsRouter);
-  app.use('/api/analysis', analysisRouter);
-  app.use('/api/audit-logs', auditLogsRouter);
-  app.use('/api/qa', qaRouter);
-  app.use('/api/claims', claimsRouter);
-  app.use('/api/watch-items', watchItemsRouter);
-  app.use('/api/indicators', indicatorsRouter);
-  app.use('/api/scan-sessions', scanSessionsRouter);
-  app.use('/api/retention', retentionRouter);
-  app.use('/api/optimization', optimizationRouter);
-  app.use('/api/scheduler', schedulerRouter);
-  app.use('/api/xcom-rate-limit', xcomRateLimitRouter);
+  // Load xcom-rate-limit route separately with specific error handling
+  try {
+    const xcomRateLimitRouter = (await import('../backend/src/routes/xcomRateLimit.js')).default;
+    app.use('/api/xcom-rate-limit', xcomRateLimitRouter);
+  } catch (error) {
+    console.error('Error loading xcom-rate-limit route:', error);
+    // Provide a fallback route that explains the error
+    app.use('/api/xcom-rate-limit', (_req, res) => {
+      res.status(503).json({
+        error: 'Rate limit service unavailable',
+        message: 'The rate limit route failed to load. Check server logs for details.',
+        details: error instanceof Error ? error.message : String(error),
+      });
+    });
+  }
+
   // Note: /api/feeds routes are deprecated in favor of /api/ingest
   app.use('/api/feeds', (_req, res) => {
     res.status(503).json({

@@ -37,10 +37,25 @@ interface IncrementRateLimitResult {
 router.get('/check', async (_req: Request, res: Response) => {
   try {
     // Call the database function to check rate limit
+    // @ts-ignore - Supabase type inference issue in serverless environment
     const { data, error } = await supabase.rpc('check_xcom_rate_limit') as {
       data: CheckRateLimitResult[] | null;
       error: any;
     };
+
+    // If RPC function doesn't exist, return a default response
+    // PGRST202 = PostgREST function not found, 42883 = PostgreSQL function not found
+    if (error && (error.code === 'PGRST202' || error.code === '42883')) {
+      console.warn('Rate limit RPC function not found, returning default (can proceed)');
+      return res.json({
+        can_proceed: true,
+        current_count: 0,
+        max_requests: 300,
+        reset_at: new Date(Date.now() + 3600000).toISOString(),
+        requests_remaining: 300,
+        warning: 'Rate limit tracking not configured - assuming no limits',
+      });
+    }
 
     if (error) {
       console.error('Error checking X.com rate limit:', error);
@@ -88,10 +103,25 @@ router.get('/check', async (_req: Request, res: Response) => {
 router.post('/increment', async (_req: Request, res: Response) => {
   try {
     // Call the database function to increment and check
+    // @ts-ignore - Supabase type inference issue in serverless environment
     const { data, error } = await supabase.rpc('increment_xcom_rate_limit') as {
       data: IncrementRateLimitResult[] | null;
       error: any;
     };
+
+    // If RPC function doesn't exist, return a default response allowing the request
+    // PGRST202 = PostgREST function not found, 42883 = PostgreSQL function not found
+    if (error && (error.code === 'PGRST202' || error.code === '42883')) {
+      console.warn('Rate limit RPC function not found, allowing request to proceed');
+      return res.json({
+        can_proceed: true,
+        current_count: 0,
+        max_requests: 300,
+        reset_at: new Date(Date.now() + 3600000).toISOString(),
+        requests_remaining: 300,
+        warning: 'Rate limit tracking not configured - request allowed',
+      });
+    }
 
     if (error) {
       console.error('Error incrementing X.com rate limit:', error);
