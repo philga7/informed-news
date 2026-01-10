@@ -209,10 +209,10 @@ export async function fetchEnabledSources(vercelEndpoint: string, organizationId
       throw new Error(`Failed to fetch sources: ${response.status} ${response.statusText}`);
     }
 
-    const data = await response.json();
+    const data = await response.json() as { sources?: Array<{ id: string; organization_id: string; name: string; url: string }> };
     
     // Transform sources to include username extracted from URL
-    const sources: XcomSource[] = (data.sources || []).map((source: any) => {
+    const sources: XcomSource[] = (data.sources || []).map((source) => {
       // Extract username from URL (e.g., https://x.com/username -> username)
       const urlMatch = source.url?.match(/x\.com\/([^/?]+)/i);
       const username = urlMatch ? urlMatch[1] : source.name;
@@ -267,7 +267,7 @@ export async function checkSupabaseRateLimit(vercelEndpoint: string): Promise<Ra
       throw new Error(`Failed to check rate limit: ${response.status} ${response.statusText} - ${errorText}`);
     }
 
-    const data = await response.json();
+    const data = await response.json() as RateLimitCheckResult;
     
     logger.info('Rate limit check result', {
       can_proceed: data.can_proceed,
@@ -313,7 +313,7 @@ export async function incrementSupabaseRateLimit(vercelEndpoint: string): Promis
 
     if (response.status === 429) {
       // Rate limit exceeded
-      const data = await response.json();
+      const data = await response.json() as RateLimitCheckResult;
       logger.warn('Rate limit exceeded', {
         current_count: data.current_count,
         reset_at: data.reset_at,
@@ -326,7 +326,7 @@ export async function incrementSupabaseRateLimit(vercelEndpoint: string): Promis
       throw new Error(`Failed to increment rate limit: ${response.status} ${response.statusText} - ${errorText}`);
     }
 
-    const data = await response.json();
+    const data = await response.json() as RateLimitCheckResult;
     
     logger.info('Rate limit incremented', {
       can_proceed: data.can_proceed,
@@ -411,7 +411,7 @@ export async function sendTweetsToVercel(
         throw new Error(`API error: ${response.status} ${response.statusText} - ${errorText}`);
       }
 
-      const result = await response.json();
+      const result = await response.json() as { added?: number; sent?: number; skipped?: number; errors?: string[] };
       
       logger.info('Successfully sent tweets to Vercel', {
         sent: result.added || result.sent || tweets.length,
