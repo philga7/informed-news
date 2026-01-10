@@ -14,7 +14,7 @@ const router = Router();
  */
 router.get('/', async (req: Request, res: Response) => {
   try {
-    const { organization_id } = req.query;
+    const { organization_id, source_type, enabled } = req.query;
 
     if (!organization_id) {
       return res.status(400).json({ error: 'organization_id is required' });
@@ -27,11 +27,24 @@ router.get('/', async (req: Request, res: Response) => {
     }
 
     // Fetch sources (without nested records to avoid pagination issues)
-    const { data: sources, error } = await supabase
+    let query = supabase
       .from('sources')
       .select('*')
-      .eq('organization_id', organization_id as string)
-      .order('created_at', { ascending: false });
+      .eq('organization_id', organization_id as string);
+
+    // Apply source_type filter if provided
+    if (source_type) {
+      query = query.eq('source_type', source_type as string);
+    }
+
+    // Apply enabled filter if provided
+    if (enabled !== undefined) {
+      const enabledStr = Array.isArray(enabled) ? enabled[0] : enabled;
+      const enabledValue = typeof enabledStr === 'string' && (enabledStr === 'true' || enabledStr === '1');
+      query = query.eq('enabled', enabledValue);
+    }
+
+    const { data: sources, error } = await query.order('created_at', { ascending: false });
 
     if (error) {
       console.error('Error fetching sources:', error);
