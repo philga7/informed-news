@@ -18,7 +18,7 @@ You need to add two secrets to your GitHub repository:
 **Note:** If you have a domain pointing to your Hetzner server, you can use that instead:
    - Example: `https://scraper.yourdomain.com/webhook`
 
-### 2. `GITHUB_WEBHOOK_SECRET`
+### 2. `WEBHOOK_SECRET`
 
 **What it is:** A secret string used to validate webhook requests (must match the value in Hetzner `.env`).
 
@@ -38,7 +38,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 - Generate a random string (minimum 32 characters)
 - Example: `a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6`
 
-**Important:** This must be the **same value** as `GITHUB_WEBHOOK_SECRET` in your Hetzner server's `.env` file!
+**Important:** This must be the **same value** as `WEBHOOK_SECRET` in your Hetzner server's `.env` file!
 
 ## Setting Up GitHub Secrets
 
@@ -54,7 +54,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
      - **Name:** `HETZNER_WEBHOOK_URL`
      - **Value:** `http://YOUR_SERVER_IP:3000/webhook`
    - Click "Add secret"
-   - Repeat for `GITHUB_WEBHOOK_SECRET`
+   - Repeat for `WEBHOOK_SECRET`
 
 ## Workflow Configuration
 
@@ -102,12 +102,12 @@ After running, check:
 ### Error: "HETZNER_WEBHOOK_URL secret is not set"
 - **Solution:** Add the secret in GitHub repository settings
 
-### Error: "GITHUB_WEBHOOK_SECRET is not set"
+### Error: "WEBHOOK_SECRET is not set"
 - **Solution:** Add the secret in GitHub repository settings
 
 ### Error: HTTP 401 (Unauthorized)
 - **Cause:** Webhook secret mismatch
-- **Solution:** Verify `GITHUB_WEBHOOK_SECRET` in GitHub matches the value in Hetzner `.env`
+- **Solution:** Verify `WEBHOOK_SECRET` in GitHub matches the value in Hetzner `.env`
 
 ### Error: HTTP 404 (Not Found)
 - **Cause:** Incorrect webhook URL
@@ -124,7 +124,7 @@ After running, check:
 ## Security Notes
 
 - **Never commit secrets** to version control
-- **Use strong, random secrets** for `GITHUB_WEBHOOK_SECRET`
+- **Use strong, random secrets** for `WEBHOOK_SECRET`
 - **Keep secrets synchronized** between GitHub and Hetzner
 - **Rotate secrets periodically** for better security
 

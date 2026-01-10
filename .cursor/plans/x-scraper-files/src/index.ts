@@ -21,7 +21,7 @@ const logger = createLogger('server');
 app.use(express.json());
 
 // Environment variables validation
-const requiredEnvVars = ['X_USERNAME', 'X_PASSWORD', 'VERCEL_API_ENDPOINT', 'GITHUB_WEBHOOK_SECRET'];
+const requiredEnvVars = ['X_USERNAME', 'X_PASSWORD', 'VERCEL_API_ENDPOINT', 'WEBHOOK_SECRET'];
 const missingEnvVars = requiredEnvVars.filter((key) => !process.env[key]);
 
 if (missingEnvVars.length > 0) {
@@ -30,7 +30,7 @@ if (missingEnvVars.length > 0) {
 }
 
 const VERCEL_API_ENDPOINT = process.env.VERCEL_API_ENDPOINT!;
-const GITHUB_WEBHOOK_SECRET = process.env.GITHUB_WEBHOOK_SECRET!;
+const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET!;
 
 /**
  * Health check endpoint
@@ -55,7 +55,7 @@ app.post('/webhook', async (req: Request, res: Response) => {
   try {
     // Validate webhook secret
     const webhookSecret = req.headers['x-webhook-secret'] || req.body.secret;
-    if (webhookSecret !== GITHUB_WEBHOOK_SECRET) {
+    if (webhookSecret !== WEBHOOK_SECRET) {
       logger.warn('Invalid webhook secret', { received: webhookSecret ? 'present' : 'missing' });
       return res.status(401).json({
         error: 'Unauthorized',

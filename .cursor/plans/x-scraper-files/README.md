@@ -99,7 +99,7 @@ Required environment variables (from `.env`):
 - `X_USERNAME` - X.com scraper account username
 - `X_PASSWORD` - X.com scraper account password
 - `VERCEL_API_ENDPOINT` - Base URL for Vercel API (e.g., `https://your-site.vercel.app`)
-- `GITHUB_WEBHOOK_SECRET` - Secret for webhook validation
+- `WEBHOOK_SECRET` - Secret for webhook validation
 - `PORT` - Server port (default: 3000)
 - `LOG_LEVEL` - Winston log level (default: 'info')
 
@@ -152,7 +152,7 @@ This uses `tsx` to run TypeScript directly without compilation.
 ### GitHub Actions Webhook
 
 The webhook expects:
-- Header: `x-webhook-secret` with `GITHUB_WEBHOOK_SECRET` value
+- Header: `x-webhook-secret` with `WEBHOOK_SECRET` value
 - Or body: `{ secret: "..." }`
 
 ## Rate Limiting

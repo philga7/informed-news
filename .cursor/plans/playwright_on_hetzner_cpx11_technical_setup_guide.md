@@ -191,7 +191,7 @@ services:
       - X_USERNAME=${X_USERNAME}
       - X_PASSWORD=${X_PASSWORD}
       - VERCEL_API_ENDPOINT=${VERCEL_API_ENDPOINT}
-      - GITHUB_WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET}
+      - WEBHOOK_SECRET=${WEBHOOK_SECRET}
     volumes:
       - ./sessions:/app/sessions
       - ./logs:/app/logs
@@ -207,7 +207,7 @@ Create `.env`:
 X_USERNAME=your_scraper_account
 X_PASSWORD=your_secure_password
 VERCEL_API_ENDPOINT=https://your-site.vercel.app/api/ingest
-GITHUB_WEBHOOK_SECRET=your_webhook_secret
+WEBHOOK_SECRET=your_webhook_secret
 ```
 
 **Secure the environment file:**
