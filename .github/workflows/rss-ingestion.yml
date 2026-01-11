@@ -44,17 +44,101 @@ jobs:
           if [ "$http_code" -eq 200 ]; then
             echo "✅ RSS ingestion request completed (HTTP $http_code)"
             
-            # Parse summary from response
+            # Check if this is "all organizations" response (has results array with orgs)
+            has_orgs=$(echo "$body" | jq -r 'if .results[0].organization_name then "yes" else "no" end' 2>/dev/null || echo "no")
+            
+            if [ "$has_orgs" = "yes" ]; then
+              # Process "all organizations" response
+              echo ""
+              echo "📋 Processing Results by Organization:"
+              echo ""
+              
+              # Iterate through organizations
+              org_count=$(echo "$body" | jq '.results | length')
+              for ((i=0; i<org_count; i++)); do
+                org_name=$(echo "$body" | jq -r ".results[$i].organization_name // \"Unknown\"")
+                org_results=$(echo "$body" | jq ".results[$i].results // []")
+                org_summary=$(echo "$body" | jq ".results[$i].summary // {}")
+                
+                echo "🏢 Organization: $org_name"
+                
+                # Show individual sources
+                source_count=$(echo "$org_results" | jq 'length')
+                for ((j=0; j<source_count; j++)); do
+                  source_name=$(echo "$org_results" | jq -r ".[$j].source_name // \"Unknown\"")
+                  source_url=$(echo "$org_results" | jq -r ".[$j].source_url // \"\"")
+                  success=$(echo "$org_results" | jq -r ".[$j].success // false")
+                  added=$(echo "$org_results" | jq -r ".[$j].added // 0")
+                  skipped=$(echo "$org_results" | jq -r ".[$j].skipped // 0")
+                  errors=$(echo "$org_results" | jq -r ".[$j].errors // 0")
+                  error_msg=$(echo "$org_results" | jq -r ".[$j].error // \"\"")
+                  
+                  if [ "$success" = "true" ]; then
+                    echo "  ✓ $source_name: $source_url"
+                    echo "    +$added new, ~$skipped duplicates"
+                    if [ "$errors" -gt 0 ]; then
+                      echo "    ⚠️  $errors error(s)"
+                    fi
+                  else
+                    echo "  ✗ $source_name: $source_url"
+                    if [ -n "$error_msg" ]; then
+                      echo "    ❌ $error_msg"
+                    fi
+                  fi
+                done
+                
+                # Show organization summary
+                org_added=$(echo "$org_summary" | jq -r '.added // 0')
+                org_skipped=$(echo "$org_summary" | jq -r '.skipped // 0')
+                org_errors=$(echo "$org_summary" | jq -r '.errors // 0')
+                echo "  📊 $org_name: +$org_added new, ~$org_skipped duplicates, $org_errors errors"
+                echo ""
+              done
+            else
+              # Single organization response - show individual sources
+              results=$(echo "$body" | jq '.results // []')
+              if [ "$(echo "$results" | jq 'length')" -gt 0 ]; then
+                echo ""
+                echo "📋 Processing Results:"
+                echo ""
+                
+                source_count=$(echo "$results" | jq 'length')
+                for ((i=0; i<source_count; i++)); do
+                  source_name=$(echo "$results" | jq -r ".[$i].source_name // \"Unknown\"")
+                  source_url=$(echo "$results" | jq -r ".[$i].source_url // \"\"")
+                  success=$(echo "$results" | jq -r ".[$i].success // false")
+                  added=$(echo "$results" | jq -r ".[$i].added // 0")
+                  skipped=$(echo "$results" | jq -r ".[$i].skipped // 0")
+                  errors=$(echo "$results" | jq -r ".[$i].errors // 0")
+                  error_msg=$(echo "$results" | jq -r ".[$i].error // \"\"")
+                  
+                  if [ "$success" = "true" ]; then
+                    echo "  ✓ $source_name: $source_url"
+                    echo "    +$added new, ~$skipped duplicates"
+                    if [ "$errors" -gt 0 ]; then
+                      echo "    ⚠️  $errors error(s)"
+                    fi
+                  else
+                    echo "  ✗ $source_name: $source_url"
+                    if [ -n "$error_msg" ]; then
+                      echo "    ❌ $error_msg"
+                    fi
+                  fi
+                done
+                echo ""
+              fi
+            fi
+            
+            # Parse and show summary
             summary=$(echo "$body" | jq -r '.summary // empty')
-            if [ -n "$summary" ]; then
-              echo "📊 Ingestion Summary:"
+            if [ -n "$summary" ] && [ "$summary" != "null" ]; then
+              echo "📊 Overall Summary:"
               echo "$summary" | jq '.'
               
               # Check for errors in summary (endpoint returns 200 even with partial failures)
               errors=$(echo "$summary" | jq -r '.errors // 0')
               if [ "$errors" -gt 0 ]; then
                 echo "⚠️  Warning: $errors source(s) had errors during ingestion"
-                echo "💡 Check the 'results' array in the response for details"
                 # Don't fail the workflow for partial failures, but log warning
               fi
               
