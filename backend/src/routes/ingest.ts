@@ -75,7 +75,7 @@ async function processSourcesInParallel<T, R>(
 
 /**
  * POST /api/ingest/rss/all
- * Trigger RSS ingestion for all RSS sources in an organization (parallel, max 5 concurrent)
+ * Trigger RSS ingestion for all enabled RSS sources in an organization (sequential, one at a time)
  * If organization_id is "all", processes all organizations
  * 
  * NOTE: Vercel serverless functions have timeout limits:
@@ -87,6 +87,11 @@ async function processSourcesInParallel<T, R>(
  * - Using a background job queue (e.g., GitHub Actions, cron jobs)
  * - Splitting into smaller batches
  * - Using the scheduler endpoint instead of manual triggers
+ * 
+ * Sources are processed sequentially (one at a time) to:
+ * - Reduce server load and avoid rate limiting
+ * - Make error tracking easier
+ * - Provide clearer progress logging
  * 
  * Body:
  *   - organization_id: string (required) - organization ID or "all" for all organizations
@@ -328,9 +333,9 @@ router.post('/rss/all', async (req: Request, res: Response) => {
       });
     }
 
-    // Process sources in parallel with concurrency limit (5 at a time)
+    // Process sources sequentially (one at a time)
     console.log(`\n🔄 Starting RSS ingestion for organization ${organization_id}`);
-    console.log(`📋 Found ${sources.length} RSS source(s) to process (parallel, max 5 concurrent)\n`);
+    console.log(`📋 Found ${sources.length} RSS source(s) to process (sequential, one at a time)\n`);
 
     type SourceResult = {
       source_id: string;
@@ -344,107 +349,103 @@ router.post('/rss/all', async (req: Request, res: Response) => {
 
     const results: SourceResult[] = [];
 
-    // Process sources in parallel with concurrency limit
-    const processedResults = await processSourcesInParallel(
-      sources,
-      async (source, index) => {
-        const sourceNum = index + 1;
-        const result: SourceResult = {
-          source_id: source.id,
-          source_name: source.name,
-          success: false,
-          added: 0,
-          skipped: 0,
-          errors: 0,
-        };
+    // Process sources sequentially (one at a time)
+    for (let index = 0; index < sources.length; index++) {
+      const source = sources[index];
+      const sourceNum = index + 1;
+      const result: SourceResult = {
+        source_id: source.id,
+        source_name: source.name,
+        success: false,
+        added: 0,
+        skipped: 0,
+        errors: 0,
+      };
 
-        console.log(`[${sourceNum}/${sources.length}] Processing source: "${source.name}" (${source.id})`);
-        console.log(`  📡 Feed URL: ${source.url}`);
+      console.log(`[${sourceNum}/${sources.length}] Processing source: "${source.name}" (${source.id})`);
+      console.log(`  📡 Feed URL: ${source.url}`);
+      
+      if (!source.url) {
+        console.log(`  ⚠️  Skipping: Source missing URL`);
+        result.error = 'Source missing URL';
+        results.push(result);
+        continue;
+      }
+
+      // Verify source still exists before processing
+      const { data: sourceCheck, error: sourceCheckError } = await supabase
+        .from('sources')
+        .select('id')
+        .eq('id', source.id)
+        .single();
+
+      if (sourceCheckError || !sourceCheck) {
+        console.log(`  ❌ Skipping: Source no longer exists in database`);
+        result.error = 'Source no longer exists in database';
+        results.push(result);
+        continue;
+      }
+
+      try {
+        const startTime = Date.now();
+        console.log(`  🔍 Starting ingestion...`);
         
-        if (!source.url) {
-          console.log(`  ⚠️  Skipping: Source missing URL`);
-          result.error = 'Source missing URL';
-          return result;
+        // Check if this is a Nitter URL and use appropriate service
+        let service: RssIngestionService;
+        
+        if (isNitterUrl(source.url)) {
+          console.log(`  🐦 Detected Nitter URL, using scraping service`);
+          throw new Error(
+            'Nitter HTML scraping ingestion is disabled for speed/safety. Please use an RSS feed URL for this source (or ingest via manual input), and reserve scraping for AI analysis.'
+          );
+        } else {
+          // Create RSS ingestion service with scrapeExternalUrl from source config
+          service = new RssIngestionService({
+            sourceId: source.id,
+            feedUrl: source.url,
+            scrapeExternalUrl: source.scrape_external_url || false,
+            extractFullContent: false,
+          });
         }
 
-        // Verify source still exists before processing
-        const { data: sourceCheck, error: sourceCheckError } = await supabase
+        // Create controller and ingest
+        const controller = new IngestionController(service);
+        const ingestResult = await controller.ingest();
+        
+        const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+
+        // Update source updated_at timestamp
+        await supabase
           .from('sources')
-          .select('id')
-          .eq('id', source.id)
-          .single();
+          // @ts-expect-error - Supabase type inference issue in serverless environment
+          .update({ updated_at: new Date().toISOString() })
+          .eq('id', source.id);
 
-        if (sourceCheckError || !sourceCheck) {
-          console.log(`  ❌ Skipping: Source no longer exists in database`);
-          result.error = 'Source no longer exists in database';
-          return result;
-        }
+        result.success = true;
+        result.added = ingestResult.added;
+        result.skipped = ingestResult.skipped;
+        result.errors = ingestResult.errors.length;
 
-        try {
-          const startTime = Date.now();
-          console.log(`  🔍 Starting ingestion...`);
-          
-          // Check if this is a Nitter URL and use appropriate service
-          let service: RssIngestionService;
-          
-          if (isNitterUrl(source.url)) {
-            console.log(`  🐦 Detected Nitter URL, using scraping service`);
-            throw new Error(
-              'Nitter HTML scraping ingestion is disabled for speed/safety. Please use an RSS feed URL for this source (or ingest via manual input), and reserve scraping for AI analysis.'
-            );
-          } else {
-            // Create RSS ingestion service with scrapeExternalUrl from source config
-            service = new RssIngestionService({
-              sourceId: source.id,
-              feedUrl: source.url,
-              scrapeExternalUrl: source.scrape_external_url || false,
-              extractFullContent: false,
-            });
+        console.log(`  ✅ Completed in ${duration}s: +${ingestResult.added} new, ~${ingestResult.skipped} duplicates, ❌${ingestResult.errors.length} errors`);
+        if (ingestResult.errors.length > 0) {
+          console.log(`  ⚠️  Errors encountered:`);
+          ingestResult.errors.slice(0, 3).forEach((err, idx) => {
+            console.log(`     ${idx + 1}. ${err}`);
+          });
+          if (ingestResult.errors.length > 3) {
+            console.log(`     ... and ${ingestResult.errors.length - 3} more`);
           }
-
-          // Create controller and ingest
-          const controller = new IngestionController(service);
-          const ingestResult = await controller.ingest();
-          
-          const duration = ((Date.now() - startTime) / 1000).toFixed(2);
-
-          // Update source updated_at timestamp
-          await supabase
-            .from('sources')
-            // @ts-expect-error - Supabase type inference issue in serverless environment
-            .update({ updated_at: new Date().toISOString() })
-            .eq('id', source.id);
-
-          result.success = true;
-          result.added = ingestResult.added;
-          result.skipped = ingestResult.skipped;
-          result.errors = ingestResult.errors.length;
-
-          console.log(`  ✅ Completed in ${duration}s: +${ingestResult.added} new, ~${ingestResult.skipped} duplicates, ❌${ingestResult.errors.length} errors`);
-          if (ingestResult.errors.length > 0) {
-            console.log(`  ⚠️  Errors encountered:`);
-            ingestResult.errors.slice(0, 3).forEach((err, idx) => {
-              console.log(`     ${idx + 1}. ${err}`);
-            });
-            if (ingestResult.errors.length > 3) {
-              console.log(`     ... and ${ingestResult.errors.length - 3} more`);
-            }
-          }
-        } catch (error) {
-          const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-          console.log(`  ❌ Failed: ${errorMsg}`);
-          result.errors = 1;
-          result.error = errorMsg;
         }
-        
-        console.log(''); // Empty line between sources
-        return result;
-      },
-      5 // Concurrency limit: 5 sources at a time
-    );
-
-    // Collect results and calculate totals
-    results.push(...processedResults);
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+        console.log(`  ❌ Failed: ${errorMsg}`);
+        result.errors = 1;
+        result.error = errorMsg;
+      }
+      
+      console.log(''); // Empty line between sources
+      results.push(result);
+    }
     const totalAdded = results.reduce((sum, r) => sum + r.added, 0);
     const totalSkipped = results.reduce((sum, r) => sum + r.skipped, 0);
     const totalErrors = results.reduce((sum, r) => sum + r.errors, 0);

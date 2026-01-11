@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Edit2, FileText, AlertTriangle, Link2, Trash2, RefreshCw, PowerOff } from 'lucide-react';
+import { Edit2, FileText, AlertTriangle, Link2, Trash2, RefreshCw, PowerOff, Info } from 'lucide-react';
+import { format } from 'date-fns';
 import type { Source } from '../../types/osint';
 import { EditSourceModal } from './EditSourceModal';
 import { SourceValueRating } from './SourceValueRating';
@@ -107,6 +108,35 @@ export function OsintSourcesTable({ sources, onUpdate, onDelete, onRefresh }: Os
     return (source.days_since_last_link || 0) > 90 && source.record_count > 0;
   };
 
+  const formatLastUpdated = (date: Date) => {
+    return format(new Date(date), 'EEE, MMM d, HH:mm');
+  };
+
+  function LastUpdatedTooltip({ source }: StaleWarningTooltipProps) {
+    const [showTooltip, setShowTooltip] = useState(false);
+
+    return (
+      <div
+        className="relative"
+        onMouseEnter={() => setShowTooltip(true)}
+        onMouseLeave={() => setShowTooltip(false)}
+      >
+        <Info
+          size={14}
+          className="text-stone-500 hover:text-stone-400 cursor-help flex-shrink-0"
+        />
+        {showTooltip && (
+          <div className="absolute left-0 top-6 z-50 w-48 p-3 bg-stone-800 border border-stone-700 rounded-lg shadow-xl">
+            <div className="text-xs text-stone-300">
+              <div className="font-semibold text-stone-200 mb-1">Last updated</div>
+              <div className="text-stone-400">{formatLastUpdated(source.updatedAt)}</div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   function StaleWarningTooltip({ source }: StaleWarningTooltipProps) {
     const [showTooltip, setShowTooltip] = useState(false);
     const daysSinceLastLink = source.days_since_last_link || 0;
@@ -212,10 +242,13 @@ export function OsintSourcesTable({ sources, onUpdate, onDelete, onRefresh }: Os
                         />
                       </div>
                     )}
-                    <div className="flex flex-col">
-                      <p className={`font-medium ${source.enabled === false ? 'text-stone-500' : 'text-stone-200'}`}>
-                        {source.name}
-                      </p>
+                    <div className="flex flex-col flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className={`font-medium ${source.enabled === false ? 'text-stone-500' : 'text-stone-200'}`}>
+                          {source.name}
+                        </p>
+                        <LastUpdatedTooltip source={source} />
+                      </div>
                       {source.url && (
                         <p className="text-stone-500 text-xs mt-1 truncate max-w-xs" title={source.url}>
                           {source.url}
