@@ -185,6 +185,7 @@ router.post('/rss/all', async (req: Request, res: Response) => {
           const orgResults: Array<{
             source_id: string;
             source_name: string;
+            source_url: string | null;
             success: boolean;
             added: number;
             skipped: number;
@@ -201,6 +202,7 @@ router.post('/rss/all', async (req: Request, res: Response) => {
               orgResults.push({
                 source_id: source.id,
                 source_name: source.name,
+                source_url: source.url,
                 success: false,
                 added: 0,
                 skipped: 0,
@@ -234,6 +236,7 @@ router.post('/rss/all', async (req: Request, res: Response) => {
               orgResults.push({
                 source_id: source.id,
                 source_name: source.name,
+                source_url: source.url,
                 success: true,
                 added: result.added,
                 skipped: result.skipped,
@@ -244,6 +247,7 @@ router.post('/rss/all', async (req: Request, res: Response) => {
               orgResults.push({
                 source_id: source.id,
                 source_name: source.name,
+                source_url: source.url,
                 success: false,
                 added: 0,
                 skipped: 0,
@@ -340,6 +344,7 @@ router.post('/rss/all', async (req: Request, res: Response) => {
     type SourceResult = {
       source_id: string;
       source_name: string;
+      source_url: string | null;
       success: boolean;
       added: number;
       skipped: number;
@@ -357,6 +362,7 @@ router.post('/rss/all', async (req: Request, res: Response) => {
         const result: SourceResult = {
           source_id: source.id,
           source_name: source.name,
+          source_url: source.url,
           success: false,
           added: 0,
           skipped: 0,
