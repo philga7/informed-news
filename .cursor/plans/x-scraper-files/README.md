@@ -136,6 +136,23 @@ npm run dev
 
 This uses `tsx` to run TypeScript directly without compilation.
 
+### Manual Login (for X.com Verification Issues)
+
+If X.com requires email verification codes or other manual verification steps, you can use the manual login helper:
+
+```bash
+npm run manual-login
+```
+
+This script:
+1. Opens a browser window (non-headless)
+2. Navigates to X.com login page
+3. Waits for you to manually log in (including any verification codes)
+4. After successful login, press Enter in the terminal
+5. Saves the session to `sessions/auth.json`
+
+The scraper will then reuse this session for future runs, avoiding the need for repeated logins.
+
 ## Integration Points
 
 ### Vercel API Endpoints Used
