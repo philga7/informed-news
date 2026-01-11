@@ -13,8 +13,17 @@ jobs:
     steps:
       - name: Trigger RSS Ingestion for All Organizations
         env:
-          API_URL: ${{ secrets.VITE_API_URL || 'https://your-api-url.vercel.app' }}
+          API_URL: ${{ secrets.VITE_API_URL }}
         run: |
+          if [ -z "$API_URL" ]; then
+            echo "❌ Error: VITE_API_URL secret is not set"
+            echo "💡 Please set the VITE_API_URL secret in GitHub repository settings:"
+            echo "   Settings > Secrets and variables > Actions > New repository secret"
+            echo "   Name: VITE_API_URL"
+            echo "   Value: https://your-project.vercel.app (your actual Vercel deployment URL)"
+            exit 1
+          fi
+          
           echo "🔄 Starting RSS ingestion for all organizations..."
           echo "📡 API URL: $API_URL"
           

@@ -75,7 +75,7 @@ async function processSourcesInParallel<T, R>(
 
 /**
  * POST /api/ingest/rss/all
- * Trigger RSS ingestion for all RSS sources in an organization (parallel, max 5 concurrent)
+ * Trigger RSS ingestion for all enabled RSS sources in an organization (parallel, max 8 concurrent)
  * If organization_id is "all", processes all organizations
  * 
  * NOTE: Vercel serverless functions have timeout limits:
@@ -87,6 +87,11 @@ async function processSourcesInParallel<T, R>(
  * - Using a background job queue (e.g., GitHub Actions, cron jobs)
  * - Splitting into smaller batches
  * - Using the scheduler endpoint instead of manual triggers
+ * 
+ * Sources are processed in parallel (8 concurrent) to:
+ * - Speed up ingestion for dozens of sources
+ * - Better resource utilization
+ * - Errors are isolated per source
  * 
  * Body:
  *   - organization_id: string (required) - organization ID or "all" for all organizations
@@ -328,9 +333,9 @@ router.post('/rss/all', async (req: Request, res: Response) => {
       });
     }
 
-    // Process sources in parallel with concurrency limit (5 at a time)
+    // Process sources in parallel with concurrency limit (8 at a time)
     console.log(`\n🔄 Starting RSS ingestion for organization ${organization_id}`);
-    console.log(`📋 Found ${sources.length} RSS source(s) to process (parallel, max 5 concurrent)\n`);
+    console.log(`📋 Found ${sources.length} RSS source(s) to process (parallel, max 8 concurrent)\n`);
 
     type SourceResult = {
       source_id: string;
@@ -358,8 +363,8 @@ router.post('/rss/all', async (req: Request, res: Response) => {
           errors: 0,
         };
 
-        console.log(`[${sourceNum}/${sources.length}] Processing source: "${source.name}" (${source.id})`);
-        console.log(`  📡 Feed URL: ${source.url}`);
+        console.log(`[${sourceNum}/${sources.length}] Processing: ${source.url}`);
+        console.log(`  📰 Source: "${source.name}" (${source.id})`);
         
         if (!source.url) {
           console.log(`  ⚠️  Skipping: Source missing URL`);
@@ -382,7 +387,7 @@ router.post('/rss/all', async (req: Request, res: Response) => {
 
         try {
           const startTime = Date.now();
-          console.log(`  🔍 Starting ingestion...`);
+          console.log(`  🔍 Starting ingestion for ${source.url}...`);
           
           // Check if this is a Nitter URL and use appropriate service
           let service: RssIngestionService;
@@ -420,7 +425,7 @@ router.post('/rss/all', async (req: Request, res: Response) => {
           result.skipped = ingestResult.skipped;
           result.errors = ingestResult.errors.length;
 
-          console.log(`  ✅ Completed in ${duration}s: +${ingestResult.added} new, ~${ingestResult.skipped} duplicates, ❌${ingestResult.errors.length} errors`);
+          console.log(`  ✅ ${source.url} completed in ${duration}s: +${ingestResult.added} new, ~${ingestResult.skipped} duplicates, ❌${ingestResult.errors.length} errors`);
           if (ingestResult.errors.length > 0) {
             console.log(`  ⚠️  Errors encountered:`);
             ingestResult.errors.slice(0, 3).forEach((err, idx) => {
@@ -432,7 +437,7 @@ router.post('/rss/all', async (req: Request, res: Response) => {
           }
         } catch (error) {
           const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-          console.log(`  ❌ Failed: ${errorMsg}`);
+          console.log(`  ❌ ${source.url} failed: ${errorMsg}`);
           result.errors = 1;
           result.error = errorMsg;
         }
@@ -440,7 +445,7 @@ router.post('/rss/all', async (req: Request, res: Response) => {
         console.log(''); // Empty line between sources
         return result;
       },
-      5 // Concurrency limit: 5 sources at a time
+      8 // Concurrency limit: 8 sources at a time
     );
 
     // Collect results and calculate totals
