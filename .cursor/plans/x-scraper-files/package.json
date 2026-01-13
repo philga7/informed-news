@@ -8,8 +8,7 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "tsx watch src/index.ts",
-    "typecheck": "tsc --noEmit",
-    "manual-login": "tsx src/manual-login.ts"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "express": "^4.18.2",
