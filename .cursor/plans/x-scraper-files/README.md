@@ -63,9 +63,14 @@ This directory contains the four TypeScript files for the X.com scraping service
 
 ## Additional Files
 
-- `package.json` - Dependencies and scripts
+- `package.json` - Dependencies and scripts (note: validate-session script is in main backend)
 - `tsconfig.json` - TypeScript configuration
 - `README.md` - This file
+
+**Note:** The session extraction scripts (`extract-session.ts` and `validate-session.ts`) are located in the main backend directory at `backend/scripts/` to better organize dependencies. They're part of the main backend package, not this x-scraper-files package.
+
+- **`extract-session.ts`** - Recommended: Connects to your existing browser session and extracts cookies
+- **`validate-session.ts`** - Alternative: Opens a browser window for you to log in
 
 ## Important Notes
 
@@ -111,12 +116,14 @@ The application expects these directories to exist (created automatically):
 
 ### Dependencies
 
-Key dependencies:
+Key dependencies (for the Hetzner scraper):
 - `playwright` + `playwright-extra` - Browser automation
 - `puppeteer-extra-plugin-stealth` - Anti-detection
 - `express` - Web server
 - `winston` - Logging
 - `dotenv` - Environment variables
+
+**Note:** The session validation script uses the same Playwright dependencies, which are installed in the main `backend/package.json` for local development.
 
 ### TypeScript Compilation
 
@@ -136,22 +143,57 @@ npm run dev
 
 This uses `tsx` to run TypeScript directly without compilation.
 
-### Manual Login (for X.com Verification Issues)
+### Local Session Extraction
 
-If X.com requires email verification codes or other manual verification steps, you can use the manual login helper:
+The simplest way to get your X.com session is to log in normally in your browser and extract it. The session extraction scripts are located in the main backend directory (`backend/scripts/`), not in this x-scraper-files directory.
+
+#### Recommended: Extract Session (Simplest)
 
 ```bash
-npm run manual-login
+cd backend
+npm run extract-session
 ```
 
 This script:
-1. Opens a browser window (non-headless)
+1. Launches or connects to Chrome/Edge with remote debugging
+2. Opens X.com (or uses your existing X.com tab)
+3. You log in normally with phil@informedcrew.com (including any verification codes)
+4. Press Enter in the terminal when you're logged in
+5. Extracts and saves the session to `backend/sessions/auth.json`
+
+**That's it!** The script connects to your browser and extracts the session automatically.
+
+#### Alternative: Validate Session (Opens Browser for You)
+
+If you prefer the script to open a browser window for you:
+
+```bash
+cd backend
+npm run validate-session
+```
+
+This script:
+1. Opens a browser window (non-headless) on your local machine
 2. Navigates to X.com login page
 3. Waits for you to manually log in (including any verification codes)
-4. After successful login, press Enter in the terminal
-5. Saves the session to `sessions/auth.json`
+4. Automatically detects when login is successful
+5. Saves the session to `backend/sessions/auth.json`
 
-The scraper will then reuse this session for future runs, avoiding the need for repeated logins.
+**Transfer to Hetzner:**
+
+After extraction/validation, transfer the session file to your Hetzner server:
+
+```bash
+# Using SCP (from project root)
+scp backend/sessions/auth.json user@hetzner-server:~/x-scraper/sessions/auth.json
+
+# Or using rsync
+rsync -avz backend/sessions/auth.json user@hetzner-server:~/x-scraper/sessions/
+```
+
+The scraper on Hetzner will automatically use this session for authentication, avoiding the need for repeated logins or manual intervention on the server.
+
+**Dependencies:** The backend package.json includes the required Playwright dependencies. Make sure to run `npm install` in the backend directory first.
 
 ## Integration Points
 
