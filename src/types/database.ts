@@ -300,6 +300,79 @@ export interface Database {
           created_at?: string;
         };
       };
+      xcom_profiles: {
+        Row: {
+          id: string;
+          organization_id: string;
+          username: string;
+          display_name: string | null;
+          display_order: number;
+          settings: Json;
+          enabled: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          username: string;
+          display_name?: string | null;
+          display_order?: number;
+          settings?: Json;
+          enabled?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          username?: string;
+          display_name?: string | null;
+          display_order?: number;
+          settings?: Json;
+          enabled?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      xcom_lists: {
+        Row: {
+          id: string;
+          organization_id: string;
+          owner_screen_name: string;
+          slug: string;
+          display_name: string | null;
+          display_order: number;
+          settings: Json;
+          enabled: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          owner_screen_name: string;
+          slug: string;
+          display_name?: string | null;
+          display_order?: number;
+          settings?: Json;
+          enabled?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          owner_screen_name?: string;
+          slug?: string;
+          display_name?: string | null;
+          display_order?: number;
+          settings?: Json;
+          enabled?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
     };
     Views: {
       [_ in never]: never;
