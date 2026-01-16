@@ -49,6 +49,8 @@ async function loadRoutes() {
     const retentionRouter = (await import('../backend/src/routes/retention.js')).default;
     const optimizationRouter = (await import('../backend/src/routes/optimization.js')).default;
     const schedulerRouter = (await import('../backend/src/routes/scheduler.js')).default;
+    const xcomProfilesRouter = (await import('../backend/src/routes/xcomProfiles.js')).default;
+    const xcomListsRouter = (await import('../backend/src/routes/xcomLists.js')).default;
     
     // API Routes
     app.use('/api/organizations', organizationsRouter);
@@ -66,6 +68,8 @@ async function loadRoutes() {
     app.use('/api/retention', retentionRouter);
     app.use('/api/optimization', optimizationRouter);
     app.use('/api/scheduler', schedulerRouter);
+    app.use('/api/xcom-profiles', xcomProfilesRouter);
+    app.use('/api/xcom-lists', xcomListsRouter);
   } catch (error) {
     console.error('Error loading standard routes:', error);
     // Continue - don't block other routes

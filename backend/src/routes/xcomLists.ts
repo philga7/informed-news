@@ -183,6 +183,71 @@ router.post('/', async (req: Request, res: Response) => {
 });
 
 /**
+ * PATCH /api/xcom-lists/reorder
+ * Batch update display_order for lists
+ * Body: { organization_id, listIds: string[] }
+ * NOTE: Must come before /:id route to avoid route conflicts
+ */
+router.patch('/reorder', async (req: Request, res: Response) => {
+  try {
+    const { organization_id, listIds } = req.body;
+
+    if (!organization_id || !Array.isArray(listIds)) {
+      return res.status(400).json({ 
+        error: 'organization_id and listIds array are required' 
+      });
+    }
+
+    // Update display_order for each list
+    // @ts-ignore - Supabase type inference issue with new xcom_lists table
+    const updates = listIds.map((listId: string, index: number) => 
+      supabase
+        .from('xcom_lists')
+        // @ts-ignore - Supabase type inference issue with new xcom_lists table
+        .update({ display_order: index } as any)
+        .eq('id', listId)
+        .eq('organization_id', organization_id)
+    );
+
+    const results = await Promise.all(updates);
+    const errors = results.filter(r => r.error);
+
+    if (errors.length > 0) {
+      console.error('Error reordering lists:', errors);
+      return res.status(500).json({
+        error: 'Failed to reorder lists',
+        message: errors[0].error?.message || 'Unknown error',
+      });
+    }
+
+    // Log audit action for reorder
+    const userId = getUserId(req);
+    await auditService.logAction({
+      action: 'xcom_list_updated',
+      entityType: 'xcom_list',
+      entityId: listIds[0] || '', // Use first list ID for batch operation
+      userId,
+      metadata: {
+        operation: 'reorder',
+        list_ids: listIds,
+        organization_id,
+      },
+    });
+
+    res.json({
+      success: true,
+      message: 'Lists reordered successfully',
+    });
+  } catch (error) {
+    console.error('Error reordering lists:', error);
+    res.status(500).json({
+      error: 'Failed to reorder lists',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+/**
  * PATCH /api/xcom-lists/:id
  * Update a list
  * Body: { owner_screen_name?, slug?, display_name?, display_order?, settings?, enabled? }
@@ -282,70 +347,6 @@ router.patch('/:id', async (req: Request, res: Response) => {
     console.error('Error updating X.com list:', error);
     res.status(500).json({
       error: 'Failed to update X.com list',
-      message: error instanceof Error ? error.message : 'Unknown error',
-    });
-  }
-});
-
-/**
- * PATCH /api/xcom-lists/reorder
- * Batch update display_order for lists
- * Body: { organization_id, listIds: string[] }
- */
-router.patch('/reorder', async (req: Request, res: Response) => {
-  try {
-    const { organization_id, listIds } = req.body;
-
-    if (!organization_id || !Array.isArray(listIds)) {
-      return res.status(400).json({ 
-        error: 'organization_id and listIds array are required' 
-      });
-    }
-
-    // Update display_order for each list
-    // @ts-ignore - Supabase type inference issue with new xcom_lists table
-    const updates = listIds.map((listId: string, index: number) => 
-      supabase
-        .from('xcom_lists')
-        // @ts-ignore - Supabase type inference issue with new xcom_lists table
-        .update({ display_order: index } as any)
-        .eq('id', listId)
-        .eq('organization_id', organization_id)
-    );
-
-    const results = await Promise.all(updates);
-    const errors = results.filter(r => r.error);
-
-    if (errors.length > 0) {
-      console.error('Error reordering lists:', errors);
-      return res.status(500).json({
-        error: 'Failed to reorder lists',
-        message: errors[0].error?.message || 'Unknown error',
-      });
-    }
-
-    // Log audit action for reorder
-    const userId = getUserId(req);
-    await auditService.logAction({
-      action: 'xcom_list_updated',
-      entityType: 'xcom_list',
-      entityId: listIds[0] || '', // Use first list ID for batch operation
-      userId,
-      metadata: {
-        operation: 'reorder',
-        list_ids: listIds,
-        organization_id,
-      },
-    });
-
-    res.json({
-      success: true,
-      message: 'Lists reordered successfully',
-    });
-  } catch (error) {
-    console.error('Error reordering lists:', error);
-    res.status(500).json({
-      error: 'Failed to reorder lists',
       message: error instanceof Error ? error.message : 'Unknown error',
     });
   }
