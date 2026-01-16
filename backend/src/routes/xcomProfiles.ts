@@ -174,6 +174,71 @@ router.post('/', async (req: Request, res: Response) => {
 });
 
 /**
+ * PATCH /api/xcom-profiles/reorder
+ * Batch update display_order for profiles
+ * Body: { organization_id, profileIds: string[] }
+ * NOTE: Must come before /:id route to avoid route conflicts
+ */
+router.patch('/reorder', async (req: Request, res: Response) => {
+  try {
+    const { organization_id, profileIds } = req.body;
+
+    if (!organization_id || !Array.isArray(profileIds)) {
+      return res.status(400).json({ 
+        error: 'organization_id and profileIds array are required' 
+      });
+    }
+
+    // Update display_order for each profile
+    // @ts-ignore - Supabase type inference issue with new xcom_profiles table
+    const updates = profileIds.map((profileId: string, index: number) => 
+      supabase
+        .from('xcom_profiles')
+        // @ts-ignore - Supabase type inference issue with new xcom_profiles table
+        .update({ display_order: index } as any)
+        .eq('id', profileId)
+        .eq('organization_id', organization_id)
+    );
+
+    const results = await Promise.all(updates);
+    const errors = results.filter(r => r.error);
+
+    if (errors.length > 0) {
+      console.error('Error reordering profiles:', errors);
+      return res.status(500).json({
+        error: 'Failed to reorder profiles',
+        message: errors[0].error?.message || 'Unknown error',
+      });
+    }
+
+    // Log audit action for reorder
+    const userId = getUserId(req);
+    await auditService.logAction({
+      action: 'xcom_profile_updated',
+      entityType: 'xcom_profile',
+      entityId: profileIds[0] || '', // Use first profile ID for batch operation
+      userId,
+      metadata: {
+        operation: 'reorder',
+        profile_ids: profileIds,
+        organization_id,
+      },
+    });
+
+    res.json({
+      success: true,
+      message: 'Profiles reordered successfully',
+    });
+  } catch (error) {
+    console.error('Error reordering profiles:', error);
+    res.status(500).json({
+      error: 'Failed to reorder profiles',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+/**
  * PATCH /api/xcom-profiles/:id
  * Update a profile
  * Body: { username?, display_name?, display_order?, settings?, enabled? }
@@ -263,70 +328,6 @@ router.patch('/:id', async (req: Request, res: Response) => {
     console.error('Error updating X.com profile:', error);
     res.status(500).json({
       error: 'Failed to update X.com profile',
-      message: error instanceof Error ? error.message : 'Unknown error',
-    });
-  }
-});
-
-/**
- * PATCH /api/xcom-profiles/reorder
- * Batch update display_order for profiles
- * Body: { organization_id, profileIds: string[] }
- */
-router.patch('/reorder', async (req: Request, res: Response) => {
-  try {
-    const { organization_id, profileIds } = req.body;
-
-    if (!organization_id || !Array.isArray(profileIds)) {
-      return res.status(400).json({ 
-        error: 'organization_id and profileIds array are required' 
-      });
-    }
-
-    // Update display_order for each profile
-    // @ts-ignore - Supabase type inference issue with new xcom_profiles table
-    const updates = profileIds.map((profileId: string, index: number) => 
-      supabase
-        .from('xcom_profiles')
-        // @ts-ignore - Supabase type inference issue with new xcom_profiles table
-        .update({ display_order: index } as any)
-        .eq('id', profileId)
-        .eq('organization_id', organization_id)
-    );
-
-    const results = await Promise.all(updates);
-    const errors = results.filter(r => r.error);
-
-    if (errors.length > 0) {
-      console.error('Error reordering profiles:', errors);
-      return res.status(500).json({
-        error: 'Failed to reorder profiles',
-        message: errors[0].error?.message || 'Unknown error',
-      });
-    }
-
-    // Log audit action for reorder
-    const userId = getUserId(req);
-    await auditService.logAction({
-      action: 'xcom_profile_updated',
-      entityType: 'xcom_profile',
-      entityId: profileIds[0] || '', // Use first profile ID for batch operation
-      userId,
-      metadata: {
-        operation: 'reorder',
-        profile_ids: profileIds,
-        organization_id,
-      },
-    });
-
-    res.json({
-      success: true,
-      message: 'Profiles reordered successfully',
-    });
-  } catch (error) {
-    console.error('Error reordering profiles:', error);
-    res.status(500).json({
-      error: 'Failed to reorder profiles',
       message: error instanceof Error ? error.message : 'Unknown error',
     });
   }
