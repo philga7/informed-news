@@ -32,9 +32,15 @@ export type AuditAction =
   | 'record_archived'
   | 'record_deleted'
   | 'record_restored'
-  | 'collection_plan_suggestions_generated';
+  | 'collection_plan_suggestions_generated'
+  | 'xcom_profile_created'
+  | 'xcom_profile_updated'
+  | 'xcom_profile_deleted'
+  | 'xcom_list_created'
+  | 'xcom_list_updated'
+  | 'xcom_list_deleted';
 
-export type EntityType = 'topic' | 'source_record' | 'link' | 'artifact' | 'source';
+export type EntityType = 'topic' | 'source_record' | 'link' | 'artifact' | 'source' | 'xcom_profile' | 'xcom_list';
 
 export interface AuditLogParams {
   action: AuditAction;
