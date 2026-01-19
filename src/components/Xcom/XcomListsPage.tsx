@@ -8,6 +8,23 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Sparkles, User, List, Plus, RefreshCw } from 'lucide-react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { useOrganization } from '../../context/OrganizationContext';
 import { xcomListsService } from '../../services';
 import { LoadingSpinner } from '../UI/LoadingSpinner';
@@ -28,6 +45,15 @@ export function XcomListsPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingList, setEditingList] = useState<XcomList | null>(null);
   const [deletingListId, setDeletingListId] = useState<string | null>(null);
+  const [isReordering, setIsReordering] = useState(false);
+
+  // Configure sensors for drag-and-drop
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   const loadLists = async (showSpinner = true) => {
     if (!currentOrganization) {
@@ -151,6 +177,51 @@ export function XcomListsPage() {
     }
   };
 
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (!over || !currentOrganization) {
+      return;
+    }
+
+    if (active.id !== over.id) {
+      const oldIndex = lists.findIndex((l) => l.id === active.id);
+      const newIndex = lists.findIndex((l) => l.id === over.id);
+
+      if (oldIndex === -1 || newIndex === -1) {
+        return;
+      }
+
+      // Optimistic update
+      const reorderedLists = arrayMove(lists, oldIndex, newIndex);
+      setLists(reorderedLists);
+      setIsReordering(true);
+
+      try {
+        // Get the new order of list IDs
+        const listIds = reorderedLists.map((l) => l.id);
+        
+        // Persist to backend
+        await xcomListsService.reorder(currentOrganization.id, listIds);
+        
+        showToast({
+          type: 'success',
+          message: 'Lists reordered successfully',
+        });
+      } catch (err) {
+        // Revert on error
+        setLists(lists);
+        console.error('Error reordering lists:', err);
+        showToast({
+          type: 'error',
+          message: err instanceof Error ? err.message : 'Failed to reorder lists',
+        });
+      } finally {
+        setIsReordering(false);
+      }
+    }
+  };
+
   if (!currentOrganization) {
     return <LoadingSpinner />;
   }
@@ -268,18 +339,30 @@ export function XcomListsPage() {
 
           {/* Lists Grid */}
           {lists.length > 0 && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {lists.map((list) => (
-                <XcomListCard
-                  key={list.id}
-                  list={list}
-                  onEdit={setEditingList}
-                  onDelete={handleDeleteList}
-                  onUpdateSettings={handleUpdateSettings}
-                  isDeleting={deletingListId === list.id}
-                />
-              ))}
-            </div>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={lists.map((l) => l.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {lists.map((list) => (
+                    <SortableListCard
+                      key={list.id}
+                      list={list}
+                      onEdit={setEditingList}
+                      onDelete={handleDeleteList}
+                      onUpdateSettings={handleUpdateSettings}
+                      isDeleting={deletingListId === list.id}
+                      disabled={isReordering}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
           )}
         </div>
       </div>
@@ -289,7 +372,9 @@ export function XcomListsPage() {
         <XcomListForm
           initialData={null}
           organizationId={currentOrganization.id}
-          onSubmit={handleCreateList}
+          onSubmit={async (data) => {
+            await handleCreateList(data as XcomListInsert);
+          }}
           onCancel={() => setShowCreateModal(false)}
         />
       )}
@@ -299,10 +384,64 @@ export function XcomListsPage() {
         <XcomListForm
           initialData={editingList}
           organizationId={currentOrganization.id}
-          onSubmit={(data) => handleUpdateList(editingList.id, data as XcomListUpdate)}
+          onSubmit={async (data) => {
+            await handleUpdateList(editingList.id, data as XcomListUpdate);
+          }}
           onCancel={() => setEditingList(null)}
         />
       )}
+    </div>
+  );
+}
+
+/**
+ * Sortable wrapper for XcomListCard
+ */
+interface SortableListCardProps {
+  list: XcomList;
+  onEdit: (list: XcomList) => void;
+  onDelete: (listId: string) => void;
+  onUpdateSettings: (listId: string, settings: XcomList['settings']) => Promise<void>;
+  isDeleting?: boolean;
+  disabled?: boolean;
+}
+
+function SortableListCard({
+  list,
+  onEdit,
+  onDelete,
+  onUpdateSettings,
+  isDeleting = false,
+  disabled = false,
+}: SortableListCardProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: list.id,
+    disabled,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      <XcomListCard
+        list={list}
+        onEdit={onEdit}
+        onDelete={onDelete}
+        onUpdateSettings={onUpdateSettings}
+        isDeleting={isDeleting}
+        dragHandleProps={{ ...attributes, ...listeners }}
+      />
     </div>
   );
 }

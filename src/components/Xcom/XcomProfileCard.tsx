@@ -17,6 +17,7 @@ interface XcomProfileCardProps {
   onDelete: (profileId: string) => void;
   onUpdateSettings: (profileId: string, settings: XcomProfile['settings']) => Promise<void>;
   isDeleting?: boolean;
+  dragHandleProps?: React.HTMLAttributes<HTMLElement>;
 }
 
 export function XcomProfileCard({
@@ -25,6 +26,7 @@ export function XcomProfileCard({
   onDelete,
   onUpdateSettings,
   isDeleting = false,
+  dragHandleProps,
 }: XcomProfileCardProps) {
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -62,6 +64,7 @@ export function XcomProfileCard({
                 className="text-stone-500 hover:text-stone-400 cursor-move flex-shrink-0"
                 title="Drag to reorder"
                 type="button"
+                {...dragHandleProps}
               >
                 <GripVertical size={18} />
               </button>
