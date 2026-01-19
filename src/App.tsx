@@ -14,6 +14,8 @@ import { AnalystDashboard } from './components/Dashboard/AnalystDashboard';
 import { WatchListPage } from './components/WatchList/WatchListPage';
 import { ScanPage } from './components/Scan/ScanPage';
 import { IndicatorsPage } from './components/Indicators/IndicatorsPage';
+import { XcomProfilesPage } from './components/Xcom/XcomProfilesPage';
+import { XcomListsPage } from './components/Xcom/XcomListsPage';
 
 function App() {
   const { state } = useApp();
@@ -32,6 +34,8 @@ function App() {
         <main className="flex-1 overflow-y-auto lg:ml-0">
           <Routes>
             <Route path="/dashboard" element={<AnalystDashboard />} />
+            <Route path="/developing-news/xcom-profiles" element={<XcomProfilesPage />} />
+            <Route path="/developing-news/xcom-lists" element={<XcomListsPage />} />
             <Route path="/scan" element={<ScanPage />} />
             <Route path="/watch-list" element={<WatchListPage />} />
             <Route path="/indicators" element={<IndicatorsPage />} />
