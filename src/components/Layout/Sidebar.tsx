@@ -8,7 +8,8 @@ import {
   FileText, 
   Database,
   Menu,
-  X
+  X,
+  Sparkles
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -26,6 +27,13 @@ const navItems: NavItem[] = [
     label: 'Dashboard',
     icon: BarChart3,
     matchPattern: (path) => path === '/dashboard',
+    group: 'entry',
+  },
+  {
+    path: '/developing-news/xcom-profiles',
+    label: 'Developing News',
+    icon: Sparkles,
+    matchPattern: (path) => path.startsWith('/developing-news'),
     group: 'entry',
   },
   {
