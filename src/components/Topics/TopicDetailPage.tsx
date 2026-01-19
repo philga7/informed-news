@@ -25,7 +25,7 @@ import { QAChecklist } from './QAChecklist';
 import { CollectionPlanCard } from './CollectionPlanCard';
 import { ClaimsAnalysis } from './ClaimsAnalysis';
 import { CorroborationMatrix } from './CorroborationMatrix';
-import type { TopicTimeline, OsintTopic, CollectionPlan } from '../../types/osint';
+import type { TopicTimeline, CollectionPlan } from '../../types/osint';
 
 export function TopicDetailPage() {
   const { id } = useParams<{ id: string }>();
