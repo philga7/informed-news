@@ -8,6 +8,23 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Sparkles, User, List, Plus, RefreshCw } from 'lucide-react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { useOrganization } from '../../context/OrganizationContext';
 import { xcomProfilesService } from '../../services';
 import { LoadingSpinner } from '../UI/LoadingSpinner';
@@ -28,6 +45,15 @@ export function XcomProfilesPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingProfile, setEditingProfile] = useState<XcomProfile | null>(null);
   const [deletingProfileId, setDeletingProfileId] = useState<string | null>(null);
+  const [isReordering, setIsReordering] = useState(false);
+
+  // Configure sensors for drag-and-drop
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   const loadProfiles = async (showSpinner = true) => {
     if (!currentOrganization) {
@@ -151,6 +177,51 @@ export function XcomProfilesPage() {
     }
   };
 
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (!over || !currentOrganization) {
+      return;
+    }
+
+    if (active.id !== over.id) {
+      const oldIndex = profiles.findIndex((p) => p.id === active.id);
+      const newIndex = profiles.findIndex((p) => p.id === over.id);
+
+      if (oldIndex === -1 || newIndex === -1) {
+        return;
+      }
+
+      // Optimistic update
+      const reorderedProfiles = arrayMove(profiles, oldIndex, newIndex);
+      setProfiles(reorderedProfiles);
+      setIsReordering(true);
+
+      try {
+        // Get the new order of profile IDs
+        const profileIds = reorderedProfiles.map((p) => p.id);
+        
+        // Persist to backend
+        await xcomProfilesService.reorder(currentOrganization.id, profileIds);
+        
+        showToast({
+          type: 'success',
+          message: 'Profiles reordered successfully',
+        });
+      } catch (err) {
+        // Revert on error
+        setProfiles(profiles);
+        console.error('Error reordering profiles:', err);
+        showToast({
+          type: 'error',
+          message: err instanceof Error ? err.message : 'Failed to reorder profiles',
+        });
+      } finally {
+        setIsReordering(false);
+      }
+    }
+  };
+
   if (!currentOrganization) {
     return <LoadingSpinner />;
   }
@@ -268,18 +339,30 @@ export function XcomProfilesPage() {
 
           {/* Profiles Grid */}
           {profiles.length > 0 && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {profiles.map((profile) => (
-                <XcomProfileCard
-                  key={profile.id}
-                  profile={profile}
-                  onEdit={setEditingProfile}
-                  onDelete={handleDeleteProfile}
-                  onUpdateSettings={handleUpdateSettings}
-                  isDeleting={deletingProfileId === profile.id}
-                />
-              ))}
-            </div>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={profiles.map((p) => p.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {profiles.map((profile) => (
+                    <SortableProfileCard
+                      key={profile.id}
+                      profile={profile}
+                      onEdit={setEditingProfile}
+                      onDelete={handleDeleteProfile}
+                      onUpdateSettings={handleUpdateSettings}
+                      isDeleting={deletingProfileId === profile.id}
+                      disabled={isReordering}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
           )}
         </div>
       </div>
@@ -289,7 +372,9 @@ export function XcomProfilesPage() {
         <XcomProfileForm
           initialData={null}
           organizationId={currentOrganization.id}
-          onSubmit={handleCreateProfile}
+          onSubmit={async (data) => {
+            await handleCreateProfile(data as XcomProfileInsert);
+          }}
           onCancel={() => setShowCreateModal(false)}
         />
       )}
@@ -299,10 +384,64 @@ export function XcomProfilesPage() {
         <XcomProfileForm
           initialData={editingProfile}
           organizationId={currentOrganization.id}
-          onSubmit={(data) => handleUpdateProfile(editingProfile.id, data as XcomProfileUpdate)}
+          onSubmit={async (data) => {
+            await handleUpdateProfile(editingProfile.id, data as XcomProfileUpdate);
+          }}
           onCancel={() => setEditingProfile(null)}
         />
       )}
+    </div>
+  );
+}
+
+/**
+ * Sortable wrapper for XcomProfileCard
+ */
+interface SortableProfileCardProps {
+  profile: XcomProfile;
+  onEdit: (profile: XcomProfile) => void;
+  onDelete: (profileId: string) => void;
+  onUpdateSettings: (profileId: string, settings: XcomProfile['settings']) => Promise<void>;
+  isDeleting?: boolean;
+  disabled?: boolean;
+}
+
+function SortableProfileCard({
+  profile,
+  onEdit,
+  onDelete,
+  onUpdateSettings,
+  isDeleting = false,
+  disabled = false,
+}: SortableProfileCardProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: profile.id,
+    disabled,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      <XcomProfileCard
+        profile={profile}
+        onEdit={onEdit}
+        onDelete={onDelete}
+        onUpdateSettings={onUpdateSettings}
+        isDeleting={isDeleting}
+        dragHandleProps={{ ...attributes, ...listeners }}
+      />
     </div>
   );
 }

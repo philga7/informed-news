@@ -17,6 +17,7 @@ interface XcomListCardProps {
   onDelete: (listId: string) => void;
   onUpdateSettings: (listId: string, settings: XcomList['settings']) => Promise<void>;
   isDeleting?: boolean;
+  dragHandleProps?: React.HTMLAttributes<HTMLElement>;
 }
 
 export function XcomListCard({
@@ -25,6 +26,7 @@ export function XcomListCard({
   onDelete,
   onUpdateSettings,
   isDeleting = false,
+  dragHandleProps,
 }: XcomListCardProps) {
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -65,6 +67,7 @@ export function XcomListCard({
                 className="text-stone-500 hover:text-stone-400 cursor-move flex-shrink-0"
                 title="Drag to reorder"
                 type="button"
+                {...dragHandleProps}
               >
                 <GripVertical size={18} />
               </button>
