@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { AlertTriangle, Clock, Save, Search, Sparkles, Loader2 } from 'lucide-react';
-import { analysisService, type AnalyticArtifact } from '../../services';
+import { analysisService } from '../../services';
+import type { AnalyticArtifact } from '../../services/analysis.service';
 import { LoadingSpinner } from '../UI/LoadingSpinner';
 import { ArtifactCard } from '../SourceRecords/ArtifactCard';
 import type { DuplicateGroup } from '../../types/osint';

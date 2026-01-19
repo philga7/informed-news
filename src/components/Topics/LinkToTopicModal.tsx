@@ -108,7 +108,11 @@ export function LinkToTopicModal({
       
       const data = await response.json();
       const links = data.record?.topic_source_links || [];
-      const linkedTopicIds = new Set(links.map((link: any) => link.topic_id || link.osint_topics?.id).filter(Boolean));
+      const linkedTopicIds = new Set<string>(
+        links
+          .map((link: any) => link.topic_id || link.osint_topics?.id)
+          .filter((id: any): id is string => Boolean(id) && typeof id === 'string')
+      );
       
       setAlreadyLinkedTopicIds(linkedTopicIds);
       // Pre-select already linked topics

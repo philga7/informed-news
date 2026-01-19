@@ -181,10 +181,10 @@ export function SourceRecordDetailPage() {
       await loadRecord();
       
       // Show success message
-      toast.success(`Successfully linked to ${topicIds.length} topic${topicIds.length > 1 ? 's' : ''}`);
+      toast.showSuccess(`Successfully linked to ${topicIds.length} topic${topicIds.length > 1 ? 's' : ''}`);
     } catch (err) {
       console.error('Error refreshing record after linking:', err);
-      toast.error('Link created but failed to refresh. Please reload the page to see the link.');
+      toast.showError('Link created but failed to refresh. Please reload the page to see the link.');
     }
   };
 
