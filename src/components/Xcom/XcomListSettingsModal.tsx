@@ -142,7 +142,7 @@ export function XcomListSettingsModal({
             <div>
               <label className="flex items-center gap-2 text-sm font-medium text-stone-300 mb-2">
                 <Hash size={18} className="text-accent" />
-                Tweet Limit
+                Tweet Limit <span className="text-stone-500 font-normal">(optional)</span>
               </label>
               <input
                 type="number"
@@ -153,12 +153,12 @@ export function XcomListSettingsModal({
                   const value = e.target.value === '' ? undefined : parseInt(e.target.value, 10);
                   setSettings((prev) => ({ ...prev, tweetLimit: value || undefined }));
                 }}
-                placeholder="Unlimited (leave empty)"
+                placeholder="No limit - scrollable timeline"
                 className="w-full px-3 py-2 bg-stone-800 border border-stone-700 rounded-lg text-stone-100 placeholder-stone-500 focus:outline-none focus:border-accent transition-colors"
                 disabled={isSubmitting}
               />
               <p className="mt-1 text-xs text-stone-500">
-                Number of tweets to display (1-20). Leave empty for unlimited.
+                Leave empty for unlimited scrollable tweets. Set 1-20 to show a fixed number.
               </p>
             </div>
 

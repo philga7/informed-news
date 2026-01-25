@@ -2,11 +2,17 @@
  * X.com Profile Form
  * 
  * Modal form for creating and editing X.com profiles.
+ * Uses comprehensive validation from xcomEmbed utilities.
  */
 
 import { useState } from 'react';
-import { X, User } from 'lucide-react';
+import { X, User, AlertCircle } from 'lucide-react';
 import type { XcomProfile, XcomProfileInsert, XcomProfileUpdate } from '../../types/xcom';
+import {
+  validateUsername,
+  cleanUsername,
+  XCOM_USERNAME_MAX_LENGTH,
+} from '../../utils/xcomEmbed';
 
 interface XcomProfileFormProps {
   initialData?: XcomProfile | null;
@@ -24,24 +30,21 @@ export function XcomProfileForm({
   const [username, setUsername] = useState(initialData?.username || '');
   const [displayName, setDisplayName] = useState(initialData?.displayName || '');
   const [enabled, setEnabled] = useState(initialData?.enabled !== undefined ? initialData.enabled : true);
-  const [error, setError] = useState<string | null>(null);
+  const [errors, setErrors] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
+    setErrors([]);
 
-    // Validate username
-    const cleanUsername = username.replace(/^@/, '').trim();
-    if (!cleanUsername) {
-      setError('Username is required');
+    // Validate username using shared validation utility
+    const usernameValidation = validateUsername(username);
+    if (!usernameValidation.valid) {
+      setErrors(usernameValidation.errors);
       return;
     }
 
-    if (!/^[a-zA-Z0-9_]+$/.test(cleanUsername)) {
-      setError('Username must contain only letters, numbers, and underscores');
-      return;
-    }
+    const cleanedUsername = cleanUsername(username);
 
     try {
       setIsSubmitting(true);
@@ -49,7 +52,7 @@ export function XcomProfileForm({
       if (initialData) {
         // Update existing profile
         await onSubmit({
-          username: cleanUsername,
+          username: cleanedUsername,
           displayName: displayName.trim() || null,
           enabled,
         } as XcomProfileUpdate);
@@ -57,14 +60,16 @@ export function XcomProfileForm({
         // Create new profile
         await onSubmit({
           organizationId,
-          username: cleanUsername,
+          username: cleanedUsername,
           displayName: displayName.trim() || null,
           enabled,
         } as XcomProfileInsert);
       }
     } catch (err) {
       console.error('Error submitting profile form:', err);
-      setError(err instanceof Error ? err.message : 'Failed to save profile');
+      // Handle API errors (including validation errors from backend)
+      const message = err instanceof Error ? err.message : 'Failed to save profile';
+      setErrors([message]);
     } finally {
       setIsSubmitting(false);
     }
@@ -100,9 +105,22 @@ export function XcomProfileForm({
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="p-6 space-y-6">
-            {error && (
-              <div className="p-4 bg-red-900/30 border border-red-800/50 rounded-lg text-red-300 text-sm">
-                {error}
+            {errors.length > 0 && (
+              <div className="p-4 bg-red-900/30 border border-red-800/50 rounded-lg">
+                <div className="flex items-start gap-2">
+                  <AlertCircle size={18} className="text-red-400 mt-0.5 flex-shrink-0" />
+                  <div>
+                    {errors.length === 1 ? (
+                      <p className="text-red-300 text-sm">{errors[0]}</p>
+                    ) : (
+                      <ul className="text-red-300 text-sm list-disc list-inside space-y-1">
+                        {errors.map((err, i) => (
+                          <li key={i}>{err}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                </div>
               </div>
             )}
 
@@ -119,18 +137,26 @@ export function XcomProfileForm({
                   onChange={(e) => {
                     const value = e.target.value.replace(/^@/, '').trim();
                     setUsername(value);
+                    // Clear errors when user starts typing
+                    if (errors.length > 0) setErrors([]);
                   }}
                   placeholder="username"
                   className="flex-1 px-3 py-2 bg-stone-800 border border-stone-700 rounded-lg text-stone-100 placeholder-stone-500 focus:outline-none focus:border-accent transition-colors"
                   required
                   disabled={isSubmitting}
+                  maxLength={XCOM_USERNAME_MAX_LENGTH}
                   pattern="[a-zA-Z0-9_]+"
                   title="Username must contain only letters, numbers, and underscores"
                 />
               </div>
-              <p className="mt-1 text-xs text-stone-500">
-                Enter the username without @ symbol (e.g., "sentdefender")
-              </p>
+              <div className="flex justify-between mt-1">
+                <p className="text-xs text-stone-500">
+                  Enter the username without @ symbol (e.g., "sentdefender")
+                </p>
+                <p className="text-xs text-stone-500">
+                  {username.length}/{XCOM_USERNAME_MAX_LENGTH}
+                </p>
+              </div>
             </div>
 
             {/* Display Name */}

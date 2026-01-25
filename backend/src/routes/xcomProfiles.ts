@@ -2,6 +2,13 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { supabase } from '../utils/supabase.js';
 import { auditService } from '../services/auditService.js';
+import {
+  cleanUsername,
+  validateProfileCreate,
+  validateProfileUpdate,
+  validateTimelineSettings,
+  XCOM_USERNAME_MAX_LENGTH,
+} from '../utils/xcomValidation.js';
 
 const router = Router();
 
@@ -104,28 +111,31 @@ router.post('/', async (req: Request, res: Response) => {
   try {
     const { organization_id, username, display_name, display_order, settings, enabled } = req.body;
 
-    if (!organization_id || !username) {
-      return res.status(400).json({ 
-        error: 'organization_id and username are required' 
+    // Comprehensive validation
+    const validation = validateProfileCreate({
+      organization_id,
+      username,
+      display_name,
+      settings,
+    });
+
+    if (!validation.valid) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        message: validation.errors.join('; '),
+        errors: validation.errors,
       });
     }
 
-    // Strip @ from username if present
-    const cleanUsername = username.replace(/^@/, '');
-
-    // Validate username format
-    if (!/^[a-zA-Z0-9_]+$/.test(cleanUsername)) {
-      return res.status(400).json({ 
-        error: 'Username must contain only letters, numbers, and underscores' 
-      });
-    }
+    // Clean username (strip @ and trim)
+    const cleanedUsername = cleanUsername(username);
 
     // @ts-ignore - Supabase type inference issue with new xcom_profiles table
     const { data: profile, error } = await supabase
       .from('xcom_profiles')
       .insert({
         organization_id,
-        username: cleanUsername,
+        username: cleanedUsername,
         display_name: display_name || null,
         display_order: display_order ?? 0,
         settings: settings || {},
@@ -138,7 +148,8 @@ router.post('/', async (req: Request, res: Response) => {
       // Handle duplicate key error
       if (error.code === '23505') {
         return res.status(409).json({ 
-          error: 'A profile with this username already exists for this organization' 
+          error: 'Duplicate profile',
+          message: 'A profile with this username already exists for this organization',
         });
       }
       throw error;
@@ -157,6 +168,7 @@ router.post('/', async (req: Request, res: Response) => {
         username: profileTyped.username,
         display_name: profileTyped.display_name,
         enabled: profileTyped.enabled,
+        settings: profileTyped.settings,
       },
     });
 
@@ -248,6 +260,21 @@ router.patch('/:id', async (req: Request, res: Response) => {
     const { id } = req.params;
     const { username, display_name, display_order, settings, enabled } = req.body;
 
+    // Validate update data
+    const validation = validateProfileUpdate({
+      username,
+      display_name,
+      settings,
+    });
+
+    if (!validation.valid) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        message: validation.errors.join('; '),
+        errors: validation.errors,
+      });
+    }
+
     // Get existing profile for audit trail
     const { data: existingProfile, error: fetchError } = await supabase
       .from('xcom_profiles')
@@ -256,20 +283,16 @@ router.patch('/:id', async (req: Request, res: Response) => {
       .single();
 
     if (fetchError || !existingProfile) {
-      return res.status(404).json({ error: 'X.com profile not found' });
+      return res.status(404).json({ 
+        error: 'Not found',
+        message: 'X.com profile not found',
+      });
     }
 
     // Prepare update object
     const updates: any = {};
     if (username !== undefined) {
-      // Strip @ from username if present
-      const cleanUsername = username.replace(/^@/, '');
-      if (!/^[a-zA-Z0-9_]+$/.test(cleanUsername)) {
-        return res.status(400).json({ 
-          error: 'Username must contain only letters, numbers, and underscores' 
-        });
-      }
-      updates.username = cleanUsername;
+      updates.username = cleanUsername(username);
     }
     if (display_name !== undefined) updates.display_name = display_name;
     if (display_order !== undefined) updates.display_order = display_order;
@@ -289,13 +312,14 @@ router.patch('/:id', async (req: Request, res: Response) => {
       // Handle duplicate key error
       if (error.code === '23505') {
         return res.status(409).json({ 
-          error: 'A profile with this username already exists for this organization' 
+          error: 'Duplicate profile',
+          message: 'A profile with this username already exists for this organization',
         });
       }
       throw error;
     }
 
-    // Log audit action
+    // Log audit action with detailed before/after state
     const userId = getUserId(req);
     const existingProfileTyped = existingProfile as any;
     const profileTyped = profile as any;
@@ -317,6 +341,9 @@ router.patch('/:id', async (req: Request, res: Response) => {
         display_order: profileTyped.display_order,
         enabled: profileTyped.enabled,
         settings: profileTyped.settings,
+      },
+      metadata: {
+        fields_updated: Object.keys(updates),
       },
     });
 

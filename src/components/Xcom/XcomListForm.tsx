@@ -2,11 +2,20 @@
  * X.com List Form
  * 
  * Modal form for creating and editing X.com lists.
+ * Uses comprehensive validation from xcomEmbed utilities.
  */
 
 import { useState } from 'react';
-import { X, List } from 'lucide-react';
+import { X, List, AlertCircle } from 'lucide-react';
 import type { XcomList, XcomListInsert, XcomListUpdate } from '../../types/xcom';
+import {
+  validateUsername,
+  validateSlug,
+  cleanUsername,
+  cleanSlug,
+  XCOM_USERNAME_MAX_LENGTH,
+  XCOM_SLUG_MAX_LENGTH,
+} from '../../utils/xcomEmbed';
 
 interface XcomListFormProps {
   initialData?: XcomList | null;
@@ -25,36 +34,33 @@ export function XcomListForm({
   const [slug, setSlug] = useState(initialData?.slug || '');
   const [displayName, setDisplayName] = useState(initialData?.displayName || '');
   const [enabled, setEnabled] = useState(initialData?.enabled !== undefined ? initialData.enabled : true);
-  const [error, setError] = useState<string | null>(null);
+  const [errors, setErrors] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
+    const validationErrors: string[] = [];
 
-    // Validate owner screen name
-    const cleanOwnerScreenName = ownerScreenName.replace(/^@/, '').trim();
-    if (!cleanOwnerScreenName) {
-      setError('Owner screen name is required');
+    // Validate owner screen name using shared validation utility
+    const ownerValidation = validateUsername(ownerScreenName);
+    if (!ownerValidation.valid) {
+      validationErrors.push(...ownerValidation.errors.map(e => e.replace('Username', 'Owner screen name')));
+    }
+
+    // Validate slug using shared validation utility
+    const slugValidation = validateSlug(slug);
+    if (!slugValidation.valid) {
+      validationErrors.push(...slugValidation.errors);
+    }
+
+    if (validationErrors.length > 0) {
+      setErrors(validationErrors);
       return;
     }
 
-    if (!/^[a-zA-Z0-9_]+$/.test(cleanOwnerScreenName)) {
-      setError('Owner screen name must contain only letters, numbers, and underscores');
-      return;
-    }
-
-    // Validate slug
-    const cleanSlug = slug.trim();
-    if (!cleanSlug) {
-      setError('Slug is required');
-      return;
-    }
-
-    if (!/^[a-zA-Z0-9_-]+$/.test(cleanSlug)) {
-      setError('Slug must contain only letters, numbers, hyphens, and underscores');
-      return;
-    }
+    setErrors([]);
+    const cleanedOwnerScreenName = cleanUsername(ownerScreenName);
+    const cleanedSlug = cleanSlug(slug);
 
     try {
       setIsSubmitting(true);
@@ -62,8 +68,8 @@ export function XcomListForm({
       if (initialData) {
         // Update existing list
         await onSubmit({
-          ownerScreenName: cleanOwnerScreenName,
-          slug: cleanSlug,
+          ownerScreenName: cleanedOwnerScreenName,
+          slug: cleanedSlug,
           displayName: displayName.trim() || null,
           enabled,
         } as XcomListUpdate);
@@ -71,15 +77,17 @@ export function XcomListForm({
         // Create new list
         await onSubmit({
           organizationId,
-          ownerScreenName: cleanOwnerScreenName,
-          slug: cleanSlug,
+          ownerScreenName: cleanedOwnerScreenName,
+          slug: cleanedSlug,
           displayName: displayName.trim() || null,
           enabled,
         } as XcomListInsert);
       }
     } catch (err) {
       console.error('Error submitting list form:', err);
-      setError(err instanceof Error ? err.message : 'Failed to save list');
+      // Handle API errors (including validation errors from backend)
+      const message = err instanceof Error ? err.message : 'Failed to save list';
+      setErrors([message]);
     } finally {
       setIsSubmitting(false);
     }
@@ -115,9 +123,22 @@ export function XcomListForm({
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="p-6 space-y-6">
-            {error && (
-              <div className="p-4 bg-red-900/30 border border-red-800/50 rounded-lg text-red-300 text-sm">
-                {error}
+            {errors.length > 0 && (
+              <div className="p-4 bg-red-900/30 border border-red-800/50 rounded-lg">
+                <div className="flex items-start gap-2">
+                  <AlertCircle size={18} className="text-red-400 mt-0.5 flex-shrink-0" />
+                  <div>
+                    {errors.length === 1 ? (
+                      <p className="text-red-300 text-sm">{errors[0]}</p>
+                    ) : (
+                      <ul className="text-red-300 text-sm list-disc list-inside space-y-1">
+                        {errors.map((err, i) => (
+                          <li key={i}>{err}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                </div>
               </div>
             )}
 
@@ -134,18 +155,26 @@ export function XcomListForm({
                   onChange={(e) => {
                     const value = e.target.value.replace(/^@/, '').trim();
                     setOwnerScreenName(value);
+                    // Clear errors when user starts typing
+                    if (errors.length > 0) setErrors([]);
                   }}
                   placeholder="username"
                   className="flex-1 px-3 py-2 bg-stone-800 border border-stone-700 rounded-lg text-stone-100 placeholder-stone-500 focus:outline-none focus:border-accent transition-colors"
                   required
                   disabled={isSubmitting}
+                  maxLength={XCOM_USERNAME_MAX_LENGTH}
                   pattern="[a-zA-Z0-9_]+"
                   title="Owner screen name must contain only letters, numbers, and underscores"
                 />
               </div>
-              <p className="mt-1 text-xs text-stone-500">
-                Enter the owner's username without @ symbol (e.g., "twitter")
-              </p>
+              <div className="flex justify-between mt-1">
+                <p className="text-xs text-stone-500">
+                  Enter the owner's username without @ symbol (e.g., "twitter")
+                </p>
+                <p className="text-xs text-stone-500">
+                  {ownerScreenName.length}/{XCOM_USERNAME_MAX_LENGTH}
+                </p>
+              </div>
             </div>
 
             {/* Slug */}
@@ -156,17 +185,27 @@ export function XcomListForm({
               <input
                 type="text"
                 value={slug}
-                onChange={(e) => setSlug(e.target.value.trim())}
+                onChange={(e) => {
+                  setSlug(e.target.value.trim());
+                  // Clear errors when user starts typing
+                  if (errors.length > 0) setErrors([]);
+                }}
                 placeholder="list-slug"
                 className="w-full px-3 py-2 bg-stone-800 border border-stone-700 rounded-lg text-stone-100 placeholder-stone-500 focus:outline-none focus:border-accent transition-colors"
                 required
                 disabled={isSubmitting}
+                maxLength={XCOM_SLUG_MAX_LENGTH}
                 pattern="[a-zA-Z0-9_-]+"
                 title="Slug must contain only letters, numbers, hyphens, and underscores"
               />
-              <p className="mt-1 text-xs text-stone-500">
-                Enter the list slug/identifier (e.g., "official-twitter-accts")
-              </p>
+              <div className="flex justify-between mt-1">
+                <p className="text-xs text-stone-500">
+                  Enter the list slug/identifier (e.g., "official-twitter-accts")
+                </p>
+                <p className="text-xs text-stone-500">
+                  {slug.length}/{XCOM_SLUG_MAX_LENGTH}
+                </p>
+              </div>
             </div>
 
             {/* Display Name */}
