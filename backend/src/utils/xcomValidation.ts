@@ -1,14 +1,9 @@
 /**
- * X.com Embedded Timeline Utility
+ * X.com Validation Utilities
  * 
- * Shared utility for generating X.com embedded timeline anchor attributes
- * and data attributes for both profiles and lists.
- * 
- * Also includes comprehensive validation functions for usernames, slugs,
- * and timeline settings.
+ * Validation functions for X.com profiles, lists, and timeline settings.
+ * These are used by the backend routes to validate incoming data.
  */
-
-import type { XcomTimelineSettings } from '../types/xcom';
 
 // ============================================================================
 // VALIDATION CONSTANTS
@@ -51,6 +46,24 @@ export interface ValidationResult {
 }
 
 // ============================================================================
+// TIMELINE SETTINGS TYPE (mirrors frontend)
+// ============================================================================
+
+export interface XcomTimelineSettings {
+  theme?: 'dark' | 'light';
+  tweetLimit?: number;
+  width?: number;
+  height?: number;
+  chrome?: {
+    noheader?: boolean;
+    nofooter?: boolean;
+    noborders?: boolean;
+    noscrollbar?: boolean;
+    transparent?: boolean;
+  };
+}
+
+// ============================================================================
 // USERNAME VALIDATION
 // ============================================================================
 
@@ -58,6 +71,7 @@ export interface ValidationResult {
  * Clean username by removing @ prefix and trimming whitespace
  */
 export function cleanUsername(username: string): string {
+  if (!username) return '';
   return username.replace(/^@/, '').trim();
 }
 
@@ -101,6 +115,7 @@ export function validateUsername(username: string): ValidationResult {
  * Clean slug by trimming whitespace
  */
 export function cleanSlug(slug: string): string {
+  if (!slug) return '';
   return slug.trim();
 }
 
@@ -137,94 +152,8 @@ export function validateSlug(slug: string): ValidationResult {
 }
 
 // ============================================================================
-// DATA ATTRIBUTE GENERATION
+// TIMELINE SETTINGS VALIDATION
 // ============================================================================
-
-/**
- * Generate data attributes for X.com embedded timeline
- * Converts settings object to Twitter widget data attributes
- */
-export function generateTimelineDataAttributes(settings: XcomTimelineSettings = {}): Record<string, string> {
-  const attributes: Record<string, string> = {};
-
-  // Theme: 'dark' or 'light' (default: 'dark')
-  if (settings.theme) {
-    attributes['data-theme'] = settings.theme;
-  } else {
-    attributes['data-theme'] = 'dark'; // Default for app
-  }
-
-  // Tweet limit: 1-20 (or unlimited if not specified)
-  if (settings.tweetLimit !== undefined && settings.tweetLimit !== null) {
-    if (settings.tweetLimit >= 1 && settings.tweetLimit <= 20) {
-      attributes['data-tweet-limit'] = String(settings.tweetLimit);
-    }
-  }
-
-  // Width: 180-520px (auto-adjusted by Twitter if out of range)
-  if (settings.width !== undefined && settings.width !== null) {
-    attributes['data-width'] = String(settings.width);
-  }
-
-  // Height: pixels (auto if not specified)
-  if (settings.height !== undefined && settings.height !== null) {
-    attributes['data-height'] = String(settings.height);
-  }
-
-  // Chrome options: space-separated tokens
-  if (settings.chrome) {
-    const chromeOptions: string[] = [];
-    if (settings.chrome.noheader) chromeOptions.push('noheader');
-    if (settings.chrome.nofooter) chromeOptions.push('nofooter');
-    if (settings.chrome.noborders) chromeOptions.push('noborders');
-    if (settings.chrome.noscrollbar) chromeOptions.push('noscrollbar');
-    if (settings.chrome.transparent) chromeOptions.push('transparent');
-
-    if (chromeOptions.length > 0) {
-      attributes['data-chrome'] = chromeOptions.join(' ');
-    }
-  }
-
-  return attributes;
-}
-
-/**
- * Generate profile timeline URL
- * Format: https://twitter.com/[username]
- */
-export function generateProfileTimelineUrl(username: string): string {
-  // Ensure username doesn't have @ prefix
-  const cleanUsername = username.replace(/^@/, '');
-  return `https://twitter.com/${cleanUsername}`;
-}
-
-/**
- * Generate list timeline URL
- * Format: https://twitter.com/{owner_screen_name}/lists/{slug}
- */
-export function generateListTimelineUrl(ownerScreenName: string, slug: string): string {
-  // Ensure owner_screen_name doesn't have @ prefix
-  const cleanOwner = ownerScreenName.replace(/^@/, '');
-  return `https://twitter.com/${cleanOwner}/lists/${slug}`;
-}
-
-/**
- * Generate anchor element text for profile timeline
- * Default: "Tweets by {username}"
- */
-export function generateProfileTimelineText(username: string): string {
-  const cleanUsername = username.replace(/^@/, '');
-  return `Tweets by ${cleanUsername}`;
-}
-
-/**
- * Generate anchor element text for list timeline
- * Default: "Tweets from {url}"
- */
-export function generateListTimelineText(ownerScreenName: string, slug: string): string {
-  const url = generateListTimelineUrl(ownerScreenName, slug);
-  return `Tweets from ${url}`;
-}
 
 /**
  * Validate timeline settings constraints
@@ -234,9 +163,16 @@ export function generateListTimelineText(ownerScreenName: string, slug: string):
 export function validateTimelineSettings(settings: XcomTimelineSettings): ValidationResult {
   const errors: string[] = [];
 
+  if (!settings || typeof settings !== 'object') {
+    // Empty settings are valid
+    return { valid: true, errors: [] };
+  }
+
   // Tweet limit: 1-20
   if (settings.tweetLimit !== undefined && settings.tweetLimit !== null) {
-    if (!Number.isInteger(settings.tweetLimit)) {
+    if (typeof settings.tweetLimit !== 'number') {
+      errors.push('Tweet limit must be a number');
+    } else if (!Number.isInteger(settings.tweetLimit)) {
       errors.push('Tweet limit must be a whole number');
     } else if (settings.tweetLimit < TWEET_LIMIT_MIN || settings.tweetLimit > TWEET_LIMIT_MAX) {
       errors.push(`Tweet limit must be between ${TWEET_LIMIT_MIN} and ${TWEET_LIMIT_MAX}`);
@@ -245,7 +181,9 @@ export function validateTimelineSettings(settings: XcomTimelineSettings): Valida
 
   // Width: 180-520px
   if (settings.width !== undefined && settings.width !== null) {
-    if (!Number.isInteger(settings.width)) {
+    if (typeof settings.width !== 'number') {
+      errors.push('Width must be a number');
+    } else if (!Number.isInteger(settings.width)) {
       errors.push('Width must be a whole number');
     } else if (settings.width < WIDTH_MIN || settings.width > WIDTH_MAX) {
       errors.push(`Width must be between ${WIDTH_MIN} and ${WIDTH_MAX} pixels`);
@@ -254,7 +192,9 @@ export function validateTimelineSettings(settings: XcomTimelineSettings): Valida
 
   // Height: must be positive (min 200px for usability)
   if (settings.height !== undefined && settings.height !== null) {
-    if (!Number.isInteger(settings.height)) {
+    if (typeof settings.height !== 'number') {
+      errors.push('Height must be a number');
+    } else if (!Number.isInteger(settings.height)) {
       errors.push('Height must be a whole number');
     } else if (settings.height < HEIGHT_MIN) {
       errors.push(`Height must be at least ${HEIGHT_MIN} pixels`);
@@ -265,6 +205,21 @@ export function validateTimelineSettings(settings: XcomTimelineSettings): Valida
   if (settings.theme !== undefined && settings.theme !== null) {
     if (settings.theme !== 'dark' && settings.theme !== 'light') {
       errors.push('Theme must be either "dark" or "light"');
+    }
+  }
+
+  // Chrome validation (all booleans)
+  if (settings.chrome !== undefined && settings.chrome !== null) {
+    if (typeof settings.chrome !== 'object') {
+      errors.push('Chrome options must be an object');
+    } else {
+      const chromeKeys = ['noheader', 'nofooter', 'noborders', 'noscrollbar', 'transparent'] as const;
+      for (const key of chromeKeys) {
+        const value = settings.chrome[key];
+        if (value !== undefined && value !== null && typeof value !== 'boolean') {
+          errors.push(`Chrome option "${key}" must be a boolean`);
+        }
+      }
     }
   }
 
@@ -279,13 +234,56 @@ export function validateTimelineSettings(settings: XcomTimelineSettings): Valida
 // ============================================================================
 
 /**
- * Validate a complete X.com profile insert/update
+ * Validate a complete X.com profile for creation
  * @param profile - The profile data to validate
  * @returns ValidationResult with valid flag and all error messages
  */
-export function validateXcomProfile(profile: {
+export function validateProfileCreate(profile: {
+  organization_id?: string;
   username?: string;
-  displayName?: string | null;
+  display_name?: string | null;
+  settings?: XcomTimelineSettings;
+}): ValidationResult {
+  const errors: string[] = [];
+
+  // Organization ID is required
+  if (!profile.organization_id) {
+    errors.push('Organization ID is required');
+  }
+
+  // Username is required
+  if (!profile.username) {
+    errors.push('Username is required');
+  } else {
+    const usernameValidation = validateUsername(profile.username);
+    errors.push(...usernameValidation.errors);
+  }
+
+  // Validate settings if provided
+  if (profile.settings) {
+    const settingsValidation = validateTimelineSettings(profile.settings);
+    errors.push(...settingsValidation.errors);
+  }
+
+  // Display name length check
+  if (profile.display_name && profile.display_name.length > 100) {
+    errors.push('Display name must be at most 100 characters');
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors,
+  };
+}
+
+/**
+ * Validate a complete X.com profile for update
+ * @param profile - The profile data to validate
+ * @returns ValidationResult with valid flag and all error messages
+ */
+export function validateProfileUpdate(profile: {
+  username?: string;
+  display_name?: string | null;
   settings?: XcomTimelineSettings;
 }): ValidationResult {
   const errors: string[] = [];
@@ -302,8 +300,8 @@ export function validateXcomProfile(profile: {
     errors.push(...settingsValidation.errors);
   }
 
-  // Display name doesn't need strict validation, but check reasonable length
-  if (profile.displayName && profile.displayName.length > 100) {
+  // Display name length check
+  if (profile.display_name && profile.display_name.length > 100) {
     errors.push('Display name must be at most 100 characters');
   }
 
@@ -318,23 +316,76 @@ export function validateXcomProfile(profile: {
 // ============================================================================
 
 /**
- * Validate a complete X.com list insert/update
+ * Validate a complete X.com list for creation
  * @param list - The list data to validate
  * @returns ValidationResult with valid flag and all error messages
  */
-export function validateXcomList(list: {
-  ownerScreenName?: string;
+export function validateListCreate(list: {
+  organization_id?: string;
+  owner_screen_name?: string;
   slug?: string;
-  displayName?: string | null;
+  display_name?: string | null;
+  settings?: XcomTimelineSettings;
+}): ValidationResult {
+  const errors: string[] = [];
+
+  // Organization ID is required
+  if (!list.organization_id) {
+    errors.push('Organization ID is required');
+  }
+
+  // Owner screen name is required
+  if (!list.owner_screen_name) {
+    errors.push('Owner screen name is required');
+  } else {
+    const ownerValidation = validateUsername(list.owner_screen_name);
+    if (!ownerValidation.valid) {
+      errors.push(...ownerValidation.errors.map(e => e.replace('Username', 'Owner screen name')));
+    }
+  }
+
+  // Slug is required
+  if (!list.slug) {
+    errors.push('Slug is required');
+  } else {
+    const slugValidation = validateSlug(list.slug);
+    errors.push(...slugValidation.errors);
+  }
+
+  // Validate settings if provided
+  if (list.settings) {
+    const settingsValidation = validateTimelineSettings(list.settings);
+    errors.push(...settingsValidation.errors);
+  }
+
+  // Display name length check
+  if (list.display_name && list.display_name.length > 100) {
+    errors.push('Display name must be at most 100 characters');
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors,
+  };
+}
+
+/**
+ * Validate a complete X.com list for update
+ * @param list - The list data to validate
+ * @returns ValidationResult with valid flag and all error messages
+ */
+export function validateListUpdate(list: {
+  owner_screen_name?: string;
+  slug?: string;
+  display_name?: string | null;
   settings?: XcomTimelineSettings;
 }): ValidationResult {
   const errors: string[] = [];
 
   // Validate owner screen name if provided
-  if (list.ownerScreenName !== undefined) {
-    const ownerValidation = validateUsername(list.ownerScreenName);
+  if (list.owner_screen_name !== undefined) {
+    const ownerValidation = validateUsername(list.owner_screen_name);
     if (!ownerValidation.valid) {
-      // Customize error message for owner screen name
       errors.push(...ownerValidation.errors.map(e => e.replace('Username', 'Owner screen name')));
     }
   }
@@ -351,8 +402,8 @@ export function validateXcomList(list: {
     errors.push(...settingsValidation.errors);
   }
 
-  // Display name doesn't need strict validation, but check reasonable length
-  if (list.displayName && list.displayName.length > 100) {
+  // Display name length check
+  if (list.display_name && list.display_name.length > 100) {
     errors.push('Display name must be at most 100 characters');
   }
 

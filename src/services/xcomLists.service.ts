@@ -12,6 +12,82 @@ const API_BASE = import.meta.env.PROD
   ? (import.meta.env.VITE_API_URL || '')
   : (import.meta.env.VITE_API_URL || 'http://localhost:3001');
 
+// ============================================================================
+// ERROR TYPES
+// ============================================================================
+
+export class XcomListApiError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+    public readonly code?: string,
+    public readonly errors?: string[]
+  ) {
+    super(message);
+    this.name = 'XcomListApiError';
+  }
+
+  static isValidationError(error: unknown): error is XcomListApiError {
+    return error instanceof XcomListApiError && error.status === 400;
+  }
+
+  static isDuplicateError(error: unknown): error is XcomListApiError {
+    return error instanceof XcomListApiError && error.status === 409;
+  }
+
+  static isNotFoundError(error: unknown): error is XcomListApiError {
+    return error instanceof XcomListApiError && error.status === 404;
+  }
+}
+
+/**
+ * Parse API error response and throw appropriate XcomListApiError
+ */
+async function handleApiError(response: Response, defaultMessage: string): Promise<never> {
+  let errorData: { error?: string; message?: string; errors?: string[] } = {};
+  
+  try {
+    errorData = await response.json();
+  } catch {
+    // If JSON parsing fails, use status text
+  }
+
+  const message = errorData.message || errorData.error || response.statusText || defaultMessage;
+  
+  throw new XcomListApiError(
+    message,
+    response.status,
+    errorData.error,
+    errorData.errors
+  );
+}
+
+// ============================================================================
+// TRANSFORM HELPERS
+// ============================================================================
+
+/**
+ * Transform API response to domain type
+ */
+function transformList(list: any): XcomList {
+  return {
+    id: list.id,
+    organizationId: list.organization_id,
+    ownerScreenName: list.owner_screen_name,
+    slug: list.slug,
+    displayName: list.display_name || null,
+    displayOrder: list.display_order || 0,
+    settings: (list.settings || {}) as XcomList['settings'],
+    enabled: list.enabled !== undefined ? list.enabled : true,
+    createdAt: new Date(list.created_at),
+    updatedAt: new Date(list.updated_at),
+  };
+}
+
+// ============================================================================
+// SERVICE
+// ============================================================================
+
 export const xcomListsService = {
   /**
    * Get all lists for an organization (ordered by display_order)
@@ -24,24 +100,11 @@ export const xcomListsService = {
     );
     
     if (!response.ok) {
-      throw new Error(`Failed to fetch X.com lists: ${response.statusText}`);
+      await handleApiError(response, 'Failed to fetch X.com lists');
     }
     
     const data = await response.json();
-    
-    // Transform database types to domain types
-    return (data.lists || []).map((list: any) => ({
-      id: list.id,
-      organizationId: list.organization_id,
-      ownerScreenName: list.owner_screen_name,
-      slug: list.slug,
-      displayName: list.display_name || null,
-      displayOrder: list.display_order || 0,
-      settings: (list.settings || {}) as XcomList['settings'],
-      enabled: list.enabled !== undefined ? list.enabled : true,
-      createdAt: new Date(list.created_at),
-      updatedAt: new Date(list.updated_at),
-    }));
+    return (data.lists || []).map(transformList);
   },
 
   /**
@@ -51,27 +114,11 @@ export const xcomListsService = {
     const response = await fetch(`${API_BASE}/api/xcom-lists/${listId}`);
     
     if (!response.ok) {
-      if (response.status === 404) {
-        throw new Error('X.com list not found');
-      }
-      throw new Error(`Failed to fetch X.com list: ${response.statusText}`);
+      await handleApiError(response, 'Failed to fetch X.com list');
     }
     
     const data = await response.json();
-    const list = data.list;
-    
-    return {
-      id: list.id,
-      organizationId: list.organization_id,
-      ownerScreenName: list.owner_screen_name,
-      slug: list.slug,
-      displayName: list.display_name || null,
-      displayOrder: list.display_order || 0,
-      settings: (list.settings || {}) as XcomList['settings'],
-      enabled: list.enabled !== undefined ? list.enabled : true,
-      createdAt: new Date(list.created_at),
-      updatedAt: new Date(list.updated_at),
-    };
+    return transformList(data.list);
   },
 
   /**
@@ -95,25 +142,11 @@ export const xcomListsService = {
     });
     
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || `Failed to create X.com list: ${response.statusText}`);
+      await handleApiError(response, 'Failed to create X.com list');
     }
     
     const data = await response.json();
-    const createdList = data.list;
-    
-    return {
-      id: createdList.id,
-      organizationId: createdList.organization_id,
-      ownerScreenName: createdList.owner_screen_name,
-      slug: createdList.slug,
-      displayName: createdList.display_name || null,
-      displayOrder: createdList.display_order || 0,
-      settings: (createdList.settings || {}) as XcomList['settings'],
-      enabled: createdList.enabled !== undefined ? createdList.enabled : true,
-      createdAt: new Date(createdList.created_at),
-      updatedAt: new Date(createdList.updated_at),
-    };
+    return transformList(data.list);
   },
 
   /**
@@ -139,25 +172,11 @@ export const xcomListsService = {
     });
     
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || `Failed to update X.com list: ${response.statusText}`);
+      await handleApiError(response, 'Failed to update X.com list');
     }
     
     const data = await response.json();
-    const list = data.list;
-    
-    return {
-      id: list.id,
-      organizationId: list.organization_id,
-      ownerScreenName: list.owner_screen_name,
-      slug: list.slug,
-      displayName: list.display_name || null,
-      displayOrder: list.display_order || 0,
-      settings: (list.settings || {}) as XcomList['settings'],
-      enabled: list.enabled !== undefined ? list.enabled : true,
-      createdAt: new Date(list.created_at),
-      updatedAt: new Date(list.updated_at),
-    };
+    return transformList(data.list);
   },
 
   /**
@@ -169,8 +188,7 @@ export const xcomListsService = {
     });
     
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || `Failed to delete X.com list: ${response.statusText}`);
+      await handleApiError(response, 'Failed to delete X.com list');
     }
   },
 
@@ -193,8 +211,7 @@ export const xcomListsService = {
     });
     
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || `Failed to reorder lists: ${response.statusText}`);
+      await handleApiError(response, 'Failed to reorder lists');
     }
   },
 };

@@ -2,6 +2,12 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { supabase } from '../utils/supabase.js';
 import { auditService } from '../services/auditService.js';
+import {
+  cleanUsername,
+  cleanSlug,
+  validateListCreate,
+  validateListUpdate,
+} from '../utils/xcomValidation.js';
 
 const router = Router();
 
@@ -104,36 +110,34 @@ router.post('/', async (req: Request, res: Response) => {
   try {
     const { organization_id, owner_screen_name, slug, display_name, display_order, settings, enabled } = req.body;
 
-    if (!organization_id || !owner_screen_name || !slug) {
-      return res.status(400).json({ 
-        error: 'organization_id, owner_screen_name, and slug are required' 
+    // Comprehensive validation
+    const validation = validateListCreate({
+      organization_id,
+      owner_screen_name,
+      slug,
+      display_name,
+      settings,
+    });
+
+    if (!validation.valid) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        message: validation.errors.join('; '),
+        errors: validation.errors,
       });
     }
 
-    // Strip @ from owner_screen_name if present
-    const cleanOwnerScreenName = owner_screen_name.replace(/^@/, '');
-
-    // Validate owner_screen_name format
-    if (!/^[a-zA-Z0-9_]+$/.test(cleanOwnerScreenName)) {
-      return res.status(400).json({ 
-        error: 'Owner screen name must contain only letters, numbers, and underscores' 
-      });
-    }
-
-    // Validate slug format (alphanumeric, hyphens, underscores)
-    if (!/^[a-zA-Z0-9_-]+$/.test(slug)) {
-      return res.status(400).json({ 
-        error: 'Slug must contain only letters, numbers, hyphens, and underscores' 
-      });
-    }
+    // Clean owner screen name and slug
+    const cleanedOwnerScreenName = cleanUsername(owner_screen_name);
+    const cleanedSlug = cleanSlug(slug);
 
     // @ts-ignore - Supabase type inference issue with new xcom_lists table
     const { data: list, error } = await supabase
       .from('xcom_lists')
       .insert({
         organization_id,
-        owner_screen_name: cleanOwnerScreenName,
-        slug,
+        owner_screen_name: cleanedOwnerScreenName,
+        slug: cleanedSlug,
         display_name: display_name || null,
         display_order: display_order ?? 0,
         settings: settings || {},
@@ -146,7 +150,8 @@ router.post('/', async (req: Request, res: Response) => {
       // Handle duplicate key error
       if (error.code === '23505') {
         return res.status(409).json({ 
-          error: 'A list with this owner and slug already exists for this organization' 
+          error: 'Duplicate list',
+          message: 'A list with this owner and slug already exists for this organization',
         });
       }
       throw error;
@@ -166,6 +171,7 @@ router.post('/', async (req: Request, res: Response) => {
         slug: listTyped.slug,
         display_name: listTyped.display_name,
         enabled: listTyped.enabled,
+        settings: listTyped.settings,
       },
     });
 
@@ -257,6 +263,22 @@ router.patch('/:id', async (req: Request, res: Response) => {
     const { id } = req.params;
     const { owner_screen_name, slug, display_name, display_order, settings, enabled } = req.body;
 
+    // Validate update data
+    const validation = validateListUpdate({
+      owner_screen_name,
+      slug,
+      display_name,
+      settings,
+    });
+
+    if (!validation.valid) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        message: validation.errors.join('; '),
+        errors: validation.errors,
+      });
+    }
+
     // Get existing list for audit trail
     const { data: existingList, error: fetchError } = await supabase
       .from('xcom_lists')
@@ -265,28 +287,19 @@ router.patch('/:id', async (req: Request, res: Response) => {
       .single();
 
     if (fetchError || !existingList) {
-      return res.status(404).json({ error: 'X.com list not found' });
+      return res.status(404).json({ 
+        error: 'Not found',
+        message: 'X.com list not found',
+      });
     }
 
     // Prepare update object
     const updates: any = {};
     if (owner_screen_name !== undefined) {
-      // Strip @ from owner_screen_name if present
-      const cleanOwnerScreenName = owner_screen_name.replace(/^@/, '');
-      if (!/^[a-zA-Z0-9_]+$/.test(cleanOwnerScreenName)) {
-        return res.status(400).json({ 
-          error: 'Owner screen name must contain only letters, numbers, and underscores' 
-        });
-      }
-      updates.owner_screen_name = cleanOwnerScreenName;
+      updates.owner_screen_name = cleanUsername(owner_screen_name);
     }
     if (slug !== undefined) {
-      if (!/^[a-zA-Z0-9_-]+$/.test(slug)) {
-        return res.status(400).json({ 
-          error: 'Slug must contain only letters, numbers, hyphens, and underscores' 
-        });
-      }
-      updates.slug = slug;
+      updates.slug = cleanSlug(slug);
     }
     if (display_name !== undefined) updates.display_name = display_name;
     if (display_order !== undefined) updates.display_order = display_order;
@@ -306,13 +319,14 @@ router.patch('/:id', async (req: Request, res: Response) => {
       // Handle duplicate key error
       if (error.code === '23505') {
         return res.status(409).json({ 
-          error: 'A list with this owner and slug already exists for this organization' 
+          error: 'Duplicate list',
+          message: 'A list with this owner and slug already exists for this organization',
         });
       }
       throw error;
     }
 
-    // Log audit action
+    // Log audit action with detailed before/after state
     const userId = getUserId(req);
     const existingListTyped = existingList as any;
     const listTyped = list as any;
@@ -336,6 +350,9 @@ router.patch('/:id', async (req: Request, res: Response) => {
         display_order: listTyped.display_order,
         enabled: listTyped.enabled,
         settings: listTyped.settings,
+      },
+      metadata: {
+        fields_updated: Object.keys(updates),
       },
     });
 
