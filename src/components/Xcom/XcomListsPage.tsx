@@ -3,11 +3,16 @@
  * 
  * Main page component for managing X.com list timelines.
  * Features CRUD operations, drag-and-drop reordering, and timeline embedding.
+ * 
+ * Phase 8: Layout & Styling
+ * - Responsive grid layout (1 col mobile, 2 col tablet, 3 col desktop)
+ * - View mode toggle (grid vs list)
+ * - Improved timeline height constraints
  */
 
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Sparkles, User, List, Plus, RefreshCw } from 'lucide-react';
+import { Sparkles, User, List, Plus, RefreshCw, LayoutGrid, LayoutList } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -23,15 +28,19 @@ import {
   sortableKeyboardCoordinates,
   useSortable,
   verticalListSortingStrategy,
+  rectSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useOrganization } from '../../context/OrganizationContext';
 import { xcomListsService } from '../../services';
 import { LoadingSpinner } from '../UI/LoadingSpinner';
+import { EmptyState } from '../UI/EmptyState';
 import { XcomListCard } from './XcomListCard';
 import { XcomListForm } from './XcomListForm';
 import type { XcomList, XcomListInsert, XcomListUpdate } from '../../types/xcom';
 import { useToast } from '../../context/ToastContext';
+
+type ViewMode = 'grid' | 'list';
 
 export function XcomListsPage() {
   const navigate = useNavigate();
@@ -46,6 +55,7 @@ export function XcomListsPage() {
   const [editingList, setEditingList] = useState<XcomList | null>(null);
   const [deletingListId, setDeletingListId] = useState<string | null>(null);
   const [isReordering, setIsReordering] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>('grid');
 
   // Configure sensors for drag-and-drop
   const sensors = useSensors(
@@ -308,13 +318,40 @@ export function XcomListsPage() {
                 {lists.length} list{lists.length !== 1 ? 's' : ''} configured
               </p>
             </div>
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent/90 text-stone-900 font-medium rounded-lg transition-colors"
-            >
-              <Plus size={20} />
-              Add List
-            </button>
+            <div className="flex items-center gap-3">
+              {/* View Mode Toggle */}
+              <div className="flex items-center bg-stone-800 rounded-lg p-1">
+                <button
+                  onClick={() => setViewMode('grid')}
+                  className={`p-2 rounded transition-colors ${
+                    viewMode === 'grid'
+                      ? 'bg-stone-700 text-accent'
+                      : 'text-stone-400 hover:text-stone-200'
+                  }`}
+                  title="Grid view"
+                >
+                  <LayoutGrid size={18} />
+                </button>
+                <button
+                  onClick={() => setViewMode('list')}
+                  className={`p-2 rounded transition-colors ${
+                    viewMode === 'list'
+                      ? 'bg-stone-700 text-accent'
+                      : 'text-stone-400 hover:text-stone-200'
+                  }`}
+                  title="List view"
+                >
+                  <LayoutList size={18} />
+                </button>
+              </div>
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent/90 text-stone-900 font-medium rounded-lg transition-colors"
+              >
+                <Plus size={20} />
+                Add List
+              </button>
+            </div>
           </div>
 
           {/* Error State */}
@@ -326,18 +363,14 @@ export function XcomListsPage() {
 
           {/* Empty State */}
           {lists.length === 0 && !error && (
-            <div className="flex flex-col items-center justify-center py-16 px-4">
-              <div className="text-stone-500 mb-4">
-                <List size={64} />
-              </div>
-              <h3 className="text-xl font-semibold text-stone-200 mb-2">No X.com Lists</h3>
-              <p className="text-stone-400 text-center max-w-md">
-                Add your first X.com list to start displaying timeline feeds.
-              </p>
-            </div>
+            <EmptyState
+              title="No X.com Lists"
+              description="Add your first X.com list to start displaying timeline feeds."
+              icon={<List size={64} />}
+            />
           )}
 
-          {/* Lists Grid */}
+          {/* Lists Grid/List */}
           {lists.length > 0 && (
             <DndContext
               sensors={sensors}
@@ -346,9 +379,15 @@ export function XcomListsPage() {
             >
               <SortableContext
                 items={lists.map((l) => l.id)}
-                strategy={verticalListSortingStrategy}
+                strategy={viewMode === 'grid' ? rectSortingStrategy : verticalListSortingStrategy}
               >
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div
+                  className={
+                    viewMode === 'grid'
+                      ? 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6'
+                      : 'flex flex-col gap-4'
+                  }
+                >
                   {lists.map((list) => (
                     <SortableListCard
                       key={list.id}
@@ -358,6 +397,7 @@ export function XcomListsPage() {
                       onUpdateSettings={handleUpdateSettings}
                       isDeleting={deletingListId === list.id}
                       disabled={isReordering}
+                      viewMode={viewMode}
                     />
                   ))}
                 </div>
@@ -404,6 +444,7 @@ interface SortableListCardProps {
   onUpdateSettings: (listId: string, settings: XcomList['settings']) => Promise<void>;
   isDeleting?: boolean;
   disabled?: boolean;
+  viewMode?: ViewMode;
 }
 
 function SortableListCard({
@@ -413,6 +454,7 @@ function SortableListCard({
   onUpdateSettings,
   isDeleting = false,
   disabled = false,
+  viewMode = 'grid',
 }: SortableListCardProps) {
   const {
     attributes,
@@ -441,6 +483,7 @@ function SortableListCard({
         onUpdateSettings={onUpdateSettings}
         isDeleting={isDeleting}
         dragHandleProps={{ ...attributes, ...listeners }}
+        viewMode={viewMode}
       />
     </div>
   );
