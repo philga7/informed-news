@@ -3,6 +3,11 @@
  * 
  * Card component for displaying an X.com profile with embed preview,
  * edit/delete buttons, and drag handle for reordering.
+ * 
+ * Phase 8: Layout & Styling
+ * - Support for grid and list view modes
+ * - Improved timeline height constraints
+ * - Better visual hierarchy
  */
 
 import { useState } from 'react';
@@ -11,6 +16,8 @@ import type { XcomProfile } from '../../types/xcom';
 import { XcomProfileTimelineEmbed } from './XcomProfileTimelineEmbed';
 import { XcomProfileSettingsModal } from './XcomProfileSettingsModal';
 
+type ViewMode = 'grid' | 'list';
+
 interface XcomProfileCardProps {
   profile: XcomProfile;
   onEdit: (profile: XcomProfile) => void;
@@ -18,6 +25,7 @@ interface XcomProfileCardProps {
   onUpdateSettings: (profileId: string, settings: XcomProfile['settings']) => Promise<void>;
   isDeleting?: boolean;
   dragHandleProps?: React.HTMLAttributes<HTMLElement>;
+  viewMode?: ViewMode;
 }
 
 export function XcomProfileCard({
@@ -27,6 +35,7 @@ export function XcomProfileCard({
   onUpdateSettings,
   isDeleting = false,
   dragHandleProps,
+  viewMode = 'grid',
 }: XcomProfileCardProps) {
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -46,10 +55,105 @@ export function XcomProfileCard({
     setShowSettingsModal(false);
   };
 
+  // List view layout - horizontal card
+  if (viewMode === 'list') {
+    return (
+      <>
+        <div
+          className={`bg-stone-900 border rounded-lg overflow-hidden transition-all ${
+            profile.enabled
+              ? 'border-stone-800 hover:border-stone-700'
+              : 'border-stone-800/50 opacity-60'
+          }`}
+        >
+          <div className="flex items-center gap-4 p-4">
+            {/* Drag Handle */}
+            <button
+              className="text-stone-500 hover:text-stone-400 cursor-move flex-shrink-0"
+              title="Drag to reorder"
+              type="button"
+              {...dragHandleProps}
+            >
+              <GripVertical size={18} />
+            </button>
+
+            {/* Profile Icon */}
+            <div className="w-10 h-10 bg-stone-800 rounded-full flex items-center justify-center flex-shrink-0">
+              <User className="text-accent" size={20} />
+            </div>
+
+            {/* Profile Info */}
+            <div className="flex-1 min-w-0">
+              <h3 className="font-semibold text-stone-200 truncate">
+                {profile.displayName || `@${profile.username}`}
+              </h3>
+              <a
+                href={`https://twitter.com/${profile.username}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-stone-400 hover:text-accent flex items-center gap-1 transition-colors"
+                onClick={(e) => e.stopPropagation()}
+              >
+                @{profile.username}
+                <ExternalLink size={12} />
+              </a>
+            </div>
+
+            {/* Status & Actions */}
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {!profile.enabled && (
+                <span className="text-xs text-stone-500 px-2 py-1 bg-stone-800 rounded">
+                  Disabled
+                </span>
+              )}
+              <button
+                onClick={() => setShowSettingsModal(true)}
+                className="p-2 bg-stone-800 hover:bg-stone-700 text-stone-400 hover:text-accent rounded-lg transition-colors"
+                title="Edit settings"
+                type="button"
+              >
+                <Settings size={16} />
+              </button>
+              <button
+                onClick={() => onEdit(profile)}
+                className="p-2 bg-stone-800 hover:bg-stone-700 text-stone-400 hover:text-blue-400 rounded-lg transition-colors"
+                title="Edit profile"
+                type="button"
+              >
+                <Edit2 size={16} />
+              </button>
+              <button
+                onClick={handleDelete}
+                className={`p-2 bg-stone-800 hover:bg-red-900/30 text-stone-400 hover:text-red-400 rounded-lg transition-colors ${
+                  showDeleteConfirm ? 'bg-red-900/30 text-red-400' : ''
+                }`}
+                title={showDeleteConfirm ? 'Click again to confirm' : 'Delete profile'}
+                disabled={isDeleting}
+                type="button"
+              >
+                <Trash2 size={16} />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Settings Modal */}
+        {showSettingsModal && (
+          <XcomProfileSettingsModal
+            profile={profile}
+            onSave={handleSaveSettings}
+            onClose={() => setShowSettingsModal(false)}
+          />
+        )}
+      </>
+    );
+  }
+
+  // Grid view layout - vertical card with timeline embed
   return (
     <>
       <div
-        className={`bg-stone-900 border rounded-lg overflow-hidden transition-all ${
+        className={`bg-stone-900 border rounded-lg overflow-hidden transition-all flex flex-col ${
           profile.enabled
             ? 'border-stone-800 hover:border-stone-700'
             : 'border-stone-800/50 opacity-60'
@@ -126,13 +230,13 @@ export function XcomProfileCard({
           </div>
         </div>
 
-        {/* Timeline Embed */}
+        {/* Timeline Embed with height constraint for scrolling */}
         {profile.enabled ? (
-          <div className="p-4">
+          <div className="p-4 flex-1 overflow-auto max-h-[500px]">
             <XcomProfileTimelineEmbed profile={profile} />
           </div>
         ) : (
-          <div className="p-8 text-center">
+          <div className="p-8 text-center flex-1 flex items-center justify-center">
             <p className="text-stone-500 text-sm">This profile is disabled</p>
           </div>
         )}
