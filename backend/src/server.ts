@@ -19,6 +19,7 @@ import optimizationRouter from './routes/optimization.js';
 import xcomRateLimitRouter from './routes/xcomRateLimit.js';
 import xcomProfilesRouter from './routes/xcomProfiles.js';
 import xcomListsRouter from './routes/xcomLists.js';
+import xcomTweetsRouter from './routes/xcomTweets.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -51,6 +52,7 @@ app.use('/api/optimization', optimizationRouter);
 app.use('/api/xcom-rate-limit', xcomRateLimitRouter);
 app.use('/api/xcom-profiles', xcomProfilesRouter);
 app.use('/api/xcom-lists', xcomListsRouter);
+app.use('/api/xcom-tweets', xcomTweetsRouter);
 
 // Error handling middleware
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
