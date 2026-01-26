@@ -11,10 +11,12 @@
  */
 
 import { useState } from 'react';
-import { Edit2, Trash2, Settings, GripVertical, List, ExternalLink } from 'lucide-react';
+import { Edit2, Trash2, Settings, GripVertical, List, ExternalLink, FileText } from 'lucide-react';
 import type { XcomList } from '../../types/xcom';
 import { XcomListTimelineEmbed } from './XcomListTimelineEmbed';
 import { XcomListSettingsModal } from './XcomListSettingsModal';
+import { XcomTweetUrlModal } from './XcomTweetUrlModal';
+import { useToast } from '../../context/ToastContext';
 
 type ViewMode = 'grid' | 'list';
 
@@ -37,8 +39,10 @@ export function XcomListCard({
   dragHandleProps,
   viewMode = 'grid',
 }: XcomListCardProps) {
+  const { showToast } = useToast();
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showTweetUrlModal, setShowTweetUrlModal] = useState(false);
 
   const handleDelete = () => {
     if (!showDeleteConfirm) {
@@ -53,6 +57,14 @@ export function XcomListCard({
   const handleSaveSettings = async (settings: XcomList['settings']) => {
     await onUpdateSettings(list.id, settings);
     setShowSettingsModal(false);
+  };
+
+  const handleTweetSuccess = (recordIds: string[]) => {
+    setShowTweetUrlModal(false);
+    showToast({
+      type: 'success',
+      message: `Created ${recordIds.length} Source Record${recordIds.length !== 1 ? 's' : ''} from tweets`,
+    });
   };
 
   // Generate list URL for external link
@@ -110,6 +122,14 @@ export function XcomListCard({
                 </span>
               )}
               <button
+                onClick={() => setShowTweetUrlModal(true)}
+                className="p-2 bg-stone-800 hover:bg-stone-700 text-stone-400 hover:text-green-400 rounded-lg transition-colors"
+                title="Create Source Records from tweets"
+                type="button"
+              >
+                <FileText size={16} />
+              </button>
+              <button
                 onClick={() => setShowSettingsModal(true)}
                 className="p-2 bg-stone-800 hover:bg-stone-700 text-stone-400 hover:text-accent rounded-lg transition-colors"
                 title="Edit settings"
@@ -146,6 +166,14 @@ export function XcomListCard({
             list={list}
             onSave={handleSaveSettings}
             onClose={() => setShowSettingsModal(false)}
+          />
+        )}
+
+        {/* Tweet URL Modal */}
+        {showTweetUrlModal && (
+          <XcomTweetUrlModal
+            onClose={() => setShowTweetUrlModal(false)}
+            onSuccess={handleTweetSuccess}
           />
         )}
       </>
@@ -203,6 +231,14 @@ export function XcomListCard({
                 </span>
               )}
               <button
+                onClick={() => setShowTweetUrlModal(true)}
+                className="p-2 bg-stone-800 hover:bg-stone-700 text-stone-400 hover:text-green-400 rounded-lg transition-colors"
+                title="Create Source Records from tweets"
+                type="button"
+              >
+                <FileText size={16} />
+              </button>
+              <button
                 onClick={() => setShowSettingsModal(true)}
                 className="p-2 bg-stone-800 hover:bg-stone-700 text-stone-400 hover:text-accent rounded-lg transition-colors"
                 title="Edit settings"
@@ -251,6 +287,14 @@ export function XcomListCard({
           list={list}
           onSave={handleSaveSettings}
           onClose={() => setShowSettingsModal(false)}
+        />
+      )}
+
+      {/* Tweet URL Modal */}
+      {showTweetUrlModal && (
+        <XcomTweetUrlModal
+          onClose={() => setShowTweetUrlModal(false)}
+          onSuccess={handleTweetSuccess}
         />
       )}
     </>

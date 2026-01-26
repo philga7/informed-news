@@ -51,6 +51,7 @@ async function loadRoutes() {
     const schedulerRouter = (await import('../backend/src/routes/scheduler.js')).default;
     const xcomProfilesRouter = (await import('../backend/src/routes/xcomProfiles.js')).default;
     const xcomListsRouter = (await import('../backend/src/routes/xcomLists.js')).default;
+    const xcomTweetsRouter = (await import('../backend/src/routes/xcomTweets.js')).default;
     
     // API Routes
     app.use('/api/organizations', organizationsRouter);
@@ -70,6 +71,7 @@ async function loadRoutes() {
     app.use('/api/scheduler', schedulerRouter);
     app.use('/api/xcom-profiles', xcomProfilesRouter);
     app.use('/api/xcom-lists', xcomListsRouter);
+    app.use('/api/xcom-tweets', xcomTweetsRouter);
   } catch (error) {
     console.error('Error loading standard routes:', error);
     // Continue - don't block other routes

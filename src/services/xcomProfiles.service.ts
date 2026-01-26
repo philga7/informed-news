@@ -5,7 +5,14 @@
  * Follows existing service patterns (watchItems, indicators).
  */
 
-import type { XcomProfile, XcomProfileInsert, XcomProfileUpdate } from '../types/xcom';
+import type { 
+  XcomProfile, 
+  XcomProfileInsert, 
+  XcomProfileUpdate,
+  TweetData,
+  CreateSourceRecordsFromTweetsRequest,
+  CreateSourceRecordsFromTweetsResponse,
+} from '../types/xcom';
 
 // Use relative URL in production (Vercel), localhost in development
 const API_BASE = import.meta.env.PROD 
@@ -210,5 +217,71 @@ export const xcomProfilesService = {
     if (!response.ok) {
       await handleApiError(response, 'Failed to reorder profiles');
     }
+  },
+
+  /**
+   * Create Source Records from tweets captured in embedded timelines
+   * 
+   * @param request - Request containing tweets and options
+   * @returns Response with created record IDs
+   */
+  async createSourceRecordsFromTweets(
+    request: CreateSourceRecordsFromTweetsRequest
+  ): Promise<CreateSourceRecordsFromTweetsResponse> {
+    const response = await fetch(`${API_BASE}/api/xcom-tweets/source-records`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        organization_id: request.organizationId,
+        user_id: request.userId,
+        tweets: request.tweets.map(tweet => ({
+          text: tweet.text,
+          authorUsername: tweet.authorUsername,
+          tweetUrl: tweet.tweetUrl,
+          timestamp: tweet.timestamp?.toISOString(),
+          videoLinks: tweet.videoLinks,
+          mediaUrls: tweet.mediaUrls,
+          metadata: tweet.metadata,
+        })),
+        combine_into_single: request.combineIntoSingle,
+        topic_ids: request.topicIds,
+      }),
+    });
+    
+    if (!response.ok) {
+      await handleApiError(response, 'Failed to create source records from tweets');
+    }
+    
+    const data = await response.json();
+    return {
+      success: data.success,
+      recordIds: data.recordIds || [],
+      created: data.created || 0,
+      errors: data.errors,
+    };
+  },
+
+  /**
+   * Get or create the X.com source for an organization
+   * 
+   * @param organizationId - The organization ID
+   * @returns The X.com source object
+   */
+  async getOrCreateXcomSource(organizationId: string): Promise<{ id: string; name: string }> {
+    const response = await fetch(
+      `${API_BASE}/api/xcom-tweets/source?organization_id=${encodeURIComponent(organizationId)}`
+    );
+    
+    if (!response.ok) {
+      await handleApiError(response, 'Failed to get X.com source');
+    }
+    
+    const data = await response.json();
+    return {
+      id: data.source.id,
+      name: data.source.name,
+    };
   },
 };
