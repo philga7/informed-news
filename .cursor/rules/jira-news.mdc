@@ -1,0 +1,35 @@
+---
+description: Jira MCP defaults for the Informed News (NEWS) project
+alwaysApply: true
+---
+
+# Jira — NEWS project
+
+When creating, searching, updating, or commenting on Jira work for this repo, use the **NEWS** project only (unless the user explicitly names another project).
+
+## Connection
+
+- **MCP server**: `Atlassian-MCP-Server` (project) / `user-Atlassian-MCP-Server` (user-level)
+- **Site**: https://informedcrew.atlassian.net
+- **cloudId**: `ebcd227d-1f6d-4a54-a6d7-cfe70e377a50`
+- **Project key**: `NEWS`
+- **Project name**: Informed News
+- **Project id**: `10035`
+
+## Issue types (team-managed)
+
+| Name | id |
+|------|-----|
+| Epic | 10051 |
+| Story | 10053 |
+| Task | 10052 |
+| Feature | 10054 |
+| Bug | 10055 |
+| Subtask | 10050 |
+
+## Conventions
+
+- Prefer JQL scoped with `project = NEWS`.
+- Pass `cloudId` on every Atlassian MCP call.
+- Do not use HARN, KIND, TASK, or SCRUM for Informed News work.
+- After editing `.cursor/mcp.json`, reload MCP / re-auth if tools show `needsAuth`.

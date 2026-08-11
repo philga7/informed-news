@@ -1,19 +1,22 @@
 {
-    "env": {},
-    "mcpServers": {
-        "shrimp-task-manager": {
-        "command": "mcp-shrimp-task-manager",
-        "env": {
-            "DATA_DIR": "/Users/philipclapper/ShrimpData/informed-news",
-            "TEMPLATES_USE": "en",
-            "ENABLE_GUI": "true",
-            "WEB_PORT": "3021"
-        }
-        },
-        "cipher": {
-        "transport": "streamable-http",
-        "url": "https://cipher.informedcrew.com/http",
-        "timeout": 120000
-        }
+  "env": {},
+  "mcpServers": {
+    "shrimp-task-manager": {
+      "command": "mcp-shrimp-task-manager",
+      "env": {
+        "DATA_DIR": "/Users/philipclapper/ShrimpData/informed-news",
+        "TEMPLATES_USE": "en",
+        "ENABLE_GUI": "true",
+        "WEB_PORT": "3021"
+      }
+    },
+    "cipher": {
+      "transport": "streamable-http",
+      "url": "https://cipher.informedcrew.com/http",
+      "timeout": 120000
+    },
+    "Atlassian-MCP-Server": {
+      "url": "https://mcp.atlassian.com/v1/mcp/authv2"
     }
-} 
+  }
+}
