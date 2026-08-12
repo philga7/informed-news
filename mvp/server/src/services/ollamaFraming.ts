@@ -7,7 +7,7 @@ import type {
 } from '../types/article.js';
 
 const OLLAMA_HOST = 'https://ollama.com';
-const DEFAULT_MODEL = 'gemini-3-flash-preview';
+const DEFAULT_MODEL = 'glm-5.2';
 const DEFAULT_TIMEOUT_MS = 30_000;
 
 const GENRES: readonly FramingGenre[] = [
