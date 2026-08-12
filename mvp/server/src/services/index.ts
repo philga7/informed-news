@@ -22,3 +22,13 @@ export type {
   FramingClassifySuccess,
   FramingClassifyFailure,
 } from './ollamaFraming.js';
+export {
+  classifyUnclassifiedArticles,
+  classifyArticleById,
+  sortNewestFirst,
+} from './classifyArticles.js';
+export type {
+  ClassifyBatchOptions,
+  ClassifyBatchResult,
+  ClassifyOneResult,
+} from './classifyArticles.js';
