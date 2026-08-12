@@ -22,3 +22,6 @@ dist-ssr
 *.sw?
 .env
 .vercel
+
+# MVP local JSON data store
+mvp/data/*.json
