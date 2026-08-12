@@ -3,6 +3,11 @@ import dotenv from 'dotenv';
 import express from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  createAuthRouter,
+  createSessionMiddleware,
+  requireApiSession,
+} from './auth/index.js';
 import { fetchCfpArticles } from './services/cfpFetch.js';
 import { readArticles, readMeta } from './store/index.js';
 
@@ -12,8 +17,14 @@ dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 const app = express();
 const port = Number(process.env.PORT) || 3001;
 
-app.use(cors());
+app.use(
+  cors({
+    origin: true,
+    credentials: true,
+  }),
+);
 app.use(express.json());
+app.use(createSessionMiddleware());
 
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', app: 'mvp-server' });
@@ -22,6 +33,9 @@ app.get('/health', (_req, res) => {
 app.get('/', (_req, res) => {
   res.json({ message: 'Informed News MVP server' });
 });
+
+app.use('/api', requireApiSession);
+app.use('/api', createAuthRouter());
 
 /**
  * Fetch latest CFP RSS items, scrape publisher URLs, upsert into JSON store.
