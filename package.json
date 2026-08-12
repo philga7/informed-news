@@ -11,7 +11,11 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit -p tsconfig.app.json"
+    "typecheck": "tsc --noEmit -p tsconfig.app.json",
+    "mvp:server": "npm run dev --prefix mvp/server",
+    "mvp:web": "npm run dev --prefix mvp/web",
+    "mvp:dev": "concurrently -n server,web -c blue,green \"npm run mvp:server\" \"npm run mvp:web\"",
+    "mvp:install": "npm install --prefix mvp/server && npm install --prefix mvp/web"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
