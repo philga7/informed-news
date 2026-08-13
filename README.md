@@ -63,6 +63,18 @@ Process model matches HARN: **`main` + short-lived branches**, Conventional Comm
 - **Release:** merge to `main` re-validates, then semantic-release (`npmPublish: false`).
 - **Release ≠ deploy:** GitHub Release/tag is versioning only. Runtime is local MVP and/or Vercel (or other host) — not performed by the Release workflow.
 
+## Hosting (Vercel)
+
+Root [`vercel.json`](vercel.json) deploys the **MVP web UI** (`mvp/web` → static `mvp/web/dist`). It installs `mvp/web` deps so Vite/`tsc` are available at build time.
+
+| Concern | Where |
+|---------|--------|
+| **Web UI** | Vercel (Git integration; preview + production) |
+| **API** | Local `mvp/server` (`npm run server` / `npm run dev`) — not ported to Vercel serverless |
+| **Versioning** | GitHub Release via semantic-release (does not deploy) |
+
+`_legacy/vercel.json` is historical only and is not the deploy entrypoint.
+
 ## Legacy code
 
 The previous OSINT / Supabase / Express monolith lives under **[`_legacy/`](_legacy/)** for reference. It is not the default app and must not be wired into `mvp/`.

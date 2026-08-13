@@ -69,9 +69,10 @@ Overlap on validation is intentional: a green PR does not skip the final gate be
 | Concern | Where |
 |---------|--------|
 | **Versioning** | GitHub Release + tag + `CHANGELOG.md` + `package.json` bump via semantic-release |
-| **Runtime** | Local MVP (`npm run dev`) and/or Vercel (or other host) — **not** gated by the Release workflow |
+| **Web UI (Vercel)** | Root `vercel.json` builds/publishes `mvp/web` static output — **not** gated by the Release workflow |
+| **API** | Local `mvp/server` (`npm run server` / `npm run dev`). Not hosted on Vercel in this setup. |
 
-`@semantic-release/npm` uses `npmPublish: false` (private app; no npm registry publish).
+`@semantic-release/npm` uses `npmPublish: false` (private app; no npm registry publish). Do not point Vercel at `_legacy/` or restore the legacy monolith as the deploy entrypoint.
 
 ### Version line (0.x)
 
