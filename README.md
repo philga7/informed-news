@@ -54,6 +54,15 @@ See `mvp/.env.example`:
 | `npm run typecheck` | Typecheck both packages |
 | `npm run build` | Build the web client |
 
+## Versioning & CI
+
+Process model matches HARN: **`main` + short-lived branches**, Conventional Commits, PR CI, semantic-release on merge to `main`.
+
+- **Version line:** stay on **`0.x`** until an intentional `1.0.0` (baseline tag `v0.1.0`). See [CONTRIBUTING.md](CONTRIBUTING.md).
+- **CI:** PRs to `main` run MVP install → typecheck → build.
+- **Release:** merge to `main` re-validates, then semantic-release (`npmPublish: false`).
+- **Release ≠ deploy:** GitHub Release/tag is versioning only. Runtime is local MVP and/or Vercel (or other host) — not performed by the Release workflow.
+
 ## Legacy code
 
 The previous OSINT / Supabase / Express monolith lives under **[`_legacy/`](_legacy/)** for reference. It is not the default app and must not be wired into `mvp/`.

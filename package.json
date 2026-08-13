@@ -11,9 +11,16 @@
     "start": "npm run start --prefix mvp/server",
     "install:all": "npm install --prefix mvp/server && npm install --prefix mvp/web",
     "typecheck": "npm run typecheck --prefix mvp/server && npm run typecheck --prefix mvp/web",
-    "build": "npm run build --prefix mvp/web"
+    "build": "npm run build --prefix mvp/web",
+    "release": "semantic-release",
+    "release:dry-run": "semantic-release --dry-run"
   },
   "devDependencies": {
-    "concurrently": "^9.2.1"
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/git": "^10.0.1",
+    "@semantic-release/github": "^11.0.1",
+    "@semantic-release/npm": "^12.0.1",
+    "concurrently": "^9.2.1",
+    "semantic-release": "^24.2.3"
   }
 }
