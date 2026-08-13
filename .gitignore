@@ -25,3 +25,7 @@ dist-ssr
 
 # MVP local JSON data store
 mvp/data/*.json
+
+# Committed SSH key material — rotate and untrack (separate security chore)
+informed_news
+informed_news.pub
