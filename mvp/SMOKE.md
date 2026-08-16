@@ -1,6 +1,6 @@
 # MVP E2E smoke checklist
 
-Verify the greenfield path: **login → Refresh → classify → dual citations + framing** (CFP always; xcancel when configured).
+Verify the greenfield path: **login → Refresh → classify → dual citations + depth honesty + framing** (CFP always; xcancel when configured).
 
 ## Prerequisites
 
@@ -29,10 +29,13 @@ Leave `XCANCEL_PROFILES` empty (default). Do not create `mvp/data/x-profiles.jso
 |------|--------|-----------|
 | 1. Login | Enter `MVP_PASSWORD` on the login form | Feed view loads (no 401 loop) |
 | 2. Refresh | Click **Refresh** | Status shows fetched count; CFP articles appear with a `CFP` source chip |
-| 3. Classify | Click **Classify new** | Status shows classified count (needs `OLLAMA_API_KEY`) |
-| 4. Dual links | Open an article card | Citations: **CFP** \| **Original** when scrape succeeded |
-| 5. Framing | Expand framing on a classified article | Dimension bars/scores and honesty banner visible |
-| 6. Re-fetch | Click **Refresh** again | Unchanged items keep framing; new items stay unclassified |
+| 3. Depth honesty | Scan CFP cards after Refresh | Some show a short **original-text excerpt** (`bodyStatus: ok`); others show **Original text unavailable** or **Original text blocked** — not silent |
+| 4. Publisher title | Find a card whose publisher title differs from the CFP headline | Both titles appear (CFP headline + Publisher line) |
+| 5. Classify | Click **Classify new** | Status shows classified count (needs `OLLAMA_API_KEY`) |
+| 6. Body-backed framing | Expand framing on a **body-ok** classified card | Evidence / summary can reflect article text, not only the RSS blurb |
+| 7. Dual links | Open an article card | Citations: **CFP** \| **Original** when scrape succeeded |
+| 8. Framing UI | Expand framing on a classified article | Dimension bars/scores and honesty banner visible |
+| 9. Re-fetch | Click **Refresh** again | Unchanged items keep framing; items whose body **newly** became ok clear framing so Classify can re-run; other new items stay unclassified |
 
 ## Checklist (optional xcancel)
 
@@ -46,9 +49,10 @@ XCANCEL_PROFILES=sentdefender
 
 | Step | Action | Pass when |
 |------|--------|-----------|
-| 7. Refresh with handles | Click **Refresh** | X items appear with `@handle` chip; citations **xcancel** \| **X** |
-| 8. Classify X items | Click **Classify new** | Unclassified xcancel items get framing like CFP |
-| 9. Honest failure | If xcancel blocks (Cloudflare / RSS whitelist) | Feed still shows CFP; `meta.lastError` / store note is set — not silent success |
+| 10. Refresh with handles | Click **Refresh** | X items appear with `@handle` chip; citations **xcancel** \| **X** |
+| 11. Tweet-as-body | Inspect an xcancel card | Tweet excerpt is shown; body stays `not_applicable` (no x.com scrape / no “unavailable”) |
+| 12. Classify X items | Click **Classify new** | Unclassified xcancel items get framing like CFP |
+| 13. Honest failure | If xcancel blocks (Cloudflare / RSS whitelist) | Feed still shows CFP; `meta.lastError` / store note is set — not silent success |
 
 Empty profile list must not error: CFP-only Refresh stays green.
 
@@ -66,10 +70,18 @@ curl -s -b /tmp/mvp-cookies -X POST http://localhost:3001/api/classify
 curl -s -b /tmp/mvp-cookies http://localhost:3001/api/articles | head
 ```
 
+Quick body-status spot-check (after fetch):
+
+```bash
+curl -s -b /tmp/mvp-cookies http://localhost:3001/api/articles \
+  | node -e 'let d="";process.stdin.on("data",c=>d+=c);process.stdin.on("end",()=>{const a=JSON.parse(d).articles||JSON.parse(d);const rows=(Array.isArray(a)?a:[]).slice(0,8).map(x=>({sourceKind:x.sourceKind,bodyStatus:x.bodyStatus,hasBody:Boolean(x.bodyText)}));console.log(rows)})'
+```
+
 ## Notes
 
 - Classification requires a working Ollama Cloud API key (`OLLAMA_API_KEY` in `mvp/.env`).
-- Fetch alone confirms CFP RSS + publisher scrape. With handles set, the same `POST /api/fetch` also runs xcancel (RSS-first, HTML fallback).
-- A second fetch does not wipe classification when title, snippet, and canonical URL are unchanged. Changed title/snippet **clears** classification so **Classify new** can run again.
+- Fetch alone confirms CFP RSS + publisher URL scrape + **best-effort body scrape** (no paywall bypass). With handles set, the same `POST /api/fetch` also runs xcancel (RSS-first, HTML fallback).
+- A second fetch does not wipe classification when title, snippet, and canonical URL are unchanged **and** body usability did not newly become ok. Changed title/snippet, or body newly becoming usable, **clears** classification so **Classify new** can run again.
 - Framing scores are AI-assisted analysis, not ground truth (shown in the UI honesty banner).
+- Depth honesty on the card: excerpt when original text is present; honest unavailable/blocked when not.
 - `mvp/.env.example` documents `XCANCEL_PROFILES`, `XCANCEL_PER_PROFILE_LIMIT`, and `XCANCEL_FETCH_DELAY_MS` with no secrets.
