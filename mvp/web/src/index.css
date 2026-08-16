@@ -227,6 +227,24 @@ button.linkish {
   color: var(--muted);
 }
 
+.selection-signals {
+  list-style: none;
+  margin: 0 0 0.5rem;
+  padding: 0;
+}
+
+.selection-signal {
+  margin: 0 0 0.25rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+  font-style: italic;
+  line-height: 1.4;
+}
+
+.selection-signal:last-child {
+  margin-bottom: 0;
+}
+
 .body-excerpt {
   margin: 0 0 0.75rem;
   font-size: 0.95rem;
