@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from 'react';
+import { Fragment, useState, type CSSProperties } from 'react';
 import type { Article, FramingDimensions } from './types';
 
 const DIMENSION_LABELS: { key: keyof FramingDimensions; label: string }[] = [
@@ -27,16 +27,17 @@ export function ArticleCard({ article }: ArticleCardProps) {
           : ''}
       </p>
       <p className="citations">
-        <a href={article.cfpUrl} target="_blank" rel="noreferrer">
-          CFP
-        </a>
-        <span aria-hidden="true"> | </span>
-        {article.publisherUrl ? (
-          <a href={article.publisherUrl} target="_blank" rel="noreferrer">
-            Original
-          </a>
+        {article.citations.length > 0 ? (
+          article.citations.map((cite, index) => (
+            <Fragment key={`${cite.label}-${cite.url}`}>
+              {index > 0 ? <span aria-hidden="true"> | </span> : null}
+              <a href={cite.url} target="_blank" rel="noreferrer">
+                {cite.label}
+              </a>
+            </Fragment>
+          ))
         ) : (
-          <span className="muted">Original unavailable</span>
+          <span className="muted">No citations</span>
         )}
       </p>
 

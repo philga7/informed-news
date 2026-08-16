@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 
-/** Stable article id derived from the CFP aggregator URL. */
-export function articleIdFromCfpUrl(cfpUrl: string): string {
-  return createHash('sha256').update(cfpUrl).digest('hex').slice(0, 32);
+/** Stable article id derived from the canonical source URL. */
+export function articleIdFromCanonicalUrl(canonicalUrl: string): string {
+  return createHash('sha256').update(canonicalUrl).digest('hex').slice(0, 32);
 }

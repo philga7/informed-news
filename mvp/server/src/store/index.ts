@@ -1,4 +1,5 @@
-export { articleIdFromCfpUrl } from './articleId.js';
+export { articleIdFromCanonicalUrl } from './articleId.js';
+export { citationsFromCfp, migrateArticle } from './migrateArticle.js';
 export {
   getArticleById,
   readArticles,

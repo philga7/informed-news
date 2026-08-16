@@ -5,7 +5,7 @@
 
 Greenfield MVP for Citizen Free Press (CFP) ingest, Ollama framing classification, and a thin React UI. Data lives in local JSON files — not Supabase.
 
-**Flow:** CFP RSS → publisher scrape → classify framing → display titles, dual citations, and scores.
+**Flow:** CFP RSS → publisher scrape → classify framing → display titles, citations, and scores.
 
 ## Stack
 
@@ -33,7 +33,7 @@ npm run dev
 
 ## Smoke test
 
-Follow **[mvp/SMOKE.md](mvp/SMOKE.md)**: login → Refresh CFP → Classify new → confirm dual links (CFP + Original) and framing scores.
+Follow **[mvp/SMOKE.md](mvp/SMOKE.md)**: login → Refresh CFP → Classify new → confirm citation links (CFP + Original) and framing scores.
 
 ## Environment
 

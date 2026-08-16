@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import type { Article } from '../types/article.js';
-import { articleIdFromCfpUrl } from './articleId.js';
+import { articleIdFromCanonicalUrl } from './articleId.js';
+import { articleNeedsRewrite, migrateArticle } from './migrateArticle.js';
 import { ARTICLES_PATH, DATA_DIR } from './paths.js';
 
 async function ensureDataDir(): Promise<void> {
@@ -9,6 +10,7 @@ async function ensureDataDir(): Promise<void> {
 
 /**
  * Read all articles from disk. Creates an empty store file if missing.
+ * Legacy CFP records (`cfpUrl` identity) are migrated to canonicalUrl + citations.
  */
 export async function readArticles(): Promise<Article[]> {
   await ensureDataDir();
@@ -18,7 +20,20 @@ export async function readArticles(): Promise<Article[]> {
     if (!Array.isArray(parsed)) {
       throw new Error('articles.json must contain a JSON array');
     }
-    return parsed as Article[];
+
+    const articles: Article[] = [];
+    let needsWrite = false;
+    for (const entry of parsed) {
+      const migrated = migrateArticle(entry);
+      if (articleNeedsRewrite(entry, migrated)) {
+        needsWrite = true;
+      }
+      articles.push(migrated);
+    }
+    if (needsWrite) {
+      await writeArticles(articles);
+    }
+    return articles;
   } catch (err) {
     const code = (err as NodeJS.ErrnoException).code;
     if (code === 'ENOENT') {
@@ -46,13 +61,13 @@ export async function getArticleById(id: string): Promise<Article | null> {
 }
 
 /**
- * Insert or update an article by stable id (hash of cfpUrl).
- * Ensures `id` matches `articleIdFromCfpUrl(cfpUrl)`.
+ * Insert or update an article by stable id (hash of canonicalUrl).
+ * Ensures `id` matches `articleIdFromCanonicalUrl(canonicalUrl)`.
  */
 export async function upsertArticle(
   article: Omit<Article, 'id'> & { id?: string },
 ): Promise<Article> {
-  const id = articleIdFromCfpUrl(article.cfpUrl);
+  const id = articleIdFromCanonicalUrl(article.canonicalUrl);
   const next: Article = { ...article, id };
 
   const articles = await readArticles();
@@ -77,7 +92,7 @@ export async function upsertArticles(
   const results: Article[] = [];
 
   for (const item of incoming) {
-    const id = articleIdFromCfpUrl(item.cfpUrl);
+    const id = articleIdFromCanonicalUrl(item.canonicalUrl);
     const next: Article = { ...item, id };
     byId.set(id, next);
     results.push(next);

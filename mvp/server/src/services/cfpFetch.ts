@@ -1,5 +1,5 @@
 import type { Article } from '../types/article.js';
-import { upsertArticles, updateMeta } from '../store/index.js';
+import { citationsFromCfp, upsertArticles, updateMeta } from '../store/index.js';
 import { parseRssFeed } from './rss.js';
 import { publisherDomainFromUrl, scrapePublisherUrl } from './publisherScrape.js';
 
@@ -52,15 +52,18 @@ export async function fetchCfpArticles(
 
     // Sequential scrape keeps CFP polite and avoids burst timeouts.
     for (const item of latest) {
-      const cfpUrl = item.link;
-      const publisherUrl = await scrapePublisherUrl(cfpUrl, CFP_DOMAIN);
+      const canonicalUrl = item.link;
+      const publisherUrl = await scrapePublisherUrl(canonicalUrl, CFP_DOMAIN);
       const publisherDomain = publisherDomainFromUrl(publisherUrl);
 
       articles.push({
         title: item.title,
-        cfpUrl,
+        sourceKind: 'cfp',
+        canonicalUrl,
+        citations: citationsFromCfp(canonicalUrl, publisherUrl),
         publisherUrl,
         publisherDomain,
+        handle: null,
         publishedAt: item.publishedAt,
         snippet: item.snippet,
         fetchedAt,

@@ -82,7 +82,7 @@ function firstExternalLink(
 /**
  * Scrape a CFP (aggregator) article page for the original publisher URL.
  * Prefers links inside common content containers; falls back to first page-wide external link.
- * Returns null when no external publisher link is found (caller keeps cfpUrl).
+ * Returns null when no external publisher link is found (caller keeps canonicalUrl).
  */
 export async function scrapePublisherUrl(
   pageUrl: string,

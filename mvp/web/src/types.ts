@@ -18,12 +18,22 @@ export type FramingAnalysis = {
   confidence: number;
 };
 
+export type SourceKind = 'cfp' | 'xcancel';
+
+export type ArticleCitation = {
+  label: string;
+  url: string;
+};
+
 export type Article = {
   id: string;
   title: string;
-  cfpUrl: string;
+  sourceKind: SourceKind;
+  canonicalUrl: string;
+  citations: ArticleCitation[];
   publisherUrl: string | null;
   publisherDomain: string | null;
+  handle: string | null;
   publishedAt: string | null;
   snippet: string;
   fetchedAt: string;
