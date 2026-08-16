@@ -1,5 +1,9 @@
 export { articleIdFromCanonicalUrl } from './articleId.js';
-export { citationsFromCfp, migrateArticle } from './migrateArticle.js';
+export {
+  citationsFromCfp,
+  citationsFromXcancel,
+  migrateArticle,
+} from './migrateArticle.js';
 export { mergeArticleOnUpsert } from './mergeArticleOnUpsert.js';
 export {
   getArticleById,

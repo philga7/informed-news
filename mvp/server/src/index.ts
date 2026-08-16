@@ -12,6 +12,7 @@ import {
   classifyArticleById,
   classifyUnclassifiedArticles,
   fetchCfpArticles,
+  fetchXcancelArticles,
   sortNewestFirst,
 } from './services/index.js';
 import { getArticleById, readArticles, readMeta } from './store/index.js';
@@ -43,8 +44,9 @@ app.use('/api', requireApiSession);
 app.use('/api', createAuthRouter());
 
 /**
- * Fetch latest CFP RSS items, scrape publisher URLs, upsert into JSON store.
+ * Fetch CFP RSS items, then xcancel profiles when configured.
  * Optional body/query: { limit?: number, feedUrl?: string }
+ * Empty XCANCEL_PROFILES / x-profiles.json skips xcancel (CFP-only).
  */
 app.post('/api/fetch', async (req, res) => {
   try {
@@ -54,17 +56,26 @@ app.post('/api/fetch', async (req, res) => {
       limitRaw !== undefined && limitRaw !== '' ? Number(limitRaw) : undefined;
     const feedUrl = typeof feedUrlRaw === 'string' ? feedUrlRaw : undefined;
 
-    const result = await fetchCfpArticles({ limit, feedUrl });
+    const cfp = await fetchCfpArticles({ limit, feedUrl });
+    const xcancel = await fetchXcancelArticles();
     res.json({
       ok: true,
-      feedUrl: result.feedUrl,
-      limit: result.limit,
-      fetched: result.fetched,
-      articles: result.upserted,
+      feedUrl: cfp.feedUrl,
+      limit: cfp.limit,
+      fetched: cfp.fetched + xcancel.fetched,
+      cfp: { fetched: cfp.fetched, articles: cfp.upserted },
+      xcancel: {
+        skipped: xcancel.skipped,
+        handles: xcancel.handles,
+        fetched: xcancel.fetched,
+        errors: xcancel.errors,
+        articles: xcancel.upserted,
+      },
+      articles: [...cfp.upserted, ...xcancel.upserted],
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error('CFP fetch failed:', message);
+    console.error('Fetch failed:', message);
     res.status(500).json({ ok: false, error: message });
   }
 });

@@ -1,8 +1,18 @@
 export { fetchCfpArticles } from './cfpFetch.js';
 export type { CfpFetchOptions, CfpFetchResult } from './cfpFetch.js';
+export {
+  fetchXcancelArticles,
+  fetchTweetsForHandle,
+  resolveXcancelHandles,
+} from './xcancelFetch.js';
+export type {
+  XcancelFetchOptions,
+  XcancelFetchResult,
+} from './xcancelFetch.js';
 export { scrapePublisherUrl, publisherDomainFromUrl } from './publisherScrape.js';
 export {
   parseRssFeed,
+  parseRssXml,
   preprocessXml,
   extractRssFeedFromHtml,
 } from './rss.js';
