@@ -75,6 +75,16 @@ Root [`vercel.json`](vercel.json) deploys the **MVP web UI** (`mvp/web` → stat
 
 `_legacy/vercel.json` is historical only and is not the deploy entrypoint.
 
+## Next (NEWS)
+
+[NEWS-1](https://informedcrew.atlassian.net/browse/NEWS-1) (MVP rebuild) is done. Sequenced follow-on — no product change in this note:
+
+- **[NEWS-12](https://informedcrew.atlassian.net/browse/NEWS-12)** Multi-source ingest (CFP + xcancel) — implement next
+- **[NEWS-13](https://informedcrew.atlassian.net/browse/NEWS-13)** Deeper original text — rewrite-before-build
+- **[NEWS-14](https://informedcrew.atlassian.net/browse/NEWS-14)** Cross-source corroboration — rewrite-before-build
+
+Plan: [`.cursor/plans/mvp_mission_epics_048f89b7.plan.md`](.cursor/plans/mvp_mission_epics_048f89b7.plan.md)
+
 ## Legacy code
 
 The previous OSINT / Supabase / Express monolith lives under **[`_legacy/`](_legacy/)** for reference. It is not the default app and must not be wired into `mvp/`.
