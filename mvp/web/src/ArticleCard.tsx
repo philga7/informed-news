@@ -1,5 +1,6 @@
 import { Fragment, useState, type CSSProperties } from 'react';
 import type { Article, BodyStatus, FramingDimensions } from './types';
+import { VerifyThis } from './VerifyThis';
 
 const DIMENSION_LABELS: { key: keyof FramingDimensions; label: string }[] = [
   { key: 'loadedLanguage', label: 'Loaded language' },
@@ -13,6 +14,8 @@ const BODY_EXCERPT_CHARS = 360;
 
 type ArticleCardProps = {
   article: Article;
+  /** Cluster shows verify-this once; suppress on member cards. */
+  hideVerifyThis?: boolean;
 };
 
 function sourceChipLabel(article: Article): string {
@@ -72,7 +75,10 @@ function depthHonesty(article: Article): {
   return { kind: 'unavailable', text: 'Original text unavailable' };
 }
 
-export function ArticleCard({ article }: ArticleCardProps) {
+export function ArticleCard({
+  article,
+  hideVerifyThis = false,
+}: ArticleCardProps) {
   const [expanded, setExpanded] = useState(false);
   const c = article.classification;
   const chip = sourceChipLabel(article);
@@ -152,6 +158,7 @@ export function ArticleCard({ article }: ArticleCardProps) {
               </div>
             ))}
           </div>
+          {!hideVerifyThis ? <VerifyThis classification={c} /> : null}
           <button
             type="button"
             className="linkish"
@@ -185,16 +192,6 @@ export function ArticleCard({ article }: ArticleCardProps) {
                       <li key={q}>
                         <q>{q}</q>
                       </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              {c.openQuestions.length > 0 && (
-                <div>
-                  <strong>Open questions</strong>
-                  <ul>
-                    {c.openQuestions.map((q) => (
-                      <li key={q}>{q}</li>
                     ))}
                   </ul>
                 </div>
