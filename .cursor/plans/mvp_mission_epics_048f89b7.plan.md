@@ -1,6 +1,6 @@
 ---
 name: MVP Mission Epics
-overview: Define the MVP north star (authentic news with visible framing), then create three sequenced NEWS epics. Only Epic 1 (CFP + xcancel, source-agnostic feed) is next to implement; Epics 2–3 stay roadmap.
+overview: Define the MVP north star (authentic news with visible framing), then create three sequenced NEWS epics. Only Epic 1 (CFP + xcancel, source-agnostic feed) is next to implement; Epics 2–3 stay roadmap. Platform-inspired ideas (Ground News, NewsGuard, PolitiFact, etc.) are parked on NEWS-30, not competing epics.
 todos:
   - id: jira-epic-1
     content: Create NEWS Epic 1 (multi-source ingest) + 6 stories with mission, AC, and non-goals
@@ -10,6 +10,9 @@ todos:
     status: completed
   - id: jira-epic-3
     content: Create NEWS Epic 3 (corroboration) + 4 stories; link blocked-by Epic 2
+    status: completed
+  - id: jira-inspired-align
+    content: Align platform-inspired backlog with NEWS-12–14; park leftovers on NEWS-30
     status: completed
 isProject: false
 ---
@@ -188,10 +191,28 @@ flowchart TB
 
 ## Jira (created)
 
-Site: `informedcrew.atlassian.net` / cloudId `ebcd227d-1f6d-4a54-a6d7-cfe70e377a50` / project **NEWS**. Branch: `feat/mvp-mission-epics`.
+Site: `informedcrew.atlassian.net` / cloudId `ebcd227d-1f6d-4a54-a6d7-cfe70e377a50` / project **NEWS**. Mission epics branch: `feat/mvp-mission-epics`. Inspired-by alignment branch: `feat/jira-inspired-backlog-align`.
 
 - [NEWS-12](https://informedcrew.atlassian.net/browse/NEWS-12) Multi-source ingest: CFP + xcancel profiles — Epic, Highest — stories NEWS-15–20
 - [NEWS-13](https://informedcrew.atlassian.net/browse/NEWS-13) Deeper original text for framing and facts — Epic, High — stories NEWS-21–25 (blocked by NEWS-12)
 - [NEWS-14](https://informedcrew.atlassian.net/browse/NEWS-14) Cross-source corroboration and selection bias — Epic, Medium — stories NEWS-26–29 (blocked by NEWS-13)
+- [NEWS-30](https://informedcrew.atlassian.net/browse/NEWS-30) Later roadmap: archives, transparency, and parked platform-inspired ideas — Epic, Low — NEWS-31 (archive links), NEWS-32 (Transparency Page)
 
-Do **not** start coding NEWS-12 until explicitly asked.
+Do **not** start coding NEWS-12 until explicitly asked. Do **not** start NEWS-30 until explicitly asked.
+
+## Platform-inspired backlog (aligned, not duplicated)
+
+Source prompt (kept for history, do not re-execute as written): [informed-news-jira-agent-prompt.md](informed-news-jira-agent-prompt.md).
+
+A 2026 review of Bellingcat / Ground News / AllSides / Ad Fontes / NewsGuard / Readless / Tangle / PolitiFact ideas was mapped onto this plan instead of creating six competing epics. Locked non-goals still hold: no left/right scores, no claim verdicts, thin feed.
+
+| Inspired-by idea | Disposition |
+| --- | --- |
+| Methodology / verification transparency | Folded into NEWS-12 citations + NEWS-28 verify-this list. No Bellingcat panel or “Verified” badge. |
+| Coverage comparison / blindspots | **Won’t-do for MVP.** NEWS-14 groups same-event items without partisan scores. |
+| Outlet trust scoring / bias chart | **Won’t-do for MVP.** Explicit non-goal. |
+| Dedup / synthesis | NEWS-26/27 stay crude URL/title overlap. No embeddings or digest. |
+| Facts vs opinion format | NEWS-13/24 depth honesty + existing genre. No Tangle three-section schema. |
+| Claim-level fact-check | **Won’t-do for MVP.** NEWS-28 is a reading checklist, not a verdict. |
+| Archive links for citations | Parked: [NEWS-31](https://informedcrew.atlassian.net/browse/NEWS-31) under NEWS-30. |
+| Public Transparency Page | Parked: [NEWS-32](https://informedcrew.atlassian.net/browse/NEWS-32) under NEWS-30. |
