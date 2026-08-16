@@ -53,8 +53,22 @@ function sortNewestFirst(articles: Article[]): Article[] {
 }
 
 /**
+ * Body usable for framing: publisher scrape ok, or xcancel tweet-as-body.
+ */
+export function framingBodyText(article: Article): string | null {
+  if (
+    (article.bodyStatus === 'ok' || article.bodyStatus === 'not_applicable') &&
+    article.bodyText?.trim()
+  ) {
+    return article.bodyText.trim();
+  }
+  return null;
+}
+
+/**
  * Classify articles with null classification, newest-first, up to `limit`.
  * Source-agnostic: CFP and xcancel items share FramingAnalysis.
+ * Uses body text when present; otherwise title + snippet.
  * Persists each result (success or recoverable error) via a single write cycle.
  */
 export async function classifyUnclassifiedArticles(
@@ -79,6 +93,7 @@ export async function classifyUnclassifiedArticles(
       title: article.title,
       snippet: article.snippet,
       publisherDomain: article.publisherDomain,
+      bodyText: framingBodyText(article),
     });
     const fields = articleFieldsFromClassifyResult(result);
     const next: Article = { ...article, ...fields };
@@ -120,6 +135,7 @@ export async function classifyArticleById(
     title: article.title,
     snippet: article.snippet,
     publisherDomain: article.publisherDomain,
+    bodyText: framingBodyText(article),
   });
   const fields = articleFieldsFromClassifyResult(result);
   const next = await upsertArticle({ ...article, ...fields });
