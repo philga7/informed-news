@@ -22,6 +22,8 @@ export type ClassifyBatchResult = {
   attempted: number;
   succeeded: number;
   failed: number;
+  /** How many attempted items came from each source (both kinds are eligible). */
+  bySourceKind: { cfp: number; xcancel: number };
   articles: Article[];
 };
 
@@ -52,6 +54,7 @@ function sortNewestFirst(articles: Article[]): Article[] {
 
 /**
  * Classify articles with null classification, newest-first, up to `limit`.
+ * Source-agnostic: CFP and xcancel items share FramingAnalysis.
  * Persists each result (success or recoverable error) via a single write cycle.
  */
 export async function classifyUnclassifiedArticles(
@@ -67,9 +70,11 @@ export async function classifyUnclassifiedArticles(
 
   let succeeded = 0;
   let failed = 0;
+  const bySourceKind = { cfp: 0, xcancel: 0 };
   const updated: Article[] = [];
 
   for (const article of candidates) {
+    bySourceKind[article.sourceKind] += 1;
     const result = await classifyFraming({
       title: article.title,
       snippet: article.snippet,
@@ -95,6 +100,7 @@ export async function classifyUnclassifiedArticles(
     attempted: updated.length,
     succeeded,
     failed,
+    bySourceKind,
     articles: updated,
   };
 }

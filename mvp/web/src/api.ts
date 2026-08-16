@@ -55,6 +55,11 @@ export const api = {
   },
 
   async fetchCfp(): Promise<{ articles: Article[] }> {
+    return this.refresh();
+  },
+
+  /** Unified refresh: CFP then xcancel when configured. */
+  async refresh(): Promise<{ articles: Article[] }> {
     return request('/api/fetch', { method: 'POST', body: JSON.stringify({}) });
   },
 

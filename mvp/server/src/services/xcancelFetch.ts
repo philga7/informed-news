@@ -403,9 +403,7 @@ export async function fetchXcancelArticles(
     if (errors.length > 0) {
       const message = errors.join('; ');
       await updateMeta({ lastError: message });
-      if (upserted.length === 0) {
-        throw new Error(message);
-      }
+      // Do not throw: callers (unified refresh) keep CFP results and surface errors.
     } else {
       await updateMeta({ lastFetchAt: fetchedAt, lastError: null });
     }
