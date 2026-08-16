@@ -354,6 +354,7 @@ function tweetToArticle(
     bodyText,
     bodyStatus: 'not_applicable',
     publisherTitle: null,
+    clusterId: null,
     fetchedAt,
     classification: null,
     classifiedAt: null,

@@ -46,6 +46,8 @@ export type Article = {
   bodyText: string | null;
   bodyStatus: BodyStatus;
   publisherTitle: string | null;
+  /** Crude same-event group; null = ungrouped flat list */
+  clusterId: string | null;
   fetchedAt: string;
   classification: FramingAnalysis | null;
   classifiedAt: string | null;

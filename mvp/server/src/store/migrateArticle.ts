@@ -145,6 +145,7 @@ export function migrateArticle(raw: unknown): Article {
     bodyText,
     bodyStatus,
     publisherTitle: asNullableString(raw.publisherTitle),
+    clusterId: asNullableString(raw.clusterId),
     fetchedAt: asString(raw.fetchedAt) ?? new Date().toISOString(),
     classification: parseClassification(raw.classification),
     classifiedAt: asNullableString(raw.classifiedAt),
@@ -176,6 +177,9 @@ export function articleNeedsRewrite(raw: unknown, migrated: Article): boolean {
     return true;
   }
   if (!('bodyStatus' in raw) || !('bodyText' in raw) || !('publisherTitle' in raw)) {
+    return true;
+  }
+  if (!('clusterId' in raw)) {
     return true;
   }
   return false;

@@ -74,6 +74,8 @@ function bodyNewlyUsable(existing: Article, merged: Article): boolean {
  *
  * Body fields: placeholders and flaky unavailable do not wipe a prior ok scrape;
  * intentional ok/blocked (and xcancel tweet text) apply from incoming.
+ *
+ * clusterId: fetch paths send null; keep existing until the cluster pass rewrites.
  */
 export function mergeArticleOnUpsert(
   existing: Article | undefined,
@@ -92,13 +94,18 @@ export function mergeArticleOnUpsert(
         }
       : base;
 
+  const withCluster: Article =
+    existing && incoming.clusterId == null && existing.clusterId != null
+      ? { ...withBody, clusterId: existing.clusterId }
+      : withBody;
+
   if (incomingWritesClassification(incoming) || !existing) {
-    return withBody;
+    return withCluster;
   }
 
-  if (bodyNewlyUsable(existing, withBody)) {
+  if (bodyNewlyUsable(existing, withCluster)) {
     return {
-      ...withBody,
+      ...withCluster,
       classification: null,
       classifiedAt: null,
       classifyError: null,
@@ -107,7 +114,7 @@ export function mergeArticleOnUpsert(
 
   if (contentUnchanged(existing, incoming)) {
     return {
-      ...withBody,
+      ...withCluster,
       classification: existing.classification,
       classifiedAt: existing.classifiedAt,
       classifyError: existing.classifyError,
@@ -115,7 +122,7 @@ export function mergeArticleOnUpsert(
   }
 
   return {
-    ...withBody,
+    ...withCluster,
     classification: null,
     classifiedAt: null,
     classifyError: null,
