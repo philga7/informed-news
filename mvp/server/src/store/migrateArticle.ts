@@ -1,7 +1,21 @@
-import type { Article, ArticleCitation, FramingAnalysis, SourceKind } from '../types/article.js';
+import type {
+  Article,
+  ArticleCitation,
+  BodyStatus,
+  FramingAnalysis,
+  SourceKind,
+} from '../types/article.js';
+import { truncateBodyText } from '../types/article.js';
 import { articleIdFromCanonicalUrl } from './articleId.js';
 
 const SOURCE_KINDS = new Set<SourceKind>(['cfp', 'xcancel']);
+const BODY_STATUSES = new Set<BodyStatus>([
+  'ok',
+  'unavailable',
+  'blocked',
+  'not_applicable',
+  'pending',
+]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -69,6 +83,17 @@ function parseClassification(value: unknown): FramingAnalysis | null {
   return value as FramingAnalysis;
 }
 
+function parseBodyStatus(
+  value: unknown,
+  sourceKind: SourceKind,
+): BodyStatus {
+  if (typeof value === 'string' && BODY_STATUSES.has(value as BodyStatus)) {
+    return value as BodyStatus;
+  }
+  // Tweet text is the body; no publisher scrape.
+  return sourceKind === 'xcancel' ? 'not_applicable' : 'pending';
+}
+
 /**
  * Normalize a stored article to the source-agnostic shape.
  * Legacy records used `cfpUrl` as identity and had no sourceKind / citations / handle.
@@ -99,6 +124,13 @@ export function migrateArticle(raw: unknown): Article {
   const parsedCitations = parseCitations(raw.citations);
   const citations = parsedCitations ?? citationsFromCfp(canonicalUrl, publisherUrl);
 
+  const snippet = asString(raw.snippet) ?? '';
+  const bodyStatus = parseBodyStatus(raw.bodyStatus, sourceKind);
+  const rawBody =
+    asNullableString(raw.bodyText) ??
+    (sourceKind === 'xcancel' && snippet ? snippet : null);
+  const bodyText = rawBody === null ? null : truncateBodyText(rawBody);
+
   return {
     id: articleIdFromCanonicalUrl(canonicalUrl),
     title,
@@ -109,7 +141,10 @@ export function migrateArticle(raw: unknown): Article {
     publisherDomain: asNullableString(raw.publisherDomain),
     handle: asNullableString(raw.handle),
     publishedAt: asNullableString(raw.publishedAt),
-    snippet: asString(raw.snippet) ?? '',
+    snippet,
+    bodyText,
+    bodyStatus,
+    publisherTitle: asNullableString(raw.publisherTitle),
     fetchedAt: asString(raw.fetchedAt) ?? new Date().toISOString(),
     classification: parseClassification(raw.classification),
     classifiedAt: asNullableString(raw.classifiedAt),
@@ -138,6 +173,9 @@ export function articleNeedsRewrite(raw: unknown, migrated: Article): boolean {
     return true;
   }
   if (raw.id !== migrated.id) {
+    return true;
+  }
+  if (!('bodyStatus' in raw) || !('bodyText' in raw) || !('publisherTitle' in raw)) {
     return true;
   }
   return false;

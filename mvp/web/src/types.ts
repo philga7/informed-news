@@ -20,6 +20,13 @@ export type FramingAnalysis = {
 
 export type SourceKind = 'cfp' | 'xcancel';
 
+export type BodyStatus =
+  | 'ok'
+  | 'unavailable'
+  | 'blocked'
+  | 'not_applicable'
+  | 'pending';
+
 export type ArticleCitation = {
   label: string;
   url: string;
@@ -36,6 +43,9 @@ export type Article = {
   handle: string | null;
   publishedAt: string | null;
   snippet: string;
+  bodyText: string | null;
+  bodyStatus: BodyStatus;
+  publisherTitle: string | null;
   fetchedAt: string;
   classification: FramingAnalysis | null;
   classifiedAt: string | null;

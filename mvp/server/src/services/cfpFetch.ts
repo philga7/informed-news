@@ -66,6 +66,10 @@ export async function fetchCfpArticles(
         handle: null,
         publishedAt: item.publishedAt,
         snippet: item.snippet,
+        // Body scrape is NEWS-22; placeholder so merge can preserve a later scrape.
+        bodyText: null,
+        bodyStatus: 'pending',
+        publisherTitle: null,
         fetchedAt,
         // Store upsert keeps existing analysis when title/snippet/canonical URL match.
         classification: null,
