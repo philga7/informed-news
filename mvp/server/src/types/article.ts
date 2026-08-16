@@ -31,6 +31,17 @@ export type FramingAnalysis = {
 
 export type SourceKind = 'cfp' | 'xcancel';
 
+/** Publisher body scrape / tweet-as-body status. */
+export type BodyStatus =
+  | 'ok'
+  | 'unavailable'
+  | 'blocked'
+  | 'not_applicable'
+  | 'pending';
+
+/** Soft cap for stored body text (~8–12k chars). */
+export const BODY_TEXT_MAX_CHARS = 10_000;
+
 export type ArticleCitation = {
   label: string;
   url: string;
@@ -51,12 +62,30 @@ export type Article = {
   publishedAt: string | null;
   /** RSS description/content only for MVP */
   snippet: string;
+  /**
+   * Truncated original text when available.
+   * CFP: from publisher scrape. xcancel: tweet text (bodyStatus not_applicable).
+   */
+  bodyText: string | null;
+  bodyStatus: BodyStatus;
+  /** Publisher page title / og:title when scraped; null until then */
+  publisherTitle: string | null;
   fetchedAt: string;
   classification: FramingAnalysis | null;
   classifiedAt: string | null;
   /** Human-readable error; may include raw model text after a delimiter for debugging */
   classifyError: string | null;
 };
+
+export function truncateBodyText(
+  text: string,
+  maxChars: number = BODY_TEXT_MAX_CHARS,
+): string {
+  if (text.length <= maxChars) {
+    return text;
+  }
+  return text.slice(0, maxChars);
+}
 
 /** Optional fetch/run metadata stored alongside articles */
 export type StoreMeta = {

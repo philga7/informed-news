@@ -2,6 +2,7 @@ import * as cheerio from 'cheerio';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import type { Article } from '../types/article.js';
+import { truncateBodyText } from '../types/article.js';
 import {
   citationsFromXcancel,
   DATA_DIR,
@@ -337,6 +338,8 @@ function tweetToArticle(
 ): Omit<Article, 'id'> & { id?: string } {
   const xPermalink = toXPermalink(tweet.handle, tweet.statusId);
   const xcancelUrl = toXcancelStatusUrl(tweet.handle, tweet.statusId);
+  // Tweet text is the body; do not scrape x.com.
+  const bodyText = truncateBodyText(tweet.text);
 
   return {
     title: truncateTitle(tweet.text),
@@ -348,6 +351,9 @@ function tweetToArticle(
     handle: tweet.handle,
     publishedAt: tweet.publishedAt,
     snippet: tweet.text,
+    bodyText,
+    bodyStatus: 'not_applicable',
+    publisherTitle: null,
     fetchedAt,
     classification: null,
     classifiedAt: null,

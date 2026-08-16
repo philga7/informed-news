@@ -31,6 +31,9 @@ function article(overrides: Partial<Article> = {}): Article {
     handle: null,
     publishedAt: '2026-08-16T12:00:00.000Z',
     snippet: 'The Senate passed a bill today.',
+    bodyText: null,
+    bodyStatus: 'pending',
+    publisherTitle: null,
     fetchedAt: '2026-08-16T12:05:00.000Z',
     classification: null,
     classifiedAt: null,
@@ -125,4 +128,45 @@ test('unchanged refetch keeps a prior classifyError', () => {
   const merged = mergeArticleOnUpsert(existing, incoming, existing.id);
   assert.equal(merged.classifyError, 'parse failed');
   assert.equal(merged.fetchedAt, incoming.fetchedAt);
+});
+
+test('CFP fetch placeholder preserves scraped body fields', () => {
+  const existing = article({
+    bodyText: 'Full publisher article text…',
+    bodyStatus: 'ok',
+    publisherTitle: 'Publisher headline',
+    classification: ANALYSIS,
+    classifiedAt: '2026-08-16T12:10:00.000Z',
+  });
+  const incoming = article({
+    fetchedAt: '2026-08-16T13:00:00.000Z',
+    bodyText: null,
+    bodyStatus: 'pending',
+    publisherTitle: null,
+  });
+  const merged = mergeArticleOnUpsert(existing, incoming, existing.id);
+  assert.equal(merged.bodyText, existing.bodyText);
+  assert.equal(merged.bodyStatus, 'ok');
+  assert.equal(merged.publisherTitle, 'Publisher headline');
+  assert.deepEqual(merged.classification, ANALYSIS);
+});
+
+test('xcancel body write applies tweet text on upsert', () => {
+  const existing = article({
+    sourceKind: 'xcancel',
+    snippet: 'Old tweet',
+    bodyText: 'Old tweet',
+    bodyStatus: 'not_applicable',
+  });
+  const incoming = article({
+    sourceKind: 'xcancel',
+    snippet: 'Updated tweet text',
+    bodyText: 'Updated tweet text',
+    bodyStatus: 'not_applicable',
+    publisherTitle: null,
+  });
+  const merged = mergeArticleOnUpsert(existing, incoming, existing.id);
+  assert.equal(merged.bodyText, 'Updated tweet text');
+  assert.equal(merged.bodyStatus, 'not_applicable');
+  assert.equal(merged.classification, null);
 });

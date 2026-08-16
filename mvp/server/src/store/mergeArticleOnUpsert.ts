@@ -18,6 +18,15 @@ function contentUnchanged(existing: Article, incoming: ArticleUpsertInput): bool
   );
 }
 
+/** CFP fetch default: pending + nulls — do not wipe a prior scrape result. */
+function isCfpBodyFetchPlaceholder(incoming: ArticleUpsertInput): boolean {
+  return (
+    incoming.bodyStatus === 'pending' &&
+    incoming.bodyText === null &&
+    incoming.publisherTitle === null
+  );
+}
+
 /**
  * Merge an incoming upsert onto an existing article (if any).
  *
@@ -31,6 +40,9 @@ function contentUnchanged(existing: Article, incoming: ArticleUpsertInput): bool
  *
  * We clear rather than mark stale: `classifyUnclassifiedArticles` already
  * selects `classification === null`, and a stale flag would need schema + UI.
+ *
+ * Body fields: CFP fetch placeholders preserve an existing scrape; intentional
+ * body writes (scrape, xcancel tweet text) apply from incoming.
  */
 export function mergeArticleOnUpsert(
   existing: Article | undefined,
@@ -39,13 +51,23 @@ export function mergeArticleOnUpsert(
 ): Article {
   const base: Article = { ...incoming, id };
 
+  const withBody: Article =
+    existing && isCfpBodyFetchPlaceholder(incoming)
+      ? {
+          ...base,
+          bodyText: existing.bodyText,
+          bodyStatus: existing.bodyStatus,
+          publisherTitle: existing.publisherTitle,
+        }
+      : base;
+
   if (incomingWritesClassification(incoming) || !existing) {
-    return base;
+    return withBody;
   }
 
   if (contentUnchanged(existing, incoming)) {
     return {
-      ...base,
+      ...withBody,
       classification: existing.classification,
       classifiedAt: existing.classifiedAt,
       classifyError: existing.classifyError,
@@ -53,7 +75,7 @@ export function mergeArticleOnUpsert(
   }
 
   return {
-    ...base,
+    ...withBody,
     classification: null,
     classifiedAt: null,
     classifyError: null,
