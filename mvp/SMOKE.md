@@ -28,7 +28,7 @@ Verify the greenfield path: **login → fetch → classify → dual citations + 
 | 1. Login | Enter `MVP_PASSWORD` on the login form | Feed view loads (no 401 loop) |
 | 2. Fetch | Click **Refresh CFP** | Status shows fetched count; articles appear with titles |
 | 3. Classify | Click **Classify new** | Status shows classified count (needs `OLLAMA_API_KEY`) |
-| 4. Dual links | Open an article card | **CFP** and **Original** (publisher) links are present when scrape succeeded |
+| 4. Dual links | Open an article card | Citation links from the item (CFP + Original when scrape succeeded) |
 | 5. Framing | Expand framing on a classified article | Dimension bars/scores and honesty banner visible |
 
 ## Optional API-only checks
@@ -48,5 +48,5 @@ curl -s -b /tmp/mvp-cookies http://localhost:3001/api/articles | head
 ## Notes
 
 - Classification requires a working Ollama Cloud API key (`OLLAMA_API_KEY` in `mvp/.env`).
-- Fetch alone is enough to confirm CFP RSS + publisher scrape and dual URLs.
+- Fetch alone is enough to confirm CFP RSS + publisher scrape and citation URLs.
 - Framing scores are AI-assisted analysis, not ground truth (shown in the UI honesty banner).

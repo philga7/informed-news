@@ -29,14 +29,25 @@ export type FramingAnalysis = {
   confidence: number;
 };
 
+export type SourceKind = 'cfp' | 'xcancel';
+
+export type ArticleCitation = {
+  label: string;
+  url: string;
+};
+
 export type Article = {
-  /** Stable hash of cfpUrl */
+  /** Stable hash of canonicalUrl */
   id: string;
   title: string;
-  /** Aggregator page URL (Citizen Free Press) */
-  cfpUrl: string;
+  sourceKind: SourceKind;
+  /** CFP item URL or tweet URL; input to the id hash */
+  canonicalUrl: string;
+  citations: ArticleCitation[];
   publisherUrl: string | null;
   publisherDomain: string | null;
+  /** X handle; null for CFP items */
+  handle: string | null;
   publishedAt: string | null;
   /** RSS description/content only for MVP */
   snippet: string;
