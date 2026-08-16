@@ -41,6 +41,33 @@ export function extractRssFeedFromHtml(html: string, baseUrl: string): string | 
 }
 
 /**
+ * Parse an already-fetched RSS/Atom document into items.
+ */
+export async function parseRssXml(xmlText: string): Promise<RssItem[]> {
+  const feed = await parser.parseString(preprocessXml(xmlText));
+  const items: RssItem[] = [];
+
+  for (const item of feed.items) {
+    if (!item.title || !item.link) continue;
+    const anyItem = item as unknown as { description?: string };
+    const snippet =
+      item.contentSnippet ||
+      item.content ||
+      anyItem.description ||
+      '';
+
+    items.push({
+      title: item.title,
+      link: item.link,
+      snippet: String(snippet),
+      publishedAt: item.isoDate || item.pubDate || null,
+    });
+  }
+
+  return items;
+}
+
+/**
  * Fetch and parse an RSS feed. If the URL returns HTML, discover the feed link.
  */
 export async function parseRssFeed(url: string): Promise<RssItem[]> {
@@ -69,25 +96,5 @@ export async function parseRssFeed(url: string): Promise<RssItem[]> {
     return parseRssFeed(feedUrl);
   }
 
-  const feed = await parser.parseString(preprocessXml(rawText));
-  const items: RssItem[] = [];
-
-  for (const item of feed.items) {
-    if (!item.title || !item.link) continue;
-    const anyItem = item as unknown as { description?: string };
-    const snippet =
-      item.contentSnippet ||
-      item.content ||
-      anyItem.description ||
-      '';
-
-    items.push({
-      title: item.title,
-      link: item.link,
-      snippet: String(snippet),
-      publishedAt: item.isoDate || item.pubDate || null,
-    });
-  }
-
-  return items;
+  return parseRssXml(rawText);
 }

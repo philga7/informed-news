@@ -48,6 +48,17 @@ export function citationsFromCfp(
   return citations;
 }
 
+/** Dual citations for an xcancel-ingested tweet: mirror page + x.com permalink. */
+export function citationsFromXcancel(
+  xcancelUrl: string,
+  xPermalink: string,
+): ArticleCitation[] {
+  return [
+    { label: 'xcancel', url: xcancelUrl },
+    { label: 'X', url: xPermalink },
+  ];
+}
+
 function parseClassification(value: unknown): FramingAnalysis | null {
   if (value === null || value === undefined) {
     return null;
