@@ -1,4 +1,4 @@
-import type { Article } from '../types/article.js';
+import type { Article, BodyStatus } from '../types/article.js';
 
 export type ArticleUpsertInput = Omit<Article, 'id'> & { id?: string };
 
@@ -43,6 +43,20 @@ function shouldKeepExistingBody(
   );
 }
 
+function hasUsableBody(status: BodyStatus, bodyText: string | null): boolean {
+  return (
+    (status === 'ok' || status === 'not_applicable') && Boolean(bodyText?.trim())
+  );
+}
+
+/** True when merged body becomes usable for framing vs the prior row. */
+function bodyNewlyUsable(existing: Article, merged: Article): boolean {
+  return (
+    hasUsableBody(merged.bodyStatus, merged.bodyText) &&
+    !hasUsableBody(existing.bodyStatus, existing.bodyText)
+  );
+}
+
 /**
  * Merge an incoming upsert onto an existing article (if any).
  *
@@ -52,6 +66,7 @@ function shouldKeepExistingBody(
  * When the caller did not write classification:
  * - same canonical URL, title, and snippet → keep existing analysis
  * - changed title or snippet → clear analysis so batch classify can re-run
+ * - body newly becomes usable (ok / not_applicable with text) → clear analysis
  * - no existing row → stay unclassified
  *
  * We clear rather than mark stale: `classifyUnclassifiedArticles` already
@@ -79,6 +94,15 @@ export function mergeArticleOnUpsert(
 
   if (incomingWritesClassification(incoming) || !existing) {
     return withBody;
+  }
+
+  if (bodyNewlyUsable(existing, withBody)) {
+    return {
+      ...withBody,
+      classification: null,
+      classifiedAt: null,
+      classifyError: null,
+    };
   }
 
   if (contentUnchanged(existing, incoming)) {

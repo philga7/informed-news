@@ -32,6 +32,8 @@ export type FramingInput = {
   title: string;
   snippet: string;
   publisherDomain?: string | null;
+  /** Publisher body or tweet text when available for deeper framing. */
+  bodyText?: string | null;
 };
 
 export type FramingClassifySuccess = {
@@ -192,13 +194,30 @@ function buildFramingPrompt(input: FramingInput): string {
   const domain = input.publisherDomain?.trim() || 'unknown';
   const title = input.title.trim() || '(no title)';
   const snippet = input.snippet.trim() || '(no snippet)';
+  const body = input.bodyText?.trim() || '';
+  const hasBody = body.length > 0;
 
-  return `You are an OSINT media analyst. Analyze framing in the headline and snippet only.
-Do not invent facts from outside this text. Do not fetch or assume full article body.
-
-Title: ${title}
+  const sourceBlock = hasBody
+    ? `Title: ${title}
+Original text (truncated):
+${body}
+Publisher domain: ${domain}`
+    : `Title: ${title}
 Snippet: ${snippet}
-Publisher domain: ${domain}
+Publisher domain: ${domain}`;
+
+  const scopeLine = hasBody
+    ? 'Analyze framing in the headline and original text only.'
+    : 'Analyze framing in the headline and snippet only.';
+
+  const evidenceLine = hasBody
+    ? '- evidenceQuotes must be short substrings drawn from the title or original text when possible.'
+    : '- evidenceQuotes must be short substrings drawn from the title/snippet when possible.';
+
+  return `You are an OSINT media analyst. ${scopeLine}
+Do not invent facts from outside this text. Do not fetch or assume content beyond what is provided.
+
+${sourceBlock}
 
 Respond with JSON only (no markdown fences) in this exact shape:
 {
@@ -212,14 +231,14 @@ Respond with JSON only (no markdown fences) in this exact shape:
     "attributionClarity": 0.0
   },
   "framingSummary": "2-3 sentences",
-  "evidenceQuotes": ["short quotes from title or snippet"],
+  "evidenceQuotes": ["short quotes from the provided text"],
   "openQuestions": ["what a reader should verify"],
   "confidence": 0.0
 }
 
 Rules:
 - All dimension scores and confidence must be numbers from 0 to 1 inclusive.
-- evidenceQuotes must be short substrings drawn from the title/snippet when possible.
+${evidenceLine}
 - openQuestions should help a reader verify claims, not restate the headline.
 - This is AI-assisted framing analysis — not ground truth; be explicit about uncertainty.`;
 }
@@ -249,7 +268,7 @@ async function chatWithTimeout(
 }
 
 /**
- * Classify framing from title + snippet + optional publisher domain only.
+ * Classify framing from title + (body when present, else snippet) + optional publisher domain.
  * Never silently returns a fake success on parse/API failure.
  */
 export async function classifyFraming(
@@ -267,10 +286,11 @@ export async function classifyFraming(
     };
   }
 
-  if (!input.title?.trim() && !input.snippet?.trim()) {
+  const hasBody = Boolean(input.bodyText?.trim());
+  if (!input.title?.trim() && !input.snippet?.trim() && !hasBody) {
     return {
       ok: false,
-      error: 'Cannot classify framing without title or snippet',
+      error: 'Cannot classify framing without title, snippet, or body text',
       model,
       rawText: null,
     };

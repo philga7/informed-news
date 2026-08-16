@@ -204,3 +204,62 @@ test('blocked scrape overwrites prior ok body', () => {
   assert.equal(merged.bodyStatus, 'blocked');
   assert.equal(merged.bodyText, null);
 });
+
+test('body newly ok clears prior snippet-based classification', () => {
+  const existing = article({
+    bodyText: null,
+    bodyStatus: 'pending',
+    classification: ANALYSIS,
+    classifiedAt: '2026-08-16T12:10:00.000Z',
+  });
+  const incoming = article({
+    bodyText: 'Full publisher article with enough detail for framing.',
+    bodyStatus: 'ok',
+    publisherTitle: 'Publisher headline',
+    fetchedAt: '2026-08-16T13:00:00.000Z',
+  });
+  const merged = mergeArticleOnUpsert(existing, incoming, existing.id);
+  assert.equal(merged.bodyStatus, 'ok');
+  assert.equal(merged.classification, null);
+  assert.equal(merged.classifiedAt, null);
+  assert.equal(merged.classifyError, null);
+});
+
+test('unchanged ok body keeps classification on refetch', () => {
+  const existing = article({
+    bodyText: 'Full publisher article with enough detail for framing.',
+    bodyStatus: 'ok',
+    publisherTitle: 'Publisher headline',
+    classification: ANALYSIS,
+    classifiedAt: '2026-08-16T12:10:00.000Z',
+  });
+  const incoming = article({
+    bodyText: 'Full publisher article with enough detail for framing.',
+    bodyStatus: 'ok',
+    publisherTitle: 'Publisher headline',
+    fetchedAt: '2026-08-16T13:00:00.000Z',
+  });
+  const merged = mergeArticleOnUpsert(existing, incoming, existing.id);
+  assert.deepEqual(merged.classification, ANALYSIS);
+  assert.equal(merged.classifiedAt, existing.classifiedAt);
+});
+
+test('xcancel not_applicable body counts as newly usable', () => {
+  const existing = article({
+    sourceKind: 'xcancel',
+    snippet: 'Tweet text here',
+    bodyText: null,
+    bodyStatus: 'pending',
+    classification: ANALYSIS,
+    classifiedAt: '2026-08-16T12:10:00.000Z',
+  });
+  const incoming = article({
+    sourceKind: 'xcancel',
+    snippet: 'Tweet text here',
+    bodyText: 'Tweet text here',
+    bodyStatus: 'not_applicable',
+  });
+  const merged = mergeArticleOnUpsert(existing, incoming, existing.id);
+  assert.equal(merged.bodyStatus, 'not_applicable');
+  assert.equal(merged.classification, null);
+});
