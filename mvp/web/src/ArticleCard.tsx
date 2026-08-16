@@ -13,18 +13,39 @@ type ArticleCardProps = {
   article: Article;
 };
 
+function sourceChipLabel(article: Article): string {
+  if (article.sourceKind === 'xcancel') {
+    return article.handle ? `@${article.handle}` : '@unknown';
+  }
+  return 'CFP';
+}
+
 export function ArticleCard({ article }: ArticleCardProps) {
   const [expanded, setExpanded] = useState(false);
   const c = article.classification;
+  const chip = sourceChipLabel(article);
+  const secondaryMeta =
+    article.sourceKind === 'cfp' && article.publisherDomain
+      ? article.publisherDomain
+      : null;
 
   return (
     <article className="card">
       <h2 className="card-title">{article.title}</h2>
       <p className="card-meta">
-        {article.publisherDomain ?? 'Unknown publisher'}
-        {article.publishedAt
-          ? ` · ${new Date(article.publishedAt).toLocaleDateString()}`
-          : ''}
+        <span className="source-chip">{chip}</span>
+        {secondaryMeta ? (
+          <>
+            <span aria-hidden="true"> · </span>
+            <span>{secondaryMeta}</span>
+          </>
+        ) : null}
+        {article.publishedAt ? (
+          <>
+            <span aria-hidden="true"> · </span>
+            <span>{new Date(article.publishedAt).toLocaleDateString()}</span>
+          </>
+        ) : null}
       </p>
       <p className="citations">
         {article.citations.length > 0 ? (

@@ -46,13 +46,13 @@ export function Feed({ onUnauthorized }: FeedProps) {
     void load();
   }, [load]);
 
-  const refreshCfp = async () => {
+  const refresh = async () => {
     setActionBusy('fetch');
     setError(null);
     setStatus(null);
     try {
-      const result = await api.fetchCfp();
-      setStatus(`Fetched ${result.articles.length} article(s) from CFP.`);
+      const result = await api.refresh();
+      setStatus(`Fetched ${result.articles.length} article(s).`);
       await load();
     } catch (err) {
       if (handleAuthError(err)) return;
@@ -104,10 +104,10 @@ export function Feed({ onUnauthorized }: FeedProps) {
       <div className="actions">
         <button
           type="button"
-          onClick={() => void refreshCfp()}
+          onClick={() => void refresh()}
           disabled={actionBusy !== null}
         >
-          {actionBusy === 'fetch' ? 'Refreshing…' : 'Refresh CFP'}
+          {actionBusy === 'fetch' ? 'Refreshing…' : 'Refresh'}
         </button>
         <button
           type="button"
@@ -134,7 +134,7 @@ export function Feed({ onUnauthorized }: FeedProps) {
       {loading ? (
         <p className="muted">Loading feed…</p>
       ) : articles.length === 0 ? (
-        <p className="muted">No articles yet. Use Refresh CFP to pull the feed.</p>
+        <p className="muted">No articles yet. Use Refresh to pull the feed.</p>
       ) : (
         <ul className="article-list">
           {articles.map((article) => (

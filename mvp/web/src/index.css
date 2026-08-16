@@ -160,6 +160,18 @@ button.linkish {
   color: var(--muted);
 }
 
+.source-chip {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text);
+  border: 1px solid var(--line);
+  padding: 0.05rem 0.35rem;
+  border-radius: 2px;
+  vertical-align: baseline;
+}
+
 .citations {
   margin: 0 0 0.75rem;
   font-size: 0.95rem;
