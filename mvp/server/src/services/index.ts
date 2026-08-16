@@ -9,6 +9,8 @@ export type {
   XcancelFetchOptions,
   XcancelFetchResult,
 } from './xcancelFetch.js';
+export { fetchAllSources } from './fetchAllSources.js';
+export type { FetchAllOptions, FetchAllResult } from './fetchAllSources.js';
 export { scrapePublisherUrl, publisherDomainFromUrl } from './publisherScrape.js';
 export {
   parseRssFeed,
@@ -42,3 +44,4 @@ export type {
   ClassifyBatchResult,
   ClassifyOneResult,
 } from './classifyArticles.js';
+

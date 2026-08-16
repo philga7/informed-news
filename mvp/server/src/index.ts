@@ -11,8 +11,7 @@ import {
 import {
   classifyArticleById,
   classifyUnclassifiedArticles,
-  fetchCfpArticles,
-  fetchXcancelArticles,
+  fetchAllSources,
   sortNewestFirst,
 } from './services/index.js';
 import { getArticleById, readArticles, readMeta } from './store/index.js';
@@ -44,9 +43,10 @@ app.use('/api', requireApiSession);
 app.use('/api', createAuthRouter());
 
 /**
- * Fetch CFP RSS items, then xcancel profiles when configured.
+ * Unified refresh: CFP then xcancel (when configured).
  * Optional body/query: { limit?: number, feedUrl?: string }
- * Empty XCANCEL_PROFILES / x-profiles.json skips xcancel (CFP-only).
+ * Empty XCANCEL_PROFILES / x-profiles.json skips xcancel without failing CFP.
+ * Xcancel errors are returned in the payload / meta.lastError; CFP still succeeds.
  */
 app.post('/api/fetch', async (req, res) => {
   try {
@@ -56,22 +56,21 @@ app.post('/api/fetch', async (req, res) => {
       limitRaw !== undefined && limitRaw !== '' ? Number(limitRaw) : undefined;
     const feedUrl = typeof feedUrlRaw === 'string' ? feedUrlRaw : undefined;
 
-    const cfp = await fetchCfpArticles({ limit, feedUrl });
-    const xcancel = await fetchXcancelArticles();
+    const result = await fetchAllSources({ limit, feedUrl });
     res.json({
       ok: true,
-      feedUrl: cfp.feedUrl,
-      limit: cfp.limit,
-      fetched: cfp.fetched + xcancel.fetched,
-      cfp: { fetched: cfp.fetched, articles: cfp.upserted },
+      feedUrl: result.cfp.feedUrl,
+      limit: result.cfp.limit,
+      fetched: result.fetched,
+      cfp: { fetched: result.cfp.fetched, articles: result.cfp.upserted },
       xcancel: {
-        skipped: xcancel.skipped,
-        handles: xcancel.handles,
-        fetched: xcancel.fetched,
-        errors: xcancel.errors,
-        articles: xcancel.upserted,
+        skipped: result.xcancel.skipped,
+        handles: result.xcancel.handles,
+        fetched: result.xcancel.fetched,
+        errors: result.xcancel.errors,
+        articles: result.xcancel.upserted,
       },
-      articles: [...cfp.upserted, ...xcancel.upserted],
+      articles: result.articles,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -126,6 +125,7 @@ app.post('/api/classify', async (req, res) => {
       attempted: result.attempted,
       succeeded: result.succeeded,
       failed: result.failed,
+      bySourceKind: result.bySourceKind,
       articles: result.articles,
     });
   } catch (err) {
