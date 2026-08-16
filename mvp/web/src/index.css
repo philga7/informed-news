@@ -142,6 +142,35 @@ button.linkish {
   gap: 1.25rem;
 }
 
+.cluster-group {
+  border-top: 1px solid var(--line);
+  padding-top: 0;
+}
+
+.cluster-group > .card {
+  border-top: none;
+  padding-top: 1rem;
+}
+
+.cluster-toggle {
+  margin: 0 0 0.35rem;
+}
+
+.cluster-related {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 0.85rem;
+  border-left: 2px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.cluster-related .card {
+  border-top: 1px solid var(--line);
+  padding-top: 0.85rem;
+}
+
 .card {
   padding: 1rem 0;
   border-top: 1px solid var(--line);
