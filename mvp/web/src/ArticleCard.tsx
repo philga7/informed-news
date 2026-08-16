@@ -1,5 +1,5 @@
 import { Fragment, useState, type CSSProperties } from 'react';
-import type { Article, FramingDimensions } from './types';
+import type { Article, BodyStatus, FramingDimensions } from './types';
 
 const DIMENSION_LABELS: { key: keyof FramingDimensions; label: string }[] = [
   { key: 'loadedLanguage', label: 'Loaded language' },
@@ -8,6 +8,8 @@ const DIMENSION_LABELS: { key: keyof FramingDimensions; label: string }[] = [
   { key: 'omissionOrSelectionRisk', label: 'Omission / selection' },
   { key: 'attributionClarity', label: 'Attribution clarity' },
 ];
+
+const BODY_EXCERPT_CHARS = 360;
 
 type ArticleCardProps = {
   article: Article;
@@ -20,6 +22,56 @@ function sourceChipLabel(article: Article): string {
   return 'CFP';
 }
 
+function titlesDiffer(headline: string, publisherTitle: string | null): boolean {
+  if (!publisherTitle?.trim()) return false;
+  return headline.trim().toLowerCase() !== publisherTitle.trim().toLowerCase();
+}
+
+function truncateExcerpt(text: string, maxChars: number): string {
+  const normalized = text.replace(/\s+/g, ' ').trim();
+  if (normalized.length <= maxChars) return normalized;
+  const slice = normalized.slice(0, maxChars);
+  const lastSpace = slice.lastIndexOf(' ');
+  const cut = lastSpace > maxChars * 0.6 ? lastSpace : maxChars;
+  return `${slice.slice(0, cut).trimEnd()}…`;
+}
+
+function depthHonesty(article: Article): {
+  kind: 'excerpt' | 'unavailable' | 'blocked' | 'pending';
+  text: string;
+} | null {
+  const status: BodyStatus = article.bodyStatus;
+  const body = article.bodyText?.trim() || '';
+
+  if ((status === 'ok' || status === 'not_applicable') && body) {
+    return { kind: 'excerpt', text: truncateExcerpt(body, BODY_EXCERPT_CHARS) };
+  }
+
+  if (article.sourceKind === 'xcancel') {
+    // Tweet text should already be body; fall back to snippet if needed.
+    const fallback = body || article.snippet.trim();
+    if (fallback) {
+      return {
+        kind: 'excerpt',
+        text: truncateExcerpt(fallback, BODY_EXCERPT_CHARS),
+      };
+    }
+    return null;
+  }
+
+  if (status === 'blocked') {
+    return { kind: 'blocked', text: 'Original text blocked' };
+  }
+  if (status === 'unavailable' || status === 'pending') {
+    return {
+      kind: status === 'pending' ? 'pending' : 'unavailable',
+      text: 'Original text unavailable',
+    };
+  }
+
+  return { kind: 'unavailable', text: 'Original text unavailable' };
+}
+
 export function ArticleCard({ article }: ArticleCardProps) {
   const [expanded, setExpanded] = useState(false);
   const c = article.classification;
@@ -28,10 +80,18 @@ export function ArticleCard({ article }: ArticleCardProps) {
     article.sourceKind === 'cfp' && article.publisherDomain
       ? article.publisherDomain
       : null;
+  const showPublisherTitle = titlesDiffer(article.title, article.publisherTitle);
+  const depth = depthHonesty(article);
 
   return (
     <article className="card">
       <h2 className="card-title">{article.title}</h2>
+      {showPublisherTitle ? (
+        <p className="publisher-title">
+          <span className="publisher-title-label">Publisher</span>
+          {article.publisherTitle}
+        </p>
+      ) : null}
       <p className="card-meta">
         <span className="source-chip">{chip}</span>
         {secondaryMeta ? (
@@ -61,6 +121,14 @@ export function ArticleCard({ article }: ArticleCardProps) {
           <span className="muted">No citations</span>
         )}
       </p>
+
+      {depth ? (
+        depth.kind === 'excerpt' ? (
+          <p className="body-excerpt">{depth.text}</p>
+        ) : (
+          <p className={`depth-status depth-status-${depth.kind}`}>{depth.text}</p>
+        )
+      ) : null}
 
       {c ? (
         <>
