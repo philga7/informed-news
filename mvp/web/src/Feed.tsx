@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api, ApiError } from './api';
 import { ArticleCard } from './ArticleCard';
+import { ClusterGroup } from './ClusterGroup';
+import { groupFeedArticles } from './groupFeedArticles';
 import type { Article, StoreMeta } from './types';
 
 type FeedProps = {
@@ -87,6 +89,8 @@ export function Feed({ onUnauthorized }: FeedProps) {
     onUnauthorized();
   };
 
+  const feedEntries = groupFeedArticles(articles);
+
   return (
     <main className="shell feed">
       <header className="feed-header">
@@ -137,11 +141,17 @@ export function Feed({ onUnauthorized }: FeedProps) {
         <p className="muted">No articles yet. Use Refresh to pull the feed.</p>
       ) : (
         <ul className="article-list">
-          {articles.map((article) => (
-            <li key={article.id}>
-              <ArticleCard article={article} />
-            </li>
-          ))}
+          {feedEntries.map((entry) =>
+            entry.kind === 'single' ? (
+              <li key={entry.article.id}>
+                <ArticleCard article={entry.article} />
+              </li>
+            ) : (
+              <li key={`cluster-${entry.clusterId}`}>
+                <ClusterGroup lead={entry.lead} related={entry.related} />
+              </li>
+            ),
+          )}
         </ul>
       )}
     </main>
