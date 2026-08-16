@@ -30,6 +30,7 @@ Verify the greenfield path: **login → fetch → classify → dual citations + 
 | 3. Classify | Click **Classify new** | Status shows classified count (needs `OLLAMA_API_KEY`) |
 | 4. Dual links | Open an article card | Citation links from the item (CFP + Original when scrape succeeded) |
 | 5. Framing | Expand framing on a classified article | Dimension bars/scores and honesty banner visible |
+| 6. Re-fetch | Click **Refresh CFP** again | Unchanged items keep framing; new items stay unclassified |
 
 ## Optional API-only checks
 
@@ -49,4 +50,5 @@ curl -s -b /tmp/mvp-cookies http://localhost:3001/api/articles | head
 
 - Classification requires a working Ollama Cloud API key (`OLLAMA_API_KEY` in `mvp/.env`).
 - Fetch alone is enough to confirm CFP RSS + publisher scrape and citation URLs.
+- A second fetch does not wipe classification when title, snippet, and canonical URL are unchanged. Changed title/snippet **clears** classification (not a stale flag) so **Classify new** can run again.
 - Framing scores are AI-assisted analysis, not ground truth (shown in the UI honesty banner).

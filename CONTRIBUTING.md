@@ -59,7 +59,7 @@ Bot commits `chore(release): … [skip ci]` are intentional so Release does not 
 
 ## Why both CI and Release?
 
-- **CI** (`.github/workflows/ci.yml`): every PR into `main` — install, MVP typecheck, MVP web build. Fast review feedback; no publish.
+- **CI** (`.github/workflows/ci.yml`): every PR into `main` — install, MVP typecheck, test, MVP web build. Fast review feedback; no publish.
 - **Release** (`.github/workflows/release.yml`): after merge to `main` — re-validate, then `semantic-release`.
 
 Overlap on validation is intentional: a green PR does not skip the final gate before tagging.
@@ -82,7 +82,7 @@ We stay on **`0.x`** until an intentional `1.0.0` product decision (same idea as
 
 1. Branch from `main`
 2. Use Conventional Commits locally
-3. Ensure `npm run typecheck` and `npm run build` pass
+3. Ensure `npm run typecheck`, `npm test`, and `npm run build` pass
 4. Open a PR into `main`; set the PR title to the intended conventional type (it often becomes the squash title)
 5. Reference Jira (`NEWS-…`) when applicable
 

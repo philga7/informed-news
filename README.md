@@ -52,6 +52,7 @@ See `mvp/.env.example`:
 | `npm run dev` | MVP server + web |
 | `npm run install:all` | Install `mvp/server` and `mvp/web` deps |
 | `npm run typecheck` | Typecheck both packages |
+| `npm test` | MVP server unit tests |
 | `npm run build` | Build the web client |
 
 ## Versioning & CI
@@ -59,7 +60,7 @@ See `mvp/.env.example`:
 Process model matches HARN: **`main` + short-lived branches**, Conventional Commits, PR CI, semantic-release on merge to `main`.
 
 - **Version line:** stay on **`0.x`** until an intentional `1.0.0` (baseline tag `v0.1.0`). See [CONTRIBUTING.md](CONTRIBUTING.md).
-- **CI:** PRs to `main` run MVP install → typecheck → build.
+- **CI:** PRs to `main` run MVP install → typecheck → test → build.
 - **Release:** merge to `main` re-validates, then semantic-release (`npmPublish: false`).
 - **Release ≠ deploy:** GitHub Release/tag is versioning only. Runtime is local MVP and/or Vercel (or other host) — not performed by the Release workflow.
 
