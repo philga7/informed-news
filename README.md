@@ -3,9 +3,9 @@
 **Copyright © 2025 Sandiebeach LLC. All Rights Reserved.**  
 **Proprietary Software — See [LICENSE](LICENSE) and [COPYRIGHT.md](COPYRIGHT.md)**
 
-Greenfield MVP for Citizen Free Press (CFP) ingest, Ollama framing classification, and a thin React UI. Data lives in local JSON files — not Supabase.
+Greenfield MVP for multi-source ingest (Citizen Free Press + optional xcancel profiles), Ollama framing classification, and a thin React UI. Data lives in local JSON files — not Supabase.
 
-**Flow:** CFP RSS → publisher scrape → classify framing → display titles, citations, and scores.
+**Flow:** CFP RSS (+ optional xcancel) → classify framing → one feed with source chips, dual citations, and scores.
 
 ## Stack
 
@@ -19,7 +19,8 @@ Greenfield MVP for Citizen Free Press (CFP) ingest, Ollama framing classificatio
 
 ```bash
 cp mvp/.env.example mvp/.env
-# Set MVP_PASSWORD, SESSION_SECRET, OLLAMA_API_KEY (and optional CFP_FEED_URL / FETCH_LIMIT)
+# Set MVP_PASSWORD, SESSION_SECRET, OLLAMA_API_KEY
+# Optional: CFP_FEED_URL / FETCH_LIMIT; XCANCEL_PROFILES (or mvp/data/x-profiles.json)
 
 npm install
 npm run install:all
@@ -33,7 +34,7 @@ npm run dev
 
 ## Smoke test
 
-Follow **[mvp/SMOKE.md](mvp/SMOKE.md)**: login → Refresh CFP → Classify new → confirm citation links (CFP + Original) and framing scores.
+Follow **[mvp/SMOKE.md](mvp/SMOKE.md)**: login → **Refresh** → Classify new → confirm source chips, citation links, and framing. CFP-only when profiles are empty; with handles configured, confirm xcancel items as well.
 
 ## Environment
 
@@ -42,7 +43,10 @@ See `mvp/.env.example`:
 - `MVP_PASSWORD` / `MVP_PASSWORD_HASH` — single-password session auth  
 - `SESSION_SECRET` — cookie signing  
 - `OLLAMA_API_KEY` / `OLLAMA_MODEL` — framing classify  
-- `CFP_FEED_URL` / `FETCH_LIMIT` — RSS fetch defaults  
+- `CFP_FEED_URL` / `FETCH_LIMIT` — CFP RSS fetch defaults  
+- `XCANCEL_PROFILES` — optional comma-separated handles (empty = CFP-only)  
+- `XCANCEL_PER_PROFILE_LIMIT` / `XCANCEL_FETCH_DELAY_MS` — xcancel polite fetch knobs  
+- Optional file: `mvp/data/x-profiles.json` (gitignored; see `x-profiles.example.json`)  
 - `PORT` — API port (default `3001`)
 
 ## Scripts
@@ -78,9 +82,8 @@ Root [`vercel.json`](vercel.json) deploys the **MVP web UI** (`mvp/web` → stat
 
 ## Next (NEWS)
 
-[NEWS-1](https://informedcrew.atlassian.net/browse/NEWS-1) (MVP rebuild) is done. Sequenced follow-on — no product change in this note:
+[NEWS-1](https://informedcrew.atlassian.net/browse/NEWS-1) (MVP rebuild) and **[NEWS-12](https://informedcrew.atlassian.net/browse/NEWS-12)** (multi-source CFP + xcancel) are done. Sequenced follow-on — no product change in this note:
 
-- **[NEWS-12](https://informedcrew.atlassian.net/browse/NEWS-12)** Multi-source ingest (CFP + xcancel) — implement next
 - **[NEWS-13](https://informedcrew.atlassian.net/browse/NEWS-13)** Deeper original text — rewrite-before-build
 - **[NEWS-14](https://informedcrew.atlassian.net/browse/NEWS-14)** Cross-source corroboration — rewrite-before-build
 
