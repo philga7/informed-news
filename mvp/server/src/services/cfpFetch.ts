@@ -67,6 +67,7 @@ export async function fetchCfpArticles(
         publishedAt: item.publishedAt,
         snippet: item.snippet,
         fetchedAt,
+        // Store upsert keeps existing analysis when title/snippet/canonical URL match.
         classification: null,
         classifiedAt: null,
         classifyError: null,

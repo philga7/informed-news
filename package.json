@@ -11,6 +11,7 @@
     "start": "npm run start --prefix mvp/server",
     "install:all": "npm install --prefix mvp/server && npm install --prefix mvp/web",
     "typecheck": "npm run typecheck --prefix mvp/server && npm run typecheck --prefix mvp/web",
+    "test": "npm test --prefix mvp/server",
     "build": "npm run build --prefix mvp/web",
     "release": "semantic-release",
     "release:dry-run": "semantic-release --dry-run"

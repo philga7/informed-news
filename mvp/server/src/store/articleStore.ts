@@ -2,6 +2,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import type { Article } from '../types/article.js';
 import { articleIdFromCanonicalUrl } from './articleId.js';
 import { articleNeedsRewrite, migrateArticle } from './migrateArticle.js';
+import { mergeArticleOnUpsert } from './mergeArticleOnUpsert.js';
 import { ARTICLES_PATH, DATA_DIR } from './paths.js';
 
 async function ensureDataDir(): Promise<void> {
@@ -68,10 +69,11 @@ export async function upsertArticle(
   article: Omit<Article, 'id'> & { id?: string },
 ): Promise<Article> {
   const id = articleIdFromCanonicalUrl(article.canonicalUrl);
-  const next: Article = { ...article, id };
-
   const articles = await readArticles();
   const index = articles.findIndex((a) => a.id === id);
+  const existing = index >= 0 ? articles[index] : undefined;
+  const next = mergeArticleOnUpsert(existing, article, id);
+
   if (index >= 0) {
     articles[index] = next;
   } else {
@@ -93,7 +95,7 @@ export async function upsertArticles(
 
   for (const item of incoming) {
     const id = articleIdFromCanonicalUrl(item.canonicalUrl);
-    const next: Article = { ...item, id };
+    const next = mergeArticleOnUpsert(byId.get(id), item, id);
     byId.set(id, next);
     results.push(next);
   }
