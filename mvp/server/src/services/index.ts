@@ -13,6 +13,12 @@ export { fetchAllSources } from './fetchAllSources.js';
 export type { FetchAllOptions, FetchAllResult } from './fetchAllSources.js';
 export { scrapePublisherUrl, publisherDomainFromUrl } from './publisherScrape.js';
 export {
+  scrapePublisherBody,
+  extractPublisherBodyFromHtml,
+  isBlockedPublisherHost,
+} from './publisherBodyScrape.js';
+export type { PublisherBodyResult } from './publisherBodyScrape.js';
+export {
   parseRssFeed,
   parseRssXml,
   preprocessXml,

@@ -170,3 +170,37 @@ test('xcancel body write applies tweet text on upsert', () => {
   assert.equal(merged.bodyStatus, 'not_applicable');
   assert.equal(merged.classification, null);
 });
+
+test('flaky unavailable does not wipe prior ok body', () => {
+  const existing = article({
+    bodyText: 'Full publisher article text…',
+    bodyStatus: 'ok',
+    publisherTitle: 'Publisher headline',
+  });
+  const incoming = article({
+    bodyText: null,
+    bodyStatus: 'unavailable',
+    publisherTitle: null,
+    fetchedAt: '2026-08-16T13:00:00.000Z',
+  });
+  const merged = mergeArticleOnUpsert(existing, incoming, existing.id);
+  assert.equal(merged.bodyStatus, 'ok');
+  assert.equal(merged.bodyText, existing.bodyText);
+  assert.equal(merged.publisherTitle, 'Publisher headline');
+});
+
+test('blocked scrape overwrites prior ok body', () => {
+  const existing = article({
+    bodyText: 'Full publisher article text…',
+    bodyStatus: 'ok',
+    publisherTitle: 'Publisher headline',
+  });
+  const incoming = article({
+    bodyText: null,
+    bodyStatus: 'blocked',
+    publisherTitle: 'Publisher headline',
+  });
+  const merged = mergeArticleOnUpsert(existing, incoming, existing.id);
+  assert.equal(merged.bodyStatus, 'blocked');
+  assert.equal(merged.bodyText, null);
+});

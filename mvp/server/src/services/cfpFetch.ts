@@ -1,6 +1,7 @@
 import type { Article } from '../types/article.js';
 import { citationsFromCfp, upsertArticles, updateMeta } from '../store/index.js';
 import { parseRssFeed } from './rss.js';
+import { scrapePublisherBody } from './publisherBodyScrape.js';
 import { publisherDomainFromUrl, scrapePublisherUrl } from './publisherScrape.js';
 
 const DEFAULT_FEED_URL = 'https://citizenfreepress.com/feed/';
@@ -35,7 +36,8 @@ function resolveLimit(override?: number): number {
 }
 
 /**
- * Fetch latest N CFP RSS items, scrape publisher URLs, upsert into the JSON article store.
+ * Fetch latest N CFP RSS items, scrape publisher URLs + bodies, upsert into the JSON store.
+ * Body scrape failures set unavailable/blocked; the item is still stored.
  */
 export async function fetchCfpArticles(
   options: CfpFetchOptions = {},
@@ -55,6 +57,7 @@ export async function fetchCfpArticles(
       const canonicalUrl = item.link;
       const publisherUrl = await scrapePublisherUrl(canonicalUrl, CFP_DOMAIN);
       const publisherDomain = publisherDomainFromUrl(publisherUrl);
+      const body = await scrapePublisherBody(publisherUrl);
 
       articles.push({
         title: item.title,
@@ -66,10 +69,9 @@ export async function fetchCfpArticles(
         handle: null,
         publishedAt: item.publishedAt,
         snippet: item.snippet,
-        // Body scrape is NEWS-22; placeholder so merge can preserve a later scrape.
-        bodyText: null,
-        bodyStatus: 'pending',
-        publisherTitle: null,
+        bodyText: body.bodyText,
+        bodyStatus: body.bodyStatus,
+        publisherTitle: body.publisherTitle,
         fetchedAt,
         // Store upsert keeps existing analysis when title/snippet/canonical URL match.
         classification: null,
