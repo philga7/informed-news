@@ -1,5 +1,6 @@
 import { Fragment, useState, type CSSProperties } from 'react';
 import type { Article, BodyStatus, FramingDimensions } from './types';
+import { selectionSignals, titlesDiffer } from './selectionSignals';
 import { VerifyThis } from './VerifyThis';
 
 const DIMENSION_LABELS: { key: keyof FramingDimensions; label: string }[] = [
@@ -23,11 +24,6 @@ function sourceChipLabel(article: Article): string {
     return article.handle ? `@${article.handle}` : '@unknown';
   }
   return 'CFP';
-}
-
-function titlesDiffer(headline: string, publisherTitle: string | null): boolean {
-  if (!publisherTitle?.trim()) return false;
-  return headline.trim().toLowerCase() !== publisherTitle.trim().toLowerCase();
 }
 
 function truncateExcerpt(text: string, maxChars: number): string {
@@ -88,6 +84,7 @@ export function ArticleCard({
       : null;
   const showPublisherTitle = titlesDiffer(article.title, article.publisherTitle);
   const depth = depthHonesty(article);
+  const signals = selectionSignals(article);
 
   return (
     <article className="card">
@@ -97,6 +94,15 @@ export function ArticleCard({
           <span className="publisher-title-label">Publisher</span>
           {article.publisherTitle}
         </p>
+      ) : null}
+      {signals.length > 0 ? (
+        <ul className="selection-signals">
+          {signals.map((note) => (
+            <li key={note} className="selection-signal">
+              {note}
+            </li>
+          ))}
+        </ul>
       ) : null}
       <p className="card-meta">
         <span className="source-chip">{chip}</span>
