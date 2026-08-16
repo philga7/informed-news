@@ -27,6 +27,22 @@ function isCfpBodyFetchPlaceholder(incoming: ArticleUpsertInput): boolean {
   );
 }
 
+/** Keep an existing body when incoming is a placeholder or a weaker unavailable. */
+function shouldKeepExistingBody(
+  existing: Article,
+  incoming: ArticleUpsertInput,
+): boolean {
+  if (isCfpBodyFetchPlaceholder(incoming)) {
+    return true;
+  }
+  // Do not let a flaky re-scrape erase a prior successful body.
+  return (
+    existing.bodyStatus === 'ok' &&
+    Boolean(existing.bodyText) &&
+    incoming.bodyStatus === 'unavailable'
+  );
+}
+
 /**
  * Merge an incoming upsert onto an existing article (if any).
  *
@@ -41,8 +57,8 @@ function isCfpBodyFetchPlaceholder(incoming: ArticleUpsertInput): boolean {
  * We clear rather than mark stale: `classifyUnclassifiedArticles` already
  * selects `classification === null`, and a stale flag would need schema + UI.
  *
- * Body fields: CFP fetch placeholders preserve an existing scrape; intentional
- * body writes (scrape, xcancel tweet text) apply from incoming.
+ * Body fields: placeholders and flaky unavailable do not wipe a prior ok scrape;
+ * intentional ok/blocked (and xcancel tweet text) apply from incoming.
  */
 export function mergeArticleOnUpsert(
   existing: Article | undefined,
@@ -52,12 +68,12 @@ export function mergeArticleOnUpsert(
   const base: Article = { ...incoming, id };
 
   const withBody: Article =
-    existing && isCfpBodyFetchPlaceholder(incoming)
+    existing && shouldKeepExistingBody(existing, incoming)
       ? {
           ...base,
           bodyText: existing.bodyText,
           bodyStatus: existing.bodyStatus,
-          publisherTitle: existing.publisherTitle,
+          publisherTitle: existing.publisherTitle ?? incoming.publisherTitle,
         }
       : base;
 
