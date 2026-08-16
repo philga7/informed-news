@@ -299,6 +299,45 @@ button.linkish {
   margin-bottom: 0.75rem;
 }
 
+.verify-this {
+  margin: 0.75rem 0;
+  padding: 0.75rem 0.9rem;
+  border-left: 3px solid var(--line);
+  background: #faf9f6;
+}
+
+.verify-this-heading {
+  margin: 0 0 0.35rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.verify-this .honesty {
+  margin: 0 0 0.55rem;
+  font-size: 0.85rem;
+}
+
+.verify-this-selection {
+  margin: 0 0 0.55rem;
+  font-size: 0.9rem;
+  color: var(--ink);
+}
+
+.verify-this-list {
+  margin: 0;
+  padding-left: 1.15rem;
+  font-size: 0.95rem;
+}
+
+.verify-this-list li {
+  margin-bottom: 0.3rem;
+}
+
+.verify-this-list li:last-child {
+  margin-bottom: 0;
+}
+
 @media (max-width: 520px) {
   .dim-row {
     grid-template-columns: 1fr;
