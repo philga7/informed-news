@@ -70,6 +70,11 @@ export type Article = {
   bodyStatus: BodyStatus;
   /** Publisher page title / og:title when scraped; null until then */
   publisherTitle: string | null;
+  /**
+   * Crude same-event group id from URL/title overlap.
+   * null = ungrouped (flat list). Shared id when related; not a truth verdict.
+   */
+  clusterId: string | null;
   fetchedAt: string;
   classification: FramingAnalysis | null;
   classifiedAt: string | null;

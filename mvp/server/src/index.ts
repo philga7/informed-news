@@ -62,6 +62,8 @@ app.post('/api/fetch', async (req, res) => {
       feedUrl: result.cfp.feedUrl,
       limit: result.cfp.limit,
       fetched: result.fetched,
+      clustered: result.clustered,
+      clusters: result.clusters,
       cfp: { fetched: result.cfp.fetched, articles: result.cfp.upserted },
       xcancel: {
         skipped: result.xcancel.skipped,

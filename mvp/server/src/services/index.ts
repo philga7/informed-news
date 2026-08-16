@@ -11,6 +11,14 @@ export type {
 } from './xcancelFetch.js';
 export { fetchAllSources } from './fetchAllSources.js';
 export type { FetchAllOptions, FetchAllResult } from './fetchAllSources.js';
+export {
+  assignClusterIds,
+  assignClusterIdsInMemory,
+  articlesAreRelated,
+  normalizeUrl,
+  titleTokens,
+} from './clusterArticles.js';
+export type { AssignClusterIdsResult } from './clusterArticles.js';
 export { scrapePublisherUrl, publisherDomainFromUrl } from './publisherScrape.js';
 export {
   scrapePublisherBody,

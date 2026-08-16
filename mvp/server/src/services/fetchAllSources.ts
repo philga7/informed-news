@@ -1,4 +1,5 @@
 import type { Article } from '../types/article.js';
+import { assignClusterIds } from './clusterArticles.js';
 import { fetchCfpArticles } from './cfpFetch.js';
 import type { CfpFetchOptions, CfpFetchResult } from './cfpFetch.js';
 import { fetchXcancelArticles } from './xcancelFetch.js';
@@ -11,6 +12,8 @@ export type FetchAllResult = {
   xcancel: XcancelFetchResult;
   articles: Article[];
   fetched: number;
+  clustered: number;
+  clusters: number;
 };
 
 function emptyXcancelFailure(
@@ -54,11 +57,31 @@ export async function fetchAllSources(
     xcancel = emptyXcancelFailure(message, options);
   }
 
-  const articles = [...cfp.upserted, ...xcancel.upserted];
+  // Crude same-event ids across the full store (CFP + xcancel + prior rows).
+  const clustered = await assignClusterIds();
+  const byId = new Map(clustered.articles.map((a) => [a.id, a]));
+  const withCluster = (rows: Article[]): Article[] =>
+    rows.map((a) => byId.get(a.id) ?? a);
+
+  const cfpWithCluster: CfpFetchResult = {
+    ...cfp,
+    upserted: withCluster(cfp.upserted),
+  };
+  const xcancelWithCluster: XcancelFetchResult = {
+    ...xcancel,
+    upserted: withCluster(xcancel.upserted),
+  };
+  const articles = [
+    ...cfpWithCluster.upserted,
+    ...xcancelWithCluster.upserted,
+  ];
+
   return {
-    cfp,
-    xcancel,
+    cfp: cfpWithCluster,
+    xcancel: xcancelWithCluster,
     articles,
     fetched: cfp.fetched + xcancel.fetched,
+    clustered: clustered.clustered,
+    clusters: clustered.clusters,
   };
 }

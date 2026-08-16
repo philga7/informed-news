@@ -34,6 +34,7 @@ function article(overrides: Partial<Article> = {}): Article {
     bodyText: null,
     bodyStatus: 'pending',
     publisherTitle: null,
+    clusterId: null,
     fetchedAt: '2026-08-16T12:05:00.000Z',
     classification: null,
     classifiedAt: null,
@@ -41,6 +42,16 @@ function article(overrides: Partial<Article> = {}): Article {
     ...overrides,
   };
 }
+
+test('fetch placeholder keeps existing clusterId', () => {
+  const existing = article({ clusterId: 'cluster-abc' });
+  const incoming = article({
+    clusterId: null,
+    fetchedAt: '2026-08-16T13:00:00.000Z',
+  });
+  const merged = mergeArticleOnUpsert(existing, incoming, existing.id);
+  assert.equal(merged.clusterId, 'cluster-abc');
+});
 
 test('new items stay unclassified', () => {
   const incoming = article({ fetchedAt: '2026-08-16T13:00:00.000Z' });
