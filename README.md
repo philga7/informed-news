@@ -1,44 +1,46 @@
-# Informed News (MVP)
+# Informed News
 
 **Copyright © 2025 Sandiebeach LLC. All Rights Reserved.**  
 **Proprietary Software — See [LICENSE](LICENSE) and [COPYRIGHT.md](COPYRIGHT.md)**
 
-Greenfield MVP for multi-source ingest (Citizen Free Press + optional xcancel profiles), Ollama framing classification, and a thin React UI. Data lives in local JSON files — not Supabase.
-
-**Flow:** CFP RSS (+ optional xcancel) → classify framing → one feed with source chips, dual citations, and scores.
+Product UI is the vendored **Kite** shell (`apps/kite/`, MIT). Pipeline and framing stay in **`mvp/server`**. The old React feed (`mvp/web`) is frozen and is not the default UI.
 
 ## Stack
 
 | Layer | Path | Role |
 |-------|------|------|
+| UI | `apps/kite` | SvelteKit Brief shell (default `npm run dev`) |
 | API | `mvp/server` | Express: auth, fetch, classify, articles |
-| UI | `mvp/web` | React + Vite (login, feed, framing detail) |
 | Data | `mvp/data/*.json` | Flat-file article + meta store (gitignored) |
+| Frozen UI | `mvp/web` | Legacy React feed — `npm run dev:mvp-web` only |
 
 ## Quick start
 
 ```bash
 cp mvp/.env.example mvp/.env
-# Set MVP_PASSWORD, SESSION_SECRET, OLLAMA_API_KEY
-# Optional: CFP_FEED_URL / FETCH_LIMIT; XCANCEL_PROFILES (or mvp/data/x-profiles.json)
+# Set MVP_PASSWORD, SESSION_SECRET, OLLAMA_API_KEY (API / classify)
+
+cp apps/kite/.env.example apps/kite/.env
+# Temporary: loads public Kite hosts for UI smoke (CC BY-NC). Owned brief = NEWS-44.
 
 npm install
-npm run install:all
+npm run install:all   # requires Bun for apps/kite
 npm run dev
 ```
 
-- UI: http://localhost:5174  
-- API: http://localhost:3001 (`GET /health`)
+- **UI (Kite Brief):** http://localhost:5173  
+- **API:** http://localhost:3001 (`GET /health`)
 
-`npm run dev` starts the MVP only (server + web). The old OSINT monolith is not on this path.
+`npm run dev` starts **mvp/server + Kite**. The old OSINT monolith under `_legacy/` is not on this path. Frozen React feed: `npm run dev:mvp-web` (UI on :5174).
 
 ## Smoke test
 
-Follow **[mvp/SMOKE.md](mvp/SMOKE.md)**: login → **Refresh** → Classify new → confirm source chips, citation links, and framing. CFP-only when profiles are empty; with handles configured, confirm xcancel items as well.
+- **Product UI:** open http://localhost:5173 after `npm run dev` (or `npm run test:e2e:kite`).
+- **API / legacy feed checklist:** [mvp/SMOKE.md](mvp/SMOKE.md) still covers classify + citations against `mvp/server`.
 
 ## Environment
 
-See `mvp/.env.example`:
+See `mvp/.env.example` for the API:
 
 - `MVP_PASSWORD` / `MVP_PASSWORD_HASH` — single-password session auth  
 - `SESSION_SECRET` — cookie signing  
@@ -49,73 +51,58 @@ See `mvp/.env.example`:
 - Optional file: `mvp/data/x-profiles.json` (gitignored; see `x-profiles.example.json`)  
 - `PORT` — API port (default `3001`)
 
-## Kite UI (vendored soft fork — NEWS-40)
-
-MIT front end from [kagisearch/kite-public](https://github.com/kagisearch/kite-public) lives under `apps/kite/` (pinned SHA in [`apps/kite/UPSTREAM.md`](apps/kite/UPSTREAM.md)). Default `npm run dev` is still the MVP UI until NEWS-41.
-
-Requires [Bun](https://bun.sh) (upstream lockfile). Then:
-
-```bash
-npm run install:kite
-cp apps/kite/.env.example apps/kite/.env
-npm run kite
-```
-
-- Kite UI: http://localhost:5173  
-- Sync / license: [docs/UPSTREAM_KITE.md](docs/UPSTREAM_KITE.md), [THIRD_PARTY.md](THIRD_PARTY.md)
+Kite UI env: `apps/kite/.env.example`. Sync / license: [docs/UPSTREAM_KITE.md](docs/UPSTREAM_KITE.md), [THIRD_PARTY.md](THIRD_PARTY.md).
 
 ## Scripts
 
 | Script | Purpose |
 |--------|---------|
-| `npm run dev` | MVP server + web |
-| `npm run kite` | Vendored Kite UI on port 5173 |
-| `npm run install:all` | Install `mvp/server` and `mvp/web` deps |
-| `npm run install:kite` | Install `apps/kite` deps |
-| `npm run typecheck` | Typecheck both packages |
+| `npm run dev` | **Default:** mvp/server + Kite UI (:5173) |
+| `npm run kite` | Kite UI only |
+| `npm run server` | API only |
+| `npm run dev:mvp-web` | Frozen React feed + server (not product path) |
+| `npm run install:all` | Install server, frozen web, and kite (Bun) |
+| `npm run install:kite` | Install `apps/kite` only |
+| `npm run typecheck` | Typecheck `mvp/server` and `mvp/web` |
 | `npm test` | MVP server unit tests |
-| `npm run test:kite` | Provenance / pin unit checks for `apps/kite` |
-| `npm run test:e2e:kite` | Playwright smoke: Kite loads on :5173 |
-| `npm run build` | Build the web client |
+| `npm run test:kite` | Kite provenance + default-entrypoint checks |
+| `npm run test:e2e:kite` | Playwright: Brief loads on :5173 |
+| `npm run build` | Build frozen `mvp/web` (current Vercel artifact) |
 
 ## Versioning & CI
 
 Process model matches HARN: **`main` + short-lived branches**, Conventional Commits, PR CI, semantic-release on merge to `main`.
 
 - **Version line:** stay on **`0.x`** until an intentional `1.0.0` (baseline tag `v0.1.0`). See [CONTRIBUTING.md](CONTRIBUTING.md).
-- **CI:** PRs to `main` run MVP install → typecheck → test → build.
+- **CI:** PRs to `main` run install → typecheck → test → kite provenance → build.
 - **Release:** merge to `main` re-validates, then semantic-release (`npmPublish: false`).
-- **Release ≠ deploy:** GitHub Release/tag is versioning only. Runtime is local MVP and/or Vercel (or other host) — not performed by the Release workflow.
+- **Release ≠ deploy:** GitHub Release/tag is versioning only.
 
 ## Hosting (Vercel)
 
-Root [`vercel.json`](vercel.json) deploys the **MVP web UI** (`mvp/web` → static `mvp/web/dist`). It installs `mvp/web` deps so Vite/`tsc` are available at build time.
+Root [`vercel.json`](vercel.json) still deploys the **frozen** `mvp/web` static build until a later hosting cutover. Local product UI is Kite.
 
 | Concern | Where |
 |---------|--------|
-| **Web UI** | Vercel (Git integration; preview + production) |
-| **API** | Local `mvp/server` (`npm run server` / `npm run dev`) — not ported to Vercel serverless |
-| **Versioning** | GitHub Release via semantic-release (does not deploy) |
+| **Local product UI** | `apps/kite` via `npm run dev` |
+| **Vercel (today)** | `mvp/web` → `mvp/web/dist` |
+| **API** | Local `mvp/server` — not on Vercel serverless |
+| **Versioning** | GitHub Release via semantic-release |
 
-`_legacy/vercel.json` is historical only and is not the deploy entrypoint.
+## Roadmap (NEWS)
 
-## Next (NEWS)
+Epic A ([NEWS-33](https://informedcrew.atlassian.net/browse/NEWS-33)): Kite presentation. Next: rebrand ([NEWS-45](https://informedcrew.atlassian.net/browse/NEWS-45)), owned brief ([NEWS-44](https://informedcrew.atlassian.net/browse/NEWS-44)), then nav / transparency / API compat / archive `mvp/web`.
 
-[NEWS-1](https://informedcrew.atlassian.net/browse/NEWS-1) (MVP rebuild) and **[NEWS-12](https://informedcrew.atlassian.net/browse/NEWS-12)** (multi-source CFP + xcancel) are done. Sequenced follow-on — no product change in this note:
-
-- **[NEWS-13](https://informedcrew.atlassian.net/browse/NEWS-13)** Deeper original text — rewrite-before-build
-- **[NEWS-14](https://informedcrew.atlassian.net/browse/NEWS-14)** Cross-source corroboration — rewrite-before-build
-
-Plan: [`.cursor/plans/mvp_mission_epics_048f89b7.plan.md`](.cursor/plans/mvp_mission_epics_048f89b7.plan.md)
+Plan: [`.cursor/plans/osint_jira_pivot_d6b40f87.plan.md`](.cursor/plans/osint_jira_pivot_d6b40f87.plan.md)
 
 ## Legacy code
 
-The previous OSINT / Supabase / Express monolith lives under **[`_legacy/`](_legacy/)** for reference. It is not the default app and must not be wired into `mvp/`.
+Previous OSINT / Supabase / Express monolith: **[`_legacy/`](_legacy/)**. Frozen personal-feed React UI: `mvp/web` (until [NEWS-46](https://informedcrew.atlassian.net/browse/NEWS-46)).
 
 ## Security chore (separate)
 
-SSH key files `informed_news` / `informed_news.pub` may still exist in the repo history. **Rotate those keys and untrack them** as a dedicated security task (they are listed in `.gitignore` going forward). Do not treat them as part of the MVP runtime path.
+SSH key files `informed_news` / `informed_news.pub` may still exist in repo history. **Rotate and untrack** as a dedicated task (listed in `.gitignore`).
 
 ## Agent guidelines
 
-See **[agents.md](agents.md)** for how AI agents should work in this repository (MVP-first).
+See **[agents.md](agents.md)** for how AI agents should work in this repository.

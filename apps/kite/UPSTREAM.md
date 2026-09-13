@@ -19,10 +19,13 @@ Current Informed News deltas (keep this list short):
 
 ## Local run (this package)
 
+Requires [Bun](https://bun.sh) (upstream lockfile). Default product entry is root `npm run dev` (server + Kite). Package-only:
+
 ```bash
 cp apps/kite/.env.example apps/kite/.env   # if missing
 npm run install:kite                       # Bun + apps/kite/bun.lock
-npm run kite                               # from repo root → http://localhost:5173
+npm run kite                               # UI only → http://localhost:5173
+# or from repo root: npm run dev           # server + Kite
 ```
 
 ## Bump upstream
