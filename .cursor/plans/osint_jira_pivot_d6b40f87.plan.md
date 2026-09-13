@@ -253,9 +253,12 @@ Each story is one PR-sized change with its own deliverable:
 
 1. **Fork Kite into the repo** — Deliverable: `apps/kite/` (or `kite/`) at a pinned upstream SHA; `THIRD_PARTY.md` / NOTICE with MIT attribution; `docs/UPSTREAM_KITE.md` with sync steps. Demo: Kite UI loads on a documented port.
 2. **Make Kite the default `npm run dev` target** — Deliverable: root scripts + README point at Kite; `mvp/` still typechecks but is not the entry UI. Demo: one command, Kite homepage (Brief).
-3. **Nav shell for future layers** — Deliverable: documented route map (Brief home + Transparency; Finance/Situation/Listen reserved, not empty-shipped). Demo: Brief is default; Transparency link works; reserved routes are documented, not fake tabs.
-4. **NEWS-32 Transparency page** — Deliverable: a public `/transparency` (or Kite-equivalent) page reachable without login. Demo: open URL, see funding/methodology/honesty copy.
-5. **CFP/xcancel still reachable (compat)** — Deliverable: existing MVP API still serves articles (or a documented freeze). Demo: health + one article JSON, even if the UI is Kite.
+3. **Rebrand shell to Informed News** ([NEWS-45](https://informedcrew.atlassian.net/browse/NEWS-45)) — Deliverable: product name/title/header/footer/logo chrome is Informed News; MIT notices retained. Demo: Brief chrome says Informed News, not Kagi News.
+4. **Serve owned brief JSON** ([NEWS-44](https://informedcrew.atlassian.net/browse/NEWS-44)) — Deliverable: default config loads our brief (adapter from `mvp/server` / owned JSON), not `kite.kagi.com`. Demo: Brief content from our pipeline/fixture. *(Tight pair with NEWS-45, immediately after NEWS-41.)*
+5. **Nav shell for future layers** — Deliverable: documented route map (Brief home + Transparency; Finance/Situation/Listen reserved, not empty-shipped). Demo: Brief is default; Transparency link works; reserved routes are documented, not fake tabs.
+6. **NEWS-32 Transparency page** — Deliverable: a public `/transparency` (or Kite-equivalent) page reachable without login. Demo: open URL, see funding/methodology/honesty copy.
+7. **CFP/xcancel still reachable (compat)** — Deliverable: existing MVP API still serves articles (or a documented freeze). Demo: health + one article JSON, even if the UI is Kite.
+8. **Retire `mvp/web`** ([NEWS-46](https://informedcrew.atlassian.net/browse/NEWS-46)) — Archive to `_legacy/mvp-web/` (keep `mvp/server`). Demo: default scripts never start the old React feed; API still healthy. *Late in A; not a wholesale delete of `mvp/`.*
 
 Do not seed B–G stories until A is Done. When seeding later, copy the story-level column into real tickets with the same Deliverable / Demo block.
 
