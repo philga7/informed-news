@@ -49,14 +49,33 @@ See `mvp/.env.example`:
 - Optional file: `mvp/data/x-profiles.json` (gitignored; see `x-profiles.example.json`)  
 - `PORT` — API port (default `3001`)
 
+## Kite UI (vendored soft fork — NEWS-40)
+
+MIT front end from [kagisearch/kite-public](https://github.com/kagisearch/kite-public) lives under `apps/kite/` (pinned SHA in [`apps/kite/UPSTREAM.md`](apps/kite/UPSTREAM.md)). Default `npm run dev` is still the MVP UI until NEWS-41.
+
+Requires [Bun](https://bun.sh) (upstream lockfile). Then:
+
+```bash
+npm run install:kite
+cp apps/kite/.env.example apps/kite/.env
+npm run kite
+```
+
+- Kite UI: http://localhost:5173  
+- Sync / license: [docs/UPSTREAM_KITE.md](docs/UPSTREAM_KITE.md), [THIRD_PARTY.md](THIRD_PARTY.md)
+
 ## Scripts
 
 | Script | Purpose |
 |--------|---------|
 | `npm run dev` | MVP server + web |
+| `npm run kite` | Vendored Kite UI on port 5173 |
 | `npm run install:all` | Install `mvp/server` and `mvp/web` deps |
+| `npm run install:kite` | Install `apps/kite` deps |
 | `npm run typecheck` | Typecheck both packages |
 | `npm test` | MVP server unit tests |
+| `npm run test:kite` | Provenance / pin unit checks for `apps/kite` |
+| `npm run test:e2e:kite` | Playwright smoke: Kite loads on :5173 |
 | `npm run build` | Build the web client |
 
 ## Versioning & CI

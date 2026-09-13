@@ -10,6 +10,12 @@ node_modules
 dist
 dist-ssr
 *.local
+.svelte-kit
+apps/kite/build
+test-results
+playwright-report
+blob-report
+playwright/.cache
 
 .vscode/*
 !.vscode/extensions.json
