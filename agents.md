@@ -1,105 +1,108 @@
-# AI Agent Guidelines for Informed News (MVP)
+# AI Agent Guidelines for Informed News
 
 ## Project overview
 
-Informed News MVP is a greenfield app that:
+Informed News is pivoting to an OSINT-oriented product shell:
 
-1. Fetches Citizen Free Press (CFP) RSS items and scrapes publisher pages
-2. Stores articles as local JSON (`mvp/data/`)
-3. Classifies framing via Ollama Cloud
-4. Shows a thin React UI: password login, feed, dual citations (CFP + Original), framing scores
+1. **UI:** Vendored Kite soft fork under `apps/kite/` (MIT) — default `npm run dev` entry
+2. **API / pipeline:** `mvp/server` — CFP (+ optional xcancel) ingest, JSON store, Ollama framing
+3. **Owned brief:** Epic A follow-ons map pipeline output into the Kite Brief (not Kagi-hosted `kite.json` long-term)
+4. **Frozen:** `mvp/web` (old React feed) — still typechecks; not the default UI (archive later: NEWS-46)
 
-**Primary architecture is the MVP.** The former OSINT / Supabase monolith under `_legacy/` is historical only — do not treat it as the default product path or wire it into `mvp/`.
+`_legacy/` is historical OSINT/Supabase only — never the default `npm run dev` path.
 
 ## Architecture
 
 ```
-mvp/web (React + Vite)
-    → /api proxy → mvp/server (Express)
-                      → mvp/data/*.json
-                      → CFP RSS + publisher scrape
-                      → Ollama Cloud (framing)
+apps/kite (SvelteKit Brief UI)
+    ← (brief / static data; owned adapter coming)
+mvp/server (Express)
+    → mvp/data/*.json
+    → CFP RSS + publisher scrape (+ optional xcancel)
+    → Ollama Cloud (framing)
 ```
+
+`mvp/web` remains in-tree until NEWS-46 but is **not** started by `npm run dev`.
 
 ### Layout
 
 ```
+apps/
+└── kite/            # Vendored kite-public @ pinned SHA (see UPSTREAM.md)
 mvp/
-├── server/          # Express API (auth, fetch, classify, articles)
-│   └── src/
-│       ├── auth/    # Password + cookie session
-│       ├── store/   # JSON article/meta store
-│       ├── services/# RSS, scrape, Ollama framing, classify
-│       └── index.ts
-├── web/             # React UI (login, feed, article cards)
-├── data/            # Runtime JSON (gitignored except .gitkeep)
+├── server/          # Express API (auth, fetch, classify, articles) — keep
+├── web/             # Frozen React UI — optional `npm run dev:mvp-web`
+├── data/            # Runtime JSON (gitignored)
 ├── .env.example
-└── SMOKE.md         # E2E smoke checklist
-_legacy/             # Retired OSINT stack — reference only
+└── SMOKE.md         # Legacy MVP feed smoke (API still useful)
+docs/
+└── UPSTREAM_KITE.md
+_legacy/             # Retired stacks — reference only
 ```
 
 ## Default commands
 
-- `npm run dev` — start MVP server + web (root entrypoint)
-- `npm run install:all` — install both MVP packages
-- `npm run typecheck` — typecheck server and web
-- Smoke path: [mvp/SMOKE.md](mvp/SMOKE.md)
+- `npm run install:all` — `mvp/server`, `mvp/web` (typecheck), and `apps/kite` (Bun)
+- `npm run dev` — **mvp/server + Kite** (UI http://localhost:5173, API :3001)
+- `npm run typecheck` — server + frozen `mvp/web`
+- `npm run test:kite` — provenance + default-entrypoint checks
+- `npm run test:e2e:kite` — Playwright Brief smoke
+- Optional: `npm run dev:mvp-web` — old React feed (not product path)
 
-Do **not** assume root `src/`, `backend/`, or Supabase are the live app; those live under `_legacy/` if present.
+Do **not** treat `_legacy/` or `mvp/web` as the primary product UI.
 
 ## Agent responsibilities
 
 ### Code generation
 
-- Use TypeScript with strict checking
-- Prefer functional React components with hooks
-- Keep the UI thin: call `mvp/web/src/api.ts`; put business logic in `mvp/server`
-- Match existing MVP patterns (session cookie auth, JSON store, framing honesty banner)
-- Handle loading and error states in the UI
-- Do not reintroduce Supabase, multi-tenant orgs, or OSINT topic/watch/indicator models into `mvp/`
+- Prefer changes in `apps/kite` wrappers / Informed News glue over rewriting upstream kite files
+- Put pipeline/business logic in `mvp/server`; keep UI thin
+- TypeScript with strict checking where the package already uses it
+- Do not reintroduce Supabase, multi-tenant orgs, or full OSINT topic/watch/indicator models into the live path
 
 ### Data & API
 
-- Persist via `mvp/server` store helpers (`articleStore`, `metaStore`) — flat JSON files
+- Persist via `mvp/server` store helpers — flat JSON files
 - Protect mutating/list APIs with session middleware (`requireApiSession`)
 - Env vars load from `mvp/.env` (see `mvp/.env.example`)
-- Dual citations: every article should expose `cfpUrl` and `publisherUrl` when scrape succeeds
+- Dual citations on articles when scrape succeeds (`cfpUrl`, `publisherUrl`)
 
 ### Framing / AI
 
 - Classification goes through existing Ollama framing services
-- Always treat framing as AI-assisted analysis, not ground truth (honesty copy in UI)
+- Always treat framing as AI-assisted analysis, not ground truth
 - Do not invent alternate model stacks without an explicit request
 
 ### Security
 
 - Never commit secrets (`.env`, API keys, passwords)
-- SSH key files `informed_news` / `informed_news.pub` are a **separate** rotate-and-untrack chore — not MVP runtime
+- SSH key files `informed_news` / `informed_news.pub` are a separate rotate-and-untrack chore
 - Prefer `MVP_PASSWORD_HASH` over plaintext password in shared environments
+- Keep MIT attribution (`NOTICE`, `THIRD_PARTY.md`, `apps/kite/LICENSE`); do not ship Kagi trademarks as product chrome (NEWS-45)
 
 ## When adding features
 
-1. Types in `mvp/server/src/types` (and web `types` if UI needs them)
-2. Store or service changes under `mvp/server`
+1. Prefer Brief / shell work under `apps/kite` (minimize upstream churn) + docs
+2. Pipeline types/services under `mvp/server`
 3. Routes in `mvp/server/src/index.ts` (or auth router)
-4. Thin UI updates under `mvp/web/src`
-5. Update `mvp/SMOKE.md` / root README if the operator path changes
+4. Update README / this file / smoke docs when the operator path changes
 
 ## Prohibited (unless explicitly requested)
 
-- Making `_legacy/` the default `npm run dev` target
-- Calling Supabase from the MVP
-- Porting full OSINT workflows (topics, watch items, indicators, scan, claims) into MVP without a new product decision
+- Making `_legacy/` or frozen `mvp/web` the default `npm run dev` target
+- Calling Supabase from the live path
+- Porting full OSINT workflows into the product without a new epic decision
 - Committing `mvp/data/*.json` or `.env` files
+- Defaulting the product UI at `kite.kagi.com` CC BY-NC data after owned-brief work (NEWS-44)
 
 ## Jira
 
-Informed News work uses the **NEWS** project on Atlassian (`informedcrew.atlassian.net`). Prefer JQL `project = NEWS`.
+Informed News work uses the **NEWS** project on Atlassian (`informedcrew.atlassian.net`). Prefer JQL `project = NEWS`. Epic A: NEWS-33.
 
 ## Decision order
 
-1. Keep the MVP path working (dev + smoke)
-2. Type safety
-3. Thin UI / server-side logic
+1. Keep `npm run dev` → Kite Brief + `mvp/server` healthy
+2. Type safety (including frozen `mvp/web` until archived)
+3. Thin UI / server-side pipeline logic
 4. Clear errors and honesty about AI framing
 5. Avoid scope creep from `_legacy/`
