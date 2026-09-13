@@ -67,7 +67,7 @@ class CategoryMetadataService {
 		const groups: CategoryGroup[] = [
 			{
 				type: 'core',
-				title: 'Kagi Curated',
+				title: 'Core curated',
 				categories: grouped.core,
 			},
 			{

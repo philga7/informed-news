@@ -86,7 +86,7 @@ onMount(() => {
     <h1
       class="mb-2 flex items-center justify-center text-2xl font-bold text-gray-800 dark:text-dark-text"
     >
-      <span>{s("app.title") || "Kite"}</span>
+      <span>{s("app.title") || "Informed News"}</span>
       <span
         class="mt-0.5 ms-2 rounded-lg bg-yellow-200 px-2 py-0.5 text-xs font-medium text-black"
       >
@@ -94,7 +94,7 @@ onMount(() => {
       </span>
     </h1>
     <p class="text-xl text-gray-600 dark:text-gray-400">
-      {s("app.motto") || "News. Elevated."}
+      {s("app.motto") || "Signal over noise."}
     </p>
 
     {#if hasError}

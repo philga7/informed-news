@@ -1,4 +1,5 @@
 import { browser } from '$app/environment';
+import { PRODUCT_TITLE_SUFFIX } from '$lib/brand';
 import { displaySettings } from '$lib/data/settings.svelte';
 import { navigationHandlerService } from '$lib/services/navigationHandlerService';
 import { categoryMetadataStore } from '$lib/stores/categoryMetadata.svelte';
@@ -98,7 +99,7 @@ export function useCategoryManager(options: () => CategoryManagerOptions) {
 			pageMetadata.title = displayName;
 
 			if (browser && document) {
-				document.title = `${displayName} | Kagi News`;
+				document.title = `${displayName} | ${PRODUCT_TITLE_SUFFIX}`;
 			}
 		}
 	}
