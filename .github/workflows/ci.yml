@@ -33,5 +33,11 @@ jobs:
       - name: Test
         run: npm test
 
+      - name: Kite provenance tests
+        run: npm run test:kite
+
       - name: Build web
         run: npm run build
+
+      # Optional heavier path: install kite + Playwright when apps/kite changes.
+      # Full e2e remains local via `npm run test:e2e:kite` until NEWS-41 wires default dev.
