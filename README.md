@@ -105,4 +105,4 @@ SSH key files `informed_news` / `informed_news.pub` may still exist in repo hist
 
 ## Agent guidelines
 
-See **[AGENTS.md](AGENTS.md)** for how AI agents should work in this repository.
+See **[agents.md](agents.md)** for how AI agents should work in this repository.

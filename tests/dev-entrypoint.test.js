@@ -19,9 +19,10 @@ describe('NEWS-41 default npm run dev entry', () => {
 		assert.match(devMvpWeb, /npm run web/);
 	});
 
-	it('documents Kite as the default UI in README and AGENTS', () => {
+	it('documents Kite as the default UI in README and agents.md', () => {
 		const readme = readFileSync(join(root, 'README.md'), 'utf8');
-		const agents = readFileSync(join(root, 'AGENTS.md'), 'utf8');
+		// Repo path is agents.md (lowercase); macOS is case-insensitive, Linux CI is not.
+		const agents = readFileSync(join(root, 'agents.md'), 'utf8');
 
 		assert.match(readme, /localhost:5173/);
 		assert.match(readme, /Default:\*\* mvp\/server \+ Kite UI/);
