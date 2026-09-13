@@ -4,6 +4,7 @@ import { IconCheck, IconLoader2, IconShare } from '@tabler/icons-svelte';
 import { onDestroy, onMount } from 'svelte';
 import Portal from 'svelte-portal';
 import { browser } from '$app/environment';
+import { PRODUCT_NAME } from '$lib/brand';
 import { s } from '$lib/client/localization.svelte';
 
 interface Props {
@@ -118,10 +119,10 @@ async function handleShare() {
 
 			try {
 				// Format the shared text nicely
-				const shareTitle = `${title} - Kagi News`;
+				const shareTitle = `${title} - ${PRODUCT_NAME}`;
 				const shareText = description
-					? `${description}\n\nRead more on Kagi:`
-					: `${title}\n\nRead more on Kagi:`;
+					? `${description}\n\nRead more on ${PRODUCT_NAME}:`
+					: `${title}\n\nRead more on ${PRODUCT_NAME}:`;
 
 				await navigator.share({
 					title: shareTitle,

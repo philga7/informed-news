@@ -385,7 +385,7 @@ function resetForm() {
 						aria-label={s('common.back')}
 					>
 						<IconArrowLeft size={20} />
-						<img src="/favicon.svg" alt="Kagi News" class="w-8 h-8" />
+						<img src="/favicon.svg" alt="Informed News" class="w-8 h-8 rounded" />
 					</a>
 					<div class="flex-1">
 						<h1 class="text-2xl font-bold text-primary">

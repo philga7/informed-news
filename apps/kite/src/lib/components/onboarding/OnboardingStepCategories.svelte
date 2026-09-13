@@ -18,7 +18,7 @@ let { categories = [] }: Props = $props();
     </h2>
     <p class="text-gray-600 dark:text-gray-300 mb-2">
       {s("onboarding.categories.subtitle") ||
-        "Kagi News follows news from around the world, covering national, regional, and local events. Select the categories you're interested in:"}
+        "Informed News follows news from around the world, covering national, regional, and local events. Select the categories you're interested in:"}
     </p>
   </div>
 

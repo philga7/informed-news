@@ -16,6 +16,7 @@ Current Informed News deltas (keep this list short):
 
 - This `UPSTREAM.md` pin file
 - `.env.example` for local UI smoke against public Kite data hosts
+- **NEWS-45 branding:** `src/lib/brand.ts` string overrides; `BrandMark.svelte`; header/footer/splash chrome; local `/api/locale` (no Kagi locale proxy); `app.html` / `manifest.json` / `favicon.svg` product identity. MIT notices unchanged at repo root + `LICENSE`.
 
 ## Local run (this package)
 

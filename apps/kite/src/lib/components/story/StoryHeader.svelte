@@ -101,7 +101,7 @@ function buildAssistantUrl(userQuestion: string): string {
 		day: 'numeric',
 	});
 
-	const suffix = `\n\nThis is a news story from Kagi News, reported on ${today}. Please respond in the same language as the user's question.\n\nUser's question: ${userQuestion}`;
+	const suffix = `\n\nThis is a news story from Informed News, reported on ${today}. Please respond in the same language as the user's question.\n\nUser's question: ${userQuestion}`;
 	const prefix = 'News story:\n\n';
 	const enabledSections = sections.list
 		.filter((sec) => sec.enabled)

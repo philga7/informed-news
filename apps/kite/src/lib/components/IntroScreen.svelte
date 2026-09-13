@@ -67,10 +67,10 @@ $effect(() => {
         <div class="mb-8 flex items-start justify-between">
           <div class="w-full">
             <h1 class="mb-2 text-3xl font-bold text-primary">
-              {s("app.title") || "Kite"}
+              {s("app.title") || "Informed News"}
             </h1>
             <p class="text-primary-600">
-              {s("about.subtitle") || "News app by Kagi"}
+              {s("about.subtitle") || "Daily brief with cited sources"}
             </p>
           </div>
         </div>

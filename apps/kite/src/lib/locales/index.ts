@@ -1,3 +1,4 @@
+import { applyBrandOverrides } from '$lib/brand';
 import ar from './ar.json';
 import de from './de.json';
 import en from './en.json';
@@ -14,21 +15,28 @@ import ru from './ru.json';
 import uk from './uk.json';
 import zhHans from './zh-Hans.json';
 import zhHant from './zh-Hant.json';
+
+type LocaleMap = Record<string, { text: string; translationContext: string }>;
+
+function brand(locale: LocaleMap): LocaleMap {
+	return applyBrandOverrides(locale);
+}
+
 export default {
-	ar,
-	de,
-	en,
-	es,
-	et,
-	fr,
-	he,
-	hi,
-	it,
-	ja,
-	nl,
-	pt,
-	ru,
-	uk,
-	'zh-Hans': zhHans,
-	'zh-Hant': zhHant,
-} as Record<string, Record<string, { text: string; translationContext: string }> | undefined>;
+	ar: brand(ar as LocaleMap),
+	de: brand(de as LocaleMap),
+	en: brand(en as LocaleMap),
+	es: brand(es as LocaleMap),
+	et: brand(et as LocaleMap),
+	fr: brand(fr as LocaleMap),
+	he: brand(he as LocaleMap),
+	hi: brand(hi as LocaleMap),
+	it: brand(it as LocaleMap),
+	ja: brand(ja as LocaleMap),
+	nl: brand(nl as LocaleMap),
+	pt: brand(pt as LocaleMap),
+	ru: brand(ru as LocaleMap),
+	uk: brand(uk as LocaleMap),
+	'zh-Hans': brand(zhHans as LocaleMap),
+	'zh-Hant': brand(zhHant as LocaleMap),
+} as Record<string, LocaleMap | undefined>;

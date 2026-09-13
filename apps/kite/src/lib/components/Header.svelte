@@ -2,6 +2,7 @@
 import { IconClock, IconSearch, IconSettings, IconTextSize } from '@tabler/icons-svelte';
 import { getContext, untrack } from 'svelte';
 import { browser } from '$app/environment';
+import BrandMark from '$lib/components/BrandMark.svelte';
 import { s } from '$lib/client/localization.svelte';
 import { features } from '$lib/config/features';
 import {
@@ -480,14 +481,7 @@ $effect(() => {
               class:cursor-pointer={!isAnimating}
               class:cursor-default={isAnimating}
             >
-              <img
-                src={themeSettings.isDark
-                  ? "/svg/kagi_news_compact_dark.svg"
-                  : "/svg/kagi_news_compact.svg"}
-                alt={s("app.logo.newsAlt") || "Kite News"}
-                class="w-[90px] h-auto logo z-modal-backdrop"
-                style="isolation: isolate;"
-              />
+              <BrandMark compact class="logo z-modal-backdrop" />
             </button>
           </div>
           <!-- Date displays (indices 1-5) -->
@@ -547,14 +541,7 @@ $effect(() => {
         aria-label={s("app.logo.clickToReset") || "Click to reset view to home"}
         class="me-2 p-0 border-0 bg-transparent cursor-pointer focus-visible-ring rounded"
       >
-        <img
-          src={themeSettings.isDark
-            ? "/svg/kagi_news_compact_dark.svg"
-            : "/svg/kagi_news_compact.svg"}
-          alt={s("app.logo.newsAlt") || "Kite News"}
-          class="w-[90px] h-auto logo relative z-modal-backdrop"
-          style="isolation: isolate;"
-        />
+        <BrandMark class="logo relative z-modal-backdrop" />
       </button>
     </div>
 
