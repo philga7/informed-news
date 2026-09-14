@@ -1,0 +1,33 @@
+# Product route map (NEWS-42)
+
+Informed News product surfaces vs reserved future layers. **Do not ship empty Finance / Situation / Listen tabs** until those epics deliver data.
+
+## Shipped (live)
+
+| Path | Surface | Notes |
+|------|---------|--------|
+| `/` | **Brief** (home) | Default `npm run dev` entry. Owned brief via `mvp/server`. |
+| `/about` | Product intro overlay | IntroScreen via Brief shell (not funding/methodology). |
+| `/transparency` | **Transparency** | Public page (stub until [NEWS-32](https://informedcrew.atlassian.net/browse/NEWS-32) fills funding/methodology/corrections). Footer link. No login. |
+| `/contribute` | Feed contribution | Upstream-oriented contribute wizard. |
+| `/world/latest` (and other category routes) | Brief category views | Feed categories — not product “layer” tabs. |
+
+## Reserved (docs only — no empty chrome)
+
+| Path | Epic when data exists | Guardrail |
+|------|----------------------|-----------|
+| `/finance` | [NEWS-34](https://informedcrew.atlassian.net/browse/NEWS-34) Crucix (B) | Do not add header/nav tab until ≥1 cited signal is shown |
+| `/situation` | [NEWS-35](https://informedcrew.atlassian.net/browse/NEWS-35) Geo (C) | Do not ship empty Situation chrome |
+| `/listen` | [NEWS-38](https://informedcrew.atlassian.net/browse/NEWS-38) TTS (F) | Listen control only when `brief.mp3` (or equivalent) exists |
+| `/desk` (optional later) | [NEWS-39](https://informedcrew.atlassian.net/browse/NEWS-39) Voice (G) | Last; never stub in Epic A |
+
+## Explicit non-goals for this shell
+
+- No Finance / Situation / Listen items in header, footer, or category nav until data ships
+- Category chips (World, USA, …) remain brief categories, not product epics
+- Kagi Apps launcher stays gated off ([docs/KAGI_SERVICE_CLEANUP.md](KAGI_SERVICE_CLEANUP.md))
+
+## Related
+
+- Owned brief API: [OWNED_BRIEF.md](OWNED_BRIEF.md)
+- Epic H (rich story sections): [NEWS-48](https://informedcrew.atlassian.net/browse/NEWS-48) — after Epic A

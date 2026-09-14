@@ -15,7 +15,7 @@
     "install:kite": "bun install --frozen-lockfile --cwd apps/kite",
     "typecheck": "npm run typecheck --prefix mvp/server && npm run typecheck --prefix mvp/web",
     "test": "npm test --prefix mvp/server",
-    "test:kite": "node --test tests/kite-upstream.test.js tests/dev-entrypoint.test.js tests/branding.test.js tests/kagi-service-cleanup.test.js",
+		"test:kite": "node --test tests/kite-upstream.test.js tests/dev-entrypoint.test.js tests/branding.test.js tests/kagi-service-cleanup.test.js tests/nav-shell.test.js",
     "test:e2e:kite": "playwright test e2e/kite-smoke.spec.ts",
     "build": "npm run build --prefix mvp/web",
     "release": "semantic-release",
