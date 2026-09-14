@@ -33,9 +33,22 @@ describe('NEWS-40 kite upstream provenance', () => {
 		assert.match(thirdParty, /CC BY-NC/);
 	});
 
-	it('ships .env.example for documented local port smoke', () => {
+	it('defaults brief proxy to owned mvp/server, not kite.kagi.com', () => {
 		const envExample = readFileSync(join(root, 'apps/kite/.env.example'), 'utf8');
-		assert.match(envExample, /VITE_BASE_PATH=https:\/\/kite\.kagi\.com/);
-		assert.match(envExample, /VITE_STATIC_PATH=https:\/\/kite\.kagi\.com\/static/);
+		const proxy = readFileSync(
+			join(root, 'apps/kite/src/lib/server/proxy.ts'),
+			'utf8',
+		);
+		const ownedDoc = readFileSync(join(root, 'docs/OWNED_BRIEF.md'), 'utf8');
+
+		assert.match(envExample, /KITE_API_BASE/);
+		assert.match(envExample, /kite\.kagi\.com\/api/);
+		assert.match(proxy, /127\.0\.0\.1:3001\/api/);
+		assert.doesNotMatch(
+			proxy,
+			/const KITE_API_BASE = 'https:\/\/kite\.kagi\.com\/api'/,
+		);
+		assert.match(ownedDoc, /owned-latest/);
+		assert.match(ownedDoc, /POST \/api\/fetch/);
 	});
 });

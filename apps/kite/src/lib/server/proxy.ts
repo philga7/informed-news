@@ -1,6 +1,17 @@
+import { env } from '$env/dynamic/private';
 import type { RequestHandler } from '@sveltejs/kit';
 
-const KITE_API_BASE = 'https://kite.kagi.com/api';
+/**
+ * Upstream brief API. Default: local mvp/server owned brief (NEWS-44).
+ * Opt-in CC BY-NC Kagi data: KITE_API_BASE=https://kite.kagi.com/api
+ */
+function kiteApiBase(): string {
+	const raw = env.KITE_API_BASE?.trim();
+	if (raw) {
+		return raw.replace(/\/$/, '');
+	}
+	return 'http://127.0.0.1:3001/api';
+}
 
 export function createProxy(endpoint: string): RequestHandler {
   return async ({ request, params, url }) => {
@@ -16,7 +27,7 @@ export function createProxy(endpoint: string): RequestHandler {
       }
       
       // Append query parameters
-      const targetUrl = new URL(`${KITE_API_BASE}${targetPath}`);
+      const targetUrl = new URL(`${kiteApiBase()}${targetPath}`);
       url.searchParams.forEach((value, key) => {
         targetUrl.searchParams.append(key, value);
       });
@@ -33,7 +44,7 @@ export function createProxy(endpoint: string): RequestHandler {
       // Remove host header to avoid conflicts
       proxyRequest.headers.delete('host');
       
-      // Make the request to kite.kagi.com
+      // Make the request to the configured brief API
       const response = await fetch(proxyRequest);
       
       // Create a new headers object and remove problematic encoding headers

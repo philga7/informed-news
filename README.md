@@ -21,7 +21,8 @@ cp mvp/.env.example mvp/.env
 # Set MVP_PASSWORD, SESSION_SECRET, OLLAMA_API_KEY (API / classify)
 
 cp apps/kite/.env.example apps/kite/.env
-# Temporary: loads public Kite hosts for UI smoke (CC BY-NC). Owned brief = NEWS-44.
+# Default brief = mvp/server owned adapter (see docs/OWNED_BRIEF.md).
+# Optional CC BY-NC: set KITE_API_BASE=https://kite.kagi.com/api
 
 npm install
 npm run install:all   # requires Bun for apps/kite
@@ -51,7 +52,7 @@ See `mvp/.env.example` for the API:
 - Optional file: `mvp/data/x-profiles.json` (gitignored; see `x-profiles.example.json`)  
 - `PORT` — API port (default `3001`)
 
-Kite UI env: `apps/kite/.env.example`. Sync / license: [docs/UPSTREAM_KITE.md](docs/UPSTREAM_KITE.md), [THIRD_PARTY.md](THIRD_PARTY.md).
+Kite UI env: `apps/kite/.env.example`. Owned brief contract: [docs/OWNED_BRIEF.md](docs/OWNED_BRIEF.md). Sync / license: [docs/UPSTREAM_KITE.md](docs/UPSTREAM_KITE.md), [THIRD_PARTY.md](THIRD_PARTY.md).
 
 ## Scripts
 
@@ -91,7 +92,7 @@ Root [`vercel.json`](vercel.json) still deploys the **frozen** `mvp/web` static 
 
 ## Roadmap (NEWS)
 
-Epic A ([NEWS-33](https://informedcrew.atlassian.net/browse/NEWS-33)): Kite presentation. Next: rebrand ([NEWS-45](https://informedcrew.atlassian.net/browse/NEWS-45)), owned brief ([NEWS-44](https://informedcrew.atlassian.net/browse/NEWS-44)), then nav / transparency / API compat / archive `mvp/web`.
+Epic A ([NEWS-33](https://informedcrew.atlassian.net/browse/NEWS-33)): Kite presentation. Owned brief ([NEWS-44](https://informedcrew.atlassian.net/browse/NEWS-44)) is the default content path; next: leftover Kagi service cleanup, nav, transparency, API compat, archive `mvp/web`.
 
 Plan: [`.cursor/plans/osint_jira_pivot_d6b40f87.plan.md`](.cursor/plans/osint_jira_pivot_d6b40f87.plan.md)
 

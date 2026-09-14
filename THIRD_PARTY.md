@@ -17,6 +17,6 @@ This repository includes third-party code under their original licenses. Informe
 
 Full MIT text: [`apps/kite/LICENSE`](apps/kite/LICENSE).
 
-### Remote data used for local UI smoke (not vendored)
+### Remote data (optional / not the product default)
 
-Kite’s hosted application data at `https://kite.kagi.com` (e.g. `kite.json`) is licensed separately under [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/). It is fetched at runtime for local demos only and is **not** copied into this tree as product content.
+Kite’s hosted application data at `https://kite.kagi.com` (e.g. `kite.json`) is licensed separately under [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/). It is **not** copied into this tree. The default Informed News path serves an **owned** brief from `mvp/server` ([docs/OWNED_BRIEF.md](docs/OWNED_BRIEF.md)). Opt in only via `KITE_API_BASE=https://kite.kagi.com/api` for private non-commercial UI experiments.

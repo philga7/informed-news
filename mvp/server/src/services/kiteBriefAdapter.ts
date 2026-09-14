@@ -1,0 +1,263 @@
+import type { Article } from '../types/article.js';
+
+/** Stable batch id for the live owned brief (not a Kagi UUID). */
+export const OWNED_BATCH_ID = 'owned-latest';
+
+/** Fixed category UUID so stories routes stay stable across reloads. */
+export const OWNED_CATEGORY_UUID = '00000000-0000-4000-8000-000000000001';
+
+/** Use `world` so Kite’s default `/world/latest` route shows owned stories. */
+export const OWNED_CATEGORY_SLUG = 'world';
+export const OWNED_CATEGORY_NAME = 'World';
+
+/** Distinctive fixture title for empty-store / Playwright smoke. */
+export const OWNED_FIXTURE_TITLE =
+  'Owned brief fixture — CFP sample (replace via POST /api/fetch)';
+
+export type KiteBriefArticle = {
+  title: string;
+  link: string;
+  domain: string;
+  date: string;
+};
+
+export type KiteBriefStory = {
+  id: string;
+  cluster_number: number;
+  category: string;
+  title: string;
+  short_summary: string;
+  articles: KiteBriefArticle[];
+};
+
+export type KiteBatchInfo = {
+  id: string;
+  createdAt: string;
+  dateSlug: string;
+  totalReadCount: number;
+};
+
+export type KiteBatchCategoriesResponse = {
+  batchId: string;
+  createdAt: string;
+  hasOnThisDay: boolean;
+  categories: Array<{
+    id: string;
+    categoryId: string;
+    categoryName: string;
+    timestamp: number;
+    readCount: number;
+    clusterCount: number;
+  }>;
+};
+
+export type KiteBatchStoriesResponse = {
+  batchId: string;
+  categoryId: string;
+  categoryName: string;
+  timestamp: number;
+  stories: KiteBriefStory[];
+  totalStories: number;
+  domains: Array<{ name: string }>;
+  readCount: number;
+};
+
+/** Minimal sample when `articles.json` is empty so Brief still renders. */
+export function ownedBriefFixtureArticles(
+  now: Date = new Date(),
+): Article[] {
+  const iso = now.toISOString();
+  return [
+    {
+      id: 'owned-fixture-cfp-1',
+      title: OWNED_FIXTURE_TITLE,
+      sourceKind: 'cfp',
+      canonicalUrl: 'https://citizenfreepress.com/owned-brief-fixture/',
+      citations: [
+        {
+          label: 'CFP',
+          url: 'https://citizenfreepress.com/owned-brief-fixture/',
+        },
+        {
+          label: 'Original',
+          url: 'https://example.com/owned-brief-fixture',
+        },
+      ],
+      publisherUrl: 'https://example.com/owned-brief-fixture',
+      publisherDomain: 'example.com',
+      handle: null,
+      publishedAt: iso,
+      snippet:
+        'Placeholder cluster from Informed News owned-brief adapter. Run POST /api/fetch after login to replace with live CFP/xcancel ingest.',
+      bodyText: null,
+      bodyStatus: 'not_applicable',
+      publisherTitle: null,
+      clusterId: 'owned-fixture-cluster',
+      fetchedAt: iso,
+      classification: null,
+      classifiedAt: null,
+      classifyError: null,
+    },
+  ];
+}
+
+function domainFromUrl(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return 'unknown';
+  }
+}
+
+function articleLink(article: Article): string {
+  return article.publisherUrl || article.canonicalUrl;
+}
+
+function articleDomain(article: Article): string {
+  return article.publisherDomain || domainFromUrl(articleLink(article));
+}
+
+function articleDate(article: Article): string {
+  return article.publishedAt || article.fetchedAt;
+}
+
+function shortSummary(article: Article): string {
+  const framing = article.classification?.framingSummary?.trim();
+  if (framing) return framing;
+  const snippet = article.snippet?.trim();
+  if (snippet) return snippet;
+  return article.title;
+}
+
+/**
+ * Group flat MVP articles into Kite-shaped stories.
+ * Shared `clusterId` → one story; null → one story per article.
+ */
+export function articlesToKiteStories(
+  articles: Article[],
+  options: { limit?: number } = {},
+): KiteBriefStory[] {
+  const limit = options.limit ?? 12;
+  const groups = new Map<string, Article[]>();
+  const order: string[] = [];
+
+  for (const article of articles) {
+    const key = article.clusterId?.trim() || `solo:${article.id}`;
+    if (!groups.has(key)) {
+      groups.set(key, []);
+      order.push(key);
+    }
+    groups.get(key)!.push(article);
+  }
+
+  const stories: KiteBriefStory[] = [];
+  let clusterNumber = 1;
+
+  for (const key of order) {
+    if (stories.length >= limit) break;
+    const members = groups.get(key)!;
+    members.sort((a, b) => {
+      const ta = Date.parse(articleDate(a)) || 0;
+      const tb = Date.parse(articleDate(b)) || 0;
+      return tb - ta;
+    });
+    const primary = members[0]!;
+    stories.push({
+      id: primary.clusterId?.trim() || primary.id,
+      cluster_number: clusterNumber++,
+      category: OWNED_CATEGORY_SLUG,
+      title: primary.title,
+      short_summary: shortSummary(primary),
+      articles: members.map((m) => ({
+        title: m.title,
+        link: articleLink(m),
+        domain: articleDomain(m),
+        date: articleDate(m),
+      })),
+    });
+  }
+
+  return stories;
+}
+
+export function buildOwnedBatchInfo(
+  articles: Article[],
+  now: Date = new Date(),
+): KiteBatchInfo {
+  const createdAt = now.toISOString();
+  const y = now.getUTCFullYear();
+  const m = String(now.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(now.getUTCDate()).padStart(2, '0');
+  return {
+    id: OWNED_BATCH_ID,
+    createdAt,
+    dateSlug: `${y}-${m}-${d}.1`,
+    totalReadCount: articles.length,
+  };
+}
+
+export function buildOwnedCategoriesResponse(
+  articles: Article[],
+  now: Date = new Date(),
+): KiteBatchCategoriesResponse {
+  const batch = buildOwnedBatchInfo(articles, now);
+  const stories = articlesToKiteStories(articles);
+  const timestamp = Math.floor(now.getTime() / 1000);
+  return {
+    batchId: batch.id,
+    createdAt: batch.createdAt,
+    hasOnThisDay: false,
+    categories: [
+      {
+        id: OWNED_CATEGORY_UUID,
+        categoryId: OWNED_CATEGORY_SLUG,
+        categoryName: OWNED_CATEGORY_NAME,
+        timestamp,
+        readCount: articles.length,
+        clusterCount: stories.length,
+      },
+    ],
+  };
+}
+
+export function buildOwnedStoriesResponse(
+  articles: Article[],
+  categoryId: string,
+  options: { limit?: number; now?: Date } = {},
+): KiteBatchStoriesResponse | null {
+  const known =
+    categoryId === OWNED_CATEGORY_UUID ||
+    categoryId === OWNED_CATEGORY_SLUG ||
+    categoryId === 'latest';
+  if (!known) return null;
+
+  const now = options.now ?? new Date();
+  const stories = articlesToKiteStories(articles, { limit: options.limit });
+  const domains = [
+    ...new Set(stories.flatMap((s) => s.articles.map((a) => a.domain))),
+  ].map((name) => ({ name }));
+
+  return {
+    batchId: OWNED_BATCH_ID,
+    categoryId: OWNED_CATEGORY_UUID,
+    categoryName: OWNED_CATEGORY_NAME,
+    timestamp: Math.floor(now.getTime() / 1000),
+    stories,
+    totalStories: stories.length,
+    domains,
+    readCount: articles.length,
+  };
+}
+
+/**
+ * Resolve articles for the owned brief: live store, or fixture when empty.
+ */
+export function resolveOwnedBriefArticles(
+  stored: Article[],
+  now: Date = new Date(),
+): { articles: Article[]; fromFixture: boolean } {
+  if (stored.length > 0) {
+    return { articles: stored, fromFixture: false };
+  }
+  return { articles: ownedBriefFixtureArticles(now), fromFixture: true };
+}
