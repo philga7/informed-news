@@ -60,6 +60,10 @@ export const BRAND_STRING_OVERRIDES: LocaleMap = {
 		text: 'Contribute',
 		translationContext: 'Footer contribute link label',
 	},
+	'footer.transparency': {
+		text: 'Transparency',
+		translationContext: 'Footer link to public transparency page (NEWS-42)',
+	},
 	'settings.about.aboutKite': {
 		text: `About ${PRODUCT_NAME}`,
 		translationContext: 'Settings about section title',

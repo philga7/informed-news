@@ -91,6 +91,31 @@ function getRSSFeedUrl(): string {
     </button>
 
     <a
+      href="/transparency"
+      class="flex items-center space-x-2 text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
+      title={s("footer.transparency") || "Transparency"}
+    >
+      <svg
+        class="h-5 w-5 text-gray-600 dark:text-gray-400"
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.5"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 8v4" />
+        <path d="M12 16h.01" />
+      </svg>
+      <span class="text-xs sm:text-sm"
+        >{s("footer.transparency") || "Transparency"}</span
+      >
+    </a>
+
+    <a
       href={getRSSFeedUrl()}
       target="_blank"
       class="flex items-center space-x-2 text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"

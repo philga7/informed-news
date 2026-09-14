@@ -85,3 +85,29 @@ test.describe('Kagi service cleanup (NEWS-47)', () => {
 		await expect(dialog.getByText(/Get it on Google Play/i)).toHaveCount(0);
 	});
 });
+
+test.describe('Nav shell (NEWS-42)', () => {
+	test('Brief stays default; Transparency link works; no empty layer tabs', async ({
+		page,
+	}) => {
+		await page.goto('/');
+		await expect(page).toHaveTitle(/Informed News|World/i, { timeout: 60_000 });
+		await expect(page.getByText('Informed News').first()).toBeVisible({
+			timeout: 60_000,
+		});
+
+		await expect(page.getByRole('link', { name: /^Finance$/i })).toHaveCount(0);
+		await expect(page.getByRole('link', { name: /^Situation$/i })).toHaveCount(
+			0,
+		);
+		await expect(page.getByRole('link', { name: /^Listen$/i })).toHaveCount(0);
+
+		const transparency = page.getByRole('link', { name: /^Transparency$/i });
+		await transparency.scrollIntoViewIfNeeded();
+		await transparency.click();
+		await expect(page).toHaveURL(/\/transparency\/?$/);
+		await expect(page.getByRole('heading', { name: 'Transparency' })).toBeVisible();
+		await expect(page.getByText(/AI-assisted analysis/i)).toBeVisible();
+		await expect(page.getByRole('link', { name: /Back to Brief/i })).toBeVisible();
+	});
+});

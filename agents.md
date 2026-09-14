@@ -80,6 +80,7 @@ Do **not** treat `_legacy/` or `mvp/web` as the primary product UI.
 - Prefer `MVP_PASSWORD_HASH` over plaintext password in shared environments
 - Keep MIT attribution (`NOTICE`, `THIRD_PARTY.md`, `apps/kite/LICENSE`); do not ship Kagi trademarks as product chrome (NEWS-45)
 - Default brief API is owned `mvp/server` adapter ([docs/OWNED_BRIEF.md](docs/OWNED_BRIEF.md)); `kite.kagi.com` is opt-in CC BY-NC only
+- Product routes: Brief `/` + Transparency `/transparency`; Finance/Situation/Listen reserved in docs only ([docs/ROUTE_MAP.md](docs/ROUTE_MAP.md), NEWS-42)
 - Leftover Kagi Maps / Translate / account-sync UX stays gated off ([docs/KAGI_SERVICE_CLEANUP.md](docs/KAGI_SERVICE_CLEANUP.md), NEWS-47)
 
 ## When adding features
