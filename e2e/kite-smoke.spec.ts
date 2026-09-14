@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { expect, test } from '@playwright/test';
 
 test.describe('Informed News shell branding (NEWS-45)', () => {
@@ -128,5 +130,56 @@ test.describe('Transparency page (NEWS-32)', () => {
 		await expect(page.getByText(/Phil Clapper/i).first()).toBeVisible();
 		await expect(page.locator('body')).not.toContainText('perfectly unbiased');
 		await expect(page.locator('body')).not.toContainText('we are an unbiased');
+	});
+});
+
+test.describe('MVP API compat (NEWS-43)', () => {
+	const apiBase = `http://127.0.0.1:${process.env.PORT ?? 3001}`;
+
+	function readMvpPassword(): string | undefined {
+		if (process.env.MVP_PASSWORD) return process.env.MVP_PASSWORD;
+		try {
+			const env = readFileSync(join(process.cwd(), 'mvp/.env'), 'utf8');
+			const match = env.match(/^MVP_PASSWORD=(.*)$/m);
+			return match?.[1]?.trim().replace(/^["']|["']$/g, '');
+		} catch {
+			return undefined;
+		}
+	}
+
+	test('health is public; articles JSON reachable with session while Kite runs', async ({
+		page,
+		request,
+	}) => {
+		// Kite UI is up (webServer from playwright.config).
+		await page.goto('/');
+		await expect(page).toHaveTitle(/Informed News|World/i, { timeout: 60_000 });
+
+		const health = await request.get(`${apiBase}/health`);
+		expect(health.ok()).toBeTruthy();
+		const healthBody = await health.json();
+		expect(healthBody.status).toBe('ok');
+		expect(healthBody.app).toBe('mvp-server');
+
+		const password = readMvpPassword();
+		test.skip(!password, 'mvp/.env MVP_PASSWORD required for articles check');
+
+		const login = await request.post(`${apiBase}/api/login`, {
+			data: { password },
+		});
+		expect(login.ok()).toBeTruthy();
+
+		const articlesRes = await request.get(`${apiBase}/api/articles`);
+		expect(articlesRes.ok()).toBeTruthy();
+		const articlesBody = await articlesRes.json();
+		expect(Array.isArray(articlesBody.articles)).toBeTruthy();
+
+		if (articlesBody.articles.length > 0) {
+			const id = articlesBody.articles[0].id as string;
+			const one = await request.get(`${apiBase}/api/articles/${id}`);
+			expect(one.ok()).toBeTruthy();
+			const oneBody = await one.json();
+			expect(oneBody.article?.id).toBe(id);
+		}
 	});
 });
