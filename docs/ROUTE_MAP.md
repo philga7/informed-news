@@ -8,7 +8,7 @@ Informed News product surfaces vs reserved future layers. **Do not ship empty Fi
 |------|---------|--------|
 | `/` | **Brief** (home) | Default `npm run dev` entry. Owned brief via `mvp/server`. |
 | `/about` | Product intro overlay | IntroScreen via Brief shell (not funding/methodology). |
-| `/transparency` | **Transparency** | Public page (stub until [NEWS-32](https://informedcrew.atlassian.net/browse/NEWS-32) fills funding/methodology/corrections). Footer link. No login. |
+| `/transparency` | **Transparency** | Public funding, methodology, corrections, and team ([NEWS-32](https://informedcrew.atlassian.net/browse/NEWS-32)). Footer link. No login. |
 | `/contribute` | Feed contribution | Upstream-oriented contribute wizard. |
 | `/world/latest` (and other category routes) | Brief category views | Feed categories — not product “layer” tabs. |
 

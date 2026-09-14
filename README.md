@@ -92,7 +92,7 @@ Root [`vercel.json`](vercel.json) still deploys the **frozen** `mvp/web` static 
 
 ## Roadmap (NEWS)
 
-Epic A ([NEWS-33](https://informedcrew.atlassian.net/browse/NEWS-33)): Kite presentation. Next after owned brief + service cleanup: nav, transparency, API compat, archive `mvp/web`.
+Epic A ([NEWS-33](https://informedcrew.atlassian.net/browse/NEWS-33)): Kite presentation. Remaining: API compat ([NEWS-43](https://informedcrew.atlassian.net/browse/NEWS-43)), archive `mvp/web` ([NEWS-46](https://informedcrew.atlassian.net/browse/NEWS-46)); then Epic H rich brief.
 
 Plan: [`.cursor/plans/osint_jira_pivot_d6b40f87.plan.md`](.cursor/plans/osint_jira_pivot_d6b40f87.plan.md)
 

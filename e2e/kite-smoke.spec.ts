@@ -107,7 +107,26 @@ test.describe('Nav shell (NEWS-42)', () => {
 		await transparency.click();
 		await expect(page).toHaveURL(/\/transparency\/?$/);
 		await expect(page.getByRole('heading', { name: 'Transparency' })).toBeVisible();
-		await expect(page.getByText(/AI-assisted analysis/i)).toBeVisible();
 		await expect(page.getByRole('link', { name: /Back to Brief/i })).toBeVisible();
+	});
+});
+
+test.describe('Transparency page (NEWS-32)', () => {
+	test('public page shows funding, methodology, corrections, and team', async ({
+		page,
+	}) => {
+		await page.goto('/transparency');
+		await expect(page).toHaveTitle(/Transparency/i, { timeout: 60_000 });
+		await expect(page.getByRole('heading', { name: 'Transparency' })).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'Funding' })).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'Methodology' })).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'Corrections' })).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'Team' })).toBeVisible();
+		await expect(page.getByText(/AI-assisted/i).first()).toBeVisible();
+		await expect(page.getByText(/not ground truth/i).first()).toBeVisible();
+		await expect(page.getByText(/Sandiebeach LLC/i).first()).toBeVisible();
+		await expect(page.getByText(/Phil Clapper/i).first()).toBeVisible();
+		await expect(page.locator('body')).not.toContainText('perfectly unbiased');
+		await expect(page.locator('body')).not.toContainText('we are an unbiased');
 	});
 });
