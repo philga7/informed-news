@@ -3,7 +3,7 @@
 **Copyright © 2025 Sandiebeach LLC. All Rights Reserved.**  
 **Proprietary Software — See [LICENSE](LICENSE) and [COPYRIGHT.md](COPYRIGHT.md)**
 
-Product UI is the vendored **Kite** shell (`apps/kite/`, MIT). Pipeline and framing stay in **`mvp/server`**. The old React feed (`mvp/web`) is frozen and is not the default UI.
+Product UI is the vendored **Kite** shell (`apps/kite/`, MIT). Pipeline and framing stay in **`mvp/server`**. The old React feed is archived at `_legacy/mvp-web/` (NEWS-46).
 
 ## Stack
 
@@ -12,7 +12,7 @@ Product UI is the vendored **Kite** shell (`apps/kite/`, MIT). Pipeline and fram
 | UI | `apps/kite` | SvelteKit Brief shell (default `npm run dev`) |
 | API | `mvp/server` | Express: auth, fetch, classify, articles |
 | Data | `mvp/data/*.json` | Flat-file article + meta store (gitignored) |
-| Frozen UI | `mvp/web` | Legacy React feed — `npm run dev:mvp-web` only |
+| Archived UI | `_legacy/mvp-web` | Former React feed — not on the product path |
 
 ## Quick start
 
@@ -32,7 +32,7 @@ npm run dev
 - **UI (Kite Brief):** http://localhost:5173  
 - **API:** http://localhost:3001 (`GET /health`)
 
-`npm run dev` starts **mvp/server + Kite**. The old OSINT monolith under `_legacy/` is not on this path. Frozen React feed: `npm run dev:mvp-web` (UI on :5174).
+`npm run dev` starts **mvp/server + Kite**. The old OSINT monolith and archived React feed under `_legacy/` are not on this path.
 
 CFP / xcancel / framing stay on the MVP API while Kite is the shell — frozen surface: [docs/MVP_API_COMPAT.md](docs/MVP_API_COMPAT.md).
 
@@ -40,7 +40,7 @@ CFP / xcancel / framing stay on the MVP API while Kite is the shell — frozen s
 
 - **Product UI:** open http://localhost:5173 after `npm run dev` (or `npm run test:e2e:kite`).
 - **API compat:** `GET /health` + session `GET /api/articles` (see [docs/MVP_API_COMPAT.md](docs/MVP_API_COMPAT.md)).
-- **API / legacy feed checklist:** [mvp/SMOKE.md](mvp/SMOKE.md) still covers classify + citations against `mvp/server`.
+- **API checklist:** [mvp/SMOKE.md](mvp/SMOKE.md) covers classify + citations against `mvp/server`.
 
 ## Environment
 
@@ -64,14 +64,13 @@ Kite UI env: `apps/kite/.env.example`. Owned brief: [docs/OWNED_BRIEF.md](docs/O
 | `npm run dev` | **Default:** mvp/server + Kite UI (:5173) |
 | `npm run kite` | Kite UI only |
 | `npm run server` | API only |
-| `npm run dev:mvp-web` | Frozen React feed + server (not product path) |
-| `npm run install:all` | Install server, frozen web, and kite (Bun) |
+| `npm run install:all` | Install server and kite (Bun) |
 | `npm run install:kite` | Install `apps/kite` only |
-| `npm run typecheck` | Typecheck `mvp/server` and `mvp/web` |
+| `npm run typecheck` | Typecheck `mvp/server` |
 | `npm test` | MVP server unit tests |
 | `npm run test:kite` | Kite provenance + default-entrypoint checks |
 | `npm run test:e2e:kite` | Playwright: Brief loads on :5173 |
-| `npm run build` | Build frozen `mvp/web` (current Vercel artifact) |
+| `npm run build` | Build archived `_legacy/mvp-web` (current Vercel artifact) |
 
 ## Versioning & CI
 
@@ -84,24 +83,24 @@ Process model matches HARN: **`main` + short-lived branches**, Conventional Comm
 
 ## Hosting (Vercel)
 
-Root [`vercel.json`](vercel.json) still deploys the **frozen** `mvp/web` static build until a later hosting cutover. Local product UI is Kite.
+Root [`vercel.json`](vercel.json) still deploys the **archived** `_legacy/mvp-web` static build until a later hosting cutover to Kite. Local product UI is Kite.
 
 | Concern | Where |
 |---------|--------|
 | **Local product UI** | `apps/kite` via `npm run dev` |
-| **Vercel (today)** | `mvp/web` → `mvp/web/dist` |
+| **Vercel (today)** | `_legacy/mvp-web` → `_legacy/mvp-web/dist` |
 | **API** | Local `mvp/server` — not on Vercel serverless |
 | **Versioning** | GitHub Release via semantic-release |
 
 ## Roadmap (NEWS)
 
-Epic A ([NEWS-33](https://informedcrew.atlassian.net/browse/NEWS-33)): Kite presentation. Remaining: API compat ([NEWS-43](https://informedcrew.atlassian.net/browse/NEWS-43)), archive `mvp/web` ([NEWS-46](https://informedcrew.atlassian.net/browse/NEWS-46)); then Epic H rich brief.
+Epic A ([NEWS-33](https://informedcrew.atlassian.net/browse/NEWS-33)): Kite presentation — closing with archive of the React feed ([NEWS-46](https://informedcrew.atlassian.net/browse/NEWS-46)); then Epic H rich brief.
 
 Plan: [`.cursor/plans/osint_jira_pivot_d6b40f87.plan.md`](.cursor/plans/osint_jira_pivot_d6b40f87.plan.md)
 
 ## Legacy code
 
-Previous OSINT / Supabase / Express monolith: **[`_legacy/`](_legacy/)**. Frozen personal-feed React UI: `mvp/web` (until [NEWS-46](https://informedcrew.atlassian.net/browse/NEWS-46)).
+Previous OSINT / Supabase / Express monolith and archived personal-feed React UI: **[`_legacy/`](_legacy/)** (React feed: [`_legacy/mvp-web/`](_legacy/mvp-web/)).
 
 ## Security chore (separate)
 

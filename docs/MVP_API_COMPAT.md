@@ -50,10 +50,10 @@ Public Kite brief routes under `/api/batches…` are **in addition** to this sur
 - Default `npm run dev` still starts **`mvp/server`** alongside Kite.
 - Empty `XCANCEL_PROFILES` / missing `x-profiles.json` does not break CFP fetch.
 - Framing/classify stays on this API; Kite Brief consumes adapted JSON via the owned-brief adapter, not by deleting these endpoints.
-- Retiring `mvp/web` (NEWS-46) must not remove these routes.
+- Retiring the React feed (`_legacy/mvp-web`, NEWS-46) must not remove these routes.
 
 ## Out of scope
 
 - Making `/api/articles` public without a session
 - Replacing this API with Crucix or a new gateway (later epics)
-- Perfect parity with every historical `mvp/web` client quirk
+- Perfect parity with every historical `_legacy/mvp-web` client quirk

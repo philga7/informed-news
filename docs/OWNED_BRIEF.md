@@ -27,7 +27,7 @@ Batch id is always `owned-latest`. Category slug `world` / UUID `00000000-0000-4
 ## Regenerate from ingest
 
 1. `npm run dev` (or server alone).
-2. Log in against the MVP API (session cookie) — e.g. frozen `npm run dev:mvp-web` or `curl` to `POST /api/login`.
+2. Log in against the MVP API (session cookie) — e.g. `curl` to `POST /api/login` (see [MVP_API_COMPAT.md](MVP_API_COMPAT.md)).
 3. `POST /api/fetch` (optional `limit`) then optionally `POST /api/classify`.
 4. Reload Kite Brief — Inbox stories reflect the store (fixture disappears once any article exists).
 
