@@ -240,6 +240,7 @@ Create **seven epics**, sequenced. Only Epic A is implement-next after the Jira 
 | Epic | Step | Epic Done when you can demo | Story-level deliverables (seed now for A; later for B–G) |
 |---|---|---|---|
 | **A. Kite presentation** | 1 | `npm run dev` opens **Kite**, not the CFP React feed | See stories below |
+| **H. Owned rich brief clusters** ([NEWS-48](https://informedcrew.atlassian.net/browse/NEWS-48)) | 1b | Expand owned World story → Sources + Highlights + Perspectives + Timeline | Adapter sources/quotes; cluster→perspectives; LLM enrich; optional images |
 | **B. Crucix raw layer** | 2 | A finance/macro signal from Crucix appears as a cited card/row in Kite | Compose file that brings Crucix up; healthcheck URL; adapter writes ≥1 normalized item into the store |
 | **C. Geospatial raw layer** | 3 | One geo/conflict event from **either** Shadowbroker **or** IRONSIGHT appears in Kite with a source link | One compose/upstream choice documented; adapter writes ≥1 geo item; Kite shows it |
 | **D. QA harness skeleton** | 4 | `npm test` (or a named HARN job) fails a golden brief if a citation URL is dead or feed count is under 25 | Golden-file fixture; citation-check script with a failing fixture; NEWS-31 archive URL field on a citation |
@@ -260,6 +261,15 @@ Each story is one PR-sized change with its own deliverable:
 7. **NEWS-32 Transparency page** — Deliverable: a public `/transparency` (or Kite-equivalent) page reachable without login. Demo: open URL, see funding/methodology/honesty copy.
 8. **CFP/xcancel still reachable (compat)** — Deliverable: existing MVP API still serves articles (or a documented freeze). Demo: health + one article JSON, even if the UI is Kite.
 9. **Retire `mvp/web`** ([NEWS-46](https://informedcrew.atlassian.net/browse/NEWS-46)) — Archive to `_legacy/mvp-web/` (keep `mvp/server`). Demo: default scripts never start the old React feed; API still healthy. *Late in A; not a wholesale delete of `mvp/`.*
+
+### Epic H stories ([NEWS-48](https://informedcrew.atlassian.net/browse/NEWS-48)) — after A Done, prefer before B
+
+Fill existing Kite expanded-story sections from **owned** pipeline data (shell already hides empty sections):
+
+1. **Adapter: sources / domains / quotes** ([NEWS-49](https://informedcrew.atlassian.net/browse/NEWS-49)) — Map citations + `evidenceQuotes` into Story fields. Demo: expand → Sources + Quote.
+2. **Adapter: cluster → Perspectives** ([NEWS-50](https://informedcrew.atlassian.net/browse/NEWS-50)) — Multi-member `clusterId` → `perspectives[]`. Demo: expand cluster → Perspectives.
+3. **Pipeline: highlights / timeline / Q&A** ([NEWS-51](https://informedcrew.atlassian.net/browse/NEWS-51)) — Ollama/enrich writes `talking_points`, `timeline`, `suggested_qna` with honesty copy. Demo: expand → Highlights + Timeline + Q&A.
+4. **Optional: scraped images** ([NEWS-52](https://informedcrew.atlassian.net/browse/NEWS-52)) — `primary_image` when og/scrape available. Demo: expand → image section when present.
 
 Do not seed B–G stories until A is Done. When seeding later, copy the story-level column into real tickets with the same Deliverable / Demo block.
 
