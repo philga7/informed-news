@@ -79,6 +79,7 @@ Do **not** treat `_legacy/` or `mvp/web` as the primary product UI.
 - SSH key files `informed_news` / `informed_news.pub` are a separate rotate-and-untrack chore
 - Prefer `MVP_PASSWORD_HASH` over plaintext password in shared environments
 - Keep MIT attribution (`NOTICE`, `THIRD_PARTY.md`, `apps/kite/LICENSE`); do not ship Kagi trademarks as product chrome (NEWS-45)
+- Default brief API is owned `mvp/server` adapter ([docs/OWNED_BRIEF.md](docs/OWNED_BRIEF.md)); `kite.kagi.com` is opt-in CC BY-NC only
 
 ## When adding features
 

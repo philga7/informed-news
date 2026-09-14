@@ -59,4 +59,16 @@ export type {
   ClassifyBatchResult,
   ClassifyOneResult,
 } from './classifyArticles.js';
+export {
+  OWNED_BATCH_ID,
+  OWNED_CATEGORY_UUID,
+  OWNED_FIXTURE_TITLE,
+  articlesToKiteStories,
+  buildOwnedBatchInfo,
+  buildOwnedCategoriesResponse,
+  buildOwnedStoriesResponse,
+  ownedBriefFixtureArticles,
+  resolveOwnedBriefArticles,
+} from './kiteBriefAdapter.js';
+export { createKiteBriefRouter } from './kiteBriefRoutes.js';
 

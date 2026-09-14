@@ -11,6 +11,7 @@ import {
 import {
   classifyArticleById,
   classifyUnclassifiedArticles,
+  createKiteBriefRouter,
   fetchAllSources,
   sortNewestFirst,
 } from './services/index.js';
@@ -38,6 +39,9 @@ app.get('/health', (_req, res) => {
 app.get('/', (_req, res) => {
   res.json({ message: 'Informed News MVP server' });
 });
+
+// Public Kite brief adapter (NEWS-44) — must stay before requireApiSession.
+app.use('/api', createKiteBriefRouter());
 
 app.use('/api', requireApiSession);
 app.use('/api', createAuthRouter());

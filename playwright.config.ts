@@ -21,7 +21,8 @@ export default defineConfig({
 		},
 	],
 	webServer: {
-		command: `npm run kite -- --host 127.0.0.1 --port ${kitePort} --strictPort`,
+		// Owned brief requires mvp/server + Kite (NEWS-44).
+		command: `npm run dev`,
 		url: baseURL,
 		reuseExistingServer: !process.env.CI,
 		timeout: 180_000,

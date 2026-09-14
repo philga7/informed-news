@@ -48,4 +48,5 @@ Read the source of truth: [`apps/kite/UPSTREAM.md`](../apps/kite/UPSTREAM.md).
 ## License notes
 
 - **Front-end source** in `apps/kite/`: MIT (see `apps/kite/LICENSE`).
-- **Remote brief data** (`kite.json` and files it references on kite.kagi.com): CC BY-NC — fine for local non-commercial UI smoke; production Informed News briefs should eventually come from our pipeline, not Kagi’s hosted data.
+- **Default brief data**: owned adapter from `mvp/server` — see [OWNED_BRIEF.md](OWNED_BRIEF.md).
+- **Optional** remote Kagi data (`kite.kagi.com`): CC BY-NC — set `KITE_API_BASE=https://kite.kagi.com/api` only for private non-commercial smoke; not the product default.
