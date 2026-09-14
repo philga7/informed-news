@@ -16,7 +16,7 @@ Informed News serves the Kite shell from **our** brief API by default — not `h
 | GET | `/api/batches/:batchId/categories` | Inbox category |
 | GET | `/api/batches/:batchId/categories/:categoryId/stories` | Stories from ingest |
 
-Batch id is always `owned-latest`. Category slug `inbox` / UUID `00000000-0000-4000-8000-000000000001`.
+Batch id is always `owned-latest`. Category slug `world` / UUID `00000000-0000-4000-8000-000000000001` (matches Kite’s default `/world/latest` route).
 
 ## Source data
 

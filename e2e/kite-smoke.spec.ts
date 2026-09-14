@@ -34,7 +34,7 @@ test.describe('Owned brief (NEWS-44)', () => {
 		);
 		expect(categories.ok()).toBeTruthy();
 		const catBody = await categories.json();
-		expect(catBody.categories?.[0]?.categoryId).toBe('inbox');
+		expect(catBody.categories?.[0]?.categoryId).toBe('world');
 		const categoryUuid = catBody.categories[0].id as string;
 
 		const stories = await page.request.get(

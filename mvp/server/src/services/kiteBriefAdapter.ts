@@ -6,8 +6,9 @@ export const OWNED_BATCH_ID = 'owned-latest';
 /** Fixed category UUID so stories routes stay stable across reloads. */
 export const OWNED_CATEGORY_UUID = '00000000-0000-4000-8000-000000000001';
 
-export const OWNED_CATEGORY_SLUG = 'inbox';
-export const OWNED_CATEGORY_NAME = 'Inbox';
+/** Use `world` so Kite’s default `/world/latest` route shows owned stories. */
+export const OWNED_CATEGORY_SLUG = 'world';
+export const OWNED_CATEGORY_NAME = 'World';
 
 /** Distinctive fixture title for empty-store / Playwright smoke. */
 export const OWNED_FIXTURE_TITLE =
