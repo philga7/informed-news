@@ -52,7 +52,7 @@ See `mvp/.env.example` for the API:
 - Optional file: `mvp/data/x-profiles.json` (gitignored; see `x-profiles.example.json`)  
 - `PORT` — API port (default `3001`)
 
-Kite UI env: `apps/kite/.env.example`. Owned brief contract: [docs/OWNED_BRIEF.md](docs/OWNED_BRIEF.md). Sync / license: [docs/UPSTREAM_KITE.md](docs/UPSTREAM_KITE.md), [THIRD_PARTY.md](THIRD_PARTY.md).
+Kite UI env: `apps/kite/.env.example`. Owned brief: [docs/OWNED_BRIEF.md](docs/OWNED_BRIEF.md). Kagi service cleanup: [docs/KAGI_SERVICE_CLEANUP.md](docs/KAGI_SERVICE_CLEANUP.md). Sync / license: [docs/UPSTREAM_KITE.md](docs/UPSTREAM_KITE.md), [THIRD_PARTY.md](THIRD_PARTY.md).
 
 ## Scripts
 
@@ -92,7 +92,7 @@ Root [`vercel.json`](vercel.json) still deploys the **frozen** `mvp/web` static 
 
 ## Roadmap (NEWS)
 
-Epic A ([NEWS-33](https://informedcrew.atlassian.net/browse/NEWS-33)): Kite presentation. Owned brief ([NEWS-44](https://informedcrew.atlassian.net/browse/NEWS-44)) is the default content path; next: leftover Kagi service cleanup, nav, transparency, API compat, archive `mvp/web`.
+Epic A ([NEWS-33](https://informedcrew.atlassian.net/browse/NEWS-33)): Kite presentation. Next after owned brief + service cleanup: nav, transparency, API compat, archive `mvp/web`.
 
 Plan: [`.cursor/plans/osint_jira_pivot_d6b40f87.plan.md`](.cursor/plans/osint_jira_pivot_d6b40f87.plan.md)
 

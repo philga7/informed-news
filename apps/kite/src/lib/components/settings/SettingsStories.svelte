@@ -10,6 +10,7 @@ import {
 	type StoryOpenMode,
 	settings,
 } from '$lib/data/settings.svelte.js';
+import { FEATURES } from '$lib/features';
 import { preferredSources } from '$lib/stores/preferredSources.svelte.js';
 import SectionsList from './snippets/SectionsList.svelte';
 import StoryCountSlider from './snippets/StoryCountSlider.svelte';
@@ -42,16 +43,20 @@ const storyOpenModeOptions = $derived([
 	},
 ]);
 
-// Maps provider options
+// Maps provider options (no Kagi Maps — NEWS-47)
 const mapsProviderOptions = $derived([
-	{
-		value: 'auto',
-		label: s('settings.mapsProvider.auto') || 'Auto',
-	},
-	{
-		value: 'kagi',
-		label: s('settings.mapsProvider.kagi') || 'Kagi Maps',
-	},
+	...(FEATURES.kagiMaps
+		? [
+				{
+					value: 'auto',
+					label: s('settings.mapsProvider.auto') || 'Auto',
+				},
+				{
+					value: 'kagi',
+					label: s('settings.mapsProvider.kagi') || 'Kagi Maps',
+				},
+			]
+		: []),
 	{
 		value: 'google',
 		label: s('settings.mapsProvider.google') || 'Google Maps',

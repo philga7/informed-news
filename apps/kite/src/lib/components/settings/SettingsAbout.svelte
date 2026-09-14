@@ -2,6 +2,7 @@
 import { IconKeyboard } from '@tabler/icons-svelte';
 import { s } from '$lib/client/localization.svelte';
 import { settingsModalState, themeSettings } from '$lib/data/settings.svelte.js';
+import { FEATURES } from '$lib/features';
 import { keyboardNavigation } from '$lib/stores/keyboardNavigation.svelte';
 import { language } from '$lib/stores/language.svelte';
 
@@ -188,7 +189,8 @@ const googlePlayNeedsScaling = $derived(badgesWithExtraPadding.includes(googlePl
 		</div>
 	</div>
 
-	<!-- Mobile Apps -->
+	<!-- Mobile Apps (Kagi News store listings) — gated off NEWS-47 -->
+	{#if FEATURES.kagiMobileApps}
 	<div class="space-y-3">
 		<h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300">
 			{s('settings.about.mobileApps') || 'Mobile Apps'}
@@ -230,11 +232,12 @@ const googlePlayNeedsScaling = $derived(badgesWithExtraPadding.includes(googlePl
 			</div>
 		</div>
 	</div>
+	{/if}
 
 	<!-- Copyright -->
 	<div class="ps-2 pt-4 border-t border-gray-200 dark:border-gray-700">
 		<p class="text-xs text-gray-500 dark:text-gray-400">
-			© {new Date().getFullYear()} Kagi Inc.
+			© {new Date().getFullYear()} Informed News. UI shell from kite-public (MIT).
 		</p>
 	</div>
 </div>

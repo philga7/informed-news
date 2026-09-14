@@ -14,6 +14,7 @@ import {
 	settings,
 	themeSettings,
 } from '$lib/data/settings.svelte.js';
+import { FEATURES } from '$lib/features';
 import { dataLanguage } from '$lib/stores/dataLanguage.svelte';
 import { experimental } from '$lib/stores/experimental.svelte';
 import { language } from '$lib/stores/language.svelte.js';
@@ -92,15 +93,14 @@ onMount(async () => {
 	// Initialize data language
 	dataLanguage.init();
 
-	// Initialize sync watcher
-	if (syncSettingsWatcher) {
-		syncSettingsWatcher.initialize();
-	}
-
-	// Initialize sync if user is logged in
-	if (data.session?.loggedIn) {
-		// Initialize sync manager
-		await syncManager.initialize(data.session.id);
+	// Initialize sync watcher / Kagi account sync only when enabled (NEWS-47)
+	if (FEATURES.kagiAccountSync) {
+		if (syncSettingsWatcher) {
+			syncSettingsWatcher.initialize();
+		}
+		if (data.session?.loggedIn) {
+			await syncManager.initialize(data.session.id);
+		}
 	}
 
 	// Initialize OverlayScrollbars on the body element

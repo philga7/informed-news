@@ -2,6 +2,7 @@
 import { IconCards, IconDownload, IconSparkles, IconVolume } from '@tabler/icons-svelte';
 import { getContext } from 'svelte';
 import { s } from '$lib/client/localization.svelte';
+import { FEATURES } from '$lib/features';
 import { experimental } from '$lib/stores/experimental.svelte.js';
 import { sections } from '$lib/stores/sections.svelte.js';
 import { language } from '$lib/stores/language.svelte';
@@ -67,11 +68,13 @@ function handleSimplifyToggle() {
 // Get session from context
 const session = getContext<Session | null>('session');
 
-// Check if user is a subscriber
-const isSubscriber = $derived(session?.subscription === true);
+// Check if user is a subscriber (Kagi Translate simplify — gated NEWS-47)
+const isSubscriber = $derived(
+	FEATURES.kagiReadingLevel && session?.subscription === true,
+);
 
-// Check if user is logged in (for assistant feature)
-const isLoggedIn = $derived(session?.loggedIn === true);
+// Ask Assistant → kagi.com (gated NEWS-47)
+const isLoggedIn = $derived(FEATURES.kagiAssistant && session?.loggedIn === true);
 
 // Assistant input state
 let showAssistantInput = $state(false);

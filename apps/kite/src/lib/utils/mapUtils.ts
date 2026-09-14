@@ -93,7 +93,7 @@ export function getMapServiceName(): string {
 			// This will be determined dynamically
 			return 'Maps';
 		case 'kagi':
-			return 'Kagi Maps';
+			return 'Maps';
 		case 'google':
 			return 'Google Maps';
 		case 'openstreetmap':

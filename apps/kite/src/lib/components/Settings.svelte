@@ -18,6 +18,7 @@ import {
 	saveAllSettings,
 	settingsModalState,
 } from '$lib/data/settings.svelte.js';
+import { FEATURES } from '$lib/features';
 import { ttsManager } from '$lib/stores/ttsManager.svelte';
 import type { Category } from '$lib/types';
 import { createModalBehavior } from '$lib/utils/modalBehavior.svelte';
@@ -50,12 +51,19 @@ let { visible = false, categories = [], onClose, onShowAbout }: Props = $props()
 const session = getContext<Session | null>('session');
 
 // Active tab state - use from settings modal state if provided
-let activeTab = $state(settingsModalState.activeTab || 'appearance');
+let activeTab = $state(
+	settingsModalState.activeTab === 'account' && !FEATURES.kagiAccountSync
+		? 'appearance'
+		: settingsModalState.activeTab || 'appearance',
+);
 
 // Update activeTab when settingsModalState.activeTab changes
 $effect(() => {
 	if (settingsModalState.activeTab) {
-		activeTab = settingsModalState.activeTab;
+		activeTab =
+			settingsModalState.activeTab === 'account' && !FEATURES.kagiAccountSync
+				? 'appearance'
+				: settingsModalState.activeTab;
 	}
 });
 
@@ -326,7 +334,16 @@ const tabs = $derived([
 	},
 	{ id: 'stories', labelKey: 'settings.tabs.stories', fallback: 'Stories', icon: IconNews },
 	{ id: 'filters', labelKey: 'settings.tabs.filters', fallback: 'Filters', icon: IconFilter },
-	{ id: 'account', labelKey: 'settings.tabs.account', fallback: 'Account', icon: IconUserCircle },
+	...(FEATURES.kagiAccountSync
+		? [
+				{
+					id: 'account',
+					labelKey: 'settings.tabs.account',
+					fallback: 'Account',
+					icon: IconUserCircle,
+				},
+			]
+		: []),
 	{ id: 'about', labelKey: 'settings.tabs.about', fallback: 'About', icon: IconInfoCircle },
 	...(showPreloadingTab
 		? [{ id: 'preloading', labelKey: '', fallback: 'Preloading (Debug)', icon: IconInfoCircle }]
@@ -524,7 +541,7 @@ const tabs = $derived([
             <SettingsStories />
           {:else if activeTab === "filters"}
             <SettingsFilters />
-          {:else if activeTab === "account"}
+          {:else if activeTab === "account" && FEATURES.kagiAccountSync}
             <SettingsAccount />
           {:else if activeTab === "about"}
             <SettingsAbout {onShowAbout} />
