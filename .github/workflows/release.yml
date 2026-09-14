@@ -24,10 +24,8 @@ jobs:
       - name: Install root dependencies
         run: npm ci
 
-      - name: Install MVP packages
-        run: |
-          npm ci --prefix mvp/server
-          npm ci --prefix mvp/web
+      - name: Install MVP server
+        run: npm ci --prefix mvp/server
 
       - name: Typecheck
         run: npm run typecheck
@@ -35,8 +33,10 @@ jobs:
       - name: Test
         run: npm test
 
-      - name: Build web
-        run: npm run build
+      - name: Install & build archived React feed (Vercel artifact until hosting cutover)
+        run: |
+          npm ci --prefix _legacy/mvp-web
+          npm run build
 
   release:
     name: Semantic Release

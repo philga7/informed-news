@@ -16,27 +16,29 @@ Verify the greenfield path: **login → Refresh → classify → dual citations 
    ```bash
    npm install
    npm run install:all
-   npm run dev
+   npm run server   # or npm run dev (server + Kite)
    ```
 
-3. Open the UI at [http://localhost:5174](http://localhost:5174). API health: [http://localhost:3001/health](http://localhost:3001/health).
+3. API health: [http://localhost:3001/health](http://localhost:3001/health). Product UI is Kite on :5173; this checklist is **API-oriented** (the old React feed is archived at `_legacy/mvp-web/`).
 
 ## Checklist (CFP-only)
 
 Leave `XCANCEL_PROFILES` empty (default). Do not create `mvp/data/x-profiles.json`.
 
+Use curl + session cookie (see Optional API-only checks below). Interactive React feed steps require optionally running `_legacy/mvp-web` — not the product path.
+
 | Step | Action | Pass when |
 |------|--------|-----------|
-| 1. Login | Enter `MVP_PASSWORD` on the login form | Feed view loads (no 401 loop) |
-| 2. Refresh | Click **Refresh** | Status shows fetched count; CFP articles appear with a `CFP` source chip |
-| 3. Depth honesty | Scan CFP cards after Refresh | Some show a short **original-text excerpt** (`bodyStatus: ok`); others show **Original text unavailable** or **Original text blocked** — not silent |
-| 4. Publisher title / selection | Find a card whose publisher title differs from the CFP headline | Both titles appear (CFP headline + Publisher line) **and** a plain-language **selection signal** note (honest cue — not a truth verdict) |
-| 5. Classify | Click **Classify new** | Status shows classified count (needs `OLLAMA_API_KEY`) |
-| 6. Body-backed framing | Expand framing on a **body-ok** classified card | Evidence / summary can reflect article text, not only the RSS blurb |
-| 7. Dual links | Open an article card | Citations: **CFP** \| **Original** when scrape succeeded |
-| 8. Framing UI | Expand framing on a classified article | Dimension bars/scores and honesty banner visible |
-| 9. Verify this | Inspect a classified card (or cluster lead) | **Verify this** checklist shows `openQuestions` and/or a selection-risk note when high; honesty copy says AI-assisted, not ground truth |
-| 10. Re-fetch | Click **Refresh** again | Unchanged items keep framing; items whose body **newly** became ok clear framing so Classify can re-run; other new items stay unclassified |
+| 1. Login | `POST /api/login` with `MVP_PASSWORD` | `{"ok":true}` + session cookie |
+| 2. Refresh | `POST /api/fetch` | Status shows fetched count; articles include CFP `sourceKind` |
+| 3. Depth honesty | Inspect article JSON after fetch | Some `bodyStatus: ok` with `bodyText`; others unavailable/blocked — not silent |
+| 4. Publisher title / selection | Find item whose `publisherTitle` differs from CFP `title` | Both present when scrape succeeded; selection signal fields honest (not a truth verdict) |
+| 5. Classify | `POST /api/classify` | Classified count increases (needs `OLLAMA_API_KEY`) |
+| 6. Body-backed framing | Inspect a **body-ok** classified article | Evidence / summary can reflect article text |
+| 7. Dual links | Inspect `citations` | **CFP** \| **Original** when scrape succeeded |
+| 8. Framing | Inspect `classification` | Dimension scores present; treat as AI-assisted |
+| 9. Verify this | Inspect classified item | `openQuestions` / selection-risk notes when present |
+| 10. Re-fetch | `POST /api/fetch` again | Unchanged items keep framing; newly body-ok items clear framing for re-classify |
 
 ## Checklist (optional xcancel)
 
@@ -50,11 +52,11 @@ XCANCEL_PROFILES=sentdefender
 
 | Step | Action | Pass when |
 |------|--------|-----------|
-| 11. Refresh with handles | Click **Refresh** | X items appear with `@handle` chip; citations **xcancel** \| **X** |
-| 12. Tweet-as-body | Inspect an xcancel card | Tweet excerpt is shown; body stays `not_applicable` (no x.com scrape / no “unavailable”) |
-| 13. Classify X items | Click **Classify new** | Unclassified xcancel items get framing like CFP |
-| 14. Cluster group | Find items that share a `clusterId` (e.g. CFP + tweet linking the publisher URL) | They render as **one expandable group** (CFP lead + related); unrelated items stay **flat** |
-| 15. Honest failure | If xcancel blocks (Cloudflare / RSS whitelist) | Feed still shows CFP; `meta.lastError` / store note is set — not silent success |
+| 11. Refresh with handles | `POST /api/fetch` | X items appear with xcancel `sourceKind`; citations **xcancel** \| **X** |
+| 12. Tweet-as-body | Inspect an xcancel article | Tweet text present; body stays `not_applicable` |
+| 13. Classify X items | `POST /api/classify` | Unclassified xcancel items get framing like CFP |
+| 14. Cluster group | Find items that share a `clusterId` | Related CFP + tweet share `clusterId` |
+| 15. Honest failure | If xcancel blocks (Cloudflare / RSS whitelist) | CFP still succeeds; `meta.lastError` / store note is set — not silent success |
 
 Empty profile list must not error: CFP-only Refresh stays green.
 

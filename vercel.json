@@ -1,7 +1,7 @@
 {
   "buildCommand": "npm run build",
-  "outputDirectory": "mvp/web/dist",
-  "installCommand": "npm ci && npm ci --prefix mvp/web",
+  "outputDirectory": "_legacy/mvp-web/dist",
+  "installCommand": "npm ci && npm ci --prefix _legacy/mvp-web",
   "framework": null,
   "rewrites": [
     {

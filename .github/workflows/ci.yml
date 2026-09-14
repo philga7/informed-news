@@ -22,10 +22,8 @@ jobs:
       - name: Install root dependencies
         run: npm ci
 
-      - name: Install MVP packages
-        run: |
-          npm ci --prefix mvp/server
-          npm ci --prefix mvp/web
+      - name: Install MVP server
+        run: npm ci --prefix mvp/server
 
       - name: Typecheck
         run: npm run typecheck
@@ -36,8 +34,10 @@ jobs:
       - name: Kite provenance tests
         run: npm run test:kite
 
-      - name: Build web
-        run: npm run build
+      - name: Install & build archived React feed (Vercel artifact until hosting cutover)
+        run: |
+          npm ci --prefix _legacy/mvp-web
+          npm run build
 
       # Optional heavier path: install kite + Playwright when apps/kite changes.
-      # Full e2e remains local via `npm run test:e2e:kite` until NEWS-41 wires default dev.
+      # Full e2e remains local via `npm run test:e2e:kite`.

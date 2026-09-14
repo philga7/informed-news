@@ -7,16 +7,18 @@ import { fileURLToPath } from 'node:url';
 const root = join(fileURLToPath(new URL('.', import.meta.url)), '..');
 
 describe('NEWS-41 default npm run dev entry', () => {
-	it('starts Kite UI with mvp/server, not mvp/web', () => {
+	it('starts Kite UI with mvp/server, not the archived React feed', () => {
 		const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
-		const { dev, kite, web, 'dev:mvp-web': devMvpWeb } = pkg.scripts;
+		const { dev, kite } = pkg.scripts;
 
 		assert.match(dev, /npm run kite/);
 		assert.match(dev, /npm run server/);
 		assert.doesNotMatch(dev, /npm run web\b/);
+		assert.doesNotMatch(dev, /mvp\/web/);
+		assert.doesNotMatch(dev, /_legacy\/mvp-web/);
 		assert.match(kite, /apps\/kite/);
-		assert.match(web, /mvp\/web/);
-		assert.match(devMvpWeb, /npm run web/);
+		assert.equal(pkg.scripts.web, undefined);
+		assert.equal(pkg.scripts['dev:mvp-web'], undefined);
 	});
 
 	it('documents Kite as the default UI in README and agents.md', () => {

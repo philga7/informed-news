@@ -59,7 +59,7 @@ Bot commits `chore(release): … [skip ci]` are intentional so Release does not 
 
 ## Why both CI and Release?
 
-- **CI** (`.github/workflows/ci.yml`): every PR into `main` — install, MVP typecheck, test, MVP web build. Fast review feedback; no publish.
+- **CI** (`.github/workflows/ci.yml`): every PR into `main` — install, MVP server typecheck, test, kite checks, archived `_legacy/mvp-web` build (Vercel artifact). Fast review feedback; no publish.
 - **Release** (`.github/workflows/release.yml`): after merge to `main` — re-validate, then `semantic-release`.
 
 Overlap on validation is intentional: a green PR does not skip the final gate before tagging.
@@ -69,7 +69,7 @@ Overlap on validation is intentional: a green PR does not skip the final gate be
 | Concern | Where |
 |---------|--------|
 | **Versioning** | GitHub Release + tag + `CHANGELOG.md` + `package.json` bump via semantic-release |
-| **Web UI (Vercel)** | Root `vercel.json` builds/publishes `mvp/web` static output — **not** gated by the Release workflow |
+| **Web UI (Vercel)** | Root `vercel.json` builds/publishes `_legacy/mvp-web` static output until hosting cutover — **not** gated by the Release workflow |
 | **API** | Local `mvp/server` (`npm run server` / `npm run dev`). Not hosted on Vercel in this setup. |
 
 `@semantic-release/npm` uses `npmPublish: false` (private app; no npm registry publish). Do not point Vercel at `_legacy/` or restore the legacy monolith as the deploy entrypoint.

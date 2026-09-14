@@ -6,23 +6,21 @@ Informed News is pivoting to an OSINT-oriented product shell:
 
 1. **UI:** Vendored Kite soft fork under `apps/kite/` (MIT) — default `npm run dev` entry
 2. **API / pipeline:** `mvp/server` — CFP (+ optional xcancel) ingest, JSON store, Ollama framing
-3. **Owned brief:** Epic A follow-ons map pipeline output into the Kite Brief (not Kagi-hosted `kite.json` long-term)
-4. **Frozen:** `mvp/web` (old React feed) — still typechecks; not the default UI (archive later: NEWS-46)
+3. **Owned brief:** Pipeline output maps into the Kite Brief (not Kagi-hosted `kite.json` long-term)
+4. **Archived:** `_legacy/mvp-web/` (former React feed, NEWS-46) — reference only; not started by default scripts
 
-`_legacy/` is historical OSINT/Supabase only — never the default `npm run dev` path.
+`_legacy/` (including the OSINT/Supabase monolith and `mvp-web`) is historical — never the default `npm run dev` path.
 
 ## Architecture
 
 ```
 apps/kite (SvelteKit Brief UI)
-    ← (brief / static data; owned adapter coming)
+    ← owned brief adapter on mvp/server
 mvp/server (Express)
     → mvp/data/*.json
     → CFP RSS + publisher scrape (+ optional xcancel)
     → Ollama Cloud (framing)
 ```
-
-`mvp/web` remains in-tree until NEWS-46 but is **not** started by `npm run dev`.
 
 ### Layout
 
@@ -31,25 +29,25 @@ apps/
 └── kite/            # Vendored kite-public @ pinned SHA (see UPSTREAM.md)
 mvp/
 ├── server/          # Express API (auth, fetch, classify, articles) — keep
-├── web/             # Frozen React UI — optional `npm run dev:mvp-web`
 ├── data/            # Runtime JSON (gitignored)
 ├── .env.example
-└── SMOKE.md         # Legacy MVP feed smoke (API still useful)
+└── SMOKE.md         # API smoke (classify + citations)
 docs/
 └── UPSTREAM_KITE.md
-_legacy/             # Retired stacks — reference only
+_legacy/
+├── mvp-web/         # Archived React feed (NEWS-46) — not product UI
+└── …                # Retired OSINT/Supabase stacks — reference only
 ```
 
 ## Default commands
 
-- `npm run install:all` — `mvp/server`, `mvp/web` (typecheck), and `apps/kite` (Bun)
+- `npm run install:all` — `mvp/server` and `apps/kite` (Bun)
 - `npm run dev` — **mvp/server + Kite** (UI http://localhost:5173, API :3001)
-- `npm run typecheck` — server + frozen `mvp/web`
-- `npm run test:kite` — provenance + default-entrypoint checks
+- `npm run typecheck` — `mvp/server`
+- `npm run test:kite` — provenance + default-entrypoint + retire-mvp-web checks
 - `npm run test:e2e:kite` — Playwright Brief smoke
-- Optional: `npm run dev:mvp-web` — old React feed (not product path)
 
-Do **not** treat `_legacy/` or `mvp/web` as the primary product UI.
+Do **not** treat `_legacy/` (including `_legacy/mvp-web`) as the primary product UI.
 
 ## Agent responsibilities
 
@@ -59,6 +57,7 @@ Do **not** treat `_legacy/` or `mvp/web` as the primary product UI.
 - Put pipeline/business logic in `mvp/server`; keep UI thin
 - TypeScript with strict checking where the package already uses it
 - Do not reintroduce Supabase, multi-tenant orgs, or full OSINT topic/watch/indicator models into the live path
+- Do not revive `_legacy/mvp-web` into the default product path without an explicit product decision
 
 ### Data & API
 
@@ -66,6 +65,7 @@ Do **not** treat `_legacy/` or `mvp/web` as the primary product UI.
 - Protect mutating/list APIs with session middleware (`requireApiSession`)
 - Env vars load from `mvp/.env` (see `mvp/.env.example`)
 - Dual citations on articles when scrape succeeds (`cfpUrl`, `publisherUrl`)
+- Compat surface: [docs/MVP_API_COMPAT.md](docs/MVP_API_COMPAT.md)
 
 ### Framing / AI
 
@@ -92,7 +92,7 @@ Do **not** treat `_legacy/` or `mvp/web` as the primary product UI.
 
 ## Prohibited (unless explicitly requested)
 
-- Making `_legacy/` or frozen `mvp/web` the default `npm run dev` target
+- Making `_legacy/` or `_legacy/mvp-web` the default `npm run dev` target
 - Calling Supabase from the live path
 - Porting full OSINT workflows into the product without a new epic decision
 - Committing `mvp/data/*.json` or `.env` files
@@ -105,7 +105,7 @@ Informed News work uses the **NEWS** project on Atlassian (`informedcrew.atlassi
 ## Decision order
 
 1. Keep `npm run dev` → Kite Brief + `mvp/server` healthy
-2. Type safety (including frozen `mvp/web` until archived)
+2. Type safety on the live path (`mvp/server`, `apps/kite`)
 3. Thin UI / server-side pipeline logic
 4. Clear errors and honesty about AI framing
 5. Avoid scope creep from `_legacy/`
