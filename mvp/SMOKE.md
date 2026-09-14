@@ -60,6 +60,8 @@ Empty profile list must not error: CFP-only Refresh stays green.
 
 ## Optional API-only checks
 
+Frozen compat surface (health + articles/fetch/classify while Kite is the UI): [docs/MVP_API_COMPAT.md](../docs/MVP_API_COMPAT.md).
+
 With a valid session cookie (after browser login), or via curl after `POST /api/login`:
 
 ```bash

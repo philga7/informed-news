@@ -44,3 +44,5 @@ Documented in [THIRD_PARTY.md](../THIRD_PARTY.md). Do not use as the commercial 
 
 Stories need at least: `title`, `short_summary`, `category`, `articles[]` with `title`, `link`, `domain`, `date`.  
 Perfect parity with every Kagi brief field is out of scope (NEWS-44).
+
+Session-gated CFP/xcancel article + classify routes remain on the same server — see [MVP_API_COMPAT.md](MVP_API_COMPAT.md).
