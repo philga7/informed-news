@@ -116,6 +116,46 @@ export const BRAND_STRING_OVERRIDES: LocaleMap = {
 		text: `Contribute to ${PRODUCT_NAME}`,
 		translationContext: 'Contribute onboarding title',
 	},
+	'contribute.onboarding.feedTypes.title': {
+		text: `Two kinds of feeds power ${PRODUCT_NAME}`,
+		translationContext: 'Contribute feed types heading',
+	},
+	'contribute.onboarding.guidelines.anyLanguage': {
+		text: 'Any language is welcome. The brief pipeline can mix languages in one category when translation is available.',
+		translationContext: 'Contribute guideline without Kagi Translate claim',
+	},
+	'contribute.onboarding.guidelines.minimum': {
+		text: `New categories need at least 25 feeds to be surfaced in ${PRODUCT_NAME}. This ensures enough overlap for clustering to work.`,
+		translationContext: 'Contribute minimum feeds guideline',
+	},
+	'contribute.onboarding.guidelines.rssOnly': {
+		text: `${PRODUCT_NAME} doesn't scrape websites — it only uses publicly available RSS or Atom feed data.`,
+		translationContext: 'Contribute RSS-only guideline',
+	},
+	'contribute.onboarding.pipeline.note': {
+		text: 'No editorial staff picks individual stories by hand. Stories come from feeds and clustering.',
+		translationContext: 'Contribute pipeline note without Kagi staff claim',
+	},
+	'contribute.onboarding.community.description': {
+		text: 'No staff member decides what categories exist or what stories show up. All of that comes from the feeds, and the feeds come from the community.',
+		translationContext: 'Contribute community description',
+	},
+	'contribute.onboarding.whatToDo.new.description': {
+		text: `Local news, regional coverage, niche topics. New categories need at least 25 feeds to go live in ${PRODUCT_NAME}. This ensures enough overlap for clustering to produce real stories.`,
+		translationContext: 'Contribute new category guidance',
+	},
+	'contribute.history.status.live.tooltip': {
+		text: `Your feeds are active on ${PRODUCT_NAME}. If a category shows no stories, it means articles didn't cluster — this is normal.`,
+		translationContext: 'Contribute live status tooltip',
+	},
+	'contribute.history.status.merged.tooltip': {
+		text: `Your pull request has been merged. Changes will go live with the next ${PRODUCT_NAME} batch.`,
+		translationContext: 'Contribute merged status tooltip',
+	},
+	'timeTravel.description': {
+		text: 'Browse previous brief batches when historical search is enabled.',
+		translationContext: 'Time travel description without Kagi subscriber gate copy',
+	},
 };
 
 export function applyBrandOverrides<T extends LocaleMap>(strings: T | undefined | null): T {

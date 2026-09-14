@@ -20,6 +20,7 @@ import { timeTravel } from '$lib/stores/timeTravel.svelte.js';
 import { timeTravelBatch } from '$lib/stores/timeTravelBatch.svelte';
 import { formatTimeAgo } from '$lib/utils/formatTimeAgo';
 import { getNextUpdateCountdown } from '$lib/utils/getTimeAgo';
+import { FEATURES } from '$lib/features';
 import AppNavigation from './AppNavigation.svelte';
 import ChaosIndex from './ChaosIndex.svelte';
 
@@ -663,13 +664,13 @@ $effect(() => {
         <IconSettings size={24} stroke={1.5} class="text-gray-600 dark:text-gray-400" />
       </button>
 
-      <!-- Divider -->
-      <div class="h-[25px] flex items-center justify-center">
-        <div class="w-px h-full bg-gray-200 dark:bg-gray-700"></div>
-      </div>
-
-      <!-- App Navigation -->
-      <AppNavigation />
+      <!-- Divider + App Navigation (Kagi Apps) — gated off NEWS-47 -->
+      {#if FEATURES.kagiAppNavigation}
+        <div class="h-[25px] flex items-center justify-center">
+          <div class="w-px h-full bg-gray-200 dark:bg-gray-700"></div>
+        </div>
+        <AppNavigation />
+      {/if}
     </div>
   </div>
 </header>

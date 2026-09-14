@@ -44,6 +44,8 @@ export type ContentFilter = 'default' | 'family' | 'none';
 export type FilterMode = 'hide' | 'blur';
 export type FilterScope = 'title' | 'summary' | 'all';
 export type MapsProvider = 'auto' | 'kagi' | 'google' | 'openstreetmap' | 'apple';
+// Default Google — Kagi Maps option gated off in UI (NEWS-47).
+// Legacy stored 'auto' | 'kagi' values still type-check; mapsProvider.ts remaps them.
 export type SinglePageMode = 'disabled' | 'sequential' | 'mixed' | 'random';
 export type SinglePageMixOrder = 'sequential' | 'mixed' | 'random';
 export type LayoutWidth = 'normal' | 'wide' | 'full';
@@ -95,7 +97,7 @@ export const settings = {
 		'display',
 	),
 	useLatestUrls: new Setting<boolean>('useLatestUrls', false, 'when_true', 'display'),
-	mapsProvider: new Setting<MapsProvider>('mapsProvider', 'auto', 'when_not_default', 'display'),
+	mapsProvider: new Setting<MapsProvider>('mapsProvider', 'google', 'when_not_default', 'display'),
 	layoutWidth: new Setting<LayoutWidth>('layoutWidth', 'normal', 'when_not_default', 'display'),
 
 	// Category Settings
@@ -430,10 +432,16 @@ export const displaySettings = $state({
 		settings.useLatestUrls.currentValue = value;
 	},
 	get mapsProvider(): MapsProvider {
-		return settings.mapsProvider.currentValue;
+		const value = settings.mapsProvider.currentValue;
+		// Migrate leftover Kagi Maps prefs (NEWS-47)
+		if (value === 'kagi' || value === 'auto') {
+			return 'google';
+		}
+		return value;
 	},
 	set mapsProvider(value: MapsProvider) {
-		settings.mapsProvider.currentValue = value;
+		settings.mapsProvider.currentValue =
+			value === 'kagi' || value === 'auto' ? 'google' : value;
 	},
 	get layoutWidth(): LayoutWidth {
 		return settings.layoutWidth.currentValue;
