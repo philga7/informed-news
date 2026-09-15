@@ -33,7 +33,9 @@ mvp/
 ├── .env.example
 └── SMOKE.md         # API smoke (classify + citations)
 docs/
-└── UPSTREAM_KITE.md
+├── UPSTREAM_KITE.md
+└── AGENT_SKILLS.md   # Portable repo-local skills recipe
+.cursor/skills/         # Cursor agent skills (shape → gate → build)
 _legacy/
 ├── mvp-web/         # Archived React feed (NEWS-46) — not product UI
 └── …                # Retired OSINT/Supabase stacks — reference only
@@ -101,6 +103,32 @@ Do **not** treat `_legacy/` (including `_legacy/mvp-web`) as the primary product
 ## Jira
 
 Informed News work uses the **NEWS** project on Atlassian (`informedcrew.atlassian.net`). Prefer JQL `project = NEWS`. Epic A: NEWS-33.
+
+## Agent skill loop
+
+Repo-local skills live under `.cursor/skills/` (see [docs/AGENT_SKILLS.md](docs/AGENT_SKILLS.md)). They do not override this file or `.cursor/rules/`. Mid-epic: do not re-grill finished work; new discoveries become additional NEWS items.
+
+1. **Shape first:** `/find-skills` → `/grill-me` → `/frontend-design` and/or `/prototype` / `/image-to-code` until scope is sharp. Do not start product implementation from a vague idea.
+2. **Gate:** create or update a **NEWS** issue only when scope, UX direction, and open questions are resolved.
+3. **Build:** `/subagent-driven-development` → `/agent-browser` / `/diagnosing-bugs` → `/skill-creator` / `/mcp-builder` as needed.
+4. **Product invariants still win** (Kite + `mvp/server`, no `_legacy/` default, no Supabase on the live path). Keep throwaway prototypes off the default `npm run dev` entrypoint.
+
+### Skill cheat sheet
+
+| Invoke | Does | When |
+|--------|------|------|
+| `/find-skills` | Searches/installs skills from the open ecosystem | “Is there a skill for X?” / missing capability |
+| `/grill-me` | Relentless interview to sharpen a plan (uses companion `grilling`) | Idea or design is fuzzy; before tickets |
+| `/frontend-design` | Pushes distinctive UI direction; avoids generic AI look | New or reshaped UI |
+| `/prototype` | Throwaway code to answer one design/logic question | Sanity-check state model or UI variants |
+| `/image-to-code` | Generate/analyze design images, then match in code | Vision-led frontend from mocks/refs |
+| `/subagent-driven-development` | Fresh implementer subagent per task + review loop | Executing a **grilled** multi-step plan |
+| `/agent-browser` | Scripted browser CLI (stub skill; install CLI separately) | Inspect/verify pages outside IDE browser |
+| `/diagnosing-bugs` | Gated debug loop: repro → minimize → fix → regression | Hard bugs / “why is this broken/slow?” |
+| `/skill-creator` | Author/improve skills and run evals | Packaging a workflow for reuse |
+| `/mcp-builder` | Guide to build/test MCP servers | Adding a new MCP integration |
+
+Full install/copy recipe and licenses: [docs/AGENT_SKILLS.md](docs/AGENT_SKILLS.md).
 
 ## Decision order
 
