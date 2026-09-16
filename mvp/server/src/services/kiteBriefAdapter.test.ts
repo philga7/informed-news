@@ -98,6 +98,86 @@ test('articlesToKiteStories groups by clusterId', () => {
   assert.equal(clustered.title, 'Cluster lead');
 });
 
+test('articlesToKiteStories maps enrichment onto stories when provided', () => {
+  const stories = articlesToKiteStories(
+    [
+      article({
+        id: 'e1',
+        title: 'Enriched cluster',
+        clusterId: 'enriched-1',
+        classification: {
+          genre: 'news_blurb',
+          headlineDevices: [],
+          dimensions: {
+            loadedLanguage: 0.1,
+            emotionalAppeal: 0.1,
+            certaintyClaiming: 0.1,
+            omissionOrSelectionRisk: 0.1,
+            attributionClarity: 0.9,
+          },
+          framingSummary: 'Fallback framing summary',
+          evidenceQuotes: [],
+          openQuestions: [],
+          confidence: 0.8,
+        },
+      }),
+    ],
+    {
+      enrichments: new Map([
+        [
+          'enriched-1',
+          {
+            talking_points: ['Point A', 'Point B'],
+            timeline: [{ date: '2026-09-12', content: 'Timeline entry' }],
+            suggested_qna: [{ question: 'Q?', answer: 'A.' }],
+            short_summary: 'Enrichment short summary wins',
+          },
+        ],
+      ]),
+    },
+  );
+
+  assert.equal(stories.length, 1);
+  const story = stories[0]!;
+  assert.equal(story.short_summary, 'Enrichment short summary wins');
+  assert.deepEqual(story.talking_points, ['Point A', 'Point B']);
+  assert.deepEqual(story.timeline, [
+    { date: '2026-09-12', content: 'Timeline entry' },
+  ]);
+  assert.deepEqual(story.suggested_qna, [{ question: 'Q?', answer: 'A.' }]);
+});
+
+test('articlesToKiteStories omits enrichment fields when missing or empty', () => {
+  const missing = articlesToKiteStories([
+    article({ id: 'm1', title: 'Missing enrichment', clusterId: 'm-cluster' }),
+  ]);
+  assert.equal(missing[0]!.talking_points, undefined);
+  assert.equal(missing[0]!.timeline, undefined);
+  assert.equal(missing[0]!.suggested_qna, undefined);
+
+  const empty = articlesToKiteStories(
+    [
+      article({
+        id: 'm2',
+        title: 'Empty enrichment arrays',
+        clusterId: 'empty-cluster',
+      }),
+    ],
+    {
+      enrichments: {
+        'empty-cluster': {
+          talking_points: [],
+          timeline: [],
+          suggested_qna: [],
+        },
+      },
+    },
+  );
+  assert.equal(empty[0]!.talking_points, undefined);
+  assert.equal(empty[0]!.timeline, undefined);
+  assert.equal(empty[0]!.suggested_qna, undefined);
+});
+
 test('multi-member clusters map members to perspectives', () => {
   const stories = articlesToKiteStories([
     article({

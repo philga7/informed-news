@@ -1,4 +1,5 @@
 import type { Article } from '../types/article.js';
+import type { ClusterEnrichmentPayload } from '../types/clusterEnrichment.js';
 
 /** Stable batch id for the live owned brief (not a Kagi UUID). */
 export const OWNED_BATCH_ID = 'owned-latest';
@@ -34,6 +35,9 @@ export type KiteBriefStory = {
   quote_attribution?: string | null;
   quote_source_url?: string | null;
   quote_source_domain?: string | null;
+  talking_points?: string[];
+  timeline?: Array<{ date: string; content: string; date_iso?: string }>;
+  suggested_qna?: Array<{ question: string; answer: string }>;
   perspectives?: Array<{
     text: string;
     sources: Array<{ name: string; url: string }>;
@@ -175,6 +179,40 @@ export function ownedBriefFixtureArticles(
   ];
 }
 
+/** Minimal enrichment sample when `cluster-enrichments.json` is empty. */
+export function ownedBriefFixtureEnrichments(): Map<
+  string,
+  ClusterEnrichmentPayload
+> {
+  return new Map([
+    [
+      'owned-fixture-cluster',
+      {
+        talking_points: [
+          'Owned brief fixture highlight: this story is a placeholder so the Brief UI renders even when `mvp/data/articles.json` is empty.',
+          'Replace this fixture by logging in and running POST /api/fetch (and optionally /api/classify + /api/enrich).',
+        ],
+        timeline: [
+          {
+            date: 'Today',
+            content:
+              'Fixture enrichment is served from a local JSON store; it is AI-assisted and may be incomplete or wrong.',
+          },
+        ],
+        suggested_qna: [
+          {
+            question: 'What should I do next?',
+            answer:
+              'Log in to the MVP API, run POST /api/fetch, then optionally POST /api/classify and POST /api/enrich to populate story enrichments.',
+          },
+        ],
+        short_summary:
+          'Owned brief fixture enrichment: sample talking points, timeline, and Q&A for the placeholder cluster.',
+      },
+    ],
+  ]);
+}
+
 function domainFromUrl(url: string): string {
   try {
     return new URL(url).hostname.replace(/^www\./, '');
@@ -286,9 +324,15 @@ function pickStoryQuote(members: Article[]): StoryQuoteFields | null {
  */
 export function articlesToKiteStories(
   articles: Article[],
-  options: { limit?: number } = {},
+  options: {
+    limit?: number;
+    enrichments?:
+      | Map<string, ClusterEnrichmentPayload>
+      | Record<string, ClusterEnrichmentPayload>;
+  } = {},
 ): KiteBriefStory[] {
   const limit = options.limit ?? 12;
+  const enrichments = options.enrichments;
   const groups = new Map<string, Article[]>();
   const order: string[] = [];
 
@@ -316,6 +360,12 @@ export function articlesToKiteStories(
     const quote = pickStoryQuote(members);
     const domains = storyDomains(members);
     const perspectives = storyPerspectives(members);
+    const enrichment =
+      enrichments instanceof Map
+        ? enrichments.get(key)
+        : enrichments
+          ? enrichments[key]
+          : undefined;
     const story: KiteBriefStory = {
       id: primary.clusterId?.trim() || primary.id,
       cluster_number: clusterNumber++,
@@ -329,6 +379,10 @@ export function articlesToKiteStories(
         date: articleDate(m),
       })),
     };
+    const enrichmentSummary = enrichment?.short_summary?.trim();
+    if (enrichmentSummary) {
+      story.short_summary = enrichmentSummary;
+    }
     if (domains && domains.length > 0) {
       story.domains = domains;
     }
@@ -341,6 +395,15 @@ export function articlesToKiteStories(
       story.quote_attribution = quote.quote_attribution;
       story.quote_source_url = quote.quote_source_url;
       story.quote_source_domain = quote.quote_source_domain;
+    }
+    if (enrichment?.talking_points && enrichment.talking_points.length > 0) {
+      story.talking_points = enrichment.talking_points;
+    }
+    if (enrichment?.timeline && enrichment.timeline.length > 0) {
+      story.timeline = enrichment.timeline;
+    }
+    if (enrichment?.suggested_qna && enrichment.suggested_qna.length > 0) {
+      story.suggested_qna = enrichment.suggested_qna;
     }
     stories.push(story);
   }
@@ -391,7 +454,13 @@ export function buildOwnedCategoriesResponse(
 export function buildOwnedStoriesResponse(
   articles: Article[],
   categoryId: string,
-  options: { limit?: number; now?: Date } = {},
+  options: {
+    limit?: number;
+    now?: Date;
+    enrichments?:
+      | Map<string, ClusterEnrichmentPayload>
+      | Record<string, ClusterEnrichmentPayload>;
+  } = {},
 ): KiteBatchStoriesResponse | null {
   const known =
     categoryId === OWNED_CATEGORY_UUID ||
@@ -400,7 +469,10 @@ export function buildOwnedStoriesResponse(
   if (!known) return null;
 
   const now = options.now ?? new Date();
-  const stories = articlesToKiteStories(articles, { limit: options.limit });
+  const stories = articlesToKiteStories(articles, {
+    limit: options.limit,
+    enrichments: options.enrichments,
+  });
   const domains = [
     ...new Set(stories.flatMap((s) => s.articles.map((a) => a.domain))),
   ].map((name) => ({ name }));
