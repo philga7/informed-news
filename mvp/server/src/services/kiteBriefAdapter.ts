@@ -34,6 +34,10 @@ export type KiteBriefStory = {
   quote_attribution?: string | null;
   quote_source_url?: string | null;
   quote_source_domain?: string | null;
+  perspectives?: Array<{
+    text: string;
+    sources: Array<{ name: string; url: string }>;
+  }>;
 };
 
 export type KiteBatchInfo = {
@@ -121,6 +125,53 @@ export function ownedBriefFixtureArticles(
       classifiedAt: null,
       classifyError: null,
     },
+    {
+      id: 'owned-fixture-cfp-2',
+      title: 'Owned brief fixture — secondary member',
+      sourceKind: 'cfp',
+      canonicalUrl: 'https://citizenfreepress.com/owned-brief-fixture-2/',
+      citations: [
+        {
+          label: 'CFP',
+          url: 'https://citizenfreepress.com/owned-brief-fixture-2/',
+        },
+        {
+          label: 'Original',
+          url: 'https://example.org/owned-brief-fixture-2',
+        },
+      ],
+      publisherUrl: 'https://example.org/owned-brief-fixture-2',
+      publisherDomain: 'example.org',
+      handle: null,
+      publishedAt: iso,
+      snippet:
+        'Secondary member for the owned brief fixture cluster to test perspectives.',
+      bodyText: null,
+      bodyStatus: 'not_applicable',
+      publisherTitle: null,
+      clusterId: 'owned-fixture-cluster',
+      fetchedAt: iso,
+      classification: {
+        genre: 'news_blurb',
+        headlineDevices: [],
+        dimensions: {
+          loadedLanguage: 0.1,
+          emotionalAppeal: 0.1,
+          certaintyClaiming: 0.1,
+          omissionOrSelectionRisk: 0.1,
+          attributionClarity: 0.9,
+        },
+        framingSummary:
+          'Secondary fixture framing summary for the owned brief sample cluster.',
+        evidenceQuotes: [
+          'Secondary fixture sample quote for the owned brief.',
+        ],
+        openQuestions: [],
+        confidence: 0.5,
+      },
+      classifiedAt: null,
+      classifyError: null,
+    },
   ];
 }
 
@@ -160,6 +211,37 @@ function storyDomains(
   ];
   if (names.length === 0) return undefined;
   return names.map((name) => ({ name }));
+}
+
+type StoryPerspective = {
+  text: string;
+  sources: Array<{ name: string; url: string }>;
+};
+
+function storyPerspectives(
+  members: Article[],
+): StoryPerspective[] | undefined {
+  if (members.length < 2) return undefined;
+
+  const perspectives: StoryPerspective[] = [];
+
+  for (const member of members) {
+    const title = member.title?.trim();
+    const snippet = member.snippet?.trim();
+    const text = title || snippet;
+    if (!text) continue;
+
+    const url = articleLink(member);
+    const name = articleDomain(member);
+
+    perspectives.push({
+      text,
+      sources: [{ name, url }],
+    });
+  }
+
+  if (perspectives.length === 0) return undefined;
+  return perspectives;
 }
 
 type StoryQuoteFields = {
@@ -233,6 +315,7 @@ export function articlesToKiteStories(
     const primary = members[0]!;
     const quote = pickStoryQuote(members);
     const domains = storyDomains(members);
+    const perspectives = storyPerspectives(members);
     const story: KiteBriefStory = {
       id: primary.clusterId?.trim() || primary.id,
       cluster_number: clusterNumber++,
@@ -248,6 +331,9 @@ export function articlesToKiteStories(
     };
     if (domains && domains.length > 0) {
       story.domains = domains;
+    }
+    if (perspectives && perspectives.length > 0) {
+      story.perspectives = perspectives;
     }
     if (quote) {
       story.quote = quote.quote;
