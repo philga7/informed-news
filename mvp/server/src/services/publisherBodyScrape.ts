@@ -129,7 +129,7 @@ function extractImageMeta(
     null;
   const imageCaption = rawCaption && rawCaption.trim() ? normalizeWhitespace(rawCaption) : null;
 
-  const imageCredit = hostnameOf(baseUrl || '') ?? hostnameOf(imageUrl);
+  const imageCredit = baseUrl ? hostnameOf(baseUrl) : null;
   return { imageUrl, imageCaption, imageCredit };
 }
 
@@ -279,14 +279,27 @@ export async function scrapePublisherBody(
     const response = await fetchHtml(publisherUrl, 0);
 
     if (BLOCKED_HTTP.has(response.status)) {
-      return {
-        bodyText: null,
-        bodyStatus: 'blocked',
-        publisherTitle: null,
-        imageUrl: null,
-        imageCaption: null,
-        imageCredit: null,
-      };
+      try {
+        const html = await response.text();
+        const extracted = extractPublisherBodyFromHtml(html, publisherUrl);
+        return {
+          bodyText: null,
+          bodyStatus: 'blocked',
+          publisherTitle: extracted.publisherTitle,
+          imageUrl: extracted.imageUrl,
+          imageCaption: extracted.imageCaption,
+          imageCredit: extracted.imageCredit,
+        };
+      } catch {
+        return {
+          bodyText: null,
+          bodyStatus: 'blocked',
+          publisherTitle: null,
+          imageUrl: null,
+          imageCaption: null,
+          imageCredit: null,
+        };
+      }
     }
 
     if (!response.ok) {

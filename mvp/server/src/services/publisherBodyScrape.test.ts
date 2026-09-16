@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import {
   extractPublisherBodyFromHtml,
   isBlockedPublisherHost,
+  scrapePublisherBody,
 } from './publisherBodyScrape.js';
 
 const ARTICLE_HTML = `<!doctype html>
@@ -84,6 +85,22 @@ test('extracts og:image + og:image:alt', () => {
   assert.equal(result.imageCredit, 'publisher.example.com');
 });
 
+test('does not infer image credit from image host without baseUrl', () => {
+  const html = `<!doctype html>
+  <html>
+  <head>
+    <meta property="og:image" content="https://cdn.example.com/hero.jpg" />
+  </head>
+  <body>
+    <article><p>${'Text '.repeat(300)}</p></article>
+  </body>
+  </html>`;
+
+  const result = extractPublisherBodyFromHtml(html);
+  assert.equal(result.imageUrl, 'https://cdn.example.com/hero.jpg');
+  assert.equal(result.imageCredit, null);
+});
+
 test('falls back to twitter:image when og:image missing', () => {
   const html = `<!doctype html>
   <html>
@@ -155,6 +172,38 @@ test('extracts image meta even when page is paywalled/blocked', () => {
   assert.equal(result.bodyText, null);
   assert.equal(result.imageUrl, 'https://cdn.example.com/paywall.jpg');
   assert.equal(result.imageCredit, 'publisher.example.com');
+});
+
+test('scrapePublisherBody extracts image meta on blocked HTTP responses', async () => {
+  const prev = globalThis.fetch;
+  try {
+    const html = `<!doctype html>
+    <html>
+    <head>
+      <meta property="og:image" content="https://cdn.example.com/blocked.jpg" />
+      <meta property="og:image:alt" content="Blocked alt" />
+      <title>Blocked Page</title>
+    </head>
+    <body><main><p>Please sign in</p></main></body>
+    </html>`;
+
+    globalThis.fetch = (async () =>
+      ({
+        status: 403,
+        ok: false,
+        text: async () => html,
+      }) as unknown as Response) as typeof fetch;
+
+    const result = await scrapePublisherBody('https://publisher.example.com/blocked');
+    assert.equal(result.bodyStatus, 'blocked');
+    assert.equal(result.bodyText, null);
+    assert.equal(result.imageUrl, 'https://cdn.example.com/blocked.jpg');
+    assert.equal(result.imageCaption, 'Blocked alt');
+    assert.equal(result.imageCredit, 'publisher.example.com');
+    assert.equal(result.publisherTitle, 'Blocked Page');
+  } finally {
+    globalThis.fetch = prev;
+  }
 });
 
 test('blocks x.com and twitter hosts', () => {
