@@ -61,18 +61,6 @@ test.describe('Owned brief (NEWS-44)', () => {
 
 		// Owned brief stories payload should expose at least one perspectives entry
 		// (either from live ingest or the fixture multi-member cluster).
-		// Skip the smoke check entirely when there are no multi-member clusters yet.
-		const hasClusteredStory = storiesBody.stories.some(
-			(s: { articles?: Array<unknown> }) =>
-				Array.isArray(s.articles) && s.articles.length > 1,
-		);
-		if (!hasClusteredStory) {
-			test.skip(
-				true,
-				'owned brief has no multi-member clusters; perspectives smoke requires a cluster',
-			);
-		}
-
 		const storiesWithPerspectives = storiesBody.stories.filter(
 			(s: { perspectives?: Array<unknown> }) =>
 				Array.isArray(s.perspectives) && s.perspectives.length >= 1,
