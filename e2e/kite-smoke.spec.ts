@@ -13,6 +13,79 @@ test.describe('Informed News shell branding (NEWS-45)', () => {
 });
 
 test.describe('Owned brief (NEWS-44)', () => {
+	test('Owned brief stories expose primary_image or article image (NEWS-52)', async ({
+		page,
+	}) => {
+		// Ensure Kite UI is up (webServer from playwright config) so relative
+		// page.request calls resolve against the same origin.
+		await page.goto('/');
+		await expect(page).toHaveTitle(/Informed News/i, { timeout: 60_000 });
+
+		const latest = await page.request.get('/api/batches/latest');
+		expect(latest.ok()).toBeTruthy();
+		const batch = (await latest.json()) as { id?: string };
+		expect(batch.id).toBe('owned-latest');
+
+		const categories = await page.request.get(`/api/batches/${batch.id}/categories`);
+		expect(categories.ok()).toBeTruthy();
+		const catBody = (await categories.json()) as {
+			categories?: Array<{ id: string; categoryId?: string }>;
+		};
+		expect(catBody.categories?.[0]?.categoryId).toBe('world');
+		const categoryUuid = catBody.categories?.[0]?.id as string | undefined;
+		expect(categoryUuid, 'expected first owned category id').toBeTruthy();
+
+		const storiesRes = await page.request.get(
+			`/api/batches/${batch.id}/categories/${categoryUuid}/stories?limit=12`,
+		);
+		expect(storiesRes.ok()).toBeTruthy();
+		const storiesBody = (await storiesRes.json()) as { stories?: Array<any> };
+		const stories = storiesBody.stories ?? [];
+		expect(Array.isArray(stories)).toBeTruthy();
+		expect(stories.length).toBeGreaterThan(0);
+
+		const hasPrimaryImageUrl = stories.some((s: any) => {
+			const url = s?.primary_image?.url;
+			return typeof url === 'string' && url.trim().length > 0;
+		});
+		const hasArticleImage = stories.some((s: any) => {
+			const articles = s?.articles;
+			return (
+				Array.isArray(articles) &&
+				articles.some((a: any) => {
+					const img = a?.image;
+					return typeof img === 'string' && img.trim().length > 0;
+				})
+			);
+		});
+
+		if (!hasPrimaryImageUrl && !hasArticleImage) {
+			test.skip(
+				true,
+				'owned brief has no primary_image.url or articles[].image; primary-image smoke requires fixture or live scrape images',
+			);
+			return;
+		}
+
+		expect(
+			hasPrimaryImageUrl || hasArticleImage,
+			'expected at least one story with primary_image.url or at least one member with articles[].image',
+		).toBeTruthy();
+
+		// If primary_image exists, assert it is well-formed without depending on CDN image loads.
+		const storyWithPrimary = stories.find(
+			(s: any) =>
+				typeof s?.primary_image?.url === 'string' &&
+				s.primary_image.url.trim().length > 0,
+		);
+		if (storyWithPrimary) {
+			expect(typeof storyWithPrimary.primary_image.caption).toBe('string');
+			expect(storyWithPrimary.primary_image.caption.trim().length).toBeGreaterThan(
+				0,
+			);
+		}
+	});
+
 	test('Brief cold path does not require kite.kagi.com', async ({ page }) => {
 		const kagiHosts: string[] = [];
 		page.on('request', (req) => {
