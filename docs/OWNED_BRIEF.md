@@ -46,3 +46,21 @@ Stories need at least: `title`, `short_summary`, `category`, `articles[]` with `
 Perfect parity with every Kagi brief field is out of scope (NEWS-44).
 
 Session-gated CFP/xcancel article + classify routes remain on the same server — see [MVP_API_COMPAT.md](MVP_API_COMPAT.md).
+
+### Owned story fields from the MVP store
+
+The owned brief adapter (`mvp/server/src/services/kiteBriefAdapter.ts`) also fills a small set of **story-level** fields directly from the MVP article store:
+
+- **`domains`**: optional array of `{ name: string }` for each story.  
+  - Computed from the unique publisher domains of all member articles in the cluster.  
+  - Uses `publisherDomain` when present; otherwise falls back to the hostname of the publisher or canonical URL (stripping `www.`).  
+  - Omitted entirely when no domain can be derived.
+- **`quote`**: optional pull-quote text for the story, taken from the first non-empty `classification.evidenceQuotes[]` value across cluster members (newest articles are checked first).
+- **`quote_author`**: reserved for future use; currently always `null` in the owned brief.
+- **`quote_attribution`**: optional string describing where the quote comes from.  
+  - Prefers the article’s `publisherTitle` when available, otherwise falls back to the quote source domain.
+- **`quote_source_url`**: optional URL pointing to the page the quote was taken from.  
+  - Prefers `publisherUrl`, then the first `citations[0].url`, then `canonicalUrl`.
+- **`quote_source_domain`**: optional hostname for the quote source, derived from `publisherDomain` or the `quote_source_url`.
+
+These fields are only populated for the owned brief path; they do not introduce Perspectives, timelines, or image metadata.
