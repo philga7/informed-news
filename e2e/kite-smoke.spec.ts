@@ -48,6 +48,17 @@ test.describe('Owned brief (NEWS-44)', () => {
 		expect(storiesBody.stories.length).toBeGreaterThan(0);
 		expect(storiesBody.stories[0].title).toBeTruthy();
 
+		// Owned brief stories payload should expose at least one domains entry
+		// (either from live ingest or the fixture cluster).
+		const storiesWithDomains = storiesBody.stories.filter(
+			(s: { domains?: Array<{ name: string }> }) =>
+				Array.isArray(s.domains) && s.domains.length >= 1,
+		);
+		expect(
+			storiesWithDomains.length,
+			'expected at least one story with domains[] from owned adapter',
+		).toBeGreaterThan(0);
+
 		expect(
 			kagiHosts,
 			`unexpected kite.kagi.com requests: ${kagiHosts.join(', ')}`,

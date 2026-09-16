@@ -70,6 +70,8 @@ test('articlesToKiteStories maps solo articles and prefers framing summary', () 
   assert.equal(stories[0]!.category, OWNED_CATEGORY_SLUG);
   assert.equal(stories[0]!.articles[0]!.domain, 'example.com');
   assert.equal(stories[0]!.articles[0]!.link, 'https://example.com/a1');
+  assert.deepEqual(stories[0]!.domains, [{ name: 'example.com' }]);
+  assert.equal(stories[0]!.quote, undefined);
 });
 
 test('articlesToKiteStories groups by clusterId', () => {
@@ -93,6 +95,92 @@ test('articlesToKiteStories groups by clusterId', () => {
   const clustered = stories.find((s) => s.id === 'evt-1')!;
   assert.equal(clustered.articles.length, 2);
   assert.equal(clustered.title, 'Cluster lead');
+});
+
+test('story domains are unique per cluster from publisher domains', () => {
+  const stories = articlesToKiteStories([
+    article({
+      id: 'd1',
+      title: 'Domain one',
+      clusterId: 'dom-1',
+      publisherDomain: 'one.example',
+    }),
+    article({
+      id: 'd2',
+      title: 'Domain two',
+      clusterId: 'dom-1',
+      publisherDomain: 'two.example',
+    }),
+    article({
+      id: 'd3',
+      title: 'Duplicate',
+      clusterId: 'dom-1',
+      publisherDomain: 'two.example',
+    }),
+  ]);
+
+  const story = stories.find((s) => s.id === 'dom-1')!;
+  const storyDomains = story.domains?.map((d) => d.name).sort();
+  assert.deepEqual(storyDomains, ['one.example', 'two.example']);
+});
+
+test('quote fields are populated from first usable evidenceQuotes entry', () => {
+  const stories = articlesToKiteStories([
+    article({
+      id: 'old',
+      title: 'Older member with quote',
+      clusterId: 'q-1',
+      publishedAt: '2026-09-12T10:00:00.000Z',
+      publisherDomain: 'old.example',
+      publisherUrl: 'https://old.example/story',
+      publisherTitle: 'Old Example',
+      classification: {
+        genre: 'news_blurb',
+        headlineDevices: [],
+        dimensions: {
+          loadedLanguage: 0.1,
+          emotionalAppeal: 0.1,
+          certaintyClaiming: 0.1,
+          omissionOrSelectionRisk: 0.1,
+          attributionClarity: 0.9,
+        },
+        framingSummary: 'Old framing summary',
+        evidenceQuotes: ['Old quote'],
+        openQuestions: [],
+        confidence: 0.8,
+      },
+    }),
+    article({
+      id: 'new',
+      title: 'Newer member with quote',
+      clusterId: 'q-1',
+      publishedAt: '2026-09-12T15:00:00.000Z',
+      publisherDomain: 'new.example',
+      publisherUrl: 'https://new.example/story',
+      publisherTitle: 'New Example',
+      classification: {
+        genre: 'news_blurb',
+        headlineDevices: [],
+        dimensions: {
+          loadedLanguage: 0.1,
+          emotionalAppeal: 0.1,
+          certaintyClaiming: 0.1,
+          omissionOrSelectionRisk: 0.1,
+          attributionClarity: 0.9,
+        },
+        framingSummary: 'New framing summary',
+        evidenceQuotes: ['Latest quote'],
+        openQuestions: [],
+        confidence: 0.8,
+      },
+    }),
+  ]);
+
+  const story = stories.find((s) => s.id === 'q-1')!;
+  assert.equal(story.quote, 'Latest quote');
+  assert.equal(story.quote_source_url, 'https://new.example/story');
+  assert.equal(story.quote_source_domain, 'new.example');
+  assert.equal(story.quote_attribution, 'New Example');
 });
 
 test('owned batch/categories/stories responses match Kite cold-path shape', () => {
@@ -144,4 +232,7 @@ test('fixture articles produce at least one story', () => {
   const stories = articlesToKiteStories(fixture);
   assert.equal(stories.length, 1);
   assert.match(stories[0]!.title, /Owned brief fixture/);
+   const domains = stories[0]!.domains?.map((d) => d.name);
+   assert.ok(domains && domains.length >= 1);
+   assert.ok(stories[0]!.quote);
 });

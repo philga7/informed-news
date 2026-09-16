@@ -28,6 +28,12 @@ export type KiteBriefStory = {
   title: string;
   short_summary: string;
   articles: KiteBriefArticle[];
+  domains?: Array<{ name: string }>;
+  quote?: string;
+  quote_author?: string | null;
+  quote_attribution?: string | null;
+  quote_source_url?: string | null;
+  quote_source_domain?: string | null;
 };
 
 export type KiteBatchInfo = {
@@ -94,7 +100,24 @@ export function ownedBriefFixtureArticles(
       publisherTitle: null,
       clusterId: 'owned-fixture-cluster',
       fetchedAt: iso,
-      classification: null,
+      classification: {
+        genre: 'news_blurb',
+        headlineDevices: [],
+        dimensions: {
+          loadedLanguage: 0.1,
+          emotionalAppeal: 0.1,
+          certaintyClaiming: 0.1,
+          omissionOrSelectionRisk: 0.1,
+          attributionClarity: 0.9,
+        },
+        framingSummary:
+          'Fixture framing summary for the owned brief sample cluster.',
+        evidenceQuotes: [
+          'Fixture sample quote for the owned brief.',
+        ],
+        openQuestions: [],
+        confidence: 0.5,
+      },
       classifiedAt: null,
       classifyError: null,
     },
@@ -127,6 +150,52 @@ function shortSummary(article: Article): string {
   const snippet = article.snippet?.trim();
   if (snippet) return snippet;
   return article.title;
+}
+
+function storyDomains(
+  members: Article[],
+): Array<{ name: string }> | undefined {
+  const names = [
+    ...new Set(members.map((m) => articleDomain(m)).filter(Boolean)),
+  ];
+  if (names.length === 0) return undefined;
+  return names.map((name) => ({ name }));
+}
+
+type StoryQuoteFields = {
+  quote: string;
+  quote_author: string | null;
+  quote_attribution: string | null;
+  quote_source_url: string | null;
+  quote_source_domain: string | null;
+};
+
+function pickStoryQuote(members: Article[]): StoryQuoteFields | null {
+  for (const article of members) {
+    const quoteText =
+      article.classification?.evidenceQuotes?.find(
+        (q) => q && q.trim().length > 0,
+      ) ?? null;
+    if (!quoteText) continue;
+
+    const sourceUrl =
+      article.publisherUrl ??
+      article.citations[0]?.url ??
+      article.canonicalUrl;
+    const sourceDomain =
+      article.publisherDomain ??
+      (sourceUrl ? domainFromUrl(sourceUrl) : null);
+    const attribution = article.publisherTitle ?? sourceDomain ?? null;
+
+    return {
+      quote: quoteText.trim(),
+      quote_author: null,
+      quote_attribution: attribution,
+      quote_source_url: sourceUrl ?? null,
+      quote_source_domain: sourceDomain,
+    };
+  }
+  return null;
 }
 
 /**
@@ -162,7 +231,9 @@ export function articlesToKiteStories(
       return tb - ta;
     });
     const primary = members[0]!;
-    stories.push({
+    const quote = pickStoryQuote(members);
+    const domains = storyDomains(members);
+    const story: KiteBriefStory = {
       id: primary.clusterId?.trim() || primary.id,
       cluster_number: clusterNumber++,
       category: OWNED_CATEGORY_SLUG,
@@ -174,7 +245,18 @@ export function articlesToKiteStories(
         domain: articleDomain(m),
         date: articleDate(m),
       })),
-    });
+    };
+    if (domains && domains.length > 0) {
+      story.domains = domains;
+    }
+    if (quote) {
+      story.quote = quote.quote;
+      story.quote_author = quote.quote_author;
+      story.quote_attribution = quote.quote_attribution;
+      story.quote_source_url = quote.quote_source_url;
+      story.quote_source_domain = quote.quote_source_domain;
+    }
+    stories.push(story);
   }
 
   return stories;
