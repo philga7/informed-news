@@ -42,7 +42,7 @@ Kite does **not** need to proxy these routes. Hit the API on `:3001` directly (d
 | POST | `/api/fetch` | Session | Unified CFP then optional xcancel refresh |
 | POST | `/api/classify` | Session | Batch framing for unclassified items |
 | POST | `/api/classify/:id` | Session | Reclassify one article |
-| POST | `/api/enrich` | Session | Batch cluster enrichment (AI-assisted) |
+| POST | `/api/enrich` | Session | Batch cluster enrichment (AI-assisted). Optional body/query: `{ limit?: number, force?: boolean }` |
 
 Public Kite brief routes under `/api/batches…` are **in addition** to this surface (NEWS-44); they are not a replacement for `/api/articles`.
 

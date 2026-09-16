@@ -41,6 +41,14 @@ export type EnrichBatchResult = {
   keys: string[];
 };
 
+function isAllEmptyEnrichment(enrichment: ClusterEnrichmentPayload): boolean {
+  return (
+    enrichment.talking_points.length === 0 &&
+    enrichment.timeline.length === 0 &&
+    enrichment.suggested_qna.length === 0
+  );
+}
+
 function resolveBatchLimit(override?: number): number {
   if (typeof override === 'number' && Number.isFinite(override) && override > 0) {
     return Math.floor(override);
@@ -124,9 +132,28 @@ export async function enrichUnenrichedClusters(
     const at = nowIsoFn();
 
     if (result.ok) {
+      const enrichment = result.enrichment as ClusterEnrichmentPayload;
+      if (isAllEmptyEnrichment(enrichment)) {
+        const error = 'Enrichment payload was empty after validation';
+        const enrichError = result.rawText
+          ? `${error}${CLASSIFY_RAW_DELIMITER}${result.rawText}`
+          : error;
+
+        const record: ClusterEnrichmentRecord = {
+          key: cluster.key,
+          enrichment: null,
+          enrichedAt: null,
+          enrichError,
+          model: result.model,
+        };
+        await upsertFn(record);
+        failed += 1;
+        continue;
+      }
+
       const record: ClusterEnrichmentRecord = {
         key: cluster.key,
-        enrichment: result.enrichment as ClusterEnrichmentPayload,
+        enrichment,
         enrichedAt: at,
         enrichError: null,
         model: result.model,

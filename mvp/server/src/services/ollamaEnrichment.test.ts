@@ -58,3 +58,16 @@ test('parseEnrichmentResponse throws on non-JSON garbage', () => {
   );
 });
 
+test('parseEnrichmentResponse throws on all-empty enrichment', () => {
+  const raw = JSON.stringify({
+    talking_points: [],
+    timeline: [],
+    suggested_qna: [],
+  });
+
+  assert.throws(
+    () => parseEnrichmentResponse(raw),
+    /Enrichment payload was empty after validation/,
+  );
+});
+

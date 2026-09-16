@@ -165,7 +165,7 @@ app.post('/api/classify/:id', async (req, res) => {
 });
 
 /**
- * Enrich unenriched clusters (batch). Optional body/query: { limit?: number }
+ * Enrich unenriched clusters (batch). Optional body/query: { limit?: number, force?: boolean }
  */
 app.post('/api/enrich', async (req, res) => {
   try {
@@ -173,7 +173,19 @@ app.post('/api/enrich', async (req, res) => {
     const limit =
       limitRaw !== undefined && limitRaw !== '' ? Number(limitRaw) : undefined;
 
-    const result = await enrichUnenrichedClusters({ limit });
+    const forceRaw = req.body?.force ?? req.query.force;
+    const force =
+      forceRaw === undefined || forceRaw === ''
+        ? undefined
+        : typeof forceRaw === 'boolean'
+          ? forceRaw
+          : typeof forceRaw === 'number'
+            ? forceRaw !== 0
+            : typeof forceRaw === 'string'
+              ? ['1', 'true', 'yes', 'on'].includes(forceRaw.trim().toLowerCase())
+              : undefined;
+
+    const result = await enrichUnenrichedClusters({ limit, force });
     res.json({
       ok: true,
       limit: result.limit,

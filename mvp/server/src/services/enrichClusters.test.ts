@@ -82,3 +82,87 @@ test('enrichUnenrichedClusters upserts unenriched and skips already enriched', a
   assert.ok(upserted[0]!.enrichment);
 });
 
+test('enrichUnenrichedClusters treats all-empty enrichment as failure (not stored as success)', async () => {
+  const articles: Article[] = [article({ id: 'a1', title: 'Solo unenriched' })];
+
+  const upserted: ClusterEnrichmentRecord[] = [];
+
+  const result = await enrichUnenrichedClusters({
+    limit: 10,
+    readArticlesFn: async () => articles,
+    getClusterEnrichmentFn: async () => null,
+    enrichFn: async () => ({
+      ok: true,
+      enrichment: { talking_points: [], timeline: [], suggested_qna: [] },
+      model: 'glm-5.2',
+      rawText: '{"talking_points":[],"timeline":[],"suggested_qna":[]}',
+    }),
+    upsertClusterEnrichmentFn: async (record) => {
+      upserted.push(record);
+      return record;
+    },
+    nowIsoFn: () => '2026-09-12T20:00:00.000Z',
+  });
+
+  assert.equal(result.attempted, 1);
+  assert.equal(result.succeeded, 0);
+  assert.equal(result.failed, 1);
+
+  assert.equal(upserted.length, 1);
+  assert.equal(upserted[0]!.key, 'solo:a1');
+  assert.equal(upserted[0]!.enrichedAt, null);
+  assert.ok(upserted[0]!.enrichError);
+  assert.match(upserted[0]!.enrichError!, /empty after validation/);
+  assert.equal(upserted[0]!.enrichment, null);
+});
+
+test('enrichUnenrichedClusters force re-enriches existing key', async () => {
+  const articles: Article[] = [
+    article({ id: 'a1', title: 'Existing cluster member', clusterId: 'c1' }),
+  ];
+
+  const upserted: ClusterEnrichmentRecord[] = [];
+
+  const result = await enrichUnenrichedClusters({
+    limit: 10,
+    force: true,
+    readArticlesFn: async () => articles,
+    getClusterEnrichmentFn: async (key: string) => ({
+      key,
+      enrichment: {
+        talking_points: ['existing'],
+        timeline: [],
+        suggested_qna: [],
+      },
+      enrichedAt: '2026-09-12T13:00:00.000Z',
+      enrichError: null,
+      model: 'glm-5.2',
+    }),
+    enrichFn: async () => ({
+      ok: true,
+      enrichment: {
+        talking_points: ['new'],
+        timeline: [{ date: 'Sep 12', content: 'event' }],
+        suggested_qna: [{ question: 'Q', answer: 'A' }],
+      },
+      model: 'glm-5.2',
+      rawText: '{"talking_points":["new"],"timeline":[],"suggested_qna":[]}',
+    }),
+    upsertClusterEnrichmentFn: async (record) => {
+      upserted.push(record);
+      return record;
+    },
+    nowIsoFn: () => '2026-09-12T20:00:00.000Z',
+  });
+
+  assert.equal(result.attempted, 1);
+  assert.equal(result.succeeded, 1);
+  assert.equal(result.failed, 0);
+  assert.deepEqual(result.keys, ['c1']);
+
+  assert.equal(upserted.length, 1);
+  assert.equal(upserted[0]!.key, 'c1');
+  assert.ok(upserted[0]!.enrichment);
+  assert.deepEqual(upserted[0]!.enrichment!.talking_points, ['new']);
+});
+

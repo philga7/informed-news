@@ -93,6 +93,14 @@ function validateClusterEnrichmentPayload(parsed: unknown): ClusterEnrichmentPay
       ? obj.short_summary.trim()
       : undefined;
 
+  if (
+    talking_points.length === 0 &&
+    timeline.length === 0 &&
+    suggested_qna.length === 0
+  ) {
+    throw new Error('Enrichment payload was empty after validation');
+  }
+
   return {
     talking_points,
     timeline,
