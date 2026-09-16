@@ -34,11 +34,12 @@ Use curl + session cookie (see Optional API-only checks below). Interactive Reac
 | 3. Depth honesty | Inspect article JSON after fetch | Some `bodyStatus: ok` with `bodyText`; others unavailable/blocked — not silent |
 | 4. Publisher title / selection | Find item whose `publisherTitle` differs from CFP `title` | Both present when scrape succeeded; selection signal fields honest (not a truth verdict) |
 | 5. Classify | `POST /api/classify` | Classified count increases (needs `OLLAMA_API_KEY`) |
-| 6. Body-backed framing | Inspect a **body-ok** classified article | Evidence / summary can reflect article text |
-| 7. Dual links | Inspect `citations` | **CFP** \| **Original** when scrape succeeded |
-| 8. Framing | Inspect `classification` | Dimension scores present; treat as AI-assisted |
-| 9. Verify this | Inspect classified item | `openQuestions` / selection-risk notes when present |
-| 10. Re-fetch | `POST /api/fetch` again | Unchanged items keep framing; newly body-ok items clear framing for re-classify |
+| 6. Enrich | `POST /api/enrich` | Brief clusters include highlights/timeline/Q&A when available |
+| 7. Body-backed framing | Inspect a **body-ok** classified article | Evidence / summary can reflect article text |
+| 8. Dual links | Inspect `citations` | **CFP** \| **Original** when scrape succeeded |
+| 9. Framing | Inspect `classification` | Dimension scores present; treat as AI-assisted |
+| 10. Verify this | Inspect classified item | `openQuestions` / selection-risk notes when present |
+| 11. Re-fetch | `POST /api/fetch` again | Unchanged items keep framing; newly body-ok items clear framing for re-classify |
 
 ## Checklist (optional xcancel)
 
@@ -52,11 +53,11 @@ XCANCEL_PROFILES=sentdefender
 
 | Step | Action | Pass when |
 |------|--------|-----------|
-| 11. Refresh with handles | `POST /api/fetch` | X items appear with xcancel `sourceKind`; citations **xcancel** \| **X** |
-| 12. Tweet-as-body | Inspect an xcancel article | Tweet text present; body stays `not_applicable` |
-| 13. Classify X items | `POST /api/classify` | Unclassified xcancel items get framing like CFP |
-| 14. Cluster group | Find items that share a `clusterId` | Related CFP + tweet share `clusterId` |
-| 15. Honest failure | If xcancel blocks (Cloudflare / RSS whitelist) | CFP still succeeds; `meta.lastError` / store note is set — not silent success |
+| 12. Refresh with handles | `POST /api/fetch` | X items appear with xcancel `sourceKind`; citations **xcancel** \| **X** |
+| 13. Tweet-as-body | Inspect an xcancel article | Tweet text present; body stays `not_applicable` |
+| 14. Classify X items | `POST /api/classify` | Unclassified xcancel items get framing like CFP |
+| 15. Cluster group | Find items that share a `clusterId` | Related CFP + tweet share `clusterId` |
+| 16. Honest failure | If xcancel blocks (Cloudflare / RSS whitelist) | CFP still succeeds; `meta.lastError` / store note is set — not silent success |
 
 Empty profile list must not error: CFP-only Refresh stays green.
 
