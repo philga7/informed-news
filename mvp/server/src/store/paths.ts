@@ -8,3 +8,7 @@ export const DATA_DIR = path.resolve(__dirname, '../../../data');
 
 export const ARTICLES_PATH = path.join(DATA_DIR, 'articles.json');
 export const META_PATH = path.join(DATA_DIR, 'meta.json');
+export const CLUSTER_ENRICHMENTS_PATH = path.join(
+  DATA_DIR,
+  'cluster-enrichments.json',
+);
