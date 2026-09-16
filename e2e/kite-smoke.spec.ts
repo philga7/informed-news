@@ -48,6 +48,41 @@ test.describe('Owned brief (NEWS-44)', () => {
 		expect(storiesBody.stories.length).toBeGreaterThan(0);
 		expect(storiesBody.stories[0].title).toBeTruthy();
 
+		const hasTalkingPoints = storiesBody.stories.some(
+			(s: { talking_points?: unknown }) =>
+				Array.isArray(s.talking_points) && s.talking_points.length > 0,
+		);
+		const hasTimeline = storiesBody.stories.some(
+			(s: { timeline?: unknown }) => Array.isArray(s.timeline) && s.timeline.length > 0,
+		);
+		const hasSuggestedQna = storiesBody.stories.some(
+			(s: { suggested_qna?: unknown }) =>
+				Array.isArray(s.suggested_qna) && s.suggested_qna.length > 0,
+		);
+
+		if (!hasTalkingPoints) {
+			test.skip(
+				true,
+				'owned brief has no enriched stories (talking_points/timeline/suggested_qna); enrich smoke requires fixture or enriched live data',
+			);
+			return;
+		}
+		expect(hasTimeline, 'expected at least one story with timeline[]').toBeTruthy();
+		expect(hasSuggestedQna, 'expected at least one story with suggested_qna[]').toBeTruthy();
+
+		const storyToOpen = storiesBody.stories.find(
+			(s: {
+				cluster_number?: number;
+				talking_points?: unknown;
+				timeline?: unknown;
+				suggested_qna?: unknown;
+			}) =>
+				(Array.isArray(s.talking_points) && s.talking_points.length > 0) ||
+				(Array.isArray(s.timeline) && s.timeline.length > 0) ||
+				(Array.isArray(s.suggested_qna) && s.suggested_qna.length > 0),
+		);
+		expect(storyToOpen?.cluster_number, 'expected an enriched story to open').toBeTruthy();
+
 		// Owned brief stories payload should expose at least one domains entry
 		// (either from live ingest or the fixture cluster).
 		const storiesWithDomains = storiesBody.stories.filter(
@@ -81,6 +116,17 @@ test.describe('Owned brief (NEWS-44)', () => {
 			storiesWithPerspectives.length,
 			'expected at least one story with perspectives[] from owned adapter',
 		).toBeGreaterThan(0);
+
+		// Expand an enriched story and verify the concise honesty copy appears.
+		const storyCard = page.locator(
+			`article#story-${(storyToOpen as { cluster_number: number }).cluster_number}`,
+		);
+		await expect(storyCard).toBeVisible({ timeout: 60_000 });
+		await storyCard.scrollIntoViewIfNeeded();
+		await storyCard.locator('button[aria-label="Expand story"]').click();
+		await expect(page.getByText('AI-assisted — not ground truth.')).toBeVisible({
+			timeout: 60_000,
+		});
 
 		expect(
 			kagiHosts,

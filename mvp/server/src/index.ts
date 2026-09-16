@@ -12,6 +12,7 @@ import {
   classifyArticleById,
   classifyUnclassifiedArticles,
   createKiteBriefRouter,
+  enrichUnenrichedClusters,
   fetchAllSources,
   sortNewestFirst,
 } from './services/index.js';
@@ -159,6 +160,43 @@ app.post('/api/classify/:id', async (req, res) => {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error('Classify by id failed:', message);
+    res.status(500).json({ ok: false, error: message });
+  }
+});
+
+/**
+ * Enrich unenriched clusters (batch). Optional body/query: { limit?: number, force?: boolean }
+ */
+app.post('/api/enrich', async (req, res) => {
+  try {
+    const limitRaw = req.body?.limit ?? req.query.limit;
+    const limit =
+      limitRaw !== undefined && limitRaw !== '' ? Number(limitRaw) : undefined;
+
+    const forceRaw = req.body?.force ?? req.query.force;
+    const force =
+      forceRaw === undefined || forceRaw === ''
+        ? undefined
+        : typeof forceRaw === 'boolean'
+          ? forceRaw
+          : typeof forceRaw === 'number'
+            ? forceRaw !== 0
+            : typeof forceRaw === 'string'
+              ? ['1', 'true', 'yes', 'on'].includes(forceRaw.trim().toLowerCase())
+              : undefined;
+
+    const result = await enrichUnenrichedClusters({ limit, force });
+    res.json({
+      ok: true,
+      limit: result.limit,
+      attempted: result.attempted,
+      succeeded: result.succeeded,
+      failed: result.failed,
+      keys: result.keys,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('Batch enrich failed:', message);
     res.status(500).json({ ok: false, error: message });
   }
 });

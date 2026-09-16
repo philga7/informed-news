@@ -72,3 +72,12 @@ export {
 } from './kiteBriefAdapter.js';
 export { createKiteBriefRouter } from './kiteBriefRoutes.js';
 
+export {
+  buildEnrichmentPrompt,
+  enrichCluster,
+  parseEnrichmentResponse,
+} from './ollamaEnrichment.js';
+export type { EnrichMemberInput, EnrichClusterResult } from './ollamaEnrichment.js';
+export { enrichUnenrichedClusters } from './enrichClusters.js';
+export type { EnrichBatchOptions, EnrichBatchResult } from './enrichClusters.js';
+

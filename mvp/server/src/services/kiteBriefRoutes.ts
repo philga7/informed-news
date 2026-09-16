@@ -1,10 +1,11 @@
 import { Router } from 'express';
-import { readArticles } from '../store/index.js';
+import { readArticles, readClusterEnrichments } from '../store/index.js';
 import {
   OWNED_BATCH_ID,
   buildOwnedBatchInfo,
   buildOwnedCategoriesResponse,
   buildOwnedStoriesResponse,
+  ownedBriefFixtureEnrichments,
   resolveOwnedBriefArticles,
 } from './kiteBriefAdapter.js';
 
@@ -18,6 +19,24 @@ export function createKiteBriefRouter(): Router {
   async function loadArticles() {
     const stored = await readArticles();
     return resolveOwnedBriefArticles(stored);
+  }
+
+  async function loadEnrichments(fromFixture: boolean) {
+    const records = await readClusterEnrichments();
+    const map = new Map(
+      records
+        .filter((r) => r.enrichment !== null)
+        .map((r) => [r.key, r.enrichment!] as const),
+    );
+
+    if (fromFixture) {
+      const fixture = ownedBriefFixtureEnrichments();
+      for (const [key, enrichment] of fixture.entries()) {
+        if (!map.has(key)) map.set(key, enrichment);
+      }
+    }
+
+    return map;
   }
 
   router.get('/batches/latest', async (_req, res) => {
@@ -42,9 +61,11 @@ export function createKiteBriefRouter(): Router {
         limitRaw !== undefined && limitRaw !== ''
           ? Number(limitRaw)
           : undefined;
-      const { articles } = await loadArticles();
+      const { articles, fromFixture } = await loadArticles();
+      const enrichments = await loadEnrichments(fromFixture);
       const body = buildOwnedStoriesResponse(articles, req.params.categoryId, {
         limit: Number.isFinite(limit) ? limit : undefined,
+        enrichments,
       });
       if (!body) {
         res.status(404).json({ error: 'Category not found' });
