@@ -62,5 +62,9 @@ The owned brief adapter (`mvp/server/src/services/kiteBriefAdapter.ts`) also fil
 - **`quote_source_url`**: set when a quote is present; URL pointing to the page the quote was taken from.  
   - Prefers `publisherUrl`, then the first `citations[0].url`, then `canonicalUrl`.
 - **`quote_source_domain`**: set when a quote is present; hostname for the quote source, derived from `publisherDomain` or the `quote_source_url` (with the same `unknown` fallback on parse failure).
+- **`perspectives`**: optional array of `{ text: string; sources: { name: string; url: string }[] }` describing additional viewpoints on the story.  
+  - Built **deterministically (no LLM)** from cluster members: each member with a non-empty `title` or `snippet` becomes one perspective, with `sources[0]` pointing at that member’s domain and URL.  
+  - Only emitted for **multi-member clusters** (stories where multiple articles share a `clusterId`); solo-member stories leave `perspectives` undefined rather than an empty array.  
+  - Members that lack both title and snippet are simply skipped, so `perspectives.length` may be smaller than the raw member count.
 
-These fields are only populated for the owned brief path; they do not introduce Perspectives, timelines, or image metadata.
+These fields are only populated for the owned brief path; they do not introduce timelines or image metadata.

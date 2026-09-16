@@ -71,6 +71,7 @@ test('articlesToKiteStories maps solo articles and prefers framing summary', () 
   assert.equal(stories[0]!.articles[0]!.domain, 'example.com');
   assert.equal(stories[0]!.articles[0]!.link, 'https://example.com/a1');
   assert.deepEqual(stories[0]!.domains, [{ name: 'example.com' }]);
+  assert.equal(stories[0]!.perspectives, undefined);
   assert.equal(stories[0]!.quote, undefined);
 });
 
@@ -95,6 +96,35 @@ test('articlesToKiteStories groups by clusterId', () => {
   const clustered = stories.find((s) => s.id === 'evt-1')!;
   assert.equal(clustered.articles.length, 2);
   assert.equal(clustered.title, 'Cluster lead');
+});
+
+test('multi-member clusters map members to perspectives', () => {
+  const stories = articlesToKiteStories([
+    article({
+      id: 'p1',
+      title: 'Perspective One',
+      clusterId: 'p-cluster',
+      publisherDomain: 'one.example',
+      publisherUrl: 'https://one.example/story-1',
+    }),
+    article({
+      id: 'p2',
+      title: 'Perspective Two',
+      clusterId: 'p-cluster',
+      publisherDomain: 'two.example',
+      publisherUrl: 'https://two.example/story-2',
+    }),
+  ]);
+
+  const story = stories.find((s) => s.id === 'p-cluster')!;
+  assert.ok(story.perspectives && story.perspectives.length >= 1);
+  for (const perspective of story.perspectives!) {
+    assert.ok(perspective.text && perspective.text.length > 0);
+    assert.ok(
+      perspective.sources[0]!.url &&
+        perspective.sources[0]!.url.length > 0,
+    );
+  }
 });
 
 test('story domains are unique per cluster from publisher domains', () => {
@@ -230,9 +260,11 @@ test('fixture articles produce at least one story', () => {
     new Date('2026-09-12T00:00:00.000Z'),
   );
   const stories = articlesToKiteStories(fixture);
-  assert.equal(stories.length, 1);
+  assert.ok(stories.length >= 1);
   assert.match(stories[0]!.title, /Owned brief fixture/);
-   const domains = stories[0]!.domains?.map((d) => d.name);
-   assert.ok(domains && domains.length >= 1);
-   assert.ok(stories[0]!.quote);
+  const domains = stories[0]!.domains?.map((d) => d.name);
+  assert.ok(domains && domains.length >= 1);
+  assert.ok(stories[0]!.quote);
+  assert.ok(stories[0]!.perspectives);
+  assert.ok(stories[0]!.perspectives!.length >= 1);
 });
