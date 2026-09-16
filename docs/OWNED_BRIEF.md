@@ -69,7 +69,24 @@ The owned brief adapter (`mvp/server/src/services/kiteBriefAdapter.ts`) also fil
   - Only emitted for **multi-member clusters** (stories where multiple articles share a `clusterId`); solo-member stories leave `perspectives` undefined rather than an empty array.  
   - Members that lack both title and snippet are simply skipped, so `perspectives.length` may be smaller than the raw member count.
 
-These fields are only populated for the owned brief path; they do not introduce timelines or image metadata.
+These fields are only populated for the owned brief path; they do not attempt full parity with every Kagi story field, and they intentionally omit empty placeholders (soft-slip for live coverage).
+They also include a minimal image mapping so Kite’s story hero can render a primary image when available.
+
+#### Images (owned brief only)
+
+- **`primary_image?: { url: string; caption: string; credit?: string; link?: string }`**: optional story hero image.
+  - Selected deterministically from the **first (newest-first)** cluster member that has a non-empty `Article.imageUrl`.
+  - **`url`**: `Article.imageUrl`
+  - **`caption`**: `Article.imageCaption?.trim() || Article.publisherTitle || Article.title || ''`
+  - **`credit`**: `Article.imageCredit || Article.publisherDomain` (omitted when empty)
+  - **`link`**: `Article.publisherUrl || Article.canonicalUrl`
+  - Omitted entirely when **no** cluster member has an image URL.
+- **`articles[].image?: string`**: per-article image URL.
+  - Set to `Article.imageUrl` when present; otherwise omitted.
+
+**Attribution note:** `imageCredit` / `imageCaption` are **display hints**, not a license grant. The upstream page’s embedded metadata may not reflect the actual copyright holder or the terms of reuse; treat these fields as best-effort attribution only.
+
+**Soft-slip:** live stories may lack images initially (or indefinitely) depending on publisher pages, scrape success, or blocked bodies; the adapter omits image fields rather than emitting empty placeholders.
 
 ### Owned story fields from cluster enrichments
 

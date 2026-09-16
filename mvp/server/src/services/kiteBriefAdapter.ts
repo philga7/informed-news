@@ -20,6 +20,14 @@ export type KiteBriefArticle = {
   link: string;
   domain: string;
   date: string;
+  image?: string;
+};
+
+export type KiteBriefPrimaryImage = {
+  url: string;
+  caption: string;
+  credit?: string;
+  link?: string;
 };
 
 export type KiteBriefStory = {
@@ -29,6 +37,7 @@ export type KiteBriefStory = {
   title: string;
   short_summary: string;
   articles: KiteBriefArticle[];
+  primary_image?: KiteBriefPrimaryImage;
   domains?: Array<{ name: string }>;
   quote?: string;
   quote_author?: string | null;
@@ -106,9 +115,10 @@ export function ownedBriefFixtureArticles(
       bodyText: null,
       bodyStatus: 'not_applicable',
       publisherTitle: null,
-      imageUrl: null,
-      imageCaption: null,
-      imageCredit: null,
+      imageUrl: 'https://picsum.photos/seed/owned-brief-fixture/800/450',
+      imageCaption:
+        'Owned brief fixture image — stable placeholder for smoke tests.',
+      imageCredit: 'picsum.photos',
       clusterId: 'owned-fixture-cluster',
       fetchedAt: iso,
       classification: {
@@ -288,6 +298,32 @@ function storyPerspectives(
   return perspectives;
 }
 
+function pickStoryPrimaryImage(
+  members: Article[],
+): KiteBriefPrimaryImage | undefined {
+  for (const member of members) {
+    const url = member.imageUrl?.trim();
+    if (!url) continue;
+
+    const caption =
+      member.imageCaption?.trim() ||
+      member.publisherTitle?.trim() ||
+      member.title?.trim() ||
+      '';
+    const credit =
+      member.imageCredit?.trim() || member.publisherDomain || undefined;
+    const link = member.publisherUrl || member.canonicalUrl;
+
+    return {
+      url,
+      caption,
+      credit,
+      link,
+    };
+  }
+  return undefined;
+}
+
 type StoryQuoteFields = {
   quote: string;
   quote_author: string | null;
@@ -366,6 +402,7 @@ export function articlesToKiteStories(
     const quote = pickStoryQuote(members);
     const domains = storyDomains(members);
     const perspectives = storyPerspectives(members);
+    const primaryImage = pickStoryPrimaryImage(members);
     const enrichment =
       enrichments instanceof Map
         ? enrichments.get(key)
@@ -383,8 +420,14 @@ export function articlesToKiteStories(
         link: articleLink(m),
         domain: articleDomain(m),
         date: articleDate(m),
+        ...(m.imageUrl?.trim()
+          ? { image: m.imageUrl.trim() }
+          : {}),
       })),
     };
+    if (primaryImage) {
+      story.primary_image = primaryImage;
+    }
     const enrichmentSummary = enrichment?.short_summary?.trim();
     if (enrichmentSummary) {
       story.short_summary = enrichmentSummary;
