@@ -106,6 +106,9 @@ export function ownedBriefFixtureArticles(
       bodyText: null,
       bodyStatus: 'not_applicable',
       publisherTitle: null,
+      imageUrl: null,
+      imageCaption: null,
+      imageCredit: null,
       clusterId: 'owned-fixture-cluster',
       fetchedAt: iso,
       classification: {
@@ -153,6 +156,9 @@ export function ownedBriefFixtureArticles(
       bodyText: null,
       bodyStatus: 'not_applicable',
       publisherTitle: null,
+      imageUrl: null,
+      imageCaption: null,
+      imageCredit: null,
       clusterId: 'owned-fixture-cluster',
       fetchedAt: iso,
       classification: {

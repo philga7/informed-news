@@ -145,6 +145,9 @@ export function migrateArticle(raw: unknown): Article {
     bodyText,
     bodyStatus,
     publisherTitle: asNullableString(raw.publisherTitle),
+    imageUrl: asNullableString(raw.imageUrl),
+    imageCaption: asNullableString(raw.imageCaption),
+    imageCredit: asNullableString(raw.imageCredit),
     clusterId: asNullableString(raw.clusterId),
     fetchedAt: asString(raw.fetchedAt) ?? new Date().toISOString(),
     classification: parseClassification(raw.classification),
@@ -177,6 +180,9 @@ export function articleNeedsRewrite(raw: unknown, migrated: Article): boolean {
     return true;
   }
   if (!('bodyStatus' in raw) || !('bodyText' in raw) || !('publisherTitle' in raw)) {
+    return true;
+  }
+  if (!('imageUrl' in raw) || !('imageCaption' in raw) || !('imageCredit' in raw)) {
     return true;
   }
   if (!('clusterId' in raw)) {

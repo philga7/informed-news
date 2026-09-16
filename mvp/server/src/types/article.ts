@@ -70,6 +70,12 @@ export type Article = {
   bodyStatus: BodyStatus;
   /** Publisher page title / og:title when scraped; null until then */
   publisherTitle: string | null;
+  /** Absolute image URL from publisher og/twitter meta when scraped; null if none. */
+  imageUrl: string | null;
+  /** Optional caption from og:image:alt / twitter:image:alt when present. */
+  imageCaption: string | null;
+  /** Optional credit string (e.g. site name); not a license grant. */
+  imageCredit: string | null;
   /**
    * Crude same-event group id from URL/title overlap.
    * null = ungrouped (flat list). Shared id when related; not a truth verdict.

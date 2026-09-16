@@ -44,6 +44,9 @@ test('extracts og:title and article body text', () => {
   assert.ok(result.bodyText && result.bodyText.length >= 200);
   assert.match(result.bodyText!, /committee voted/);
   assert.doesNotMatch(result.bodyText!, /Home Politics Sports/);
+  assert.equal(result.imageUrl, null);
+  assert.equal(result.imageCaption, null);
+  assert.equal(result.imageCredit, null);
 });
 
 test('marks short paywall pages as blocked', () => {
@@ -51,12 +54,107 @@ test('marks short paywall pages as blocked', () => {
   assert.equal(result.bodyStatus, 'blocked');
   assert.equal(result.bodyText, null);
   assert.equal(result.publisherTitle, 'Exclusive Report');
+  assert.equal(result.imageUrl, null);
 });
 
 test('marks empty/boilerplate pages as unavailable', () => {
   const result = extractPublisherBodyFromHtml(EMPTY_HTML);
   assert.equal(result.bodyStatus, 'unavailable');
   assert.equal(result.bodyText, null);
+  assert.equal(result.imageUrl, null);
+});
+
+test('extracts og:image + og:image:alt', () => {
+  const html = `<!doctype html>
+  <html>
+  <head>
+    <meta property="og:title" content="Story" />
+    <meta property="og:image" content="https://cdn.example.com/hero.jpg" />
+    <meta property="og:image:alt" content="A hero image" />
+  </head>
+  <body>
+    <article><p>${'Text '.repeat(300)}</p></article>
+  </body>
+  </html>`;
+
+  const result = extractPublisherBodyFromHtml(html, 'https://publisher.example.com/story');
+  assert.equal(result.bodyStatus, 'ok');
+  assert.equal(result.imageUrl, 'https://cdn.example.com/hero.jpg');
+  assert.equal(result.imageCaption, 'A hero image');
+  assert.equal(result.imageCredit, 'publisher.example.com');
+});
+
+test('falls back to twitter:image when og:image missing', () => {
+  const html = `<!doctype html>
+  <html>
+  <head>
+    <meta name="twitter:image" content="https://images.example.com/tw.jpg" />
+    <meta name="twitter:image:alt" content="Twitter alt" />
+  </head>
+  <body>
+    <main><p>${'Text '.repeat(300)}</p></main>
+  </body>
+  </html>`;
+
+  const result = extractPublisherBodyFromHtml(html, 'https://publisher.example.com/story');
+  assert.equal(result.imageUrl, 'https://images.example.com/tw.jpg');
+  assert.equal(result.imageCaption, 'Twitter alt');
+  assert.equal(result.imageCredit, 'publisher.example.com');
+});
+
+test('resolves relative image URLs when baseUrl provided', () => {
+  const html = `<!doctype html>
+  <html>
+  <head>
+    <meta property="og:image" content="/img/hero.jpg" />
+  </head>
+  <body>
+    <article><p>${'Text '.repeat(300)}</p></article>
+  </body>
+  </html>`;
+
+  const result = extractPublisherBodyFromHtml(html, 'https://publisher.example.com/story/page');
+  assert.equal(result.imageUrl, 'https://publisher.example.com/img/hero.jpg');
+  assert.equal(result.imageCredit, 'publisher.example.com');
+});
+
+test('drops relative image URLs when baseUrl missing', () => {
+  const html = `<!doctype html>
+  <html>
+  <head>
+    <meta property="og:image" content="/img/hero.jpg" />
+  </head>
+  <body>
+    <article><p>${'Text '.repeat(300)}</p></article>
+  </body>
+  </html>`;
+
+  const result = extractPublisherBodyFromHtml(html);
+  assert.equal(result.imageUrl, null);
+  assert.equal(result.imageCaption, null);
+  assert.equal(result.imageCredit, null);
+});
+
+test('extracts image meta even when page is paywalled/blocked', () => {
+  const html = `<!doctype html>
+  <html>
+  <head>
+    <title>Exclusive Report</title>
+    <meta property="og:image" content="https://cdn.example.com/paywall.jpg" />
+  </head>
+  <body>
+    <main>
+      <p>Subscribe to continue reading this article.</p>
+      <p>Already a subscriber? Sign in to read.</p>
+    </main>
+  </body>
+  </html>`;
+
+  const result = extractPublisherBodyFromHtml(html, 'https://publisher.example.com/exclusive');
+  assert.equal(result.bodyStatus, 'blocked');
+  assert.equal(result.bodyText, null);
+  assert.equal(result.imageUrl, 'https://cdn.example.com/paywall.jpg');
+  assert.equal(result.imageCredit, 'publisher.example.com');
 });
 
 test('blocks x.com and twitter hosts', () => {
