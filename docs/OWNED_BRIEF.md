@@ -54,13 +54,13 @@ The owned brief adapter (`mvp/server/src/services/kiteBriefAdapter.ts`) also fil
 - **`domains`**: optional array of `{ name: string }` for each story.  
   - Computed from the unique publisher domains of all member articles in the cluster.  
   - Uses `publisherDomain` when present; otherwise falls back to the hostname of the publisher or canonical URL (stripping `www.`).  
-  - Omitted entirely when no domain can be derived.
-- **`quote`**: optional pull-quote text for the story, taken from the first non-empty `classification.evidenceQuotes[]` value across cluster members (newest articles are checked first).
-- **`quote_author`**: reserved for future use; currently always `null` in the owned brief.
-- **`quote_attribution`**: optional string describing where the quote comes from.  
+  - If URL parsing fails, the fallback hostname is the literal string `unknown` (so story `domains` is typically present whenever the cluster has member articles).
+- **`quote`**: optional pull-quote text for the story, taken from the first non-empty `classification.evidenceQuotes[]` value across cluster members (newest articles are checked first; whitespace is trimmed).
+- **`quote_author`**: when a quote is present, this field is always emitted as `null` (reserved for future use). When no usable evidence quote exists, `quote_author` and all other `quote*` fields are omitted from the story.
+- **`quote_attribution`**: set when a quote is present; describes where the quote comes from.  
   - Prefers the article’s `publisherTitle` when available, otherwise falls back to the quote source domain.
-- **`quote_source_url`**: optional URL pointing to the page the quote was taken from.  
+- **`quote_source_url`**: set when a quote is present; URL pointing to the page the quote was taken from.  
   - Prefers `publisherUrl`, then the first `citations[0].url`, then `canonicalUrl`.
-- **`quote_source_domain`**: optional hostname for the quote source, derived from `publisherDomain` or the `quote_source_url`.
+- **`quote_source_domain`**: set when a quote is present; hostname for the quote source, derived from `publisherDomain` or the `quote_source_url` (with the same `unknown` fallback on parse failure).
 
 These fields are only populated for the owned brief path; they do not introduce Perspectives, timelines, or image metadata.

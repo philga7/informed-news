@@ -188,7 +188,7 @@ function pickStoryQuote(members: Article[]): StoryQuoteFields | null {
     const attribution = article.publisherTitle ?? sourceDomain ?? null;
 
     return {
-      quote: quoteText,
+      quote: quoteText.trim(),
       quote_author: null,
       quote_attribution: attribution,
       quote_source_url: sourceUrl ?? null,
