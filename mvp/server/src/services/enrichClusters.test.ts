@@ -48,7 +48,7 @@ test('enrichUnenrichedClusters upserts unenriched and skips already enriched', a
           },
           enrichedAt: '2026-09-12T13:00:00.000Z',
           enrichError: null,
-          model: 'glm-5.2',
+          model: 'glm-5.3-flash',
         };
       }
       return null;
@@ -60,7 +60,7 @@ test('enrichUnenrichedClusters upserts unenriched and skips already enriched', a
         timeline: [{ date: 'Sep 12', content: 'event' }],
         suggested_qna: [{ question: 'Q', answer: 'A' }],
       },
-      model: 'glm-5.2',
+      model: 'glm-5.3-flash',
       rawText: '{"talking_points":["tp"],"timeline":[],"suggested_qna":[]}',
     }),
     upsertClusterEnrichmentFn: async (record) => {
@@ -94,7 +94,7 @@ test('enrichUnenrichedClusters treats all-empty enrichment as failure (not store
     enrichFn: async () => ({
       ok: true,
       enrichment: { talking_points: [], timeline: [], suggested_qna: [] },
-      model: 'glm-5.2',
+      model: 'glm-5.3-flash',
       rawText: '{"talking_points":[],"timeline":[],"suggested_qna":[]}',
     }),
     upsertClusterEnrichmentFn: async (record) => {
@@ -136,7 +136,7 @@ test('enrichUnenrichedClusters force re-enriches existing key', async () => {
       },
       enrichedAt: '2026-09-12T13:00:00.000Z',
       enrichError: null,
-      model: 'glm-5.2',
+      model: 'glm-5.3-flash',
     }),
     enrichFn: async () => ({
       ok: true,
@@ -145,7 +145,7 @@ test('enrichUnenrichedClusters force re-enriches existing key', async () => {
         timeline: [{ date: 'Sep 12', content: 'event' }],
         suggested_qna: [{ question: 'Q', answer: 'A' }],
       },
-      model: 'glm-5.2',
+      model: 'glm-5.3-flash',
       rawText: '{"talking_points":["new"],"timeline":[],"suggested_qna":[]}',
     }),
     upsertClusterEnrichmentFn: async (record) => {
