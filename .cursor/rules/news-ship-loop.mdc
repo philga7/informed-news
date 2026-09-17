@@ -1,0 +1,10 @@
+---
+description: When shipping NEWS-* work (start build, open/merge PR, mark Done), follow /news-ship-loop.
+alwaysApply: true
+---
+
+# NEWS ship loop
+
+For Informed News ticket lifecycle (In Progress → build → PR → squash-merge → Done → delete SDD plan), follow `.cursor/skills/news-ship-loop/SKILL.md`.
+
+Do not invent alternate Jira status or merge rituals. Push / open PR / merge to `main` only when the user asks.

@@ -111,7 +111,8 @@ Repo-local skills live under `.cursor/skills/` (see [docs/AGENT_SKILLS.md](docs/
 1. **Shape first:** `/find-skills` → `/grill-me` → `/frontend-design` and/or `/prototype` / `/image-to-code` until scope is sharp. Do not start product implementation from a vague idea.
 2. **Gate:** create or update a **NEWS** issue only when scope, UX direction, and open questions are resolved.
 3. **Build:** `/subagent-driven-development` → `/agent-browser` / `/diagnosing-bugs` → `/skill-creator` / `/mcp-builder` as needed.
-4. **Product invariants still win** (Kite + `mvp/server`, no `_legacy/` default, no Supabase on the live path). Keep throwaway prototypes off the default `npm run dev` entrypoint.
+4. **Ship:** `/news-ship-loop` — In Progress → (SDD) → PR/merge when asked → Done → delete SDD plan.
+5. **Product invariants still win** (Kite + `mvp/server`, no `_legacy/` default, no Supabase on the live path). Keep throwaway prototypes off the default `npm run dev` entrypoint.
 
 ### Skill cheat sheet
 
@@ -123,6 +124,7 @@ Repo-local skills live under `.cursor/skills/` (see [docs/AGENT_SKILLS.md](docs/
 | `/prototype` | Throwaway code to answer one design/logic question | Sanity-check state model or UI variants |
 | `/image-to-code` | Generate/analyze design images, then match in code | Vision-led frontend from mocks/refs |
 | `/subagent-driven-development` | Fresh implementer subagent per task + review loop | Executing a **grilled** multi-step plan |
+| `/news-ship-loop` | NEWS Jira In Progress → PR/merge → Done + plan cleanup | Starting/finishing a NEWS-* item or merging its PR |
 | `/agent-browser` | Scripted browser CLI (stub skill; install CLI separately) | Inspect/verify pages outside IDE browser |
 | `/diagnosing-bugs` | Gated debug loop: repro → minimize → fix → regression | Hard bugs / “why is this broken/slow?” |
 | `/skill-creator` | Author/improve skills and run evals | Packaging a workflow for reuse |

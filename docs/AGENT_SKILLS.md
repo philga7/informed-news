@@ -10,13 +10,14 @@ Copy this file into another project, run the install commands from that project�
 find-skills → grill-me → frontend-design / prototype / image-to-code
         → gate (tracker item)
         → subagent-driven-development
+        → news-ship-loop
         → agent-browser / diagnosing-bugs
         → skill-creator / mcp-builder
 ```
 
 1. **Shape first** — pressure-test and prototype until scope is sharp. Do not start product implementation from a vague idea.
 2. **Gate** — create/update a tracker item only when scope, UX direction, and open questions are resolved. (Informed News: **NEWS** on Atlassian.)
-3. **Build / verify / package** — implement, inspect, debug, then package reusable workflow or MCP if needed.
+3. **Build / ship** — implement via SDD, then `/news-ship-loop` for Jira status + PR/merge/Done.
 4. **Product invariants win** — skills do not override `AGENTS.md` / project rules.
 
 Mid-epic: do not re-grill finished work. New discoveries → additional tickets (or edits to open ones). See “Adopting mid-epic” in the integration plan notes below.
@@ -31,6 +32,7 @@ Mid-epic: do not re-grill finished work. New discoveries → additional tickets 
 | `prototype` | Shape | mattpocock/skills |
 | `image-to-code` | Shape | [leonxlnx/taste-skill](https://github.com/leonxlnx/taste-skill) |
 | `subagent-driven-development` | Build | [obra/superpowers](https://github.com/obra/superpowers) |
+| `news-ship-loop` | Ship | Informed News (repo-local) |
 | `agent-browser` | Verify | [vercel-labs/agent-browser](https://github.com/vercel-labs/agent-browser) |
 | `diagnosing-bugs` | Verify | mattpocock/skills |
 | `skill-creator` | Package | anthropics/skills |
@@ -102,3 +104,4 @@ In Cursor Agent chat: `/skill-name` (e.g. `/grill-me`) or `@` attach. Model-invo
 - Tracker: **NEWS** (`informedcrew.atlassian.net`). Prefer JQL `project = NEWS`.
 - Product path: `npm run dev` → Kite Brief + `mvp/server`. Prototypes stay off that default entrypoint.
 - Skills do not replace [AGENTS.md](../AGENTS.md) rules or `.cursor/rules/`.
+- Ship ritual: `/news-ship-loop` + `.cursor/rules/news-ship-loop.mdc`.
