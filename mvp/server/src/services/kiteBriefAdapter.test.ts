@@ -32,6 +32,9 @@ function article(
     bodyText: null,
     bodyStatus: 'ok',
     publisherTitle: null,
+    imageUrl: null,
+    imageCaption: null,
+    imageCredit: null,
     clusterId: null,
     fetchedAt: '2026-09-12T12:05:00.000Z',
     classification: null,
@@ -96,6 +99,64 @@ test('articlesToKiteStories groups by clusterId', () => {
   const clustered = stories.find((s) => s.id === 'evt-1')!;
   assert.equal(clustered.articles.length, 2);
   assert.equal(clustered.title, 'Cluster lead');
+});
+
+test('articlesToKiteStories maps primary_image and per-article image when present', () => {
+  const stories = articlesToKiteStories([
+    article({
+      id: 'img-new',
+      title: 'Newer member without image',
+      clusterId: 'img-cluster',
+      publishedAt: '2026-09-12T15:00:00.000Z',
+      imageUrl: null,
+    }),
+    article({
+      id: 'img-old',
+      title: 'Older member with image',
+      clusterId: 'img-cluster',
+      publishedAt: '2026-09-12T10:00:00.000Z',
+      imageUrl: 'https://img.example/one.jpg',
+      imageCaption: 'Caption text',
+      imageCredit: 'Credit text',
+      publisherUrl: 'https://example.com/img-old',
+      canonicalUrl: 'https://citizenfreepress.com/img-old',
+      publisherDomain: 'example.com',
+    }),
+  ]);
+
+  const story = stories.find((s) => s.id === 'img-cluster')!;
+  assert.deepEqual(story.primary_image, {
+    url: 'https://img.example/one.jpg',
+    caption: 'Caption text',
+    credit: 'Credit text',
+    link: 'https://example.com/img-old',
+  });
+
+  const old = story.articles.find((a) => a.link === 'https://example.com/img-old')!;
+  assert.equal(old.image, 'https://img.example/one.jpg');
+  const newer = story.articles.find((a) => a.link === 'https://example.com/img-new')!;
+  assert.equal(newer.image, undefined);
+});
+
+test('articlesToKiteStories omits primary_image when no members have imageUrl', () => {
+  const stories = articlesToKiteStories([
+    article({
+      id: 'noimg-1',
+      title: 'No image here',
+      clusterId: 'noimg-cluster',
+      imageUrl: null,
+    }),
+    article({
+      id: 'noimg-2',
+      title: 'Also no image',
+      clusterId: 'noimg-cluster',
+      imageUrl: null,
+    }),
+  ]);
+
+  const story = stories.find((s) => s.id === 'noimg-cluster')!;
+  assert.equal(story.primary_image, undefined);
+  assert.ok(story.articles.every((a) => a.image === undefined));
 });
 
 test('articlesToKiteStories maps enrichment onto stories when provided', () => {

@@ -34,6 +34,9 @@ function article(overrides: Partial<Article> = {}): Article {
     bodyText: null,
     bodyStatus: 'pending',
     publisherTitle: null,
+    imageUrl: null,
+    imageCaption: null,
+    imageCredit: null,
     clusterId: null,
     fetchedAt: '2026-08-16T12:05:00.000Z',
     classification: null,
@@ -214,6 +217,58 @@ test('blocked scrape overwrites prior ok body', () => {
   const merged = mergeArticleOnUpsert(existing, incoming, existing.id);
   assert.equal(merged.bodyStatus, 'blocked');
   assert.equal(merged.bodyText, null);
+});
+
+test('unchanged refetch preserves existing image when incoming has none', () => {
+  const existing = article({
+    imageUrl: 'https://images.example.com/hero.jpg',
+    imageCaption: 'Hero image',
+    imageCredit: 'example.com',
+  });
+  const incoming = article({
+    fetchedAt: '2026-08-16T13:00:00.000Z',
+    imageUrl: null,
+    imageCaption: null,
+    imageCredit: null,
+  });
+  const merged = mergeArticleOnUpsert(existing, incoming, existing.id);
+  assert.equal(merged.imageUrl, 'https://images.example.com/hero.jpg');
+  assert.equal(merged.imageCaption, 'Hero image');
+  assert.equal(merged.imageCredit, 'example.com');
+});
+
+test('incoming non-null imageUrl overwrites existing image fields', () => {
+  const existing = article({
+    imageUrl: 'https://images.example.com/old.jpg',
+    imageCaption: 'Old caption',
+    imageCredit: 'example.com',
+  });
+  const incoming = article({
+    imageUrl: 'https://cdn.example.com/new.jpg',
+    imageCaption: null,
+    imageCredit: 'publisher.example.com',
+  });
+  const merged = mergeArticleOnUpsert(existing, incoming, existing.id);
+  assert.equal(merged.imageUrl, 'https://cdn.example.com/new.jpg');
+  assert.equal(merged.imageCaption, null);
+  assert.equal(merged.imageCredit, 'publisher.example.com');
+});
+
+test('changed snippet does not preserve existing image when incoming has none', () => {
+  const existing = article({
+    snippet: 'Original snippet',
+    imageUrl: 'https://images.example.com/hero.jpg',
+  });
+  const incoming = article({
+    snippet: 'Updated snippet from RSS',
+    imageUrl: null,
+    imageCaption: null,
+    imageCredit: null,
+  });
+  const merged = mergeArticleOnUpsert(existing, incoming, existing.id);
+  assert.equal(merged.imageUrl, null);
+  assert.equal(merged.imageCaption, null);
+  assert.equal(merged.imageCredit, null);
 });
 
 test('body newly ok clears prior snippet-based classification', () => {

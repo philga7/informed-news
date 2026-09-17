@@ -43,6 +43,21 @@ function shouldKeepExistingBody(
   );
 }
 
+function shouldKeepExistingImage(
+  existing: Article,
+  incoming: ArticleUpsertInput,
+): boolean {
+  // Only preserve when the incoming fetch did not find an image.
+  if (incoming.imageUrl !== null) {
+    return false;
+  }
+  if (!existing.imageUrl) {
+    return false;
+  }
+  // If the item is otherwise unchanged, keep the existing image metadata.
+  return contentUnchanged(existing, incoming);
+}
+
 function hasUsableBody(status: BodyStatus, bodyText: string | null): boolean {
   return (
     (status === 'ok' || status === 'not_applicable') && Boolean(bodyText?.trim())
@@ -94,10 +109,20 @@ export function mergeArticleOnUpsert(
         }
       : base;
 
+  const withImage: Article =
+    existing && shouldKeepExistingImage(existing, incoming)
+      ? {
+          ...withBody,
+          imageUrl: existing.imageUrl,
+          imageCaption: existing.imageCaption,
+          imageCredit: existing.imageCredit,
+        }
+      : withBody;
+
   const withCluster: Article =
     existing && incoming.clusterId == null && existing.clusterId != null
-      ? { ...withBody, clusterId: existing.clusterId }
-      : withBody;
+      ? { ...withImage, clusterId: existing.clusterId }
+      : withImage;
 
   if (incomingWritesClassification(incoming) || !existing) {
     return withCluster;

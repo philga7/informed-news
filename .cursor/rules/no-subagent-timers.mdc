@@ -1,0 +1,20 @@
+---
+description: Never timer-poll or AwaitShell-wait on background Task/subagents; end the turn and resume on completion notifications.
+alwaysApply: true
+---
+
+# No subagent timers
+
+When you dispatch a background `Task` / subagent (`run_in_background: true` or equivalent):
+
+1. Do any immediate local bookkeeping (ledger, packaging a *already-finished* review).
+2. **End your turn.** Do not keep the conversation open waiting.
+3. Continue only when the **subagent completion notification** arrives (or the user pings you).
+
+**Forbidden for Task/subagent waits:**
+
+- `AwaitShell` / sleep / “wait N minutes” polling loops
+- Short-timeout poll loops against subagent transcripts
+- Sitting idle in-turn “until the child finishes”
+
+**Allowed:** close-monitoring waits for *shell* jobs that can hang (dev servers, long builds, migrations) — not for SDD implementers/reviewers or other background agents.

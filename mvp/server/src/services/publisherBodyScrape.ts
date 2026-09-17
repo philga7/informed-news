@@ -61,6 +61,9 @@ export type PublisherBodyResult = {
   bodyText: string | null;
   bodyStatus: Extract<BodyStatus, 'ok' | 'unavailable' | 'blocked'>;
   publisherTitle: string | null;
+  imageUrl: string | null;
+  imageCaption: string | null;
+  imageCredit: string | null;
 };
 
 function isRetryableNetworkError(err: unknown): boolean {
@@ -81,6 +84,53 @@ function hostnameOf(url: string): string | null {
   } catch {
     return null;
   }
+}
+
+function isHttpUrl(url: string): boolean {
+  try {
+    const u = new URL(url);
+    return u.protocol === 'http:' || u.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+function resolveImageUrl(raw: string, baseUrl?: string): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  if (isHttpUrl(trimmed)) return trimmed;
+  if (!baseUrl) return null;
+  try {
+    const u = new URL(trimmed, baseUrl);
+    return u.protocol === 'http:' || u.protocol === 'https:' ? u.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+function extractImageMeta(
+  $: cheerio.CheerioAPI,
+  baseUrl?: string,
+): Pick<PublisherBodyResult, 'imageUrl' | 'imageCaption' | 'imageCredit'> {
+  const rawUrl =
+    $('meta[property="og:image"]').attr('content') ||
+    $('meta[name="twitter:image"]').attr('content') ||
+    $('meta[name="twitter:image:src"]').attr('content') ||
+    '';
+
+  const imageUrl = rawUrl ? resolveImageUrl(rawUrl, baseUrl) : null;
+  if (!imageUrl) {
+    return { imageUrl: null, imageCaption: null, imageCredit: null };
+  }
+
+  const rawCaption =
+    $('meta[property="og:image:alt"]').attr('content') ||
+    $('meta[name="twitter:image:alt"]').attr('content') ||
+    null;
+  const imageCaption = rawCaption && rawCaption.trim() ? normalizeWhitespace(rawCaption) : null;
+
+  const imageCredit = baseUrl ? hostnameOf(baseUrl) : null;
+  return { imageUrl, imageCaption, imageCredit };
 }
 
 /** Do not scrape X / Twitter pages (xcancel items already carry tweet text). */
@@ -150,24 +200,28 @@ function extractMainText($: cheerio.CheerioAPI): string {
 /**
  * Pure HTML → body fields (no network). Used by scrape + unit tests.
  */
-export function extractPublisherBodyFromHtml(html: string): PublisherBodyResult {
+export function extractPublisherBodyFromHtml(
+  html: string,
+  baseUrl?: string,
+): PublisherBodyResult {
   const $ = cheerio.load(html);
   const publisherTitle = extractTitle($);
+  const image = extractImageMeta($, baseUrl);
   const rawText = extractMainText($);
   const bodyText = rawText ? truncateBodyText(rawText) : null;
 
   if (looksPaywalled(html, rawText) && (!bodyText || bodyText.length < MIN_BODY_CHARS * 2)) {
-    return { bodyText: null, bodyStatus: 'blocked', publisherTitle };
+    return { bodyText: null, bodyStatus: 'blocked', publisherTitle, ...image };
   }
 
   if (!bodyText || bodyText.length < MIN_BODY_CHARS) {
     if (looksPaywalled(html, rawText)) {
-      return { bodyText: null, bodyStatus: 'blocked', publisherTitle };
+      return { bodyText: null, bodyStatus: 'blocked', publisherTitle, ...image };
     }
-    return { bodyText: null, bodyStatus: 'unavailable', publisherTitle };
+    return { bodyText: null, bodyStatus: 'unavailable', publisherTitle, ...image };
   }
 
-  return { bodyText, bodyStatus: 'ok', publisherTitle };
+  return { bodyText, bodyStatus: 'ok', publisherTitle, ...image };
 }
 
 async function fetchHtml(url: string, retryCount: number): Promise<Response> {
@@ -200,32 +254,80 @@ export async function scrapePublisherBody(
   publisherUrl: string | null | undefined,
 ): Promise<PublisherBodyResult> {
   if (!publisherUrl) {
-    return { bodyText: null, bodyStatus: 'unavailable', publisherTitle: null };
+    return {
+      bodyText: null,
+      bodyStatus: 'unavailable',
+      publisherTitle: null,
+      imageUrl: null,
+      imageCaption: null,
+      imageCredit: null,
+    };
   }
 
   if (isBlockedPublisherHost(publisherUrl)) {
-    return { bodyText: null, bodyStatus: 'unavailable', publisherTitle: null };
+    return {
+      bodyText: null,
+      bodyStatus: 'unavailable',
+      publisherTitle: null,
+      imageUrl: null,
+      imageCaption: null,
+      imageCredit: null,
+    };
   }
 
   try {
     const response = await fetchHtml(publisherUrl, 0);
 
     if (BLOCKED_HTTP.has(response.status)) {
-      return { bodyText: null, bodyStatus: 'blocked', publisherTitle: null };
+      try {
+        const html = await response.text();
+        const extracted = extractPublisherBodyFromHtml(html, publisherUrl);
+        return {
+          bodyText: null,
+          bodyStatus: 'blocked',
+          publisherTitle: extracted.publisherTitle,
+          imageUrl: extracted.imageUrl,
+          imageCaption: extracted.imageCaption,
+          imageCredit: extracted.imageCredit,
+        };
+      } catch {
+        return {
+          bodyText: null,
+          bodyStatus: 'blocked',
+          publisherTitle: null,
+          imageUrl: null,
+          imageCaption: null,
+          imageCredit: null,
+        };
+      }
     }
 
     if (!response.ok) {
       console.warn(`Publisher body HTTP ${response.status} for ${publisherUrl}`);
-      return { bodyText: null, bodyStatus: 'unavailable', publisherTitle: null };
+      return {
+        bodyText: null,
+        bodyStatus: 'unavailable',
+        publisherTitle: null,
+        imageUrl: null,
+        imageCaption: null,
+        imageCredit: null,
+      };
     }
 
     const html = await response.text();
-    return extractPublisherBodyFromHtml(html);
+    return extractPublisherBodyFromHtml(html, publisherUrl);
   } catch (err) {
     console.warn(
       `Publisher body scrape failed for ${publisherUrl}:`,
       err instanceof Error ? err.message : err,
     );
-    return { bodyText: null, bodyStatus: 'unavailable', publisherTitle: null };
+    return {
+      bodyText: null,
+      bodyStatus: 'unavailable',
+      publisherTitle: null,
+      imageUrl: null,
+      imageCaption: null,
+      imageCredit: null,
+    };
   }
 }

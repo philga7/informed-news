@@ -232,16 +232,16 @@ Everything you paste into a dispatch prompt — and everything a subagent
 prints back — stays resident in your context for the rest of the session
 and is re-read on every later turn. Hand artifacts over as files.
 
-**Waiting on dispatched subagents:** never poll a wait interface with
-short timeouts, and never sit in one silent, open-ended wait either.
-While you have local work — ledger updates, packaging the next review,
-reading reports — keep working; child results arrive on their own.
-When you are genuinely idle, wait in bounded stretches (five to ten
-minutes, where your platform allows), and between stretches post one
-line of status and reconcile your live children: list them, and chase
-any that finished without reporting. A bounded stretch keeps nearly
-all of a long wait's efficiency while guaranteeing a stuck or lost
-child is noticed within minutes, not at the end of the session.
+**Waiting on dispatched subagents:** after you dispatch a background
+`Task` / subagent, finish any local bookkeeping you can do *now*
+(ledger lines, review-package prep for a *prior* completed child), then
+**end your turn**. Do **not** `AwaitShell`, sleep-poll, or sit in a
+timed wait for Task subagents. The harness delivers a **completion
+notification**; that is when you continue the SDD loop. Never invent a
+timer “so you don’t lose the thread” — that parks the human for minutes
+while nothing useful happens. Shell jobs that need close monitoring
+(dev servers, long builds) are a separate case; they are not the SDD
+Task wait path.
 
 ### 1. Dispatch the implementer
 
@@ -499,6 +499,7 @@ Use superpowers:finishing-a-development-branch.
 | "Reviews slow the loop down" | The loop without reviews is just unverified churn. Reviews are the loop's brakes and steering. |
 | "Ledger bookkeeping is overhead" | The ledger is what survives compaction. Controllers without one have re-dispatched entire completed task sequences. |
 | "The implementer spawned its own reviewer — free extra assurance" | It's a duplicate seat reviewing the same diff; the task review is the gate. A worker-spawned reviewer is a defect to flag, not rigor. |
+| "I'll AwaitShell / sleep so I don't lose the thread" | Ending the turn is correct. The subagent completion notification resumes you; timed waits only stall the human. |
 
 ## Example Workflow
 

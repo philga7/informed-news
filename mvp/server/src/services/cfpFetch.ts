@@ -72,6 +72,9 @@ export async function fetchCfpArticles(
         bodyText: body.bodyText,
         bodyStatus: body.bodyStatus,
         publisherTitle: body.publisherTitle,
+        imageUrl: body.imageUrl,
+        imageCaption: body.imageCaption,
+        imageCredit: body.imageCredit,
         clusterId: null,
         fetchedAt,
         // Store upsert keeps existing analysis when title/snippet/canonical URL match.
