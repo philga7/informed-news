@@ -94,9 +94,9 @@ Root [`vercel.json`](vercel.json) still deploys the **archived** `_legacy/mvp-we
 
 ## Roadmap (NEWS)
 
-Epic A ([NEWS-33](https://informedcrew.atlassian.net/browse/NEWS-33)): Kite presentation — closing with archive of the React feed ([NEWS-46](https://informedcrew.atlassian.net/browse/NEWS-46)); then Epic H rich brief.
+Agent-facing order of work: **[docs/ROADMAP.md](docs/ROADMAP.md)** (current next: [NEWS-53](https://informedcrew.atlassian.net/browse/NEWS-53) / [NEWS-54](https://informedcrew.atlassian.net/browse/NEWS-54)).
 
-Plan: [`.cursor/plans/osint_jira_pivot_d6b40f87.plan.md`](.cursor/plans/osint_jira_pivot_d6b40f87.plan.md)
+Done so far: Epic A ([NEWS-33](https://informedcrew.atlassian.net/browse/NEWS-33)), Epic H ([NEWS-48](https://informedcrew.atlassian.net/browse/NEWS-48)). Historical pivot plan: [`.cursor/plans/osint_jira_pivot_d6b40f87.plan.md`](.cursor/plans/osint_jira_pivot_d6b40f87.plan.md).
 
 ## Legacy code
 

@@ -102,7 +102,9 @@ Do **not** treat `_legacy/` (including `_legacy/mvp-web`) as the primary product
 
 ## Jira
 
-Informed News work uses the **NEWS** project on Atlassian (`informedcrew.atlassian.net`). Prefer JQL `project = NEWS`. Epic A: NEWS-33.
+Informed News work uses the **NEWS** project on Atlassian (`informedcrew.atlassian.net`). Prefer JQL `project = NEWS`.
+
+**Item ordering:** [docs/ROADMAP.md](docs/ROADMAP.md) — current next is Epic **NEWS-53** (start **NEWS-54**). Do not pick parked B–G epics unless the user reorders.
 
 ## Agent skill loop
 

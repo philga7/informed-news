@@ -1,0 +1,12 @@
+---
+description: Prefer docs/ROADMAP.md for NEWS item ordering; do not invent next from open To Do alone.
+alwaysApply: true
+---
+
+# NEWS roadmap pointer
+
+Before choosing “what to build next” in the NEWS project, read [docs/ROADMAP.md](docs/ROADMAP.md).
+
+- **Current next** is documented there (as of writing: NEWS-53 / NEWS-54).
+- Parked epics B–G stay parked unless the user explicitly reorders.
+- If Jira status disagrees with the doc, Jira wins — update `docs/ROADMAP.md` in the same change set.

@@ -55,6 +55,7 @@ gate ticket ready
 
 ### 1. Start work on a NEWS story
 
+0. If the user did not name a key, pick from [docs/ROADMAP.md](../../docs/ROADMAP.md) (not from open To Do alone).
 1. Fetch the issue (`searchJiraIssuesUsingJql` / `getJiraIssue`) — confirm summary, acceptance, parent epic.
 2. Transition to **In Progress** (`transitionJiraIssue` with transition id `21`, or looked-up equivalent).
 3. Sync `main`, create `feat/news-<N>-…` (never implement on `main` without explicit consent).
