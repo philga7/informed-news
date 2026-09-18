@@ -12,6 +12,12 @@ Informed News product surfaces vs reserved future layers. **Do not ship empty Fi
 | `/contribute` | Feed contribution | Upstream-oriented contribute wizard. |
 | `/world/latest` (and other category routes) | Brief category views | Feed categories — not product “layer” tabs. |
 
+## Planned (Developing desk — NEWS-57)
+
+| Path | Surface | Notes |
+|------|---------|--------|
+| `/radar` | **Radar** (headline lane) | Session-required. CFP + curated RSS v1; track/mute live here. Not a Finance/Situation-style product tab. Epic: [NEWS-57](https://informedcrew.atlassian.net/browse/NEWS-57). |
+
 ## Reserved (docs only — no empty chrome)
 
 | Path | Epic when data exists | Guardrail |
@@ -30,4 +36,5 @@ Informed News product surfaces vs reserved future layers. **Do not ship empty Fi
 ## Related
 
 - Owned brief API: [OWNED_BRIEF.md](OWNED_BRIEF.md)
-- Epic H (rich story sections): [NEWS-48](https://informedcrew.atlassian.net/browse/NEWS-48) — after Epic A
+- Epic H (rich story sections): [NEWS-48](https://informedcrew.atlassian.net/browse/NEWS-48) — Done
+- Epic I (Developing desk): [NEWS-57](https://informedcrew.atlassian.net/browse/NEWS-57) — `/radar`
