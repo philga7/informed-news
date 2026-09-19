@@ -6,7 +6,7 @@ Informed News product surfaces vs reserved future layers. **Do not ship empty Fi
 
 | Path | Surface | Notes |
 |------|---------|--------|
-| `/` | **Brief** (home / analysis feed) | Default `npm run dev` entry. Owned brief via `mvp/server`. After Developing desk (NEWS-65): **Accepted** clusters only (not the full article store). |
+| `/` | **Brief** (home / analysis feed) | Default `npm run dev` entry. Owned brief via `mvp/server`. After Developing desk (NEWS-65/66): **Accepted** clusters only (incl. manual seeds); not the full article store. |
 | `/about` | Product intro overlay | IntroScreen via Brief shell (not funding/methodology). |
 | `/transparency` | **Transparency** | Public funding, methodology, corrections, and team ([NEWS-32](https://informedcrew.atlassian.net/browse/NEWS-32)). Footer link. No login. |
 | `/contribute` | Feed contribution | Upstream-oriented contribute wizard. |

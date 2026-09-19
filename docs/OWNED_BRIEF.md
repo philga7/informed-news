@@ -25,9 +25,9 @@ Batch id is always `owned-latest`. Category slug `world` / UUID `00000000-0000-4
 - If the store is **empty**, the adapter returns a single **fixture** story so Brief still loads.
 - Adapter: `mvp/server/src/services/kiteBriefAdapter.ts` (groups by `clusterId`, maps framing summary → `short_summary`).
 
-### Membership (Developing desk — NEWS-57 / NEWS-65)
+### Membership (Developing desk — NEWS-57 / NEWS-65 / NEWS-66)
 
-Until Accept ships, Brief may still reflect the full store (current adapter behavior). **Target:** Brief shows **Accepted** clusters only, minus **global mute**; new articles that join an accepted `clusterId` appear without re-Accept. Radar (`/radar`) is the triage lane for fresh CFP + curated RSS. See [ROADMAP.md](ROADMAP.md).
+Until Accept ships, Brief may still reflect the full store (current adapter behavior). **Target:** Brief shows **Accepted** clusters only, minus **global mute**; new articles that join an accepted `clusterId` appear without re-Accept. Operators can also **manually seed** a Brief story (title / note / optional URLs; `sourceKind: manual`) — Accepted by definition, not shown on Radar; Unaccept drops from Brief. Radar (`/radar`) is the triage lane for fresh CFP + curated RSS. See [ROADMAP.md](ROADMAP.md).
 
 ## Regenerate from ingest
 

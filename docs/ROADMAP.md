@@ -15,22 +15,24 @@ Historical plan (A–G + H story seeds): [`.cursor/plans/osint_jira_pivot_d6b40f
 | 1b | [NEWS-55](https://informedcrew.atlassian.net/browse/NEWS-55) | Ingest curated RSS into article store |
 | 1c | [NEWS-58](https://informedcrew.atlassian.net/browse/NEWS-58) | Radar UI at `/radar` |
 | 1d | [NEWS-65](https://informedcrew.atlassian.net/browse/NEWS-65) | Accept cluster onto Brief (membership + association) |
-| 1e | [NEWS-59](https://informedcrew.atlassian.net/browse/NEWS-59) | Track developing story (alerts) |
-| 1f | [NEWS-60](https://informedcrew.atlassian.net/browse/NEWS-60) | Mute undesired topics (global) |
-| 1g | [NEWS-61](https://informedcrew.atlassian.net/browse/NEWS-61) | In-app alert badge on tracked updates |
+| 1e | [NEWS-66](https://informedcrew.atlassian.net/browse/NEWS-66) | Manual Brief seed (title / note / optional URLs) |
+| 1f | [NEWS-59](https://informedcrew.atlassian.net/browse/NEWS-59) | Track developing story (alerts) |
+| 1g | [NEWS-60](https://informedcrew.atlassian.net/browse/NEWS-60) | Mute undesired topics (global) |
+| 1h | [NEWS-61](https://informedcrew.atlassian.net/browse/NEWS-61) | In-app alert badge on tracked updates |
 
 Start at **NEWS-54** unless the user names another key. Do not open Epics **B–G** until desk v1 is Done (or the user explicitly reorders).
 
-### Membership (locked 2026-09-18)
+### Membership (locked 2026-09-18; manual seeds 2026-09-19)
 
 | Surface | What appears |
 |--------|----------------|
-| **Radar** | Auto triage: fresh CFP + curated RSS clusters (headline lane) |
-| **Brief** | **Accepted** clusters only, minus **global mute**; new articles that share an accepted `clusterId` join Brief automatically |
+| **Radar** | Auto triage: fresh CFP + curated RSS clusters (headline lane). No manual seeds in v1. |
+| **Brief** | **Accepted** clusters only, minus **global mute**; new articles that share an accepted `clusterId` join Brief automatically. **Manual seeds** ([NEWS-66](https://informedcrew.atlassian.net/browse/NEWS-66)): title / note / optional URL(s), `sourceKind: manual`, Accepted by definition (not on Radar). |
 
 - **Accept** = Brief membership (from Radar). One verb — not a separate “Promote.”
+- **Manual seed** = Accept without ingest parent; **Unaccept** drops from Brief (hard-delete not required in v1).
 - **Mute** = global veto (Radar hide + Brief ineligible).
-- **Track** = alerts only; may default on at Accept.
+- **Track** = alerts only; may default on at Accept / manual seed.
 - No auto live/breaking classifier in v1. Brief is the home / analysis feed (not framed by time of day).
 
 **Radar v1 sources:** CFP + curated RSS only. Birdclaw/X ([NEWS-62](https://informedcrew.atlassian.net/browse/NEWS-62)), Telegram ([NEWS-63](https://informedcrew.atlassian.net/browse/NEWS-63)), claims/disagreements ([NEWS-64](https://informedcrew.atlassian.net/browse/NEWS-64)), and Brief categories ([NEWS-56](https://informedcrew.atlassian.net/browse/NEWS-56)) are **Later** — not the Done-demo.
