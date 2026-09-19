@@ -6,7 +6,7 @@ Informed News product surfaces vs reserved future layers. **Do not ship empty Fi
 
 | Path | Surface | Notes |
 |------|---------|--------|
-| `/` | **Brief** (home) | Default `npm run dev` entry. Owned brief via `mvp/server`. |
+| `/` | **Brief** (home / analysis feed) | Default `npm run dev` entry. Owned brief via `mvp/server`. After Developing desk (NEWS-65): **Accepted** clusters only (not the full article store). |
 | `/about` | Product intro overlay | IntroScreen via Brief shell (not funding/methodology). |
 | `/transparency` | **Transparency** | Public funding, methodology, corrections, and team ([NEWS-32](https://informedcrew.atlassian.net/browse/NEWS-32)). Footer link. No login. |
 | `/contribute` | Feed contribution | Upstream-oriented contribute wizard. |
@@ -16,7 +16,7 @@ Informed News product surfaces vs reserved future layers. **Do not ship empty Fi
 
 | Path | Surface | Notes |
 |------|---------|--------|
-| `/radar` | **Radar** (headline lane) | Session-required. CFP + curated RSS v1; track/mute live here. Not a Finance/Situation-style product tab. Epic: [NEWS-57](https://informedcrew.atlassian.net/browse/NEWS-57). |
+| `/radar` | **Radar** (triage / headline lane) | Session-required. CFP + curated RSS v1. Accept → Brief; Track = alerts; Mute = global. Not a Finance/Situation-style product tab. Epic: [NEWS-57](https://informedcrew.atlassian.net/browse/NEWS-57). |
 
 ## Reserved (docs only — no empty chrome)
 

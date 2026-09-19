@@ -10,15 +10,28 @@ Historical plan (A–G + H story seeds): [`.cursor/plans/osint_jira_pivot_d6b40f
 
 | Order | Key | Summary |
 |-------|-----|---------|
-| **1** | [NEWS-57](https://informedcrew.atlassian.net/browse/NEWS-57) | **I. Developing desk** (radar → track/mute) |
+| **1** | [NEWS-57](https://informedcrew.atlassian.net/browse/NEWS-57) | **I. Developing desk** (radar → accept → track/mute) |
 | 1a | [NEWS-54](https://informedcrew.atlassian.net/browse/NEWS-54) | Lock CFP + curated RSS radar sources (3–5) + config |
 | 1b | [NEWS-55](https://informedcrew.atlassian.net/browse/NEWS-55) | Ingest curated RSS into article store |
 | 1c | [NEWS-58](https://informedcrew.atlassian.net/browse/NEWS-58) | Radar UI at `/radar` |
-| 1d | [NEWS-59](https://informedcrew.atlassian.net/browse/NEWS-59) | Track developing story |
-| 1e | [NEWS-60](https://informedcrew.atlassian.net/browse/NEWS-60) | Mute negative topics on radar |
-| 1f | [NEWS-61](https://informedcrew.atlassian.net/browse/NEWS-61) | In-app alert badge on tracked updates |
+| 1d | [NEWS-65](https://informedcrew.atlassian.net/browse/NEWS-65) | Accept cluster onto Brief (membership + association) |
+| 1e | [NEWS-59](https://informedcrew.atlassian.net/browse/NEWS-59) | Track developing story (alerts) |
+| 1f | [NEWS-60](https://informedcrew.atlassian.net/browse/NEWS-60) | Mute undesired topics (global) |
+| 1g | [NEWS-61](https://informedcrew.atlassian.net/browse/NEWS-61) | In-app alert badge on tracked updates |
 
 Start at **NEWS-54** unless the user names another key. Do not open Epics **B–G** until desk v1 is Done (or the user explicitly reorders).
+
+### Membership (locked 2026-09-18)
+
+| Surface | What appears |
+|--------|----------------|
+| **Radar** | Auto triage: fresh CFP + curated RSS clusters (headline lane) |
+| **Brief** | **Accepted** clusters only, minus **global mute**; new articles that share an accepted `clusterId` join Brief automatically |
+
+- **Accept** = Brief membership (from Radar). One verb — not a separate “Promote.”
+- **Mute** = global veto (Radar hide + Brief ineligible).
+- **Track** = alerts only; may default on at Accept.
+- No auto live/breaking classifier in v1. Brief is the home / analysis feed (not framed by time of day).
 
 **Radar v1 sources:** CFP + curated RSS only. Birdclaw/X ([NEWS-62](https://informedcrew.atlassian.net/browse/NEWS-62)), Telegram ([NEWS-63](https://informedcrew.atlassian.net/browse/NEWS-63)), claims/disagreements ([NEWS-64](https://informedcrew.atlassian.net/browse/NEWS-64)), and Brief categories ([NEWS-56](https://informedcrew.atlassian.net/browse/NEWS-56)) are **Later** — not the Done-demo.
 
@@ -31,7 +44,7 @@ Former [NEWS-53](https://informedcrew.atlassian.net/browse/NEWS-53) (Brief sourc
 | Done | A. Kite presentation | [NEWS-33](https://informedcrew.atlassian.net/browse/NEWS-33) | Shell + owned brief path |
 | Done | H. Owned rich brief clusters | [NEWS-48](https://informedcrew.atlassian.net/browse/NEWS-48) | Expand sections (sources → enrich → images) |
 | Superseded | Brief source breadth | [NEWS-53](https://informedcrew.atlassian.net/browse/NEWS-53) | Absorbed into NEWS-57 |
-| **Active** | I. Developing desk | [NEWS-57](https://informedcrew.atlassian.net/browse/NEWS-57) | Radar → track/mute; before B |
+| **Active** | I. Developing desk | [NEWS-57](https://informedcrew.atlassian.net/browse/NEWS-57) | Radar → Accept → track/mute; before B |
 | Parked | B. Crucix raw layer | [NEWS-34](https://informedcrew.atlassian.net/browse/NEWS-34) | build-order-2 |
 | Parked | C. Geospatial raw layer | [NEWS-35](https://informedcrew.atlassian.net/browse/NEWS-35) | build-order-3 |
 | Parked | D. QA harness skeleton | [NEWS-36](https://informedcrew.atlassian.net/browse/NEWS-36) | build-order-4; later: [NEWS-31](https://informedcrew.atlassian.net/browse/NEWS-31) archives |

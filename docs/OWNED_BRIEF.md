@@ -20,10 +20,14 @@ Batch id is always `owned-latest`. Category slug `world` / UUID `00000000-0000-4
 
 ## Source data
 
-- Prefer articles in `mvp/data/articles.json` (CFP / xcancel + framing).
+- Prefer articles in `mvp/data/articles.json` (CFP / xcancel + framing; curated RSS via Developing desk).
 - Cluster-level enrichments are stored separately in `mvp/data/cluster-enrichments.json` (generated via `POST /api/enrich`).
 - If the store is **empty**, the adapter returns a single **fixture** story so Brief still loads.
 - Adapter: `mvp/server/src/services/kiteBriefAdapter.ts` (groups by `clusterId`, maps framing summary → `short_summary`).
+
+### Membership (Developing desk — NEWS-57 / NEWS-65)
+
+Until Accept ships, Brief may still reflect the full store (current adapter behavior). **Target:** Brief shows **Accepted** clusters only, minus **global mute**; new articles that join an accepted `clusterId` appear without re-Accept. Radar (`/radar`) is the triage lane for fresh CFP + curated RSS. See [ROADMAP.md](ROADMAP.md).
 
 ## Regenerate from ingest
 
