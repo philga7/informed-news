@@ -43,7 +43,7 @@ Notes:
 
 ## Config shape (NEWS-54)
 
-Committed JSON (path TBD in implementation; near existing MVP source patterns), e.g.:
+Committed JSON at `mvp/server/config/radar-sources.json`. Loaded by `mvp/server/src/services/loadRadarSources.ts` (empty/missing file → no curated sources). Example entry:
 
 ```json
 {
