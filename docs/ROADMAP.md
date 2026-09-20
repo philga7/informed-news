@@ -11,7 +11,7 @@ Historical plan (A–G + H story seeds): [`.cursor/plans/osint_jira_pivot_d6b40f
 | Order | Key | Summary |
 |-------|-----|---------|
 | **1** | [NEWS-57](https://informedcrew.atlassian.net/browse/NEWS-57) | **I. Developing desk** (radar → accept → track/mute) |
-| 1a | [NEWS-54](https://informedcrew.atlassian.net/browse/NEWS-54) | Lock CFP + curated RSS radar sources (3–5) + config |
+| 1a | [NEWS-54](https://informedcrew.atlassian.net/browse/NEWS-54) | Lock CFP + curated RSS radar sources (starter set) + config |
 | 1b | [NEWS-55](https://informedcrew.atlassian.net/browse/NEWS-55) | Ingest curated RSS into article store |
 | 1c | [NEWS-58](https://informedcrew.atlassian.net/browse/NEWS-58) | Radar UI at `/radar` |
 | 1d | [NEWS-65](https://informedcrew.atlassian.net/browse/NEWS-65) | Accept cluster onto Brief (membership + association) |
@@ -35,7 +35,7 @@ Start at **NEWS-54** unless the user names another key. Do not open Epics **B–
 - **Track** = alerts only; may default on at Accept / manual seed.
 - No auto live/breaking classifier in v1. Brief is the home / analysis feed (not framed by time of day).
 
-**Radar v1 sources:** CFP + curated RSS only. Birdclaw/X ([NEWS-62](https://informedcrew.atlassian.net/browse/NEWS-62)), Telegram ([NEWS-63](https://informedcrew.atlassian.net/browse/NEWS-63)), claims/disagreements ([NEWS-64](https://informedcrew.atlassian.net/browse/NEWS-64)), and Brief categories ([NEWS-56](https://informedcrew.atlassian.net/browse/NEWS-56)) are **Later** — not the Done-demo.
+**Radar v1 sources:** CFP + curated RSS starter set ([docs/RADAR_SOURCES.md](RADAR_SOURCES.md)) — 14 curated feeds + CFP. File config only until [NEWS-67](https://informedcrew.atlassian.net/browse/NEWS-67) (source admin CRUD). Birdclaw/X ([NEWS-62](https://informedcrew.atlassian.net/browse/NEWS-62)), Telegram ([NEWS-63](https://informedcrew.atlassian.net/browse/NEWS-63)), claims/disagreements ([NEWS-64](https://informedcrew.atlassian.net/browse/NEWS-64)), and Brief categories ([NEWS-56](https://informedcrew.atlassian.net/browse/NEWS-56)) are **Later** — not the Done-demo.
 
 Former [NEWS-53](https://informedcrew.atlassian.net/browse/NEWS-53) (Brief source breadth) was **absorbed** into NEWS-57.
 
