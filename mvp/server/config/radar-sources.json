@@ -1,0 +1,116 @@
+{
+  "sources": [
+    {
+      "id": "georgia-recorder",
+      "name": "Georgia Recorder",
+      "domain": "georgiarecorder.com",
+      "feedUrl": "https://georgiarecorder.com/feed/localFeed/",
+      "region": "georgia",
+      "enabled": true
+    },
+    {
+      "id": "capitol-beat",
+      "name": "Capitol Beat",
+      "domain": "capitol-beat.org",
+      "feedUrl": "https://capitol-beat.org/feed/",
+      "region": "georgia",
+      "enabled": true
+    },
+    {
+      "id": "11alive-local",
+      "name": "11Alive local",
+      "domain": "11alive.com",
+      "feedUrl": "https://www.11alive.com/feeds/syndication/rss/news/local",
+      "region": "georgia",
+      "enabled": true
+    },
+    {
+      "id": "newsnation",
+      "name": "NewsNation",
+      "domain": "newsnationnow.com",
+      "feedUrl": "https://www.newsnationnow.com/feed/",
+      "region": "national",
+      "enabled": true
+    },
+    {
+      "id": "scotusblog",
+      "name": "SCOTUSblog",
+      "domain": "scotusblog.com",
+      "feedUrl": "https://www.scotusblog.com/feed/",
+      "region": "national",
+      "enabled": true
+    },
+    {
+      "id": "times-of-israel",
+      "name": "Times of Israel",
+      "domain": "timesofisrael.com",
+      "feedUrl": "https://www.timesofisrael.com/feed/",
+      "region": "national",
+      "enabled": true
+    },
+    {
+      "id": "al-monitor",
+      "name": "Al-Monitor",
+      "domain": "al-monitor.com",
+      "feedUrl": "https://www.al-monitor.com/rss",
+      "region": "national",
+      "enabled": true
+    },
+    {
+      "id": "goldseek",
+      "name": "GoldSeek",
+      "domain": "goldseek.com",
+      "feedUrl": "https://goldseek.com/rss.xml",
+      "region": "national",
+      "enabled": true
+    },
+    {
+      "id": "macrumors",
+      "name": "MacRumors",
+      "domain": "macrumors.com",
+      "feedUrl": "https://feeds.macrumors.com/MacRumors-All",
+      "region": "national",
+      "enabled": true
+    },
+    {
+      "id": "fox-latest",
+      "name": "Fox News latest",
+      "domain": "foxnews.com",
+      "feedUrl": "https://moxie.foxnews.com/google-publisher/latest.xml",
+      "region": "national",
+      "enabled": true
+    },
+    {
+      "id": "abc-topstories",
+      "name": "ABC top stories",
+      "domain": "abcnews.com",
+      "feedUrl": "https://abcnews.com/abcnews/topstories",
+      "region": "national",
+      "enabled": true
+    },
+    {
+      "id": "cbs-main",
+      "name": "CBS main",
+      "domain": "cbsnews.com",
+      "feedUrl": "https://www.cbsnews.com/latest/rss/main",
+      "region": "national",
+      "enabled": true
+    },
+    {
+      "id": "nbc-news",
+      "name": "NBC News",
+      "domain": "nbcnews.com",
+      "feedUrl": "https://feeds.nbcnews.com/nbcnews/public/news",
+      "region": "national",
+      "enabled": true
+    },
+    {
+      "id": "newsmax-newsfront",
+      "name": "Newsmax Newsfront",
+      "domain": "newsmax.com",
+      "feedUrl": "https://www.newsmax.com/rss/Newsfront/16",
+      "region": "national",
+      "enabled": true
+    }
+  ]
+}
