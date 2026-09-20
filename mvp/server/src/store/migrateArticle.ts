@@ -8,7 +8,7 @@ import type {
 import { truncateBodyText } from '../types/article.js';
 import { articleIdFromCanonicalUrl } from './articleId.js';
 
-const SOURCE_KINDS = new Set<SourceKind>(['cfp', 'xcancel']);
+const SOURCE_KINDS = new Set<SourceKind>(['cfp', 'xcancel', 'rss']);
 const BODY_STATUSES = new Set<BodyStatus>([
   'ok',
   'unavailable',
@@ -71,6 +71,14 @@ export function citationsFromXcancel(
     { label: 'xcancel', url: xcancelUrl },
     { label: 'X', url: xPermalink },
   ];
+}
+
+/** Single citation for a curated RSS item: feed source name + article URL. */
+export function citationsFromRss(
+  sourceName: string,
+  articleUrl: string,
+): ArticleCitation[] {
+  return [{ label: sourceName, url: articleUrl }];
 }
 
 function parseClassification(value: unknown): FramingAnalysis | null {

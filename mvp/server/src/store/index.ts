@@ -1,6 +1,7 @@
 export { articleIdFromCanonicalUrl } from './articleId.js';
 export {
   citationsFromCfp,
+  citationsFromRss,
   citationsFromXcancel,
   migrateArticle,
 } from './migrateArticle.js';

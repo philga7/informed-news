@@ -22,8 +22,8 @@ export type ClassifyBatchResult = {
   attempted: number;
   succeeded: number;
   failed: number;
-  /** How many attempted items came from each source (both kinds are eligible). */
-  bySourceKind: { cfp: number; xcancel: number };
+  /** How many attempted items came from each source (all kinds are eligible). */
+  bySourceKind: { cfp: number; xcancel: number; rss: number };
   articles: Article[];
 };
 
@@ -84,7 +84,7 @@ export async function classifyUnclassifiedArticles(
 
   let succeeded = 0;
   let failed = 0;
-  const bySourceKind = { cfp: 0, xcancel: 0 };
+  const bySourceKind = { cfp: 0, xcancel: 0, rss: 0 };
   const updated: Article[] = [];
 
   for (const article of candidates) {

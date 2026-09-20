@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
-    "test": "node --import tsx --test src/store/mergeArticleOnUpsert.test.ts src/services/publisherBodyScrape.test.ts src/services/clusterArticles.test.ts src/services/kiteBriefAdapter.test.ts src/services/ollamaEnrichment.test.ts src/services/enrichClusters.test.ts src/services/loadRadarSources.test.ts",
+    "test": "node --import tsx --test src/store/migrateArticle.test.ts src/store/mergeArticleOnUpsert.test.ts src/services/publisherBodyScrape.test.ts src/services/clusterArticles.test.ts src/services/kiteBriefAdapter.test.ts src/services/ollamaEnrichment.test.ts src/services/enrichClusters.test.ts src/services/loadRadarSources.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
