@@ -72,12 +72,13 @@ function parseConfig(raw: unknown): RadarSource[] {
   const parsed: RadarSource[] = [];
   for (const entry of sources) {
     const source = parseSource(entry);
-    if (source && sourceIsEnabled(source)) {
-      parsed.push(source);
+    if (!source) {
+      return [];
     }
+    parsed.push(source);
   }
 
-  return parsed;
+  return parsed.filter(sourceIsEnabled);
 }
 
 /**
