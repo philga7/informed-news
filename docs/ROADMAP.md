@@ -20,7 +20,7 @@ Historical plan (A–G + H story seeds): [`.cursor/plans/osint_jira_pivot_d6b40f
 | 1g | [NEWS-60](https://informedcrew.atlassian.net/browse/NEWS-60) | Mute undesired topics (global) |
 | 1h | [NEWS-61](https://informedcrew.atlassian.net/browse/NEWS-61) | In-app alert badge on tracked updates |
 
-Start at **NEWS-54** unless the user names another key. Do not open Epics **B–G** until desk v1 is Done (or the user explicitly reorders).
+Start at **NEWS-58** unless the user names another key (NEWS-54/55 Done). Do not open Epics **B–G** until desk v1 is Done (or the user explicitly reorders).
 
 ### Membership (locked 2026-09-18; manual seeds 2026-09-19)
 
