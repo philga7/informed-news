@@ -1,6 +1,6 @@
 # MVP E2E smoke checklist
 
-Verify the greenfield path: **login → Refresh → classify → dual citations + depth honesty + framing + clusters / selection signal** (CFP always; xcancel when configured).
+Verify the greenfield path: **login → Refresh → classify → dual citations + depth honesty + framing + clusters / selection signal** (CFP always; curated RSS when `radar-sources.json` is present; xcancel when configured).
 
 ## Prerequisites
 
@@ -41,6 +41,18 @@ Use curl + session cookie (see Optional API-only checks below). Interactive Reac
 | 10. Verify this | Inspect classified item | `openQuestions` / selection-risk notes when present |
 | 11. Re-fetch | `POST /api/fetch` again | Unchanged items keep framing; newly body-ok items clear framing for re-classify |
 
+## Checklist (curated RSS)
+
+With committed `mvp/server/config/radar-sources.json` present (default in repo), repeat Refresh:
+
+| Step | Action | Pass when |
+|------|--------|-----------|
+| 12. Refresh with curated | `POST /api/fetch` | Response includes `curated: { skipped, sources, fetched, errors, articles }`; ≥1 article has `sourceKind: "rss"` |
+| 13. Curated citations | Inspect an RSS article | Citations use the source name + article URL (not CFP/xcancel labels) |
+| 14. Honest failure | If one feed fails (network / parse) | CFP still succeeds; failure appears in `curated.errors` — not silent |
+
+Empty or missing `radar-sources.json` keeps CFP-only Refresh green (`curated.skipped: true`); no RSS items required.
+
 ## Checklist (optional xcancel)
 
 Configure 1–2 handles, then repeat Refresh + Classify:
@@ -53,11 +65,11 @@ XCANCEL_PROFILES=sentdefender
 
 | Step | Action | Pass when |
 |------|--------|-----------|
-| 12. Refresh with handles | `POST /api/fetch` | X items appear with xcancel `sourceKind`; citations **xcancel** \| **X** |
-| 13. Tweet-as-body | Inspect an xcancel article | Tweet text present; body stays `not_applicable` |
-| 14. Classify X items | `POST /api/classify` | Unclassified xcancel items get framing like CFP |
-| 15. Cluster group | Find items that share a `clusterId` | Related CFP + tweet share `clusterId` |
-| 16. Honest failure | If xcancel blocks (Cloudflare / RSS whitelist) | CFP still succeeds; `meta.lastError` / store note is set — not silent success |
+| 15. Refresh with handles | `POST /api/fetch` | X items appear with xcancel `sourceKind`; citations **xcancel** \| **X** |
+| 16. Tweet-as-body | Inspect an xcancel article | Tweet text present; body stays `not_applicable` |
+| 17. Classify X items | `POST /api/classify` | Unclassified xcancel items get framing like CFP |
+| 18. Cluster group | Find items that share a `clusterId` | Related CFP + tweet share `clusterId` |
+| 19. Honest failure | If xcancel blocks (Cloudflare / RSS whitelist) | CFP still succeeds; `meta.lastError` / store note is set — not silent success |
 
 Empty profile list must not error: CFP-only Refresh stays green.
 
@@ -87,7 +99,7 @@ curl -s -b /tmp/mvp-cookies http://localhost:3001/api/articles \
 ## Notes
 
 - Classification requires a working Ollama Cloud API key (`OLLAMA_API_KEY` in `mvp/.env`).
-- Fetch alone confirms CFP RSS + publisher URL scrape + **best-effort body scrape** (no paywall bypass). With handles set, the same `POST /api/fetch` also runs xcancel (RSS-first, HTML fallback).
+- Fetch alone confirms CFP RSS + publisher URL scrape + **best-effort body scrape** (no paywall bypass). The same `POST /api/fetch` also runs enabled curated RSS when config is present (CFP → curated → xcancel). With handles set, xcancel runs last (RSS-first, HTML fallback).
 - A second fetch does not wipe classification when title, snippet, and canonical URL are unchanged **and** body usability did not newly become ok. Changed title/snippet, or body newly becoming usable, **clears** classification so **Classify new** can run again.
 - Framing scores are AI-assisted analysis, not ground truth (shown in the UI honesty banner).
 - Depth honesty on the card: excerpt when original text is present; honest unavailable/blocked when not.

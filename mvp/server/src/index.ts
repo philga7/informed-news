@@ -48,10 +48,11 @@ app.use('/api', requireApiSession);
 app.use('/api', createAuthRouter());
 
 /**
- * Unified refresh: CFP then xcancel (when configured).
+ * Unified refresh: CFP → curated RSS → xcancel (when configured).
  * Optional body/query: { limit?: number, feedUrl?: string }
+ * Empty/missing radar-sources.json skips curated without failing CFP.
  * Empty XCANCEL_PROFILES / x-profiles.json skips xcancel without failing CFP.
- * Xcancel errors are returned in the payload / meta.lastError; CFP still succeeds.
+ * Curated/xcancel errors are returned in the payload; CFP still succeeds.
  */
 app.post('/api/fetch', async (req, res) => {
   try {

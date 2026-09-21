@@ -61,3 +61,7 @@ Committed JSON at `mvp/server/config/radar-sources.json`. Loaded by `mvp/server/
 ```
 
 Empty/missing curated file → CFP-only (and optional xcancel if configured) still works.
+
+## Ingest (NEWS-55)
+
+[NEWS-55](https://informedcrew.atlassian.net/browse/NEWS-55): enabled sources from `radar-sources.json` are fetched on `POST /api/fetch` and upserted into the shared article store (`sourceKind: "rss"`). Response field `curated` reports counts and per-source errors. Ingested items are **not** Brief membership — Accept / manual seed still required ([NEWS-65](https://informedcrew.atlassian.net/browse/NEWS-65), [NEWS-66](https://informedcrew.atlassian.net/browse/NEWS-66)).
