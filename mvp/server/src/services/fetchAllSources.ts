@@ -4,11 +4,19 @@ import { fetchCfpArticles } from './cfpFetch.js';
 import type { CfpFetchOptions, CfpFetchResult } from './cfpFetch.js';
 import { fetchXcancelArticles } from './xcancelFetch.js';
 import type { XcancelFetchOptions, XcancelFetchResult } from './xcancelFetch.js';
+import { fetchCuratedRss } from './curatedRssFetch.js';
+import type {
+  CuratedRssFetchOptions,
+  CuratedRssFetchResult,
+} from './curatedRssFetch.js';
 
-export type FetchAllOptions = CfpFetchOptions & XcancelFetchOptions;
+export type FetchAllOptions = CfpFetchOptions &
+  XcancelFetchOptions &
+  CuratedRssFetchOptions;
 
 export type FetchAllResult = {
   cfp: CfpFetchResult;
+  curated: CuratedRssFetchResult;
   xcancel: XcancelFetchResult;
   articles: Article[];
   fetched: number;
@@ -30,11 +38,24 @@ function emptyXcancelFailure(
   };
 }
 
+function emptyCuratedFailure(
+  message: string,
+  options: CuratedRssFetchOptions = {},
+): CuratedRssFetchResult {
+  return {
+    fetched: 0,
+    upserted: [],
+    sources: options.sources?.map((s) => s.id) ?? [],
+    skipped: false,
+    errors: [message],
+    limit: options.limit ?? 0,
+  };
+}
+
 /**
- * Run enabled sources in sequence: CFP, then xcancel.
- * CFP failure fails the whole refresh. Xcancel failure is isolated — CFP
- * results are still returned and xcancel errors surface on the result / meta.
- * Empty xcancel config is a no-op (skipped), never fails CFP.
+ * Run enabled sources in sequence: CFP, then curated RSS, then xcancel.
+ * CFP failure fails the whole refresh. Other source failures are isolated —
+ * CFP results are still returned and errors surface on the result.
  */
 export async function fetchAllSources(
   options: FetchAllOptions = {},
@@ -43,6 +64,18 @@ export async function fetchAllSources(
     feedUrl: options.feedUrl,
     limit: options.limit,
   });
+
+  let curated: CuratedRssFetchResult;
+  try {
+    curated = await fetchCuratedRss({
+      sources: options.sources,
+      limit: options.limit,
+      configPath: options.configPath,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    curated = emptyCuratedFailure(message, options);
+  }
 
   let xcancel: XcancelFetchResult;
   try {
@@ -57,7 +90,7 @@ export async function fetchAllSources(
     xcancel = emptyXcancelFailure(message, options);
   }
 
-  // Crude same-event ids across the full store (CFP + xcancel + prior rows).
+  // Crude same-event ids across the full store (CFP + curated + xcancel + prior rows).
   const clustered = await assignClusterIds();
   const byId = new Map(clustered.articles.map((a) => [a.id, a]));
   const withCluster = (rows: Article[]): Article[] =>
@@ -67,20 +100,26 @@ export async function fetchAllSources(
     ...cfp,
     upserted: withCluster(cfp.upserted),
   };
+  const curatedWithCluster: CuratedRssFetchResult = {
+    ...curated,
+    upserted: withCluster(curated.upserted),
+  };
   const xcancelWithCluster: XcancelFetchResult = {
     ...xcancel,
     upserted: withCluster(xcancel.upserted),
   };
   const articles = [
     ...cfpWithCluster.upserted,
+    ...curatedWithCluster.upserted,
     ...xcancelWithCluster.upserted,
   ];
 
   return {
     cfp: cfpWithCluster,
+    curated: curatedWithCluster,
     xcancel: xcancelWithCluster,
     articles,
-    fetched: cfp.fetched + xcancel.fetched,
+    fetched: cfp.fetched + curated.fetched + xcancel.fetched,
     clustered: clustered.clustered,
     clusters: clustered.clusters,
   };

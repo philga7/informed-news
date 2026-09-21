@@ -70,6 +70,13 @@ app.post('/api/fetch', async (req, res) => {
       clustered: result.clustered,
       clusters: result.clusters,
       cfp: { fetched: result.cfp.fetched, articles: result.cfp.upserted },
+      curated: {
+        skipped: result.curated.skipped,
+        sources: result.curated.sources,
+        fetched: result.curated.fetched,
+        errors: result.curated.errors,
+        articles: result.curated.upserted,
+      },
       xcancel: {
         skipped: result.xcancel.skipped,
         handles: result.xcancel.handles,
