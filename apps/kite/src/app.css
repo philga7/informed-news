@@ -7,8 +7,10 @@
 @import 'overlayscrollbars/styles/overlayscrollbars.css';
 
 @theme {
-	/* Font Families */
+	/* Font Families — Lufga is the product default (Brief + Radar + Transparency). */
 	--font-lufga: 'lufga', system-ui, sans-serif;
+	--font-sans: 'lufga', system-ui, sans-serif;
+	--font-universal: 'lufga', system-ui, sans-serif;
 
 	/* Colors */
 	--color-graphite: #18181a;

@@ -277,7 +277,7 @@ async function loadInitialData() {
 		}
 
 		// Use category from URL if provided, otherwise use first enabled
-		const targetCategory = initialCategoryId || enabledCategoriesForLoading[0] || 'World';
+		const targetCategory = initialCategoryId || enabledCategoriesForLoading[0] || 'world';
 		currentCategory = targetCategory;
 
 		const isMobile = isMobileDevice();
@@ -501,7 +501,7 @@ async function reloadAllData() {
 			// Category doesn't exist - will fallback to first enabled category below
 		}
 
-		const firstEnabledCategory = initialCategoryId || enabledCategoriesForLoading[0] || 'World';
+		const firstEnabledCategory = initialCategoryId || enabledCategoriesForLoading[0] || 'world';
 		currentCategory = firstEnabledCategory;
 
 		const isMobile = isMobileDevice();

@@ -246,7 +246,7 @@ test.describe('Nav shell (NEWS-42)', () => {
 		page,
 	}) => {
 		await page.goto('/');
-		await expect(page).toHaveTitle(/Informed News|World/i, { timeout: 60_000 });
+		await expect(page).toHaveTitle(/Informed News|News Briefs|World/i, { timeout: 60_000 });
 		await expect(page.getByText('Informed News').first()).toBeVisible({
 			timeout: 60_000,
 		});
@@ -314,7 +314,7 @@ test.describe('MVP API compat (NEWS-43)', () => {
 	}) => {
 		// Kite UI is up (webServer from playwright.config).
 		await page.goto('/');
-		await expect(page).toHaveTitle(/Informed News|World/i, { timeout: 60_000 });
+		await expect(page).toHaveTitle(/Informed News|News Briefs|World/i, { timeout: 60_000 });
 
 		const health = await request.get(`${apiBase}/health`);
 		expect(health.ok()).toBeTruthy();
