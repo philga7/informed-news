@@ -25,6 +25,12 @@
 
 /* Extend default theme */
 @theme {
+	/* Product default type — must live here: this file’s @import "tailwindcss"
+	 * emits a second @layer theme that would otherwise reset --font-sans. */
+	--font-lufga: 'lufga', system-ui, sans-serif;
+	--font-sans: 'lufga', system-ui, sans-serif;
+	--font-universal: 'lufga', system-ui, sans-serif;
+
 	/* Dynamic font size variables (can be overridden by JavaScript) */
 	--text-xs: var(--text-xs, 0.75rem);
 	--text-sm: var(--text-sm, 0.875rem);

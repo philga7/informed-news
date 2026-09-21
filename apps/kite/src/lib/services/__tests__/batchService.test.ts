@@ -34,7 +34,7 @@ describe('BatchService', () => {
 
 			const mockCategoriesResponse = {
 				categories: [
-					{ id: 'cat-1', categoryId: 'world', categoryName: 'World' },
+					{ id: 'cat-1', categoryId: 'world', categoryName: 'News Briefs' },
 					{ id: 'cat-2', categoryId: 'tech', categoryName: 'Technology' },
 				],
 				hasOnThisDay: true,
@@ -69,7 +69,7 @@ describe('BatchService', () => {
 			expect(result).toEqual({
 				batchId: 'latest-batch',
 				categories: [
-					{ id: 'world', name: 'World' },
+					{ id: 'world', name: 'News Briefs' },
 					{ id: 'tech', name: 'Technology' },
 					{ id: 'onthisday', name: 'On This Day' },
 				],
@@ -94,7 +94,7 @@ describe('BatchService', () => {
 			};
 
 			const mockCategoriesResponse = {
-				categories: [{ id: 'cat-1', categoryId: 'world', categoryName: 'World' }],
+				categories: [{ id: 'cat-1', categoryId: 'world', categoryName: 'News Briefs' }],
 				hasOnThisDay: false,
 			};
 

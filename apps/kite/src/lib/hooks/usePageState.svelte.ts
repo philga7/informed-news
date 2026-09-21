@@ -28,7 +28,7 @@ export function usePageState() {
 
 	// Data state
 	let categories = $state<Category[]>([]);
-	let currentCategory = $state('World');
+	let currentCategory = $state('world');
 	let stories = $state<Story[]>([]);
 	let onThisDayEvents = $state<OnThisDayEvent[]>([]);
 	let onThisDayLanguage = $state<string>('en');

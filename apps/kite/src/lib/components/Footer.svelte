@@ -22,7 +22,7 @@ interface Props {
 	onShowAbout?: () => void;
 }
 
-let { currentCategory = 'World', categories = [], stories = [], onShowAbout }: Props = $props();
+let { currentCategory = 'world', categories = [], stories = [], onShowAbout }: Props = $props();
 
 // Handle about click
 function handleAboutClick() {

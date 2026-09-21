@@ -70,7 +70,7 @@ test('articlesToKiteStories maps solo articles and prefers framing summary', () 
   assert.equal(stories.length, 1);
   assert.equal(stories[0]!.title, 'Headline A');
   assert.equal(stories[0]!.short_summary, 'AI framing summary for A');
-  assert.equal(stories[0]!.category, OWNED_CATEGORY_SLUG);
+  assert.equal(stories[0]!.category, OWNED_CATEGORY_NAME);
   assert.equal(stories[0]!.articles[0]!.domain, 'example.com');
   assert.equal(stories[0]!.articles[0]!.link, 'https://example.com/a1');
   assert.deepEqual(stories[0]!.domains, [{ name: 'example.com' }]);

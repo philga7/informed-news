@@ -7,9 +7,12 @@ export const OWNED_BATCH_ID = 'owned-latest';
 /** Fixed category UUID so stories routes stay stable across reloads. */
 export const OWNED_CATEGORY_UUID = '00000000-0000-4000-8000-000000000001';
 
-/** Use `world` so Kite’s default `/world/latest` route shows owned stories. */
+/**
+ * Use slug `world` so Kite’s default `/world/latest` route shows owned stories.
+ * Display name is interim “News Briefs” until real Brief categories (NEWS-56).
+ */
 export const OWNED_CATEGORY_SLUG = 'world';
-export const OWNED_CATEGORY_NAME = 'World';
+export const OWNED_CATEGORY_NAME = 'News Briefs';
 
 /** Distinctive fixture title for empty-store / Playwright smoke. */
 export const OWNED_FIXTURE_TITLE =
@@ -412,7 +415,7 @@ export function articlesToKiteStories(
     const story: KiteBriefStory = {
       id: primary.clusterId?.trim() || primary.id,
       cluster_number: clusterNumber++,
-      category: OWNED_CATEGORY_SLUG,
+      category: OWNED_CATEGORY_NAME,
       title: primary.title,
       short_summary: shortSummary(primary),
       articles: members.map((m) => ({

@@ -26,7 +26,7 @@ interface Props {
 
 let {
 	categories = [],
-	currentCategory = 'World',
+	currentCategory = 'world',
 	onCategoryChange,
 	onCategoryDoubleClick,
 	mobilePosition = 'bottom',
