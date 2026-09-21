@@ -7,23 +7,32 @@ import { fileURLToPath } from 'node:url';
 const root = join(fileURLToPath(new URL('.', import.meta.url)), '..');
 
 describe('NEWS-42 nav shell route map', () => {
-	it('documents Brief + Transparency shipped and reserved layers docs-only', () => {
+	it('documents Brief + Transparency + Radar shipped and reserved layers docs-only', () => {
 		const map = readFileSync(join(root, 'docs/ROUTE_MAP.md'), 'utf8');
 		assert.match(map, /NEWS-42/);
 		assert.match(map, /`\/`/);
 		assert.match(map, /`\/transparency`/);
+		assert.match(map, /`\/radar`/);
+		assert.match(map, /Session-required/);
+		assert.match(map, /CFP \+ curated RSS/);
 		assert.match(map, /`\/finance`/);
 		assert.match(map, /`\/situation`/);
 		assert.match(map, /`\/listen`/);
 		assert.match(map, /Do not ship empty/);
 		assert.match(map, /Reserved/);
+		const shippedSection = map.split('## Shipped (live)')[1]?.split('## Planned')[0];
+		assert.ok(shippedSection?.includes('`/radar`'), 'expected /radar in Shipped section');
 	});
 
-	it('ships a public /transparency page and footer link', () => {
+	it('ships /transparency and /radar pages with footer links', () => {
 		assert.equal(
 			existsSync(
 				join(root, 'apps/kite/src/routes/transparency/+page.svelte'),
 			),
+			true,
+		);
+		assert.equal(
+			existsSync(join(root, 'apps/kite/src/routes/radar/+page.svelte')),
 			true,
 		);
 		const footer = readFileSync(
@@ -31,6 +40,7 @@ describe('NEWS-42 nav shell route map', () => {
 			'utf8',
 		);
 		assert.match(footer, /href="\/transparency"/);
+		assert.match(footer, /href="\/radar"/);
 		assert.doesNotMatch(footer, /href="\/finance"/);
 		assert.doesNotMatch(footer, /href="\/situation"/);
 		assert.doesNotMatch(footer, /href="\/listen"/);
