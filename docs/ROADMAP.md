@@ -14,13 +14,14 @@ Historical plan (A–G + H story seeds): [`.cursor/plans/osint_jira_pivot_d6b40f
 | 1a | [NEWS-54](https://informedcrew.atlassian.net/browse/NEWS-54) | Lock CFP + curated RSS radar sources (starter set) + config |
 | 1b | [NEWS-55](https://informedcrew.atlassian.net/browse/NEWS-55) | Ingest curated RSS into article store |
 | 1c | [NEWS-58](https://informedcrew.atlassian.net/browse/NEWS-58) | Radar UI at `/radar` |
+| 1c′ | [NEWS-68](https://informedcrew.atlassian.net/browse/NEWS-68) | Brief: Lufga type + rename owned feed label to News Briefs |
 | 1d | [NEWS-65](https://informedcrew.atlassian.net/browse/NEWS-65) | Accept cluster onto Brief (membership + association) |
 | 1e | [NEWS-66](https://informedcrew.atlassian.net/browse/NEWS-66) | Manual Brief seed (title / note / optional URLs) |
 | 1f | [NEWS-59](https://informedcrew.atlassian.net/browse/NEWS-59) | Track developing story (alerts) |
 | 1g | [NEWS-60](https://informedcrew.atlassian.net/browse/NEWS-60) | Mute undesired topics (global) |
 | 1h | [NEWS-61](https://informedcrew.atlassian.net/browse/NEWS-61) | In-app alert badge on tracked updates |
 
-Start at **NEWS-58** unless the user names another key (NEWS-54/55 Done). Do not open Epics **B–G** until desk v1 is Done (or the user explicitly reorders).
+Start at **NEWS-68** unless the user names another key (NEWS-54/55/58 Done). Do not open Epics **B–G** until desk v1 is Done (or the user explicitly reorders).
 
 ### Membership (locked 2026-09-18; manual seeds 2026-09-19)
 
