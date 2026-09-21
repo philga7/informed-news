@@ -34,6 +34,13 @@ export {
 } from './rss.js';
 export type { RssItem } from './rss.js';
 export {
+  fetchCuratedRss,
+} from './curatedRssFetch.js';
+export type {
+  CuratedRssFetchOptions,
+  CuratedRssFetchResult,
+} from './curatedRssFetch.js';
+export {
   classifyFraming,
   articleFieldsFromClassifyResult,
   getOllamaClient,
