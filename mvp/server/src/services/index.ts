@@ -87,4 +87,11 @@ export {
 export type { EnrichMemberInput, EnrichClusterResult } from './ollamaEnrichment.js';
 export { enrichUnenrichedClusters } from './enrichClusters.js';
 export type { EnrichBatchOptions, EnrichBatchResult } from './enrichClusters.js';
+export { buildRadarFeed } from './radarFeed.js';
+export type {
+  RadarCluster,
+  RadarHeadline,
+  RadarHeadlineSourceKind,
+  RadarResponse,
+} from './radarFeed.js';
 

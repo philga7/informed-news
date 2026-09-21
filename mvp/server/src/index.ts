@@ -15,6 +15,7 @@ import {
   enrichUnenrichedClusters,
   fetchAllSources,
   sortNewestFirst,
+  buildRadarFeed,
 } from './services/index.js';
 import { getArticleById, readArticles, readMeta } from './store/index.js';
 
@@ -104,6 +105,28 @@ app.get('/api/articles', async (_req, res) => {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     res.status(500).json({ error: message });
+  }
+});
+
+/**
+ * Radar feed: clustered CFP + curated RSS headlines only.
+ */
+app.get('/api/radar', async (_req, res) => {
+  try {
+    const [articles, meta] = await Promise.all([readArticles(), readMeta()]);
+    const clusters = buildRadarFeed(articles);
+    res.json({
+      ok: true,
+      clusters,
+      meta: {
+        lastFetchAt: meta.lastFetchAt,
+        lastError: meta.lastError,
+      },
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('Radar feed failed:', message);
+    res.status(500).json({ ok: false, error: message });
   }
 });
 
