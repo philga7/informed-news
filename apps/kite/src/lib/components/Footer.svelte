@@ -116,6 +116,29 @@ function getRSSFeedUrl(): string {
     </a>
 
     <a
+      href="/radar"
+      class="flex items-center space-x-2 text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
+      title={s("footer.radar") || "Radar"}
+    >
+      <svg
+        class="h-5 w-5 text-gray-600 dark:text-gray-400"
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.5"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        <circle cx="12" cy="12" r="9" />
+        <circle cx="12" cy="12" r="4" />
+        <path d="M12 12V3" />
+      </svg>
+      <span class="text-xs sm:text-sm">{s("footer.radar") || "Radar"}</span>
+    </a>
+
+    <a
       href={getRSSFeedUrl()}
       target="_blank"
       class="flex items-center space-x-2 text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"

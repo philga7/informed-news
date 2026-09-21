@@ -264,6 +264,14 @@ test.describe('Nav shell (NEWS-42)', () => {
 		await expect(page.getByRole('heading', { name: 'Transparency' })).toBeVisible();
 		await expect(page.getByRole('link', { name: /Back to Brief/i })).toBeVisible();
 	});
+
+	test('/radar loads session shell with Radar title', async ({ page }) => {
+		await page.goto('/radar');
+		await expect(page).toHaveTitle(/Radar/i, { timeout: 60_000 });
+		await expect(page.getByRole('heading', { name: 'Radar' })).toBeVisible({
+			timeout: 60_000,
+		});
+	});
 });
 
 test.describe('Transparency page (NEWS-32)', () => {
