@@ -385,7 +385,7 @@ const isCJKStory = $derived(containsCJK(story.title));
 <div class="flex items-start">
   <div class="flex-grow">
     <button
-      class="dark:text-dark-text mb-2 flex cursor-pointer items-center text-xl text-gray-800 text-start w-full bg-transparent border-none p-0 focus-visible-ring rounded"
+      class="mb-2 flex cursor-pointer items-center text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 text-start w-full bg-transparent border-none p-0 focus-visible-ring rounded"
       class:font-semibold={!isRead}
       onclick={onTitleClick}
       aria-label="Expand story"
