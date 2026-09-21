@@ -7,7 +7,9 @@
 @import 'overlayscrollbars/styles/overlayscrollbars.css';
 
 @theme {
-	/* Font Families — Lufga is the product default (Brief + Radar + Transparency). */
+	/* Font Families — Lufga is the product default (Brief + Radar + Transparency).
+	 * Note: styles/index.css also @import "tailwindcss"; keep --font-sans in sync there
+	 * so the later theme layer does not reset to ui-sans-serif. */
 	--font-lufga: 'lufga', system-ui, sans-serif;
 	--font-sans: 'lufga', system-ui, sans-serif;
 	--font-universal: 'lufga', system-ui, sans-serif;
