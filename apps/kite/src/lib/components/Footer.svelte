@@ -1,4 +1,5 @@
 <script lang="ts">
+import { onMount } from 'svelte';
 import { s } from '$lib/client/localization.svelte';
 import { displaySettings, languageSettings, themeSettings } from '$lib/data/settings.svelte.js';
 import type { Category, Story } from '$lib/types';
@@ -24,6 +25,27 @@ interface Props {
 
 let { currentCategory = 'world', categories = [], stories = [], onShowAbout }: Props = $props();
 
+type TrackedEntry = {
+	clusterId: string;
+	trackedAt: string;
+	memberCountSnapshot: number;
+	pendingUpdate: boolean;
+	muted?: boolean;
+};
+
+type TrackedResponse =
+	| {
+			ok: true;
+			entries: TrackedEntry[];
+			updatedAt: string | null;
+	  }
+	| {
+			ok: false;
+			error: string;
+	  };
+
+let pendingTrackedCount = 0;
+
 // Handle about click
 function handleAboutClick() {
 	// Push /about to the URL
@@ -45,6 +67,35 @@ function getRSSFeedUrl(): string {
 
 	return `/${categoryLower}.xml`;
 }
+
+async function loadPendingTrackedCount(): Promise<void> {
+	try {
+		const response = await fetch('/api/brief/tracked', { credentials: 'include' });
+		// Ruling: no footer badge when unauthenticated.
+		if (response.status === 401) {
+			pendingTrackedCount = 0;
+			return;
+		}
+		if (!response.ok) {
+			pendingTrackedCount = 0;
+			return;
+		}
+
+		const body = (await response.json().catch(() => null)) as TrackedResponse | null;
+		if (body && body.ok && Array.isArray(body.entries)) {
+			pendingTrackedCount = body.entries.filter((entry) => entry.pendingUpdate).length;
+			return;
+		}
+		pendingTrackedCount = 0;
+	} catch (err) {
+		console.error('Error loading tracked pending count', err);
+		pendingTrackedCount = 0;
+	}
+}
+
+onMount(() => {
+	void loadPendingTrackedCount();
+});
 </script>
 
 <footer class="mt-8 pt-4 pb-8 md:pb-4">
@@ -135,7 +186,24 @@ function getRSSFeedUrl(): string {
         <circle cx="12" cy="12" r="4" />
         <path d="M12 12V3" />
       </svg>
-      <span class="text-xs sm:text-sm">{s("footer.radar") || "Radar"}</span>
+      <span class="inline-flex items-center gap-1 text-xs sm:text-sm">
+        {s("footer.radar") || "Radar"}
+        {#if pendingTrackedCount > 0}
+          <span class="sr-only">
+            {pendingTrackedCount} tracked update{pendingTrackedCount === 1 ? '' : 's'} pending
+          </span>
+          {#if pendingTrackedCount === 1}
+            <span class="h-2 w-2 rounded-full bg-amber-500" aria-hidden="true"></span>
+          {:else}
+            <span
+              class="inline-flex min-w-[1rem] items-center justify-center rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white"
+              aria-hidden="true"
+            >
+              {pendingTrackedCount > 9 ? '9+' : pendingTrackedCount}
+            </span>
+          {/if}
+        {/if}
+      </span>
     </a>
 
     <a
