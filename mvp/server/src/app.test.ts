@@ -223,9 +223,10 @@ test('POST /api/fetch calls syncTrackedAfterFetch with briefClusterKey counts', 
   process.env.MVP_PASSWORD = 'pw';
   delete process.env.MVP_PASSWORD_HASH;
 
-  const articles: Article[] = [
+  const fullStoreArticles: Article[] = [
     { id: 'a1', clusterId: 'c1' } as Article,
     { id: 'a2', clusterId: 'c1' } as Article,
+    { id: 'a3', clusterId: 'c1' } as Article,
     { id: 'solo-1', clusterId: null } as Article,
   ];
 
@@ -241,8 +242,11 @@ test('POST /api/fetch calls syncTrackedAfterFetch with briefClusterKey counts', 
         cfp: { feedUrl: 'x', limit: 3, fetched: 3, upserted: [] },
         curated: { skipped: true, sources: [], fetched: 0, errors: [], upserted: [] },
         xcancel: { skipped: true, handles: [], fetched: 0, errors: [], upserted: [] },
-        articles,
+        // NOTE: syncTrackedAfterFetch must be based on the full rewritten store, not only
+        // the upserted article set returned from the fetch result.
+        articles: [{ id: 'a2', clusterId: 'c1' } as Article],
       }) as any,
+    readArticles: async () => fullStoreArticles,
     syncTrackedAfterFetch: async (countByClusterId) => {
       seenMap = countByClusterId;
       return { entries: [] };
@@ -260,7 +264,7 @@ test('POST /api/fetch calls syncTrackedAfterFetch with briefClusterKey counts', 
     assert.equal(resp.status, 200);
     const json = (await resp.json()) as { ok: boolean };
     assert.equal(json.ok, true);
-    assert.deepEqual(seenMap, { c1: 2, 'solo:solo-1': 1 });
+    assert.deepEqual(seenMap, { c1: 3, 'solo:solo-1': 1 });
   } finally {
     await close();
   }

@@ -147,7 +147,10 @@ export function createApp(deps: CreateAppDeps = {}): Express {
       const result = await fetchAll({ limit, feedUrl });
 
       try {
-        const countByClusterId = countByClusterIdFromArticles(result.articles);
+        // Important: build counts from the full rewritten store (same denominator as Accept),
+        // not just the upserted rows from this fetch result.
+        const allArticles = await readAllArticles();
+        const countByClusterId = countByClusterIdFromArticles(allArticles);
         await syncTracked(countByClusterId);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);

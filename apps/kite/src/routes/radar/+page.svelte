@@ -151,12 +151,19 @@
 			// the last successful list as if it were current.
 			if (!trackedResponse.ok) {
 				trackedEntries = [];
+				const tracked = (await trackedResponse.json().catch(() => null)) as TrackedResponse | null;
+				trackError =
+					(tracked && !tracked.ok && tracked.error) ||
+					RADAR_TRACK_ERROR;
 			} else {
 				const tracked = (await trackedResponse.json().catch(() => null)) as TrackedResponse | null;
 				if (tracked && tracked.ok) {
 					trackedEntries = tracked.entries;
 				} else {
 					trackedEntries = [];
+					trackError =
+						(tracked && !tracked.ok && tracked.error) ||
+						RADAR_TRACK_ERROR;
 				}
 			}
 		} catch (err) {
