@@ -31,7 +31,7 @@ Batch id is always `owned-latest`. Category slug `world` / UUID `00000000-0000-4
 Brief shows **Accepted** clusters only (membership in `mvp/data/brief-membership.json`). Accept/Unaccept via session APIs (`POST /api/brief/accept`, `POST /api/brief/unaccept`; see [MVP_API_COMPAT.md](MVP_API_COMPAT.md)). Cluster keys match Radar and enrich: real `clusterId`, or `solo:{articleId}` when unclustered.
 
 - **Accepted multi-member cluster:** all current and future articles sharing that `clusterId` appear on Brief without re-Accept.
-- **Accepted solo key:** only that article appears until it joins a shared cluster (then the real `clusterId` key applies).
+- **Accepted solo key:** only that article appears while it stays unclustered (`solo:{articleId}`). If a later fetch merges it into a shared `clusterId`, v1 does **not** remap membership — Accept the new cluster key again (known gap; association = same key only).
 - **Global mute** (NEWS-60) is not applied here yet; mute will subtract from Accepted membership in a follow-up.
 - **Manual seed stories** (NEWS-66): Accepted by definition, not on Radar; Unaccept drops from Brief.
 - **Radar** (`/radar`) is the triage lane for fresh CFP + curated RSS before Accept. See [ROADMAP.md](ROADMAP.md).
