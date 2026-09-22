@@ -77,7 +77,8 @@ let unacceptError = $state<string | null>(null);
 let unacceptLoginHint = $state(false);
 
 async function handleUnaccept(story: Story): Promise<void> {
-	const clusterId = story.id?.trim();
+	const clusterId =
+		story.membership_key?.trim() || story.id?.trim();
 	if (!clusterId || pendingUnacceptId) return;
 
 	pendingUnacceptId = clusterId;
@@ -202,7 +203,10 @@ export function toggleReadStatus(index: number) {
 // Apply content filtering and story count limit
 const { displayedStories, filteredCount, hiddenStories } = $derived.by(() => {
 	const activeStories = stories.filter(
-		(story) => !story.id || !unacceptedIds.has(story.id),
+		(story) => {
+			const key = story.membership_key?.trim() || story.id?.trim();
+			return !key || !unacceptedIds.has(key);
+		},
 	);
 
 	// If in shared view mode, only show the specific shared article
@@ -441,8 +445,17 @@ const allStoriesExpanded = $derived(
         shouldAutoScroll={!allStoriesExpanded}
         onToggle={() => handleStoryToggle(story)}
         onReadToggle={() => handleReadToggle(story)}
-        onUnaccept={story.id && !isSharedView ? () => handleUnaccept(story) : undefined}
-        unacceptPending={pendingUnacceptId === story.id}
+        onUnaccept={
+          (story.membership_key || story.id) &&
+          !isSharedView &&
+          !timeTravelBatch.isHistoricalBatch
+            ? () => handleUnaccept(story)
+            : undefined
+        }
+        unacceptPending={
+          pendingUnacceptId ===
+          (story.membership_key?.trim() || story.id?.trim())
+        }
         priority={index < 3}
         {isFiltered}
         filterKeywords={story._matchedKeywords}

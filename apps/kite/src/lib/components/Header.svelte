@@ -622,7 +622,7 @@ $effect(() => {
         </div>
       {/if}
 
-      {#if !isSharedView}
+      {#if !isSharedView && !isInTimeTravel}
         <button
           onclick={() => openBriefSeedModal()}
           title={BRIEF_SEED_ADD_LABEL}

@@ -87,7 +87,10 @@ export function parseManualSeedBody(body: unknown): ManualSeedInput {
     if (!Array.isArray(record.urls)) {
       throw new ManualSeedValidationError('urls must be an array');
     }
-    input.urls = record.urls.filter((url): url is string => typeof url === 'string');
+    if (record.urls.some((url) => typeof url !== 'string')) {
+      throw new ManualSeedValidationError('urls must be an array of strings');
+    }
+    input.urls = record.urls as string[];
   }
 
   return input;

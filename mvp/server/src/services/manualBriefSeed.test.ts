@@ -87,6 +87,19 @@ test('parseManualSeedBody rejects missing title', () => {
   );
 });
 
+test('parseManualSeedBody rejects non-string urls entries', () => {
+  assert.throws(
+    () =>
+      parseManualSeedBody({
+        title: 'x',
+        urls: ['https://example.com', 123],
+      }),
+    (err: unknown) =>
+      err instanceof ManualSeedValidationError &&
+      err.message === 'urls must be an array of strings',
+  );
+});
+
 test('createManualSeed upserts article and accepts cluster', async () => {
   const upserted: Article[] = [];
   let acceptedClusterId: string | null = null;

@@ -36,6 +36,8 @@ export type KiteBriefPrimaryImage = {
 
 export type KiteBriefStory = {
   id: string;
+  /** Brief membership / Unaccept key (`briefClusterKey`); may differ from `id` for solos. */
+  membership_key: string;
   cluster_number: number;
   category: string;
   title: string;
@@ -422,8 +424,9 @@ export function articlesToKiteStories(
           ? enrichments[key]
           : undefined;
     const story: KiteBriefStory = {
-      // Membership key (briefClusterKey), not bare article id — required for Unaccept of solos.
-      id: key,
+      // Keep `id` as clusterId or bare article id for client read-state continuity.
+      id: primary.clusterId?.trim() || primary.id,
+      membership_key: key,
       cluster_number: clusterNumber++,
       category: OWNED_CATEGORY_NAME,
       title: primary.title,
