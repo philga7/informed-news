@@ -95,6 +95,7 @@ export type {
   RadarHeadlineSourceKind,
   RadarResponse,
 } from './radarFeed.js';
+export { articleMatchesMute, clusterMatchesMute } from './muteMatch.js';
 export { briefClusterKey, isSoloClusterKey } from './briefClusterKey.js';
 export {
   buildManualSeedArticle,

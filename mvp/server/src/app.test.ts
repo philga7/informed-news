@@ -8,6 +8,11 @@ import type { Server } from 'node:http';
 import type { Article } from './types/article.js';
 import { acceptCluster, readBriefMembership } from './store/briefMembershipStore.js';
 import { readTrackedStories, trackCluster } from './store/trackedStoriesStore.js';
+import {
+  addMuteRule,
+  readMuteRules,
+  removeMuteRule,
+} from './store/muteRulesStore.js';
 import { createManualSeed } from './services/manualBriefSeed.js';
 
 function tempMembershipPath(): string {
@@ -18,6 +23,11 @@ function tempMembershipPath(): string {
 function tempTrackedPath(): string {
   const dir = mkdtempSync(path.join(tmpdir(), 'tracked-stories-'));
   return path.join(dir, 'tracked-stories.json');
+}
+
+function tempMuteRulesPath(): string {
+  const dir = mkdtempSync(path.join(tmpdir(), 'mute-rules-'));
+  return path.join(dir, 'mute-rules.json');
 }
 
 async function startServer(app: { listen: (...args: any[]) => Server }): Promise<{
@@ -303,6 +313,246 @@ test('POST /api/fetch succeeds even when syncTrackedAfterFetch throws', async ()
     assert.equal(resp.status, 200);
     const json = (await resp.json()) as { ok: boolean };
     assert.equal(json.ok, true);
+  } finally {
+    await close();
+  }
+});
+
+test('GET /api/brief/mutes returns empty store when missing', async () => {
+  process.env.SESSION_SECRET = 'test-secret';
+  process.env.MVP_PASSWORD = 'pw';
+  delete process.env.MVP_PASSWORD_HASH;
+
+  const mutesPath = tempMuteRulesPath();
+
+  const { createApp } = await import('./app.js');
+  const app = createApp({
+    readMuteRules: async () => await readMuteRules(mutesPath),
+    addMuteRule: async (keyword, source) => await addMuteRule(keyword, source, mutesPath),
+    removeMuteRule: async (id) => await removeMuteRule(id, mutesPath),
+  });
+
+  const { baseUrl, close } = await startServer(app);
+  try {
+    const cookie = await login(baseUrl);
+    const resp = await fetch(`${baseUrl}/api/brief/mutes`, { headers: { cookie } });
+    assert.equal(resp.status, 200);
+    const body = (await resp.json()) as {
+      ok: true;
+      rules: unknown[];
+      updatedAt: string | null;
+    };
+    assert.equal(body.ok, true);
+    assert.deepEqual(body.rules, []);
+    assert.equal(body.updatedAt, null);
+  } finally {
+    await close();
+  }
+});
+
+test('POST /api/brief/mutes returns 400 on empty keyword', async () => {
+  process.env.SESSION_SECRET = 'test-secret';
+  process.env.MVP_PASSWORD = 'pw';
+  delete process.env.MVP_PASSWORD_HASH;
+
+  const mutesPath = tempMuteRulesPath();
+
+  const { createApp } = await import('./app.js');
+  const app = createApp({
+    readMuteRules: async () => await readMuteRules(mutesPath),
+    addMuteRule: async (keyword, source) => await addMuteRule(keyword, source, mutesPath),
+    removeMuteRule: async (id) => await removeMuteRule(id, mutesPath),
+  });
+
+  const { baseUrl, close } = await startServer(app);
+  try {
+    const cookie = await login(baseUrl);
+    const resp = await fetch(`${baseUrl}/api/brief/mutes`, {
+      method: 'POST',
+      headers: { cookie, 'content-type': 'application/json' },
+      body: JSON.stringify({ keyword: '   ' }),
+    });
+    assert.equal(resp.status, 400);
+    const body = (await resp.json()) as { ok: false; error: string };
+    assert.equal(body.ok, false);
+    assert.match(body.error, /keyword/i);
+  } finally {
+    await close();
+  }
+});
+
+test('POST /api/brief/mutes persists rule; DELETE /api/brief/mutes/:id removes it', async () => {
+  process.env.SESSION_SECRET = 'test-secret';
+  process.env.MVP_PASSWORD = 'pw';
+  delete process.env.MVP_PASSWORD_HASH;
+
+  const mutesPath = tempMuteRulesPath();
+
+  const { createApp } = await import('./app.js');
+  const app = createApp({
+    readMuteRules: async () => await readMuteRules(mutesPath),
+    addMuteRule: async (keyword, source) => await addMuteRule(keyword, source, mutesPath),
+    removeMuteRule: async (id) => await removeMuteRule(id, mutesPath),
+  });
+
+  const { baseUrl, close } = await startServer(app);
+  try {
+    const cookie = await login(baseUrl);
+
+    const createResp = await fetch(`${baseUrl}/api/brief/mutes`, {
+      method: 'POST',
+      headers: { cookie, 'content-type': 'application/json' },
+      body: JSON.stringify({ keyword: 'Alpha', source: 'example.com' }),
+    });
+    assert.equal(createResp.status, 200);
+    const created = (await createResp.json()) as {
+      ok: true;
+      rules: Array<{ id: string; keyword: string; source: string | null; createdAt: string }>;
+    };
+    assert.equal(created.ok, true);
+    assert.equal(created.rules.length, 1);
+    assert.equal(created.rules[0]!.keyword, 'Alpha');
+    assert.equal(created.rules[0]!.source, 'example.com');
+    assert.equal(typeof created.rules[0]!.id, 'string');
+
+    const listResp = await fetch(`${baseUrl}/api/brief/mutes`, { headers: { cookie } });
+    assert.equal(listResp.status, 200);
+    const listed = (await listResp.json()) as {
+      ok: true;
+      rules: Array<{ id: string }>;
+      updatedAt: string | null;
+    };
+    assert.equal(listed.ok, true);
+    assert.equal(listed.rules.length, 1);
+    assert.equal(listed.rules[0]!.id, created.rules[0]!.id);
+    assert.equal(typeof listed.updatedAt, 'string');
+
+    const deleteResp = await fetch(
+      `${baseUrl}/api/brief/mutes/${encodeURIComponent(created.rules[0]!.id)}`,
+      { method: 'DELETE', headers: { cookie } },
+    );
+    assert.equal(deleteResp.status, 200);
+    const deleted = (await deleteResp.json()) as {
+      ok: true;
+      rules: unknown[];
+    };
+    assert.equal(deleted.ok, true);
+    assert.deepEqual(deleted.rules, []);
+
+    const listAfterResp = await fetch(`${baseUrl}/api/brief/mutes`, { headers: { cookie } });
+    assert.equal(listAfterResp.status, 200);
+    const after = (await listAfterResp.json()) as {
+      ok: true;
+      rules: unknown[];
+    };
+    assert.equal(after.ok, true);
+    assert.deepEqual(after.rules, []);
+  } finally {
+    await close();
+  }
+});
+
+test('GET /api/radar hides muted clusters + counts them; tracked muted still returned', async () => {
+  process.env.SESSION_SECRET = 'test-secret';
+  process.env.MVP_PASSWORD = 'pw';
+  delete process.env.MVP_PASSWORD_HASH;
+
+  const { createApp } = await import('./app.js');
+
+  const article = (overrides: Partial<Article> & Pick<Article, 'id' | 'title'>): Article =>
+    ({
+      sourceKind: 'cfp',
+      canonicalUrl: `https://example.com/${overrides.id}`,
+      citations: [{ label: 'Primary', url: `https://example.com/${overrides.id}` }],
+      publisherUrl: `https://publisher.com/${overrides.id}`,
+      publisherDomain: 'publisher.com',
+      handle: null,
+      publishedAt: '2026-09-10T12:00:00.000Z',
+      snippet: 'Snippet',
+      bodyText: null,
+      bodyStatus: 'ok',
+      publisherTitle: null,
+      imageUrl: null,
+      imageCaption: null,
+      imageCredit: null,
+      clusterId: null,
+      fetchedAt: '2026-09-10T12:05:00.000Z',
+      classification: null,
+      classifiedAt: null,
+      classifyError: null,
+      ...overrides,
+    }) as Article;
+
+  const articles: Article[] = [
+    article({ id: 'a1', title: 'Alpha muted story', clusterId: 'c1' }),
+    article({ id: 'a2', title: 'Alpha follow-up', clusterId: 'c1' }),
+    article({ id: 'b1', title: 'Beta visible story', clusterId: 'c2' }),
+  ];
+
+  const app = createApp({
+    readArticles: async () => articles,
+    readMeta: async () => ({ lastFetchAt: null, lastError: null }) as any,
+    readBriefMembership: async () =>
+      ({ acceptedClusterIds: [], updatedAt: null }) as any,
+    readTrackedStories: async () =>
+      ({
+        entries: [
+          {
+            clusterId: 'c1',
+            trackedAt: '2026-09-22T00:00:00.000Z',
+            memberCountSnapshot: 2,
+            pendingUpdate: false,
+          },
+        ],
+        updatedAt: '2026-09-22T00:00:00.000Z',
+      }) as any,
+    readMuteRules: async () =>
+      ({
+        rules: [
+          {
+            id: 'mute-1',
+            keyword: 'alpha',
+            source: null,
+            createdAt: '2026-09-22T00:00:00.000Z',
+          },
+        ],
+        updatedAt: '2026-09-22T00:00:00.000Z',
+      }) as any,
+  });
+
+  const { baseUrl, close } = await startServer(app);
+  try {
+    const cookie = await login(baseUrl);
+
+    const radarResp = await fetch(`${baseUrl}/api/radar`, {
+      headers: { cookie },
+    });
+    assert.equal(radarResp.status, 200);
+    const radar = (await radarResp.json()) as {
+      ok: true;
+      clusters: Array<{ clusterId: string }>;
+      hiddenMutedCount: number;
+    };
+    assert.equal(radar.ok, true);
+    assert.deepEqual(
+      radar.clusters.map((c) => c.clusterId).sort(),
+      ['c2'],
+    );
+    assert.equal(radar.hiddenMutedCount, 1);
+
+    const trackedResp = await fetch(`${baseUrl}/api/brief/tracked`, {
+      headers: { cookie },
+    });
+    assert.equal(trackedResp.status, 200);
+    const tracked = (await trackedResp.json()) as {
+      ok: true;
+      entries: Array<{ clusterId: string; muted?: boolean }>;
+    };
+    assert.equal(tracked.ok, true);
+    assert.ok(tracked.entries.some((e) => e.clusterId === 'c1'));
+    const mutedEntry = tracked.entries.find((e) => e.clusterId === 'c1');
+    assert.ok(mutedEntry);
+    assert.equal(mutedEntry.muted, true);
   } finally {
     await close();
   }

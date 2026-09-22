@@ -32,7 +32,7 @@ Brief shows **Accepted** clusters only (membership in `mvp/data/brief-membership
 
 - **Accepted multi-member cluster:** all current and future articles sharing that `clusterId` appear on Brief without re-Accept.
 - **Accepted solo key:** only that article appears while it stays unclustered (`solo:{articleId}`). If a later fetch merges it into a shared `clusterId`, v1 does **not** remap membership — Accept the new cluster key again (known gap; association = same key only).
-- **Global mute** (NEWS-60) is not applied here yet; mute will subtract from Accepted membership in a follow-up.
+- **Global mute** ([NEWS-60](https://informedcrew.atlassian.net/browse/NEWS-60)): Accepted clusters that match a mute rule are **excluded from Brief** even though membership remains. Unaccept is unchanged; removing the rule restores Brief eligibility.
 - **Manual seed stories** (NEWS-66): Accepted by definition, not on Radar; Unaccept drops from Brief (see below).
 - **Radar** (`/radar`) is the triage lane for fresh CFP + curated RSS before Accept. See [ROADMAP.md](ROADMAP.md).
 
@@ -52,6 +52,25 @@ Cluster keys match Accept and Radar: real `clusterId`, or `solo:{articleId}` whe
 **Alert path (`pendingUpdate` — NEWS-61 seam):** After successful `POST /api/fetch`, `syncTrackedAfterFetch` compares each entry’s member count (articles whose `briefClusterKey` equals the tracked `clusterId`) to `memberCountSnapshot`. When count grows → `pendingUpdate: true` (snapshot is **not** bumped until NEWS-61 ack/view). A new Track sets snapshot to the current count and `pendingUpdate: false`. In-app badge / dismiss UX is [NEWS-61](https://informedcrew.atlassian.net/browse/NEWS-61) — this ticket only persists and exposes `pendingUpdate` on `GET /api/brief/tracked` and Radar cluster payloads.
 
 **Radar:** Tracked section on `/radar` lists watched clusters; Track / Untrack beside Accept. If a tracked cluster is Accepted, primary action opens Brief `/` (expand lives there). See [ROUTE_MAP.md](ROUTE_MAP.md).
+
+### Global mute (NEWS-60)
+
+**Mute ≠ Untrack.** Mute is a global veto on what the operator sees in the headline lane and on Brief; it does not remove track or accept state.
+
+| Action | Store | Effect |
+|--------|-------|--------|
+| **Add mute** (`POST /api/brief/mutes`) | `mvp/data/mute-rules.json` | Keyword (+ optional source) rule; case-insensitive substring match on headline/title text; optional `source` also matches publisher domain/name. |
+| **Remove mute** (`DELETE /api/brief/mutes/:id`) | same | Drops one rule by id. |
+
+**Rule shape:** `{ id, keyword, source: string \| null, createdAt }`. Duplicate keywords with different sources are allowed.
+
+**Match:** A cluster is muted when **any** member article matches a rule (keyword in title/text; when `source` is set on the rule, source must also match).
+
+**Brief:** `filterArticlesForBrief` / owned resolve path skips muted clusters even if Accepted or manual seed.
+
+**Radar:** Muted clusters are omitted from the main headline list. Response includes `hiddenMutedCount` (total muted clusters, including tracked). **Tracked override:** muted clusters that are still tracked appear in the Radar **Tracked** section with a muted indicator; alerts / `pendingUpdate` are not cleared by mute alone.
+
+Session CRUD: `GET /api/brief/mutes`, `POST /api/brief/mutes` `{ keyword, source? }`, `DELETE /api/brief/mutes/:id`. `GET /api/brief/tracked` adds `muted: boolean` per entry. See [MVP_API_COMPAT.md](MVP_API_COMPAT.md).
 
 ### Manual Brief seed (NEWS-66)
 
