@@ -146,11 +146,18 @@
 			clusters = radar.clusters;
 			meta = radar.meta;
 
-			const tracked = (await trackedResponse.json().catch(() => null)) as TrackedResponse | null;
-			if (tracked && tracked.ok) {
-				trackedEntries = tracked.entries;
-			} else if (tracked && tracked.ok === false) {
+			// Do not leave a stale tracked list mounted after transient failures.
+			// Any tracked-endpoint failure (non-401) clears trackedEntries rather than keeping
+			// the last successful list as if it were current.
+			if (!trackedResponse.ok) {
 				trackedEntries = [];
+			} else {
+				const tracked = (await trackedResponse.json().catch(() => null)) as TrackedResponse | null;
+				if (tracked && tracked.ok) {
+					trackedEntries = tracked.entries;
+				} else {
+					trackedEntries = [];
+				}
 			}
 		} catch (err) {
 			console.error('Error loading radar', err);
