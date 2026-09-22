@@ -22,8 +22,8 @@ export type ClassifyBatchResult = {
   attempted: number;
   succeeded: number;
   failed: number;
-  /** How many attempted items came from each source (all kinds are eligible). */
-  bySourceKind: { cfp: number; xcancel: number; rss: number };
+  /** How many attempted items came from each source (manual seeds are skipped). */
+  bySourceKind: { cfp: number; xcancel: number; rss: number; manual: number };
   articles: Article[];
 };
 
@@ -79,12 +79,12 @@ export async function classifyUnclassifiedArticles(
   const byId = new Map(articles.map((a) => [a.id, a]));
 
   const candidates = sortNewestFirst(articles)
-    .filter((a) => a.classification === null)
+    .filter((a) => a.classification === null && a.sourceKind !== 'manual')
     .slice(0, limit);
 
   let succeeded = 0;
   let failed = 0;
-  const bySourceKind = { cfp: 0, xcancel: 0, rss: 0 };
+  const bySourceKind = { cfp: 0, xcancel: 0, rss: 0, manual: 0 };
   const updated: Article[] = [];
 
   for (const article of candidates) {

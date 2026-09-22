@@ -29,7 +29,7 @@ export type FramingAnalysis = {
   confidence: number;
 };
 
-export type SourceKind = 'cfp' | 'xcancel' | 'rss';
+export type SourceKind = 'cfp' | 'xcancel' | 'rss' | 'manual';
 
 /** Publisher body scrape / tweet-as-body status. */
 export type BodyStatus =
