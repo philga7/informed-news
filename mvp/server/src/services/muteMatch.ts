@@ -115,11 +115,16 @@ export function clusterMatchesMute(
   cluster: MuteClusterLike,
   rules: Iterable<MuteRule>,
 ): boolean {
-  const members =
-    cluster.headlines ?? cluster.articles ?? cluster.members ?? [];
-  for (const member of members ?? []) {
-    if (articleMatchesMute(member, rules)) {
-      return true;
+  const lists: Array<ReadonlyArray<MuteArticleLike>> = [];
+  if (Array.isArray(cluster.headlines)) lists.push(cluster.headlines);
+  if (Array.isArray(cluster.articles)) lists.push(cluster.articles);
+  if (Array.isArray(cluster.members)) lists.push(cluster.members);
+
+  for (const members of lists) {
+    for (const member of members) {
+      if (articleMatchesMute(member, rules)) {
+        return true;
+      }
     }
   }
   return false;

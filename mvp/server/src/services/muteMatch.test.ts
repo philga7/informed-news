@@ -87,3 +87,14 @@ test('clusterMatchesMute supports articles/members arrays', async () => {
   );
 });
 
+test('clusterMatchesMute considers all present member arrays (mixed-shape)', async () => {
+  const rules: MuteRule[] = [rule({ keyword: 'alpha' })];
+
+  const cluster = {
+    headlines: [],
+    articles: [{ title: 'Alpha release' }],
+  };
+
+  assert.equal(clusterMatchesMute(cluster, rules), true);
+});
+
