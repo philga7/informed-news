@@ -543,14 +543,30 @@ export function buildOwnedStoriesResponse(
 }
 
 /**
- * Resolve articles for the owned brief: live store, or fixture when empty.
+ * Keep articles whose Brief cluster key is in the accepted membership set.
+ */
+export function filterArticlesForBrief(
+  articles: Article[],
+  acceptedClusterIds: string[],
+): Article[] {
+  const accepted = new Set(acceptedClusterIds);
+  return articles.filter((article) => accepted.has(briefClusterKey(article)));
+}
+
+/**
+ * Resolve articles for the owned brief: fixture when the store is empty;
+ * otherwise filter to accepted cluster keys only (empty accepted → []).
  */
 export function resolveOwnedBriefArticles(
   stored: Article[],
+  acceptedClusterIds: string[] = [],
   now: Date = new Date(),
 ): { articles: Article[]; fromFixture: boolean } {
   if (stored.length > 0) {
-    return { articles: stored, fromFixture: false };
+    return {
+      articles: filterArticlesForBrief(stored, acceptedClusterIds),
+      fromFixture: false,
+    };
   }
   return { articles: ownedBriefFixtureArticles(now), fromFixture: true };
 }

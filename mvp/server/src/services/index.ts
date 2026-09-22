@@ -75,6 +75,7 @@ export {
   buildOwnedCategoriesResponse,
   buildOwnedStoriesResponse,
   ownedBriefFixtureArticles,
+  filterArticlesForBrief,
   resolveOwnedBriefArticles,
 } from './kiteBriefAdapter.js';
 export { createKiteBriefRouter } from './kiteBriefRoutes.js';

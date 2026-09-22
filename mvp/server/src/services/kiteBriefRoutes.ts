@@ -1,5 +1,9 @@
 import { Router } from 'express';
-import { readArticles, readClusterEnrichments } from '../store/index.js';
+import {
+  readArticles,
+  readBriefMembership,
+  readClusterEnrichments,
+} from '../store/index.js';
 import {
   OWNED_BATCH_ID,
   buildOwnedBatchInfo,
@@ -18,7 +22,8 @@ export function createKiteBriefRouter(): Router {
 
   async function loadArticles() {
     const stored = await readArticles();
-    return resolveOwnedBriefArticles(stored);
+    const { acceptedClusterIds } = await readBriefMembership();
+    return resolveOwnedBriefArticles(stored, acceptedClusterIds);
   }
 
   async function loadEnrichments(fromFixture: boolean) {

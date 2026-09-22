@@ -22,12 +22,19 @@ Batch id is always `owned-latest`. Category slug `world` / UUID `00000000-0000-4
 
 - Prefer articles in `mvp/data/articles.json` (CFP / xcancel + framing; curated RSS via Developing desk).
 - Cluster-level enrichments are stored separately in `mvp/data/cluster-enrichments.json` (generated via `POST /api/enrich`).
-- If the store is **empty**, the adapter returns a single **fixture** story so Brief still loads.
+- If the store is **empty**, the adapter returns a single **fixture** story so Brief still loads (first-run / smoke).
+- If the store has articles but **none are Accepted**, Brief returns **no stories** — not the fixture.
 - Adapter: `mvp/server/src/services/kiteBriefAdapter.ts` (groups by `clusterId`, maps framing summary → `short_summary`).
 
 ### Membership (Developing desk — NEWS-57 / NEWS-65 / NEWS-66)
 
-Until Accept ships, Brief may still reflect the full store (current adapter behavior). **Target:** Brief shows **Accepted** clusters only, minus **global mute**; new articles that join an accepted `clusterId` appear without re-Accept. Operators can also **manually seed** a Brief story (title / note / optional URLs; `sourceKind: manual`) — Accepted by definition, not shown on Radar; Unaccept drops from Brief. Radar (`/radar`) is the triage lane for fresh CFP + curated RSS. See [ROADMAP.md](ROADMAP.md).
+Brief shows **Accepted** clusters only (membership in `mvp/data/brief-membership.json`). Accept/Unaccept via session APIs (`POST /api/brief/accept`, `POST /api/brief/unaccept`; see [MVP_API_COMPAT.md](MVP_API_COMPAT.md)). Cluster keys match Radar and enrich: real `clusterId`, or `solo:{articleId}` when unclustered.
+
+- **Accepted multi-member cluster:** all current and future articles sharing that `clusterId` appear on Brief without re-Accept.
+- **Accepted solo key:** only that article appears until it joins a shared cluster (then the real `clusterId` key applies).
+- **Global mute** (NEWS-60) is not applied here yet; mute will subtract from Accepted membership in a follow-up.
+- **Manual seed stories** (NEWS-66): Accepted by definition, not on Radar; Unaccept drops from Brief.
+- **Radar** (`/radar`) is the triage lane for fresh CFP + curated RSS before Accept. See [ROADMAP.md](ROADMAP.md).
 
 ## Regenerate from ingest
 
@@ -35,7 +42,8 @@ Until Accept ships, Brief may still reflect the full store (current adapter beha
 2. Log in against the MVP API (session cookie) — e.g. `curl` to `POST /api/login` (see [MVP_API_COMPAT.md](MVP_API_COMPAT.md)).
 3. `POST /api/fetch` (optional `limit`) then optionally `POST /api/classify`.
 4. After classify, `POST /api/enrich` to generate cluster-level enrichments (persisted to `mvp/data/cluster-enrichments.json`).
-5. Reload Kite Brief — Inbox stories reflect the store (fixture disappears once any article exists).
+5. Accept clusters from Radar (or via `POST /api/brief/accept`).
+6. Reload Kite Brief — Inbox shows **Accepted** stories only. The fixture disappears once any article exists; a non-empty store with zero Accepted clusters shows an empty Brief.
 
 ## Opt-in Kagi data (dev only)
 
