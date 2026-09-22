@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { Article } from '../types/article.js';
+import type { MuteRule } from '../store/muteRulesStore.js';
 import {
   OWNED_BATCH_ID,
   OWNED_CATEGORY_NAME,
@@ -473,6 +474,32 @@ test('resolveOwnedBriefArticles returns empty when store has articles but none a
   );
   assert.equal(result.fromFixture, false);
   assert.deepEqual(result.articles, []);
+});
+
+test('resolveOwnedBriefArticles excludes muted clusters even when accepted', () => {
+  const rules: MuteRule[] = [
+    {
+      id: 'mute-1',
+      keyword: 'alpha',
+      source: null,
+      createdAt: '2026-09-22T00:00:00.000Z',
+    },
+  ];
+  const result = resolveOwnedBriefArticles(
+    [
+      article({ id: 'a1', title: 'Alpha keyword here', clusterId: 'c1' }),
+      article({ id: 'a2', title: 'Second member', clusterId: 'c1' }),
+      article({ id: 'a3', title: 'Beta story', clusterId: 'c2' }),
+    ],
+    ['c1', 'c2'],
+    new Date('2026-09-22T00:00:00.000Z'),
+    rules,
+  );
+  assert.equal(result.fromFixture, false);
+  assert.deepEqual(
+    result.articles.map((a) => a.id),
+    ['a3'],
+  );
 });
 
 test('filterArticlesForBrief keeps accepted cluster members including new ingest', () => {

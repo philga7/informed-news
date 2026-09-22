@@ -308,3 +308,106 @@ test('POST /api/fetch succeeds even when syncTrackedAfterFetch throws', async ()
   }
 });
 
+test('GET /api/radar hides muted clusters + counts them; tracked muted still returned', async () => {
+  process.env.SESSION_SECRET = 'test-secret';
+  process.env.MVP_PASSWORD = 'pw';
+  delete process.env.MVP_PASSWORD_HASH;
+
+  const { createApp } = await import('./app.js');
+
+  const article = (overrides: Partial<Article> & Pick<Article, 'id' | 'title'>): Article =>
+    ({
+      sourceKind: 'cfp',
+      canonicalUrl: `https://example.com/${overrides.id}`,
+      citations: [{ label: 'Primary', url: `https://example.com/${overrides.id}` }],
+      publisherUrl: `https://publisher.com/${overrides.id}`,
+      publisherDomain: 'publisher.com',
+      handle: null,
+      publishedAt: '2026-09-10T12:00:00.000Z',
+      snippet: 'Snippet',
+      bodyText: null,
+      bodyStatus: 'ok',
+      publisherTitle: null,
+      imageUrl: null,
+      imageCaption: null,
+      imageCredit: null,
+      clusterId: null,
+      fetchedAt: '2026-09-10T12:05:00.000Z',
+      classification: null,
+      classifiedAt: null,
+      classifyError: null,
+      ...overrides,
+    }) as Article;
+
+  const articles: Article[] = [
+    article({ id: 'a1', title: 'Alpha muted story', clusterId: 'c1' }),
+    article({ id: 'a2', title: 'Alpha follow-up', clusterId: 'c1' }),
+    article({ id: 'b1', title: 'Beta visible story', clusterId: 'c2' }),
+  ];
+
+  const app = createApp({
+    readArticles: async () => articles,
+    readMeta: async () => ({ lastFetchAt: null, lastError: null }) as any,
+    readBriefMembership: async () =>
+      ({ acceptedClusterIds: [], updatedAt: null }) as any,
+    readTrackedStories: async () =>
+      ({
+        entries: [
+          {
+            clusterId: 'c1',
+            trackedAt: '2026-09-22T00:00:00.000Z',
+            memberCountSnapshot: 2,
+            pendingUpdate: false,
+          },
+        ],
+        updatedAt: '2026-09-22T00:00:00.000Z',
+      }) as any,
+    readMuteRules: async () =>
+      ({
+        rules: [
+          {
+            id: 'mute-1',
+            keyword: 'alpha',
+            source: null,
+            createdAt: '2026-09-22T00:00:00.000Z',
+          },
+        ],
+        updatedAt: '2026-09-22T00:00:00.000Z',
+      }) as any,
+  });
+
+  const { baseUrl, close } = await startServer(app);
+  try {
+    const cookie = await login(baseUrl);
+
+    const radarResp = await fetch(`${baseUrl}/api/radar`, {
+      headers: { cookie },
+    });
+    assert.equal(radarResp.status, 200);
+    const radar = (await radarResp.json()) as {
+      ok: true;
+      clusters: Array<{ clusterId: string }>;
+      hiddenMutedCount: number;
+    };
+    assert.equal(radar.ok, true);
+    assert.deepEqual(
+      radar.clusters.map((c) => c.clusterId).sort(),
+      ['c2'],
+    );
+    assert.equal(radar.hiddenMutedCount, 1);
+
+    const trackedResp = await fetch(`${baseUrl}/api/brief/tracked`, {
+      headers: { cookie },
+    });
+    assert.equal(trackedResp.status, 200);
+    const tracked = (await trackedResp.json()) as {
+      ok: true;
+      entries: Array<{ clusterId: string }>;
+    };
+    assert.equal(tracked.ok, true);
+    assert.ok(tracked.entries.some((e) => e.clusterId === 'c1'));
+  } finally {
+    await close();
+  }
+});
+

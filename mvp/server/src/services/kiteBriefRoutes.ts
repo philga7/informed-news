@@ -3,6 +3,7 @@ import {
   readArticles,
   readBriefMembership,
   readClusterEnrichments,
+  readMuteRules,
 } from '../store/index.js';
 import {
   OWNED_BATCH_ID,
@@ -21,9 +22,17 @@ export function createKiteBriefRouter(): Router {
   const router = Router();
 
   async function loadArticles() {
-    const stored = await readArticles();
-    const { acceptedClusterIds } = await readBriefMembership();
-    return resolveOwnedBriefArticles(stored, acceptedClusterIds);
+    const [stored, membership, mutes] = await Promise.all([
+      readArticles(),
+      readBriefMembership(),
+      readMuteRules(),
+    ]);
+    return resolveOwnedBriefArticles(
+      stored,
+      membership.acceptedClusterIds,
+      new Date(),
+      mutes.rules,
+    );
   }
 
   async function loadEnrichments(fromFixture: boolean) {

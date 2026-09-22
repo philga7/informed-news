@@ -1,6 +1,8 @@
 import type { Article } from '../types/article.js';
 import type { ClusterEnrichmentPayload } from '../types/clusterEnrichment.js';
+import type { MuteRule } from '../store/muteRulesStore.js';
 import { briefClusterKey } from './briefClusterKey.js';
+import { clusterMatchesMute } from './muteMatch.js';
 
 /** Stable batch id for the live owned brief (not a Kagi UUID). */
 export const OWNED_BATCH_ID = 'owned-latest';
@@ -565,6 +567,36 @@ export function filterArticlesForBrief(
   return articles.filter((article) => accepted.has(briefClusterKey(article)));
 }
 
+function filterMutedClustersForBrief(
+  articles: Article[],
+  rules: ReadonlyArray<MuteRule>,
+): Article[] {
+  if (rules.length === 0 || articles.length === 0) return articles;
+
+  const groups = new Map<string, Article[]>();
+  const order: string[] = [];
+
+  for (const article of articles) {
+    const key = briefClusterKey(article);
+    if (!groups.has(key)) {
+      groups.set(key, []);
+      order.push(key);
+    }
+    groups.get(key)!.push(article);
+  }
+
+  const filtered: Article[] = [];
+  for (const key of order) {
+    const members = groups.get(key)!;
+    if (clusterMatchesMute({ articles: members }, rules)) {
+      continue;
+    }
+    filtered.push(...members);
+  }
+
+  return filtered;
+}
+
 /**
  * Resolve articles for the owned brief: fixture when the store is empty;
  * otherwise filter to accepted cluster keys only (empty accepted → []).
@@ -573,12 +605,19 @@ export function resolveOwnedBriefArticles(
   stored: Article[],
   acceptedClusterIds: string[] = [],
   now: Date = new Date(),
+  muteRules: Iterable<MuteRule> = [],
 ): { articles: Article[]; fromFixture: boolean } {
+  const rules = [...muteRules];
   if (stored.length > 0) {
+    const accepted = filterArticlesForBrief(stored, acceptedClusterIds);
     return {
-      articles: filterArticlesForBrief(stored, acceptedClusterIds),
+      articles: filterMutedClustersForBrief(accepted, rules),
       fromFixture: false,
     };
   }
-  return { articles: ownedBriefFixtureArticles(now), fromFixture: true };
+  const fixture = ownedBriefFixtureArticles(now);
+  return {
+    articles: filterMutedClustersForBrief(fixture, rules),
+    fromFixture: true,
+  };
 }

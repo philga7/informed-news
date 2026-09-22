@@ -18,14 +18,18 @@ import {
   sortNewestFirst,
   buildRadarFeed,
   briefClusterKey,
+  clusterMatchesMute,
 } from './services/index.js';
 import {
   acceptCluster,
+  addMuteRule,
   getArticleById,
   readArticles,
   readBriefMembership,
+  readMuteRules,
   readMeta,
   readTrackedStories,
+  removeMuteRule,
   syncTrackedAfterFetch,
   trackCluster,
   unacceptCluster,
@@ -51,6 +55,9 @@ export type CreateAppDeps = {
   classifyUnclassifiedArticles?: typeof classifyUnclassifiedArticles;
   classifyArticleById?: typeof classifyArticleById;
   enrichUnenrichedClusters?: typeof enrichUnenrichedClusters;
+  readMuteRules?: typeof readMuteRules;
+  addMuteRule?: typeof addMuteRule;
+  removeMuteRule?: typeof removeMuteRule;
 };
 
 function parseClusterId(body: unknown): string | null {
@@ -99,6 +106,9 @@ export function createApp(deps: CreateAppDeps = {}): Express {
   const track = deps.trackCluster ?? trackCluster;
   const untrack = deps.untrackCluster ?? untrackCluster;
   const readTracked = deps.readTrackedStories ?? readTrackedStories;
+  const readMutes = deps.readMuteRules ?? readMuteRules;
+  const addMute = deps.addMuteRule ?? addMuteRule;
+  const removeMute = deps.removeMuteRule ?? removeMuteRule;
   const getById = deps.getArticleById ?? getArticleById;
   const classifyBatch = deps.classifyUnclassifiedArticles ?? classifyUnclassifiedArticles;
   const classifyOne = deps.classifyArticleById ?? classifyArticleById;
@@ -215,6 +225,51 @@ export function createApp(deps: CreateAppDeps = {}): Express {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.error('Brief membership read failed:', message);
+      res.status(500).json({ ok: false, error: message });
+    }
+  });
+
+  /**
+   * Global mute rules: veto on Radar + Brief.
+   */
+  app.get('/api/brief/mutes', async (_req, res) => {
+    try {
+      const store = await readMutes();
+      res.json({ ok: true, rules: store.rules, updatedAt: store.updatedAt });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('Mute rules read failed:', message);
+      res.status(500).json({ ok: false, error: message });
+    }
+  });
+
+  app.post('/api/brief/mutes', async (req, res) => {
+    try {
+      const keywordRaw = req.body?.keyword;
+      const keyword = typeof keywordRaw === 'string' ? keywordRaw.trim() : '';
+      if (!keyword) {
+        res.status(400).json({ ok: false, error: 'keyword is required' });
+        return;
+      }
+      const sourceRaw = req.body?.source;
+      const source = typeof sourceRaw === 'string' ? sourceRaw : null;
+
+      const result = await addMute(keyword, source);
+      res.json({ ok: true, rules: result.rules });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('Mute rule create failed:', message);
+      res.status(500).json({ ok: false, error: message });
+    }
+  });
+
+  app.delete('/api/brief/mutes/:id', async (req, res) => {
+    try {
+      const result = await removeMute(req.params.id);
+      res.json({ ok: true, rules: result.rules });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('Mute rule delete failed:', message);
       res.status(500).json({ ok: false, error: message });
     }
   });
@@ -351,13 +406,14 @@ export function createApp(deps: CreateAppDeps = {}): Express {
    */
   app.get('/api/radar', async (_req, res) => {
     try {
-      const [articles, meta, membership, tracked] = await Promise.all([
+      const [articles, meta, membership, tracked, mutes] = await Promise.all([
         readAllArticles(),
         readServerMeta(),
         readMembership(),
         readTracked(),
+        readMutes(),
       ]);
-      const clusters = buildRadarFeed(
+      const allClusters = buildRadarFeed(
         articles,
         membership.acceptedClusterIds,
         tracked.entries.map((entry) => ({
@@ -365,9 +421,16 @@ export function createApp(deps: CreateAppDeps = {}): Express {
           pendingUpdate: entry.pendingUpdate,
         })),
       );
+      const hiddenMutedCount = allClusters.filter((cluster) =>
+        clusterMatchesMute(cluster, mutes.rules),
+      ).length;
+      const clusters = allClusters.filter(
+        (cluster) => !clusterMatchesMute(cluster, mutes.rules),
+      );
       res.json({
         ok: true,
         clusters,
+        hiddenMutedCount,
         meta: {
           lastFetchAt: meta.lastFetchAt,
           lastError: meta.lastError,

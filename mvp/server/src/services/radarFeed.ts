@@ -25,6 +25,7 @@ export type RadarCluster = {
 export type RadarResponse = {
   ok: true;
   clusters: RadarCluster[];
+  hiddenMutedCount: number;
   meta: Pick<StoreMeta, 'lastFetchAt' | 'lastError'>;
 };
 
