@@ -104,7 +104,7 @@ Do **not** treat `_legacy/` (including `_legacy/mvp-web`) as the primary product
 
 Informed News work uses the **NEWS** project on Atlassian (`informedcrew.atlassian.net`). Prefer JQL `project = NEWS`.
 
-**Item ordering:** [docs/ROADMAP.md](docs/ROADMAP.md) — current next is Epic **NEWS-57** Developing desk (radar → accept → track/mute; start **NEWS-61**). Do not pick parked B–G epics unless the user reorders.
+**Item ordering:** [docs/ROADMAP.md](docs/ROADMAP.md) — desk v1 Done-demo complete (**NEWS-57**); ask before Later children or Epic **B**. Do not pick parked B–G epics unless the user reorders.
 
 ## Agent skill loop
 

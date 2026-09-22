@@ -7,6 +7,6 @@ alwaysApply: true
 
 Before choosing “what to build next” in the NEWS project, read [docs/ROADMAP.md](docs/ROADMAP.md).
 
-- **Current next** is documented there (as of writing: NEWS-57 Developing desk — radar → accept → track/mute; start NEWS-61).
+- **Current next** is documented there (as of writing: NEWS-57 Developing desk — radar → accept → track/mute; desk v1 Done-demo complete; ask before Later or Epic B).
 - Parked epics B–G stay parked unless the user explicitly reorders.
 - If Jira status disagrees with the doc, Jira wins — update `docs/ROADMAP.md` in the same change set.

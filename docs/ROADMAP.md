@@ -19,9 +19,9 @@ Historical plan (A–G + H story seeds): [`.cursor/plans/osint_jira_pivot_d6b40f
 | 1e | [NEWS-66](https://informedcrew.atlassian.net/browse/NEWS-66) | Manual Brief seed (title / note / optional URLs) *(Done)* |
 | 1f | [NEWS-59](https://informedcrew.atlassian.net/browse/NEWS-59) | Track developing story (alerts) *(Done)* |
 | 1g | [NEWS-60](https://informedcrew.atlassian.net/browse/NEWS-60) | Mute undesired topics (global) *(Done)* |
-| 1h | [NEWS-61](https://informedcrew.atlassian.net/browse/NEWS-61) | In-app alert badge on tracked updates |
+| 1h | [NEWS-61](https://informedcrew.atlassian.net/browse/NEWS-61) | In-app alert badge on tracked updates *(Done)* |
 
-Start at **NEWS-61** unless the user names another key (NEWS-54/55/58/59/60/65/66/68 Done). Do not open Epics **B–G** until desk v1 is Done (or the user explicitly reorders).
+**Desk v1 Done-demo complete** (through NEWS-61). Remaining NEWS-57 children are **[Later]** (NEWS-56/62–64/67). Ask the user before starting Later desk work or Epic **B** ([NEWS-34](https://informedcrew.atlassian.net/browse/NEWS-34)). Do not open Epics **B–G** unless the user explicitly reorders.
 
 ### Membership (locked 2026-09-18; manual seeds 2026-09-19)
 
@@ -47,7 +47,7 @@ Former [NEWS-53](https://informedcrew.atlassian.net/browse/NEWS-53) (Brief sourc
 | Done | A. Kite presentation | [NEWS-33](https://informedcrew.atlassian.net/browse/NEWS-33) | Shell + owned brief path |
 | Done | H. Owned rich brief clusters | [NEWS-48](https://informedcrew.atlassian.net/browse/NEWS-48) | Expand sections (sources → enrich → images) |
 | Superseded | Brief source breadth | [NEWS-53](https://informedcrew.atlassian.net/browse/NEWS-53) | Absorbed into NEWS-57 |
-| **Active** | I. Developing desk | [NEWS-57](https://informedcrew.atlassian.net/browse/NEWS-57) | Radar → Accept → track/mute; before B |
+| **Done (v1)** | I. Developing desk | [NEWS-57](https://informedcrew.atlassian.net/browse/NEWS-57) | Radar → Accept → track/mute Done-demo; Later children remain; before B |
 | Parked | B. Crucix raw layer | [NEWS-34](https://informedcrew.atlassian.net/browse/NEWS-34) | build-order-2 |
 | Parked | C. Geospatial raw layer | [NEWS-35](https://informedcrew.atlassian.net/browse/NEWS-35) | build-order-3 |
 | Parked | D. QA harness skeleton | [NEWS-36](https://informedcrew.atlassian.net/browse/NEWS-36) | build-order-4; later: [NEWS-31](https://informedcrew.atlassian.net/browse/NEWS-31) archives |
