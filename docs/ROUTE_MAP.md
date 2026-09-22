@@ -9,13 +9,13 @@ Informed News product surfaces vs reserved future layers. **Do not ship empty Fi
 | `/` | **Brief** (home / analysis feed) | Default `npm run dev` entry. Owned brief via `mvp/server`. After Developing desk (NEWS-65/66): **Accepted** clusters only (incl. manual seeds); not the full article store. Header / empty-state **Add story** (session) → manual seed modal ([NEWS-66](https://informedcrew.atlassian.net/browse/NEWS-66)). Story chrome **Unaccept** for accepted stories (required for manual seeds — they never appear on Radar). |
 | `/about` | Product intro overlay | IntroScreen via Brief shell (not funding/methodology). |
 | `/transparency` | **Transparency** | Public funding, methodology, corrections, and team ([NEWS-32](https://informedcrew.atlassian.net/browse/NEWS-32)). Footer link. No login. |
-| `/radar` | **Radar** (triage / headline lane) | Session-required. CFP + curated RSS v1. Footer link (not a header product tab). **Accept / Unaccept** control per cluster ([NEWS-65](https://informedcrew.atlassian.net/browse/NEWS-65)) → Brief; Track = alerts; Mute = global. Epic: [NEWS-57](https://informedcrew.atlassian.net/browse/NEWS-57). |
+| `/radar` | **Radar** (triage / headline lane) | Session-required. CFP + curated RSS v1. Footer link (not a header product tab). **Accept / Unaccept** per cluster ([NEWS-65](https://informedcrew.atlassian.net/browse/NEWS-65)) → Brief. **Track / Untrack** beside Accept ([NEWS-59](https://informedcrew.atlassian.net/browse/NEWS-59)) — Track = alerts when a cluster gains members; does not Accept. **Tracked** section lists watched clusters; Accepted + tracked → **Open on Brief** (`/`). Mute = global ([NEWS-60](https://informedcrew.atlassian.net/browse/NEWS-60)). Epic: [NEWS-57](https://informedcrew.atlassian.net/browse/NEWS-57). |
 | `/contribute` | Feed contribution | Upstream-oriented contribute wizard. |
 | `/world/latest` (and other category routes) | Brief category views | Feed categories — not product “layer” tabs. |
 
 ## Planned (Developing desk — NEWS-57)
 
-Remaining NEWS-57 desk actions (Track, Mute) ship on `/radar` and Brief — no additional product routes yet. **Accept** is live on Radar ([NEWS-65](https://informedcrew.atlassian.net/browse/NEWS-65)); **manual seeds** and Brief **Unaccept** are live on `/` ([NEWS-66](https://informedcrew.atlassian.net/browse/NEWS-66)). Brief shows accepted clusters only.
+Remaining NEWS-57 desk action (**Mute**) ships on `/radar` — no additional product routes yet. **Accept** is live on Radar ([NEWS-65](https://informedcrew.atlassian.net/browse/NEWS-65)); **Track / Untrack** and the Radar **Tracked** section are live ([NEWS-59](https://informedcrew.atlassian.net/browse/NEWS-59)); **manual seeds** and Brief **Unaccept** are live on `/` ([NEWS-66](https://informedcrew.atlassian.net/browse/NEWS-66)). In-app alert badge for `pendingUpdate` is [NEWS-61](https://informedcrew.atlassian.net/browse/NEWS-61). Brief shows accepted clusters only.
 
 ## Reserved (docs only — no empty chrome)
 

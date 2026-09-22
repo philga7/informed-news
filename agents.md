@@ -89,7 +89,7 @@ Do **not** treat `_legacy/` (including `_legacy/mvp-web`) as the primary product
 
 1. Prefer Brief / shell work under `apps/kite` (minimize upstream churn) + docs
 2. Pipeline types/services under `mvp/server`
-3. Routes in `mvp/server/src/index.ts` (or auth router)
+3. Routes live in `mvp/server/src/app.ts` (`createApp`) (plus auth router)
 4. Update README / this file / smoke docs when the operator path changes
 
 ## Prohibited (unless explicitly requested)

@@ -133,6 +133,7 @@ test('buildRadarFeed sorts clusters by newestAt desc and maps fields', () => {
   assert.equal(clusters[0]!.clusterId, 'c2');
   assert.equal(clusters[0]!.newestAt, '2026-09-13T12:00:00.000Z');
   assert.equal(clusters[0]!.accepted, false);
+  assert.equal(clusters[0]!.tracked, false);
 
   const headline = clusters[0]!.headlines[0]!;
   assert.equal(headline.id, 'a2');
@@ -163,5 +164,29 @@ test('buildRadarFeed sets accepted from membership ids', () => {
   const byId = new Map(clusters.map((c) => [c.clusterId, c]));
   assert.equal(byId.get('c1')!.accepted, true);
   assert.equal(byId.get('solo:a2')!.accepted, false);
+  assert.equal(byId.get('c1')!.tracked, false);
+  assert.equal(byId.get('solo:a2')!.tracked, false);
 });
 
+test('buildRadarFeed sets tracked + pendingUpdate from tracked entries', () => {
+  const a1 = article({
+    id: 'a1',
+    title: 'Not tracked',
+    sourceKind: 'cfp',
+    clusterId: 'c1',
+  });
+  const a2 = article({
+    id: 'a2',
+    title: 'Tracked',
+    sourceKind: 'rss',
+    clusterId: 'c2',
+  });
+
+  const clusters = buildRadarFeed([a1, a2], [], [{ clusterId: 'c2', pendingUpdate: true }]);
+
+  const byId = new Map(clusters.map((c) => [c.clusterId, c]));
+  assert.equal(byId.get('c1')!.tracked, false);
+  assert.equal(byId.get('c1')!.pendingUpdate, undefined);
+  assert.equal(byId.get('c2')!.tracked, true);
+  assert.equal(byId.get('c2')!.pendingUpdate, true);
+});

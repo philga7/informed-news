@@ -8,7 +8,7 @@ const root = join(fileURLToPath(new URL('.', import.meta.url)), '..');
 
 describe('NEWS-43 MVP API compat surface', () => {
 	it('keeps health and session-gated article/fetch/classify routes in the server', () => {
-		const src = readFileSync(join(root, 'mvp/server/src/index.ts'), 'utf8');
+		const src = readFileSync(join(root, 'mvp/server/src/app.ts'), 'utf8');
 		assert.match(src, /app\.get\('\/health'/);
 		assert.match(src, /status:\s*'ok'/);
 		assert.match(src, /app:\s*'mvp-server'/);
@@ -22,6 +22,9 @@ describe('NEWS-43 MVP API compat surface', () => {
 		assert.match(src, /app\.post\('\/api\/brief\/accept'/);
 		assert.match(src, /app\.post\('\/api\/brief\/unaccept'/);
 		assert.match(src, /app\.post\('\/api\/brief\/seed'/);
+		assert.match(src, /app\.post\('\/api\/brief\/track'/);
+		assert.match(src, /app\.post\('\/api\/brief\/untrack'/);
+		assert.match(src, /app\.get\('\/api\/brief\/tracked'/);
 		assert.match(src, /requireApiSession/);
 		assert.match(src, /createKiteBriefRouter/);
 	});
@@ -44,6 +47,10 @@ describe('NEWS-43 MVP API compat surface', () => {
 		assert.match(doc, /POST \| `\/api\/brief\/accept`/);
 		assert.match(doc, /POST \| `\/api\/brief\/unaccept`/);
 		assert.match(doc, /POST \| `\/api\/brief\/seed`/);
+		assert.match(doc, /POST \| `\/api\/brief\/track`/);
+		assert.match(doc, /POST \| `\/api\/brief\/untrack`/);
+		assert.match(doc, /GET \| `\/api\/brief\/tracked`/);
+		assert.match(doc, /pendingUpdate/);
 		assert.match(doc, /Session/);
 		assert.match(doc, /CFP/);
 		assert.match(doc, /xcancel/i);

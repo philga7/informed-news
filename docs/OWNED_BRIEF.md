@@ -36,6 +36,23 @@ Brief shows **Accepted** clusters only (membership in `mvp/data/brief-membership
 - **Manual seed stories** (NEWS-66): Accepted by definition, not on Radar; Unaccept drops from Brief (see below).
 - **Radar** (`/radar`) is the triage lane for fresh CFP + curated RSS before Accept. See [ROADMAP.md](ROADMAP.md).
 
+### Tracking developing stories (NEWS-59)
+
+**Track ≠ Accept.** They are independent operator flags with separate stores:
+
+| Action | Store | Effect |
+|--------|-------|--------|
+| **Accept** (`POST /api/brief/accept`) | `mvp/data/brief-membership.json` | Cluster appears on Brief (`/`). |
+| **Track** (`POST /api/brief/track`) | `mvp/data/tracked-stories.json` | Operator watches for **new members after ingest**; does **not** put the cluster on Brief by itself. |
+
+Cluster keys match Accept and Radar: real `clusterId`, or `solo:{articleId}` when unclustered. **Untrack** (`POST /api/brief/untrack`) ≠ **Unaccept**; **Unaccept** ≠ **Untrack**. Same solo-merge gap as Accept — if a tracked solo key merges into a shared `clusterId`, v1 does not remap; Track the new key again.
+
+**Default Track on Accept/seed:** `POST /api/brief/accept` and manual seed (`POST /api/brief/seed` / `createManualSeed`) both call `trackCluster` after accept (idempotent). Explicit Untrack is still allowed afterward.
+
+**Alert path (`pendingUpdate` — NEWS-61 seam):** After successful `POST /api/fetch`, `syncTrackedAfterFetch` compares each entry’s member count (articles whose `briefClusterKey` equals the tracked `clusterId`) to `memberCountSnapshot`. When count grows → `pendingUpdate: true` (snapshot is **not** bumped until NEWS-61 ack/view). A new Track sets snapshot to the current count and `pendingUpdate: false`. In-app badge / dismiss UX is [NEWS-61](https://informedcrew.atlassian.net/browse/NEWS-61) — this ticket only persists and exposes `pendingUpdate` on `GET /api/brief/tracked` and Radar cluster payloads.
+
+**Radar:** Tracked section on `/radar` lists watched clusters; Track / Untrack beside Accept. If a tracked cluster is Accepted, primary action opens Brief `/` (expand lives there). See [ROUTE_MAP.md](ROUTE_MAP.md).
+
 ### Manual Brief seed (NEWS-66)
 
 Operators can add a story directly to Brief without going through Radar ingest:

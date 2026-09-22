@@ -43,13 +43,16 @@ Kite does **not** need to proxy these routes. Hit the API on `:3001` directly (d
 | POST | `/api/classify` | Session | Batch framing for unclassified items |
 | POST | `/api/classify/:id` | Session | Reclassify one article |
 | POST | `/api/enrich` | Session | Batch cluster enrichment (AI-assisted). Optional body/query: `{ limit?: number, force?: boolean }` |
-| GET | `/api/radar` | Session | Developing desk triage feed: clustered CFP + curated RSS; each cluster includes `accepted` from membership |
+| GET | `/api/radar` | Session | Developing desk triage feed: clustered CFP + curated RSS; each cluster includes `accepted` from membership and `tracked` / optional `pendingUpdate` from the track store |
 | GET | `/api/brief/membership` | Session | Brief membership snapshot: `{ ok, acceptedClusterIds, updatedAt }` |
-| POST | `/api/brief/accept` | Session | Idempotent accept onto Brief; body `{ clusterId: string }` → `{ ok, acceptedClusterIds }` |
+| POST | `/api/brief/accept` | Session | Idempotent accept onto Brief; body `{ clusterId: string }` → `{ ok, acceptedClusterIds }`. Also tracks the cluster by default ([NEWS-59](https://informedcrew.atlassian.net/browse/NEWS-59)). |
 | POST | `/api/brief/unaccept` | Session | Idempotent remove from Brief; body `{ clusterId: string }` → `{ ok, acceptedClusterIds }` |
-| POST | `/api/brief/seed` | Session | Create Accepted manual Brief story ([NEWS-66](https://informedcrew.atlassian.net/browse/NEWS-66)); body `{ title: string; note?: string; urls?: string[] }` → `{ ok, articleId, clusterId, acceptedClusterIds }`; `400` on missing title or invalid URLs |
+| POST | `/api/brief/track` | Session | Idempotent track developing story (Track ≠ Accept); body `{ clusterId: string }` → `{ ok, entries: TrackedEntry[] }`; `400` on missing/empty `clusterId` |
+| POST | `/api/brief/untrack` | Session | Idempotent remove from tracked; body `{ clusterId: string }` → `{ ok, entries: TrackedEntry[] }`; `400` on missing/empty `clusterId` |
+| GET | `/api/brief/tracked` | Session | Tracked snapshot: `{ ok, entries: TrackedEntry[], updatedAt }` where `TrackedEntry = { clusterId, trackedAt, memberCountSnapshot, pendingUpdate }` |
+| POST | `/api/brief/seed` | Session | Create Accepted manual Brief story ([NEWS-66](https://informedcrew.atlassian.net/browse/NEWS-66)); body `{ title: string; note?: string; urls?: string[] }` → `{ ok, articleId, clusterId, acceptedClusterIds }`; `400` on missing title or invalid URLs. Also tracks the seed cluster by default ([NEWS-59](https://informedcrew.atlassian.net/browse/NEWS-59)). |
 
-Public Kite brief routes under `/api/batches…` are **in addition** to this surface (NEWS-44); they are not a replacement for `/api/articles`. Brief **content** is accepted-only after [NEWS-65](https://informedcrew.atlassian.net/browse/NEWS-65); membership routes above gate what appears on `/`. Manual seeds are Accepted on create and excluded from Radar.
+Public Kite brief routes under `/api/batches…` are **in addition** to this surface (NEWS-44); they are not a replacement for `/api/articles`. Brief **content** is accepted-only after [NEWS-65](https://informedcrew.atlassian.net/browse/NEWS-65); membership routes above gate what appears on `/`. Manual seeds are Accepted on create and excluded from Radar. Track / Untrack are independent of Accept / Unaccept ([NEWS-59](https://informedcrew.atlassian.net/browse/NEWS-59)); Accept and seed track by default. After `POST /api/fetch`, tracked entries may get `pendingUpdate: true` when member count grows — badge UX is [NEWS-61](https://informedcrew.atlassian.net/browse/NEWS-61).
 
 ## Guarantees
 
