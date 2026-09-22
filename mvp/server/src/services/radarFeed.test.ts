@@ -46,6 +46,26 @@ test('buildRadarFeed filters to CFP + RSS only', () => {
   assert.deepEqual(ids.sort(), ['a1', 'a2']);
 });
 
+test('buildRadarFeed excludes manual operator-seeded articles', () => {
+  const manual = article({
+    id: 'manual-1',
+    title: 'Operator seed',
+    sourceKind: 'manual',
+    canonicalUrl: 'manual://seed/test-uuid',
+    clusterId: 'manual-1',
+    snippet: 'Operator note',
+    bodyStatus: 'not_applicable',
+    publisherUrl: null,
+    publisherDomain: null,
+  });
+  const cfp = article({ id: 'cfp-1', title: 'CFP headline', sourceKind: 'cfp' });
+
+  const clusters = buildRadarFeed([manual, cfp]);
+
+  const ids = clusters.flatMap((c) => c.headlines.map((h) => h.id));
+  assert.deepEqual(ids, ['cfp-1']);
+});
+
 test('buildRadarFeed groups by clusterId or solo key', () => {
   const a1 = article({
     id: 'a1',

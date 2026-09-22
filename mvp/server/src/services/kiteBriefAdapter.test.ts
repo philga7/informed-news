@@ -45,6 +45,46 @@ function article(
   };
 }
 
+test('articlesToKiteStories uses operator note for manual seeds', () => {
+  const stories = articlesToKiteStories([
+    article({
+      id: 'manual-note',
+      title: 'Manual headline',
+      sourceKind: 'manual',
+      canonicalUrl: 'manual://seed/test-uuid',
+      snippet: 'Operator context note',
+      publisherUrl: null,
+      publisherDomain: null,
+      bodyStatus: 'not_applicable',
+    }),
+  ]);
+
+  assert.equal(stories.length, 1);
+  assert.equal(stories[0]!.short_summary, 'Operator context note');
+});
+
+test('articlesToKiteStories uses honest copy for manual seeds without note', () => {
+  const stories = articlesToKiteStories([
+    article({
+      id: 'manual-empty',
+      title: 'Manual headline only',
+      sourceKind: 'manual',
+      canonicalUrl: 'manual://seed/empty-uuid',
+      snippet: '',
+      publisherUrl: null,
+      publisherDomain: null,
+      bodyStatus: 'not_applicable',
+    }),
+  ]);
+
+  assert.equal(stories.length, 1);
+  assert.equal(
+    stories[0]!.short_summary,
+    'Operator-seeded story — no publisher body yet.',
+  );
+  assert.notEqual(stories[0]!.short_summary, 'Manual headline only');
+});
+
 test('articlesToKiteStories maps solo articles and prefers framing summary', () => {
   const stories = articlesToKiteStories([
     article({
