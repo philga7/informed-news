@@ -43,3 +43,31 @@ export const RADAR_TRACK_PENDING = 'Saving…';
 export const RADAR_TRACK_ERROR =
 	'Could not update tracked stories. Try again.';
 
+export const RADAR_HIDDEN_MUTED_PREFIX = 'Hidden';
+
+export const RADAR_MUTED_LABEL = 'Muted';
+
+export const RADAR_MUTES_SECTION_TITLE = 'Mute rules';
+
+export const RADAR_MUTES_SECTION_HELP =
+	'Hide clusters from Radar and veto Brief membership using keyword + optional source matches.';
+
+export const RADAR_MUTES_KEYWORD_LABEL = 'Keyword';
+
+export const RADAR_MUTES_SOURCE_LABEL = 'Source (optional)';
+
+export const RADAR_MUTES_ADD_LABEL = 'Mute';
+
+export const RADAR_MUTES_DELETE_LABEL = 'Delete';
+
+export const RADAR_MUTES_EMPTY_COPY = 'No mute rules yet.';
+
+export const RADAR_MUTES_LOAD_ERROR =
+	'Could not load mute rules. Try again.';
+
+export const RADAR_MUTES_SAVE_ERROR =
+	'Could not save mute rule. Try again.';
+
+export const RADAR_MUTES_DELETE_ERROR =
+	'Could not delete mute rule. Try again.';
+
