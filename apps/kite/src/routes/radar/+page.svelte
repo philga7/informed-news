@@ -2,6 +2,9 @@
 	import { onMount } from 'svelte';
 	import { PRODUCT_NAME } from '$lib/brand';
 	import {
+		RADAR_ACCEPT_ERROR,
+		RADAR_ACCEPT_LABEL,
+		RADAR_ACCEPT_PENDING,
 		RADAR_EMPTY_COPY,
 		RADAR_ERROR_GENERIC,
 		RADAR_LOGIN_INTRO,
@@ -9,6 +12,7 @@
 		RADAR_NETWORK_ERROR,
 		RADAR_PAGE_DESCRIPTION,
 		RADAR_PAGE_TITLE,
+		RADAR_UNACCEPT_LABEL,
 	} from '$lib/radar';
 
 	type RadarHeadline = {
@@ -25,6 +29,7 @@
 		clusterId: string;
 		headlines: RadarHeadline[];
 		newestAt: string | null;
+		accepted: boolean;
 	};
 
 	type RadarMeta = {
@@ -52,6 +57,8 @@
 	let password = '';
 	let loginError: string | null = null;
 	let loggingIn = false;
+	let pendingClusterId: string | null = null;
+	let acceptError: string | null = null;
 
 	function formatDateTime(value: string | null): string {
 		if (!value) return 'not yet run';
@@ -71,6 +78,7 @@
 		}
 		loading = true;
 		error = null;
+		acceptError = null;
 
 		try {
 			const response = await fetch('/api/radar', {
@@ -156,7 +164,64 @@
 			clusters = [];
 			meta = null;
 			error = null;
+			acceptError = null;
+			pendingClusterId = null;
 			unauthenticated = true;
+		}
+	}
+
+	function setClusterAccepted(clusterId: string, accepted: boolean): void {
+		clusters = clusters.map((cluster) =>
+			cluster.clusterId === clusterId ? { ...cluster, accepted } : cluster,
+		);
+	}
+
+	async function toggleAccept(cluster: RadarCluster): Promise<void> {
+		if (pendingClusterId || loading) return;
+
+		const nextAccepted = !cluster.accepted;
+		const previousAccepted = cluster.accepted;
+		acceptError = null;
+		pendingClusterId = cluster.clusterId;
+		setClusterAccepted(cluster.clusterId, nextAccepted);
+
+		try {
+			const response = await fetch(
+				nextAccepted ? '/api/brief/accept' : '/api/brief/unaccept',
+				{
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json',
+					},
+					credentials: 'include',
+					body: JSON.stringify({ clusterId: cluster.clusterId }),
+				},
+			);
+
+			if (response.status === 401) {
+				setClusterAccepted(cluster.clusterId, previousAccepted);
+				unauthenticated = true;
+				clusters = [];
+				meta = null;
+				return;
+			}
+
+			const body = (await response.json().catch(() => null)) as
+				| { ok?: boolean; error?: string }
+				| null;
+
+			if (!response.ok || (body && body.ok === false)) {
+				setClusterAccepted(cluster.clusterId, previousAccepted);
+				acceptError =
+					(body && body.error) || RADAR_ACCEPT_ERROR;
+				return;
+			}
+		} catch (err) {
+			console.error('Error toggling Brief membership', err);
+			setClusterAccepted(cluster.clusterId, previousAccepted);
+			acceptError = RADAR_NETWORK_ERROR;
+		} finally {
+			pendingClusterId = null;
 		}
 	}
 
@@ -237,6 +302,12 @@
 				</p>
 			{/if}
 
+			{#if acceptError}
+				<p class="mt-4 text-sm text-red-600 dark:text-red-400">
+					{acceptError}
+				</p>
+			{/if}
+
 			{#if meta}
 				<div
 					class="mt-6 space-y-1 text-xs text-gray-500 dark:text-gray-400"
@@ -263,12 +334,31 @@
 				<section class="mt-8 space-y-6" aria-label="Radar clusters">
 					{#each clusters as cluster}
 						<article class="border-l border-gray-200 pl-4 dark:border-gray-700">
-							{#if cluster.newestAt}
-								<p class="text-xs text-gray-500 dark:text-gray-400">
-									Latest in cluster:
-									<span class="font-medium">{formatDateTime(cluster.newestAt)}</span>
-								</p>
-							{/if}
+							<div class="flex items-baseline justify-between gap-3">
+								{#if cluster.newestAt}
+									<p class="text-xs text-gray-500 dark:text-gray-400">
+										Latest in cluster:
+										<span class="font-medium">{formatDateTime(cluster.newestAt)}</span>
+									</p>
+								{:else}
+									<span class="text-xs text-gray-500 dark:text-gray-400"></span>
+								{/if}
+								<button
+									type="button"
+									class="shrink-0 text-xs font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700 disabled:opacity-50 dark:text-blue-400 dark:hover:text-blue-300"
+									disabled={pendingClusterId === cluster.clusterId}
+									aria-pressed={cluster.accepted}
+									on:click={() => toggleAccept(cluster)}
+								>
+									{#if pendingClusterId === cluster.clusterId}
+										{RADAR_ACCEPT_PENDING}
+									{:else if cluster.accepted}
+										{RADAR_UNACCEPT_LABEL}
+									{:else}
+										{RADAR_ACCEPT_LABEL}
+									{/if}
+								</button>
+							</div>
 
 							<ul class="mt-2 space-y-1">
 								{#each cluster.headlines as headline}

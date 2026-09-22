@@ -17,6 +17,7 @@ export type RadarCluster = {
   clusterId: string; // existing id or `solo:<articleId>`
   headlines: RadarHeadline[]; // ≥1, newest first within cluster
   newestAt: string | null;
+  accepted: boolean;
 };
 
 export type RadarResponse = {
@@ -51,8 +52,13 @@ function toHeadline(article: Article): RadarHeadline {
  * - Filters to sourceKind `cfp` | `rss` only (excludes `xcancel`).
  * - Groups by existing `clusterId`; null/empty → `solo:<articleId>`.
  * - Sorts clusters by `newestAt` (desc); headlines newest-first within cluster.
+ * - Sets `accepted` from Brief membership ids (default: none accepted).
  */
-export function buildRadarFeed(articles: Article[]): RadarCluster[] {
+export function buildRadarFeed(
+  articles: Article[],
+  acceptedClusterIds: Iterable<string> = [],
+): RadarCluster[] {
+  const accepted = new Set(acceptedClusterIds);
   const filtered = articles.filter((a) => isRadarSource(a.sourceKind));
 
   const groups = new Map<string, Article[]>();
@@ -81,6 +87,7 @@ export function buildRadarFeed(articles: Article[]): RadarCluster[] {
       clusterId,
       headlines: sortedMembers.map(toHeadline),
       newestAt: newest || null,
+      accepted: accepted.has(clusterId),
     });
   }
 

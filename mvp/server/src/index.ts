@@ -187,8 +187,12 @@ app.post('/api/brief/unaccept', async (req, res) => {
  */
 app.get('/api/radar', async (_req, res) => {
   try {
-    const [articles, meta] = await Promise.all([readArticles(), readMeta()]);
-    const clusters = buildRadarFeed(articles);
+    const [articles, meta, membership] = await Promise.all([
+      readArticles(),
+      readMeta(),
+      readBriefMembership(),
+    ]);
+    const clusters = buildRadarFeed(articles, membership.acceptedClusterIds);
     res.json({
       ok: true,
       clusters,

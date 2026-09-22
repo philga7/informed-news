@@ -112,6 +112,7 @@ test('buildRadarFeed sorts clusters by newestAt desc and maps fields', () => {
   // Cluster with newer article should come first.
   assert.equal(clusters[0]!.clusterId, 'c2');
   assert.equal(clusters[0]!.newestAt, '2026-09-13T12:00:00.000Z');
+  assert.equal(clusters[0]!.accepted, false);
 
   const headline = clusters[0]!.headlines[0]!;
   assert.equal(headline.id, 'a2');
@@ -121,5 +122,26 @@ test('buildRadarFeed sorts clusters by newestAt desc and maps fields', () => {
   assert.equal(headline.publishedAt, '2026-09-13T12:00:00.000Z');
   assert.equal(headline.canonicalUrl, newerClusterArticle.canonicalUrl);
   assert.equal(headline.citationLabel, 'CFP');
+});
+
+test('buildRadarFeed sets accepted from membership ids', () => {
+  const a1 = article({
+    id: 'a1',
+    title: 'Accepted cluster',
+    sourceKind: 'cfp',
+    clusterId: 'c1',
+  });
+  const a2 = article({
+    id: 'a2',
+    title: 'Solo not accepted',
+    sourceKind: 'rss',
+    clusterId: null,
+  });
+
+  const clusters = buildRadarFeed([a1, a2], ['c1']);
+
+  const byId = new Map(clusters.map((c) => [c.clusterId, c]));
+  assert.equal(byId.get('c1')!.accepted, true);
+  assert.equal(byId.get('solo:a2')!.accepted, false);
 });
 
