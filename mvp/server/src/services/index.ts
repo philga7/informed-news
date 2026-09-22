@@ -95,4 +95,15 @@ export type {
   RadarHeadlineSourceKind,
   RadarResponse,
 } from './radarFeed.js';
+export {
+  buildManualSeedArticle,
+  createManualSeed,
+  ManualSeedValidationError,
+  parseManualSeedBody,
+} from './manualBriefSeed.js';
+export type {
+  CreateManualSeedDeps,
+  CreateManualSeedResult,
+  ManualSeedInput,
+} from './manualBriefSeed.js';
 
