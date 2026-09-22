@@ -12,3 +12,4 @@ export const CLUSTER_ENRICHMENTS_PATH = path.join(
   DATA_DIR,
   'cluster-enrichments.json',
 );
+export const BRIEF_MEMBERSHIP_PATH = path.join(DATA_DIR, 'brief-membership.json');
