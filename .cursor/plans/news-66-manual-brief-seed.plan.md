@@ -30,7 +30,7 @@ Operator creates a Brief story with **title** (required), **note** / **URL(s)** 
 | Track | Out of scope (NEWS-59). | |
 | Radar | No change required if `manual` ∉ cfp\|rss filter; add regression test. | |
 | UI | Brief Header (or empty-state) “Add story” button → small modal (title / note / URLs) → `POST /api/brief/seed` via Kite proxy; on success navigate/reload Brief. | |
-| Unaccept | Reuse existing Unaccept (Radar or future Brief control). Seed rows may remain in `articles.json`. | |
+| Unaccept | Reuse existing Unaccept API. **Brief must expose Unaccept** for accepted clusters (manual seeds never appear on Radar). Prefer a compact control on the story header/card for accepted stories. Seed rows may remain in `articles.json`. | |
 
 ### API shape (verbatim)
 
@@ -82,7 +82,7 @@ Operator creates a Brief story with **title** (required), **note** / **URL(s)** 
 
 ---
 
-## Task 4: Kite proxy + Add story UI
+## Task 4: Kite proxy + Add story UI + Brief Unaccept
 
 **Files:**
 
@@ -90,6 +90,7 @@ Operator creates a Brief story with **title** (required), **note** / **URL(s)** 
 - Thin UI: modal/component under `apps/kite/src/lib/components/` (e.g. `ManualBriefSeedModal.svelte`) + trigger from Header (Brief only) and/or StoryList empty state.
 - Copy helpers in a small `$lib/briefSeed.ts` if needed.
 - Session: if 401, surface login hint (Radar already has pattern — reuse lightly or link to `/radar` login). Prefer posting with credentials; show error on failure.
+- **Brief Unaccept:** control on Brief story chrome for accepted stories (at least for `sourceKind: manual` / all accepted). Call existing `/api/brief/unaccept` with the story’s cluster key; drop from list on success. Required so manual seeds can leave Brief (Radar never lists them).
 
 **Commit:** `feat(kite): Add story UI for manual Brief seeds`
 
