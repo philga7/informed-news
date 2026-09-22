@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 import {
+  ackTrackedUpdate,
   readTrackedStories,
   syncTrackedAfterFetch,
   trackCluster,
@@ -191,4 +192,44 @@ test('syncTrackedAfterFetch ignores invalid member counts in map', async () => {
 
   assert.deepEqual(result.entries, before.entries);
   assert.deepEqual(after, before);
+});
+
+test('ackTrackedUpdate clears pendingUpdate and bumps snapshot', async () => {
+  const trackedPath = tempTrackedPath();
+
+  await trackCluster('cluster-a', 2, trackedPath);
+  await syncTrackedAfterFetch({ 'cluster-a': 4 }, trackedPath);
+  const before = await readTrackedStories(trackedPath);
+  assert.equal(before.entries[0]?.pendingUpdate, true);
+  assert.equal(before.entries[0]?.memberCountSnapshot, 2);
+
+  const result = await ackTrackedUpdate('cluster-a', 4, trackedPath);
+  const entry = result.entries.find((e) => e.clusterId === 'cluster-a');
+  assert.ok(entry);
+  assert.equal(entry.pendingUpdate, false);
+  assert.equal(entry.memberCountSnapshot, 4);
+
+  const stored = await readTrackedStories(trackedPath);
+  const storedEntry = stored.entries.find((e) => e.clusterId === 'cluster-a');
+  assert.ok(storedEntry);
+  assert.equal(storedEntry.pendingUpdate, false);
+  assert.equal(storedEntry.memberCountSnapshot, 4);
+  assert.equal(typeof stored.updatedAt, 'string');
+});
+
+test('ackTrackedUpdate is idempotent when already clear', async () => {
+  const trackedPath = tempTrackedPath();
+
+  await trackCluster('cluster-a', 2, trackedPath);
+  await syncTrackedAfterFetch({ 'cluster-a': 4 }, trackedPath);
+  await ackTrackedUpdate('cluster-a', 4, trackedPath);
+  const before = await readTrackedStories(trackedPath);
+
+  const result = await ackTrackedUpdate('cluster-a', 6, trackedPath);
+  const after = await readTrackedStories(trackedPath);
+
+  assert.deepEqual(result.entries, before.entries);
+  assert.deepEqual(after, before);
+  assert.equal(after.entries[0]?.pendingUpdate, false);
+  assert.equal(after.entries[0]?.memberCountSnapshot, 4);
 });

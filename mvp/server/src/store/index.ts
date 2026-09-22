@@ -21,6 +21,7 @@ export {
 } from './briefMembershipStore.js';
 export type { BriefMembership } from './briefMembershipStore.js';
 export {
+  ackTrackedUpdate,
   readTrackedStories,
   syncTrackedAfterFetch,
   trackCluster,

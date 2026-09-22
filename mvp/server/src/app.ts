@@ -23,6 +23,7 @@ import {
 import {
   acceptCluster,
   addMuteRule,
+  ackTrackedUpdate,
   getArticleById,
   readArticles,
   readBriefMembership,
@@ -50,6 +51,7 @@ export type CreateAppDeps = {
   parseManualSeedBody?: typeof parseManualSeedBody;
   trackCluster?: typeof trackCluster;
   untrackCluster?: typeof untrackCluster;
+  ackTrackedUpdate?: typeof ackTrackedUpdate;
   readTrackedStories?: typeof readTrackedStories;
   getArticleById?: typeof getArticleById;
   classifyUnclassifiedArticles?: typeof classifyUnclassifiedArticles;
@@ -105,6 +107,7 @@ export function createApp(deps: CreateAppDeps = {}): Express {
   const parseSeedBody = deps.parseManualSeedBody ?? parseManualSeedBody;
   const track = deps.trackCluster ?? trackCluster;
   const untrack = deps.untrackCluster ?? untrackCluster;
+  const ackTracked = deps.ackTrackedUpdate ?? ackTrackedUpdate;
   const readTracked = deps.readTrackedStories ?? readTrackedStories;
   const readMutes = deps.readMuteRules ?? readMuteRules;
   const addMute = deps.addMuteRule ?? addMuteRule;
@@ -381,6 +384,29 @@ export function createApp(deps: CreateAppDeps = {}): Express {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.error('Brief untrack failed:', message);
+      res.status(500).json({ ok: false, error: message });
+    }
+  });
+
+  /**
+   * Ack a tracked story update (idempotent).
+   * Clears pendingUpdate and bumps memberCountSnapshot to the current full-store count.
+   */
+  app.post('/api/brief/tracked/ack', async (req, res) => {
+    try {
+      const clusterId = parseClusterId(req.body);
+      if (!clusterId) {
+        res.status(400).json({ ok: false, error: 'clusterId is required' });
+        return;
+      }
+
+      const articles = await readAllArticles();
+      const memberCount = countMembersForClusterId(articles, clusterId);
+      const result = await ackTracked(clusterId, memberCount);
+      res.json({ ok: true, entries: result.entries satisfies TrackedEntry[] });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('Brief tracked ack failed:', message);
       res.status(500).json({ ok: false, error: message });
     }
   });

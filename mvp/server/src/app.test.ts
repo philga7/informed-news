@@ -7,7 +7,12 @@ import type { Server } from 'node:http';
 
 import type { Article } from './types/article.js';
 import { acceptCluster, readBriefMembership } from './store/briefMembershipStore.js';
-import { readTrackedStories, trackCluster } from './store/trackedStoriesStore.js';
+import {
+  ackTrackedUpdate,
+  readTrackedStories,
+  syncTrackedAfterFetch,
+  trackCluster,
+} from './store/trackedStoriesStore.js';
 import {
   addMuteRule,
   readMuteRules,
@@ -313,6 +318,65 @@ test('POST /api/fetch succeeds even when syncTrackedAfterFetch throws', async ()
     assert.equal(resp.status, 200);
     const json = (await resp.json()) as { ok: boolean };
     assert.equal(json.ok, true);
+  } finally {
+    await close();
+  }
+});
+
+test('POST /api/brief/tracked/ack clears pendingUpdate and bumps snapshot via full-store count', async () => {
+  process.env.SESSION_SECRET = 'test-secret';
+  process.env.MVP_PASSWORD = 'pw';
+  delete process.env.MVP_PASSWORD_HASH;
+
+  const trackedPath = tempTrackedPath();
+
+  const articles: Article[] = [
+    { id: 'a1', clusterId: 'c1' } as Article,
+    { id: 'a2', clusterId: 'c1' } as Article,
+    { id: 'a3', clusterId: 'c1' } as Article,
+  ];
+
+  // Seed tracked state with a smaller snapshot, then mark pendingUpdate true.
+  await trackCluster('c1', 2, trackedPath);
+  await syncTrackedAfterFetch({ c1: 3 }, trackedPath);
+  const before = await readTrackedStories(trackedPath);
+  assert.equal(before.entries.find((e) => e.clusterId === 'c1')?.pendingUpdate, true);
+
+  const { createApp } = await import('./app.js');
+  const app = createApp({
+    readArticles: async () => articles,
+    ackTrackedUpdate: async (clusterId, memberCount) =>
+      await ackTrackedUpdate(clusterId, memberCount, trackedPath),
+  });
+
+  const { baseUrl, close } = await startServer(app);
+  try {
+    const cookie = await login(baseUrl);
+    const resp = await fetch(`${baseUrl}/api/brief/tracked/ack`, {
+      method: 'POST',
+      headers: { cookie, 'content-type': 'application/json' },
+      body: JSON.stringify({ clusterId: 'c1' }),
+    });
+    assert.equal(resp.status, 200);
+    const json = (await resp.json()) as {
+      ok: true;
+      entries: Array<{
+        clusterId: string;
+        memberCountSnapshot: number;
+        pendingUpdate: boolean;
+      }>;
+    };
+    assert.equal(json.ok, true);
+    const entry = json.entries.find((e) => e.clusterId === 'c1');
+    assert.ok(entry);
+    assert.equal(entry.pendingUpdate, false);
+    assert.equal(entry.memberCountSnapshot, 3);
+
+    const stored = await readTrackedStories(trackedPath);
+    const storedEntry = stored.entries.find((e) => e.clusterId === 'c1');
+    assert.ok(storedEntry);
+    assert.equal(storedEntry.pendingUpdate, false);
+    assert.equal(storedEntry.memberCountSnapshot, 3);
   } finally {
     await close();
   }

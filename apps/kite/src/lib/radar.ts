@@ -34,6 +34,15 @@ export const RADAR_TRACKED_SECTION_TITLE = 'Tracked';
 export const RADAR_TRACKED_SECTION_HELP =
 	'Developing stories you are watching for new members after ingest. Tracking does not Accept a cluster onto the Brief.';
 
+export const RADAR_TRACKED_UPDATE_BADGE = 'Update';
+
+export const RADAR_TRACKED_DISMISS_LABEL = 'Dismiss';
+
+export const RADAR_TRACKED_DISMISS_PENDING = 'Dismissing…';
+
+export const RADAR_TRACKED_ACK_ERROR =
+	'Could not clear tracked update. Try again.';
+
 export const RADAR_TRACK_LABEL = 'Track';
 
 export const RADAR_UNTRACK_LABEL = 'Untrack';
