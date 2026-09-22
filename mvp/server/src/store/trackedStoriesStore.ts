@@ -205,6 +205,47 @@ export async function untrackCluster(
 }
 
 /**
+ * Ack a tracked update (idempotent).
+ * Clears pendingUpdate and bumps memberCountSnapshot to the provided current count.
+ */
+export async function ackTrackedUpdate(
+  clusterId: string,
+  currentMemberCount: number,
+  trackedPath: string = TRACKED_STORIES_PATH,
+): Promise<{ entries: TrackedEntry[] }> {
+  const normalizedClusterId = normalizeClusterIdInput(clusterId);
+  if (!normalizedClusterId || !isValidMemberCount(currentMemberCount)) {
+    const tracked = await readTrackedStories(trackedPath);
+    return { entries: tracked.entries };
+  }
+
+  const tracked = await readTrackedStories(trackedPath);
+  const existing = tracked.entries.find(
+    (entry) => entry.clusterId === normalizedClusterId,
+  );
+  if (!existing || !existing.pendingUpdate) {
+    return { entries: tracked.entries };
+  }
+
+  const entries = tracked.entries.map((entry) =>
+    entry.clusterId !== normalizedClusterId
+      ? entry
+      : {
+          ...entry,
+          pendingUpdate: false,
+          memberCountSnapshot: currentMemberCount,
+        },
+  );
+
+  const next: TrackedStories = {
+    entries,
+    updatedAt: new Date().toISOString(),
+  };
+  await writeTrackedStories(next, trackedPath);
+  return { entries: next.entries };
+}
+
+/**
  * After fetch, mark tracked clusters whose member count grew since snapshot.
  * Does not bump snapshots — NEWS-61 ack/view owns that.
  */
