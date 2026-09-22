@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
 	import { PRODUCT_NAME } from '$lib/brand';
 	import {
 		RADAR_ACCEPT_ERROR,
@@ -26,6 +27,10 @@
 		RADAR_PAGE_TITLE,
 		RADAR_TRACKED_SECTION_HELP,
 		RADAR_TRACKED_SECTION_TITLE,
+		RADAR_TRACKED_ACK_ERROR,
+		RADAR_TRACKED_DISMISS_LABEL,
+		RADAR_TRACKED_DISMISS_PENDING,
+		RADAR_TRACKED_UPDATE_BADGE,
 		RADAR_TRACK_ERROR,
 		RADAR_TRACK_LABEL,
 		RADAR_TRACK_PENDING,
@@ -119,8 +124,10 @@
 	let loggingIn = false;
 	let pendingClusterId: string | null = null;
 	let pendingTrackClusterId: string | null = null;
+	let pendingAckClusterId: string | null = null;
 	let acceptError: string | null = null;
 	let trackError: string | null = null;
+	let ackError: string | null = null;
 
 	let muteRules: MuteRule[] = [];
 	let muteLoadError: string | null = null;
@@ -163,6 +170,7 @@
 		error = null;
 		acceptError = null;
 		trackError = null;
+		ackError = null;
 		muteLoadError = null;
 		muteActionError = null;
 
@@ -242,6 +250,59 @@
 		} finally {
 			loading = false;
 		}
+	}
+
+	async function ackTrackedUpdate(clusterId: string): Promise<void> {
+		if (pendingAckClusterId || loading) return;
+
+		pendingAckClusterId = clusterId;
+		ackError = null;
+
+		try {
+			const response = await fetch('/api/brief/tracked/ack', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				credentials: 'include',
+				body: JSON.stringify({ clusterId }),
+			});
+
+			if (response.status === 401) {
+				unauthenticated = true;
+				clusters = [];
+				trackedEntries = [];
+				muteRules = [];
+				hiddenMutedCount = 0;
+				meta = null;
+				return;
+			}
+
+			const body = (await response.json().catch(() => null)) as
+				| { ok?: boolean; error?: string; entries?: TrackedEntry[] }
+				| null;
+
+			if (!response.ok || (body && body.ok === false)) {
+				ackError = (body && body.error) || RADAR_TRACKED_ACK_ERROR;
+				return;
+			}
+
+			if (body && Array.isArray(body.entries)) {
+				trackedEntries = body.entries;
+			} else {
+				await loadRadar();
+			}
+		} catch (err) {
+			console.error('Error acknowledging tracked update', err);
+			ackError = RADAR_NETWORK_ERROR;
+		} finally {
+			pendingAckClusterId = null;
+		}
+	}
+
+	async function openOnBrief(clusterId: string, pendingUpdate: boolean): Promise<void> {
+		if (pendingUpdate) {
+			await ackTrackedUpdate(clusterId);
+		}
+		await goto('/');
 	}
 
 	async function addMuteRule(event: SubmitEvent): Promise<void> {
@@ -619,6 +680,12 @@
 				</p>
 			{/if}
 
+			{#if ackError}
+				<p class="mt-4 text-sm text-red-600 dark:text-red-400">
+					{ackError}
+				</p>
+			{/if}
+
 			{#if meta}
 				<div
 					class="mt-6 space-y-1 text-xs text-gray-500 dark:text-gray-400"
@@ -743,6 +810,12 @@
 													<span class="font-mono text-[11px]">{row.entry.clusterId}</span>
 												</p>
 											{/if}
+											{#if row.entry.pendingUpdate}
+												<p class="mt-1 inline-flex items-center gap-2 text-[11px] font-medium text-amber-700 dark:text-amber-300">
+													<span class="h-2 w-2 rounded-full bg-amber-500" aria-hidden="true"></span>
+													{RADAR_TRACKED_UPDATE_BADGE}
+												</p>
+											{/if}
 											{#if row.entry.muted}
 												<p class="mt-1 text-[11px] font-medium text-gray-600 dark:text-gray-400">
 													{RADAR_MUTED_LABEL}
@@ -751,13 +824,29 @@
 										</div>
 
 										<div class="shrink-0 flex items-center gap-3">
+											{#if row.entry.pendingUpdate}
+												<button
+													type="button"
+													class="text-xs font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700 disabled:opacity-50 dark:text-blue-400 dark:hover:text-blue-300"
+													disabled={pendingAckClusterId === row.entry.clusterId}
+													on:click={() => ackTrackedUpdate(row.entry.clusterId)}
+												>
+													{#if pendingAckClusterId === row.entry.clusterId}
+														{RADAR_TRACKED_DISMISS_PENDING}
+													{:else}
+														{RADAR_TRACKED_DISMISS_LABEL}
+													{/if}
+												</button>
+											{/if}
 											{#if row.kind === 'resolved' && row.cluster.accepted}
-												<a
-													href="/"
-													class="text-xs font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+												<button
+													type="button"
+													class="text-xs font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700 disabled:opacity-50 dark:text-blue-400 dark:hover:text-blue-300"
+													disabled={pendingAckClusterId === row.entry.clusterId}
+													on:click={() => openOnBrief(row.entry.clusterId, row.entry.pendingUpdate)}
 												>
 													Open on Brief
-												</a>
+												</button>
 											{/if}
 											{#if row.kind === 'resolved'}
 												<button
