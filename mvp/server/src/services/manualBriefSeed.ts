@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Article } from '../types/article.js';
 import { articleIdFromCanonicalUrl } from '../store/articleId.js';
-import { acceptCluster, upsertArticle } from '../store/index.js';
+import { acceptCluster, trackCluster, upsertArticle } from '../store/index.js';
 import { publisherDomainFromUrl } from './publisherScrape.js';
 
 export type ManualSeedInput = {
@@ -139,6 +139,7 @@ export function buildManualSeedArticle(
 export type CreateManualSeedDeps = {
   upsertArticle?: typeof upsertArticle;
   acceptCluster?: typeof acceptCluster;
+  trackCluster?: typeof trackCluster;
   now?: () => string;
   uuid?: () => string;
 };
@@ -150,6 +151,7 @@ export async function createManualSeed(
 ): Promise<CreateManualSeedResult> {
   const upsert = deps.upsertArticle ?? upsertArticle;
   const accept = deps.acceptCluster ?? acceptCluster;
+  const track = deps.trackCluster ?? trackCluster;
   const now = deps.now?.() ?? new Date().toISOString();
   const seedUuid = deps.uuid?.() ?? randomUUID();
 
@@ -160,8 +162,9 @@ export async function createManualSeed(
     throw new Error('manual seed is missing clusterId');
   }
 
-  // TODO(NEWS-59): default Track on accept — not implemented here.
   const { acceptedClusterIds } = await accept(clusterId);
+  // NEWS-59: default Track on accept (Track ≠ Accept; this is the seed path).
+  await track(clusterId, 1);
 
   return { article: upserted, acceptedClusterIds };
 }

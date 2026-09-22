@@ -103,6 +103,7 @@ test('parseManualSeedBody rejects non-string urls entries', () => {
 test('createManualSeed upserts article and accepts cluster', async () => {
   const upserted: Article[] = [];
   let acceptedClusterId: string | null = null;
+  const tracked: Array<{ clusterId: string; memberCount: number }> = [];
 
   const result = await createManualSeed(
     { title: 'Manual seed', note: 'Note text', urls: ['https://example.com/story'] },
@@ -117,6 +118,10 @@ test('createManualSeed upserts article and accepts cluster', async () => {
         acceptedClusterId = clusterId;
         return { acceptedClusterIds: [clusterId] };
       },
+      trackCluster: async (clusterId, memberCount) => {
+        tracked.push({ clusterId, memberCount });
+        return { entries: [] };
+      },
     },
   );
 
@@ -125,4 +130,5 @@ test('createManualSeed upserts article and accepts cluster', async () => {
   assert.equal(acceptedClusterId, result.article.id);
   assert.deepEqual(result.acceptedClusterIds, [result.article.id]);
   assert.equal(result.article.clusterId, result.article.id);
+  assert.deepEqual(tracked, [{ clusterId: result.article.id, memberCount: 1 }]);
 });

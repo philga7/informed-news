@@ -95,6 +95,7 @@ export type {
   RadarHeadlineSourceKind,
   RadarResponse,
 } from './radarFeed.js';
+export { briefClusterKey, isSoloClusterKey } from './briefClusterKey.js';
 export {
   buildManualSeedArticle,
   createManualSeed,
