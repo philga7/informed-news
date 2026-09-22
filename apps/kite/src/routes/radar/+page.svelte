@@ -69,6 +69,7 @@
 		trackedAt: string;
 		memberCountSnapshot: number;
 		pendingUpdate: boolean;
+		muted?: boolean;
 	};
 
 	type RadarResponse =
@@ -128,51 +129,6 @@
 	let muteActionError: string | null = null;
 	let keyword = '';
 	let source = '';
-
-	function normalizeNeedle(value: string | null | undefined): string {
-		if (!value) return '';
-		return value.trim().toLowerCase();
-	}
-
-	function ruleMatchesText(rule: MuteRule, text: string): boolean {
-		const keywordNeedle = normalizeNeedle(rule.keyword);
-		if (!keywordNeedle) return false;
-		return normalizeNeedle(text).includes(keywordNeedle);
-	}
-
-	function ruleMatchesSource(rule: MuteRule, sourceText: string): boolean {
-		const sourceNeedle = normalizeNeedle(rule.source);
-		if (!sourceNeedle) return true;
-		return normalizeNeedle(sourceText).includes(sourceNeedle);
-	}
-
-	function clusterMatchesRule(cluster: RadarCluster, rule: MuteRule): boolean {
-		return cluster.headlines.some((headline) => {
-			const titleMatches = ruleMatchesText(rule, headline.title);
-			if (!titleMatches) return false;
-
-			const sourceHaystack = [
-				headline.publisherDomain ?? '',
-				headline.citationLabel ?? '',
-			].join(' ');
-
-			return ruleMatchesSource(rule, sourceHaystack);
-		});
-	}
-
-	function clusterMatchesMutes(cluster: RadarCluster): boolean {
-		return muteRules.some((rule) => clusterMatchesRule(cluster, rule));
-	}
-
-	function clusterIdMatchesMutes(clusterId: string): boolean {
-		return muteRules.some((rule) => {
-			const keywordNeedle = normalizeNeedle(rule.keyword);
-			if (!keywordNeedle) return false;
-			const idHaystack = normalizeNeedle(clusterId);
-			if (!idHaystack.includes(keywordNeedle)) return false;
-			return ruleMatchesSource(rule, clusterId);
-		});
-	}
 
 	function trackedClusterRows(): Array<
 		| { kind: 'resolved'; entry: TrackedEntry; cluster: RadarCluster }
@@ -787,7 +743,7 @@
 													<span class="font-mono text-[11px]">{row.entry.clusterId}</span>
 												</p>
 											{/if}
-											{#if row.kind === 'resolved' ? clusterMatchesMutes(row.cluster) : clusterIdMatchesMutes(row.entry.clusterId)}
+											{#if row.entry.muted}
 												<p class="mt-1 text-[11px] font-medium text-gray-600 dark:text-gray-400">
 													{RADAR_MUTED_LABEL}
 												</p>

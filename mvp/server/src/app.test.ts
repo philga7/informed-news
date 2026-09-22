@@ -546,10 +546,13 @@ test('GET /api/radar hides muted clusters + counts them; tracked muted still ret
     assert.equal(trackedResp.status, 200);
     const tracked = (await trackedResp.json()) as {
       ok: true;
-      entries: Array<{ clusterId: string }>;
+      entries: Array<{ clusterId: string; muted?: boolean }>;
     };
     assert.equal(tracked.ok, true);
     assert.ok(tracked.entries.some((e) => e.clusterId === 'c1'));
+    const mutedEntry = tracked.entries.find((e) => e.clusterId === 'c1');
+    assert.ok(mutedEntry);
+    assert.equal(mutedEntry.muted, true);
   } finally {
     await close();
   }

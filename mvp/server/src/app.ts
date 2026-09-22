@@ -388,10 +388,32 @@ export function createApp(deps: CreateAppDeps = {}): Express {
   /** List tracked developing stories for the operator. */
   app.get('/api/brief/tracked', async (_req, res) => {
     try {
-      const tracked = await readTracked();
+      const [tracked, articles, mutes] = await Promise.all([
+        readTracked(),
+        readAllArticles(),
+        readMutes(),
+      ]);
+
+      const membersByClusterId = new Map<string, Article[]>();
+      for (const article of articles) {
+        const key = briefClusterKey(article);
+        const list = membersByClusterId.get(key) ?? [];
+        list.push(article);
+        membersByClusterId.set(key, list);
+      }
+
+      const entries = tracked.entries.map((entry) => {
+        const members = membersByClusterId.get(entry.clusterId) ?? [];
+        const muted =
+          members.length > 0
+            ? clusterMatchesMute({ articles: members }, mutes.rules)
+            : false;
+        return { ...entry, muted };
+      });
+
       res.json({
         ok: true,
-        entries: tracked.entries satisfies TrackedEntry[],
+        entries: entries satisfies Array<TrackedEntry & { muted: boolean }>,
         updatedAt: tracked.updatedAt,
       });
     } catch (err) {
