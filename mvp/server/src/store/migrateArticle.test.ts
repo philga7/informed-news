@@ -28,3 +28,17 @@ test('migrateArticle accepts sourceKind rss', () => {
   assert.equal(article.sourceKind, 'rss');
   assert.equal(article.canonicalUrl, 'https://example.com/a');
 });
+
+test('migrateArticle accepts sourceKind manual with not_applicable bodyStatus', () => {
+  const article = migrateArticle({
+    title: 'Operator seed headline',
+    sourceKind: 'manual',
+    canonicalUrl: 'manual://seed/abc123',
+    citations: [],
+    snippet: 'Optional note from the operator.',
+    fetchedAt: '2026-09-21T12:00:00.000Z',
+  });
+  assert.equal(article.sourceKind, 'manual');
+  assert.equal(article.bodyStatus, 'not_applicable');
+  assert.equal(article.bodyText, null);
+});

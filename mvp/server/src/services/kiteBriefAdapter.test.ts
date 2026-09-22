@@ -45,6 +45,46 @@ function article(
   };
 }
 
+test('articlesToKiteStories uses operator note for manual seeds', () => {
+  const stories = articlesToKiteStories([
+    article({
+      id: 'manual-note',
+      title: 'Manual headline',
+      sourceKind: 'manual',
+      canonicalUrl: 'manual://seed/test-uuid',
+      snippet: 'Operator context note',
+      publisherUrl: null,
+      publisherDomain: null,
+      bodyStatus: 'not_applicable',
+    }),
+  ]);
+
+  assert.equal(stories.length, 1);
+  assert.equal(stories[0]!.short_summary, 'Operator context note');
+});
+
+test('articlesToKiteStories uses honest copy for manual seeds without note', () => {
+  const stories = articlesToKiteStories([
+    article({
+      id: 'manual-empty',
+      title: 'Manual headline only',
+      sourceKind: 'manual',
+      canonicalUrl: 'manual://seed/empty-uuid',
+      snippet: '',
+      publisherUrl: null,
+      publisherDomain: null,
+      bodyStatus: 'not_applicable',
+    }),
+  ]);
+
+  assert.equal(stories.length, 1);
+  assert.equal(
+    stories[0]!.short_summary,
+    'Operator-seeded story — no publisher body yet.',
+  );
+  assert.notEqual(stories[0]!.short_summary, 'Manual headline only');
+});
+
 test('articlesToKiteStories maps solo articles and prefers framing summary', () => {
   const stories = articlesToKiteStories([
     article({
@@ -69,6 +109,8 @@ test('articlesToKiteStories maps solo articles and prefers framing summary', () 
   ]);
 
   assert.equal(stories.length, 1);
+  assert.equal(stories[0]!.id, 'a1');
+  assert.equal(stories[0]!.membership_key, 'solo:a1');
   assert.equal(stories[0]!.title, 'Headline A');
   assert.equal(stories[0]!.short_summary, 'AI framing summary for A');
   assert.equal(stories[0]!.category, OWNED_CATEGORY_NAME);
@@ -100,6 +142,29 @@ test('articlesToKiteStories groups by clusterId', () => {
   const clustered = stories.find((s) => s.id === 'evt-1')!;
   assert.equal(clustered.articles.length, 2);
   assert.equal(clustered.title, 'Cluster lead');
+  const solo = stories.find((s) => s.id === 'solo')!;
+  assert.equal(solo.membership_key, 'solo:solo');
+  assert.equal(solo.title, 'Standalone');
+});
+
+test('articlesToKiteStories uses membership key for manual seeds with clusterId=id', () => {
+  const stories = articlesToKiteStories([
+    article({
+      id: 'manual-abc',
+      title: 'Manual headline',
+      clusterId: 'manual-abc',
+      sourceKind: 'manual',
+      canonicalUrl: 'manual://seed/abc',
+      snippet: 'Note',
+      publisherUrl: null,
+      publisherDomain: null,
+      bodyStatus: 'not_applicable',
+    }),
+  ]);
+
+  assert.equal(stories.length, 1);
+  assert.equal(stories[0]!.id, 'manual-abc');
+  assert.equal(stories[0]!.membership_key, 'manual-abc');
 });
 
 test('articlesToKiteStories maps primary_image and per-article image when present', () => {

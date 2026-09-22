@@ -40,6 +40,7 @@ Use curl + session cookie (see Optional API-only checks below). Interactive Reac
 | 9. Framing | Inspect `classification` | Dimension scores present; treat as AI-assisted |
 | 10. Verify this | Inspect classified item | `openQuestions` / selection-risk notes when present |
 | 11. Re-fetch | `POST /api/fetch` again | Unchanged items keep framing; newly body-ok items clear framing for re-classify |
+| 11b. Manual seed (optional) | `POST /api/brief/seed` with `{ "title": "Smoke test seed" }` | `ok: true`, `articleId` + `clusterId`; story appears on Brief (not Radar); Unaccept removes from Brief |
 
 ## Checklist (curated RSS)
 

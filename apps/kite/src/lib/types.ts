@@ -48,6 +48,8 @@ export interface OnThisDayData {
 
 export interface Story {
 	id?: string;
+	/** Brief membership / Unaccept key; may differ from id for solo clusters. */
+	membership_key?: string;
 	cluster_number: number;
 	unique_domains?: number;
 	number_of_titles?: number;

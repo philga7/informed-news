@@ -23,6 +23,8 @@ interface Props {
 	isExpanded?: boolean;
 	onToggle?: () => void;
 	onReadToggle?: () => void;
+	onUnaccept?: () => void;
+	unacceptPending?: boolean;
 	showSourceOverlay?: boolean;
 	currentSource?: any;
 	sourceArticles?: any[];
@@ -48,6 +50,8 @@ let {
 	shouldAutoScroll = false,
 	onToggle,
 	onReadToggle,
+	onUnaccept,
+	unacceptPending = false,
 	showSourceOverlay = $bindable(false),
 	currentSource = $bindable(null),
 	sourceArticles = $bindable([]),
@@ -246,6 +250,8 @@ $effect(() => {
       isExporting={flashcards.isExporting}
       exportedCSV={flashcards.exportedCSV}
       selectedWordsCount={flashcards.selectedCount}
+      onUnacceptClick={onUnaccept}
+      {unacceptPending}
     />
 
     <!-- Expanded Content -->

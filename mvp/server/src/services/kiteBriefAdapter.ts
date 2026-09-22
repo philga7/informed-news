@@ -36,6 +36,8 @@ export type KiteBriefPrimaryImage = {
 
 export type KiteBriefStory = {
   id: string;
+  /** Brief membership / Unaccept key (`briefClusterKey`); may differ from `id` for solos. */
+  membership_key: string;
   cluster_number: number;
   category: string;
   title: string;
@@ -253,7 +255,15 @@ function articleDate(article: Article): string {
   return article.publishedAt || article.fetchedAt;
 }
 
+const MANUAL_SEED_EMPTY_NOTE_SUMMARY =
+  'Operator-seeded story — no publisher body yet.';
+
 function shortSummary(article: Article): string {
+  if (article.sourceKind === 'manual') {
+    const snippet = article.snippet?.trim();
+    if (snippet) return snippet;
+    return MANUAL_SEED_EMPTY_NOTE_SUMMARY;
+  }
   const framing = article.classification?.framingSummary?.trim();
   if (framing) return framing;
   const snippet = article.snippet?.trim();
@@ -414,7 +424,9 @@ export function articlesToKiteStories(
           ? enrichments[key]
           : undefined;
     const story: KiteBriefStory = {
+      // Keep `id` as clusterId or bare article id for client read-state continuity.
       id: primary.clusterId?.trim() || primary.id,
+      membership_key: key,
       cluster_number: clusterNumber++,
       category: OWNED_CATEGORY_NAME,
       title: primary.title,

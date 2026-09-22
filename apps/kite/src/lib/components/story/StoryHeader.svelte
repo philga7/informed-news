@@ -10,6 +10,7 @@ import { type CitationMapping, replaceWithNumberedCitations } from '$lib/utils/c
 import { containsCJK } from '$lib/utils/textUtils';
 import { extractStoryText } from '$lib/utils/storyTextExtractor';
 import Tooltip from '../Tooltip.svelte';
+import { BRIEF_UNACCEPT_LABEL, BRIEF_UNACCEPT_PENDING } from '$lib/briefSeed';
 
 // Props
 interface Props {
@@ -25,6 +26,8 @@ interface Props {
 	onTtsClick?: () => void;
 	onTtsDownloadClick?: () => void;
 	onSimplifyLevelSelect?: (level: 'very-simple' | 'simple' | 'normal') => void;
+	onUnacceptClick?: () => void;
+	unacceptPending?: boolean;
 	citationMapping?: CitationMapping;
 	isSimplifying?: boolean;
 	selectedLevel?: 'very-simple' | 'simple' | 'normal' | null;
@@ -48,6 +51,8 @@ let {
 	onTtsClick,
 	onTtsDownloadClick,
 	onSimplifyLevelSelect,
+	onUnacceptClick,
+	unacceptPending = false,
 	citationMapping,
 	isSimplifying = false,
 	selectedLevel = null,
@@ -182,8 +187,8 @@ const isCJKStory = $derived(containsCJK(story.title));
 
 <!-- Story Header -->
 {#if !isSharedView}
-  <header class="mb-1 flex items-center justify-between">
-    <div class="flex items-center gap-2">
+  <header class="mb-1 flex items-center justify-between gap-2">
+    <div class="flex items-center gap-2 min-w-0">
       <div
         class="category-label inline-flex items-center rounded py-1 text-xs text-gray-700 dark:text-gray-300 uppercase"
         role="heading"
@@ -378,6 +383,21 @@ const isCJKStory = $derived(containsCJK(story.title));
         </div>
       {/if}
     </div>
+
+    {#if onUnacceptClick && story.id}
+      <button
+        type="button"
+        class="shrink-0 text-xs font-medium text-gray-500 underline underline-offset-2 hover:text-gray-700 disabled:opacity-50 dark:text-gray-400 dark:hover:text-gray-200"
+        disabled={unacceptPending}
+        onclick={(e) => {
+          e.stopPropagation();
+          onUnacceptClick();
+        }}
+        aria-label={BRIEF_UNACCEPT_LABEL}
+      >
+        {unacceptPending ? BRIEF_UNACCEPT_PENDING : BRIEF_UNACCEPT_LABEL}
+      </button>
+    {/if}
   </header>
 {/if}
 

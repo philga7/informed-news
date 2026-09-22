@@ -33,8 +33,20 @@ Brief shows **Accepted** clusters only (membership in `mvp/data/brief-membership
 - **Accepted multi-member cluster:** all current and future articles sharing that `clusterId` appear on Brief without re-Accept.
 - **Accepted solo key:** only that article appears while it stays unclustered (`solo:{articleId}`). If a later fetch merges it into a shared `clusterId`, v1 does **not** remap membership — Accept the new cluster key again (known gap; association = same key only).
 - **Global mute** (NEWS-60) is not applied here yet; mute will subtract from Accepted membership in a follow-up.
-- **Manual seed stories** (NEWS-66): Accepted by definition, not on Radar; Unaccept drops from Brief.
+- **Manual seed stories** (NEWS-66): Accepted by definition, not on Radar; Unaccept drops from Brief (see below).
 - **Radar** (`/radar`) is the triage lane for fresh CFP + curated RSS before Accept. See [ROADMAP.md](ROADMAP.md).
+
+### Manual Brief seed (NEWS-66)
+
+Operators can add a story directly to Brief without going through Radar ingest:
+
+1. **UI:** Brief header or empty-state **Add story** → modal (title required; note and URLs optional) → `POST /api/brief/seed` via the Kite proxy (`apps/kite/src/routes/api/brief/seed/+server.ts`). Session required (same cookie as Accept).
+2. **API:** `POST /api/brief/seed` with body `{ title: string; note?: string; urls?: string[] }` → `{ ok: true, articleId, clusterId, acceptedClusterIds }`. Invalid title or non-http(s) URLs → `400`. See [MVP_API_COMPAT.md](MVP_API_COMPAT.md).
+3. **Persistence:** Stored in `mvp/data/articles.json` as `sourceKind: 'manual'`. Identity: `canonicalUrl = manual://seed/{uuid}` → article `id`; `clusterId = id` (membership key is the real id, not `solo:`). Optional URLs become `citations[]`; first URL also sets `publisherUrl`. Operator note → `snippet`; `bodyText` stays null (`bodyStatus: 'not_applicable'`).
+4. **Accepted immediately:** `createManualSeed` upserts the article and calls `acceptCluster(clusterId)` in the same request — no separate Accept step.
+5. **Not on Radar:** `buildRadarFeed` excludes `sourceKind: 'manual'`; triage stays CFP + curated RSS only.
+6. **Honest Brief copy:** Adapter prefers the operator note (`snippet`) for `short_summary`; when empty, fixed copy: `Operator-seeded story — no publisher body yet.` (never title-only silence).
+7. **Unaccept on Brief:** Manual seeds never appear on Radar, so Brief exposes **Unaccept** on story chrome (header/card). `POST /api/brief/unaccept` with the story’s `clusterId` removes Brief membership; the seed row may remain in `articles.json` (no hard-delete in v1).
 
 ## Regenerate from ingest
 

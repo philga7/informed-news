@@ -8,7 +8,7 @@ import type {
 import { truncateBodyText } from '../types/article.js';
 import { articleIdFromCanonicalUrl } from './articleId.js';
 
-const SOURCE_KINDS = new Set<SourceKind>(['cfp', 'xcancel', 'rss']);
+const SOURCE_KINDS = new Set<SourceKind>(['cfp', 'xcancel', 'rss', 'manual']);
 const BODY_STATUSES = new Set<BodyStatus>([
   'ok',
   'unavailable',
@@ -98,8 +98,11 @@ function parseBodyStatus(
   if (typeof value === 'string' && BODY_STATUSES.has(value as BodyStatus)) {
     return value as BodyStatus;
   }
-  // Tweet text is the body; no publisher scrape.
-  return sourceKind === 'xcancel' ? 'not_applicable' : 'pending';
+  // Tweet text is the body; manual seeds have no publisher scrape.
+  if (sourceKind === 'xcancel' || sourceKind === 'manual') {
+    return 'not_applicable';
+  }
+  return 'pending';
 }
 
 /**

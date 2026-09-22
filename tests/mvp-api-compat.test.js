@@ -21,6 +21,7 @@ describe('NEWS-43 MVP API compat surface', () => {
 		assert.match(src, /app\.get\('\/api\/brief\/membership'/);
 		assert.match(src, /app\.post\('\/api\/brief\/accept'/);
 		assert.match(src, /app\.post\('\/api\/brief\/unaccept'/);
+		assert.match(src, /app\.post\('\/api\/brief\/seed'/);
 		assert.match(src, /requireApiSession/);
 		assert.match(src, /createKiteBriefRouter/);
 	});
@@ -42,6 +43,7 @@ describe('NEWS-43 MVP API compat surface', () => {
 		assert.match(doc, /GET \| `\/api\/brief\/membership`/);
 		assert.match(doc, /POST \| `\/api\/brief\/accept`/);
 		assert.match(doc, /POST \| `\/api\/brief\/unaccept`/);
+		assert.match(doc, /POST \| `\/api\/brief\/seed`/);
 		assert.match(doc, /Session/);
 		assert.match(doc, /CFP/);
 		assert.match(doc, /xcancel/i);

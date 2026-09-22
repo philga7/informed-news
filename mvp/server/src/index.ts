@@ -12,8 +12,11 @@ import {
   classifyArticleById,
   classifyUnclassifiedArticles,
   createKiteBriefRouter,
+  createManualSeed,
   enrichUnenrichedClusters,
   fetchAllSources,
+  ManualSeedValidationError,
+  parseManualSeedBody,
   sortNewestFirst,
   buildRadarFeed,
 } from './services/index.js';
@@ -158,6 +161,30 @@ app.post('/api/brief/accept', async (req, res) => {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error('Brief accept failed:', message);
+    res.status(500).json({ ok: false, error: message });
+  }
+});
+
+/**
+ * Create an operator-seeded Brief story (Accepted immediately).
+ */
+app.post('/api/brief/seed', async (req, res) => {
+  try {
+    const input = parseManualSeedBody(req.body);
+    const result = await createManualSeed(input);
+    res.json({
+      ok: true,
+      articleId: result.article.id,
+      clusterId: result.article.clusterId!,
+      acceptedClusterIds: result.acceptedClusterIds,
+    });
+  } catch (err) {
+    if (err instanceof ManualSeedValidationError) {
+      res.status(400).json({ ok: false, error: err.message });
+      return;
+    }
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('Brief seed failed:', message);
     res.status(500).json({ ok: false, error: message });
   }
 });
