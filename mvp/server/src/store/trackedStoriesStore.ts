@@ -19,6 +19,23 @@ const EMPTY_TRACKED: TrackedStories = {
   updatedAt: null,
 };
 
+function normalizeClusterIdInput(clusterId: string): string | null {
+  const trimmed = clusterId.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function isValidMemberCount(count: number): boolean {
+  return Number.isFinite(count) && Number.isInteger(count) && count >= 0;
+}
+
+function normalizeMemberCountFromMap(count: unknown): number {
+  if (typeof count !== 'number') return 0;
+  if (!Number.isFinite(count)) return 0;
+  if (!Number.isInteger(count)) return 0;
+  if (count < 0) return 0;
+  return count;
+}
+
 async function ensureDataDir(): Promise<void> {
   await mkdir(DATA_DIR, { recursive: true });
 }
@@ -33,13 +50,17 @@ function normalizeEntry(raw: unknown): TrackedEntry | null {
   }
 
   const record = raw as Partial<TrackedEntry>;
-  if (typeof record.clusterId !== 'string' || record.clusterId.trim().length === 0) {
+  const clusterId =
+    typeof record.clusterId === 'string' ? record.clusterId.trim() : '';
+  if (clusterId.length === 0) {
     return null;
   }
-  if (typeof record.trackedAt !== 'string' || record.trackedAt.trim().length === 0) {
+  const trackedAt =
+    typeof record.trackedAt === 'string' ? record.trackedAt.trim() : '';
+  if (trackedAt.length === 0) {
     return null;
   }
-  if (typeof record.memberCountSnapshot !== 'number' || !Number.isFinite(record.memberCountSnapshot)) {
+  if (typeof record.memberCountSnapshot !== 'number' || !isValidMemberCount(record.memberCountSnapshot)) {
     return null;
   }
   if (typeof record.pendingUpdate !== 'boolean') {
@@ -47,8 +68,8 @@ function normalizeEntry(raw: unknown): TrackedEntry | null {
   }
 
   return {
-    clusterId: record.clusterId,
-    trackedAt: record.trackedAt,
+    clusterId,
+    trackedAt,
     memberCountSnapshot: record.memberCountSnapshot,
     pendingUpdate: record.pendingUpdate,
   };
@@ -129,8 +150,16 @@ export async function trackCluster(
   memberCount: number,
   trackedPath: string = TRACKED_STORIES_PATH,
 ): Promise<{ entries: TrackedEntry[] }> {
+  const normalizedClusterId = normalizeClusterIdInput(clusterId);
+  if (!normalizedClusterId || !isValidMemberCount(memberCount)) {
+    const tracked = await readTrackedStories(trackedPath);
+    return { entries: tracked.entries };
+  }
+
   const tracked = await readTrackedStories(trackedPath);
-  const existing = tracked.entries.find((entry) => entry.clusterId === clusterId);
+  const existing = tracked.entries.find(
+    (entry) => entry.clusterId === normalizedClusterId,
+  );
   if (existing) {
     return { entries: tracked.entries };
   }
@@ -139,7 +168,7 @@ export async function trackCluster(
     entries: [
       ...tracked.entries,
       {
-        clusterId,
+        clusterId: normalizedClusterId,
         trackedAt: new Date().toISOString(),
         memberCountSnapshot: memberCount,
         pendingUpdate: false,
@@ -156,13 +185,19 @@ export async function untrackCluster(
   clusterId: string,
   trackedPath: string = TRACKED_STORIES_PATH,
 ): Promise<{ entries: TrackedEntry[] }> {
+  const normalizedClusterId = normalizeClusterIdInput(clusterId);
+  if (!normalizedClusterId) {
+    const tracked = await readTrackedStories(trackedPath);
+    return { entries: tracked.entries };
+  }
+
   const tracked = await readTrackedStories(trackedPath);
-  if (!tracked.entries.some((entry) => entry.clusterId === clusterId)) {
+  if (!tracked.entries.some((entry) => entry.clusterId === normalizedClusterId)) {
     return { entries: tracked.entries };
   }
 
   const next: TrackedStories = {
-    entries: tracked.entries.filter((entry) => entry.clusterId !== clusterId),
+    entries: tracked.entries.filter((entry) => entry.clusterId !== normalizedClusterId),
     updatedAt: new Date().toISOString(),
   };
   await writeTrackedStories(next, trackedPath);
@@ -181,7 +216,7 @@ export async function syncTrackedAfterFetch(
   let changed = false;
 
   const entries = tracked.entries.map((entry) => {
-    const currentCount = countByClusterId[entry.clusterId] ?? 0;
+    const currentCount = normalizeMemberCountFromMap(countByClusterId[entry.clusterId]);
     if (currentCount > entry.memberCountSnapshot && !entry.pendingUpdate) {
       changed = true;
       return { ...entry, pendingUpdate: true };

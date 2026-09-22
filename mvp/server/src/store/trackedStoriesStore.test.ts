@@ -28,7 +28,7 @@ test('readTrackedStories returns empty when file is missing', async () => {
 test('trackCluster adds entry with snapshot and pendingUpdate false', async () => {
   const trackedPath = tempTrackedPath();
 
-  const result = await trackCluster('cluster-a', 3, trackedPath);
+  const result = await trackCluster('  cluster-a  ', 3, trackedPath);
   assert.equal(result.entries.length, 1);
   assert.equal(result.entries[0]?.clusterId, 'cluster-a');
   assert.equal(result.entries[0]?.memberCountSnapshot, 3);
@@ -87,6 +87,47 @@ test('trackCluster supports solo keys', async () => {
   assert.equal(result.entries[0]?.clusterId, 'solo:article-123');
 });
 
+test('trackCluster is a no-op when clusterId is empty or whitespace', async () => {
+  const trackedPath = tempTrackedPath();
+
+  const result1 = await trackCluster('', 1, trackedPath);
+  assert.deepEqual(result1.entries, []);
+
+  const result2 = await trackCluster('   ', 1, trackedPath);
+  assert.deepEqual(result2.entries, []);
+
+  const stored = await readTrackedStories(trackedPath);
+  assert.deepEqual(stored, { entries: [], updatedAt: null });
+});
+
+test('trackCluster is a no-op when memberCount is invalid', async () => {
+  const trackedPath = tempTrackedPath();
+
+  const negative = await trackCluster('cluster-a', -1, trackedPath);
+  assert.deepEqual(negative.entries, []);
+
+  const nan = await trackCluster('cluster-a', Number.NaN, trackedPath);
+  assert.deepEqual(nan.entries, []);
+
+  const float = await trackCluster('cluster-a', 1.5, trackedPath);
+  assert.deepEqual(float.entries, []);
+
+  const stored = await readTrackedStories(trackedPath);
+  assert.deepEqual(stored, { entries: [], updatedAt: null });
+});
+
+test('untrackCluster is a no-op when clusterId is empty or whitespace', async () => {
+  const trackedPath = tempTrackedPath();
+
+  await trackCluster('cluster-a', 2, trackedPath);
+  const before = await readTrackedStories(trackedPath);
+  const result = await untrackCluster('   ', trackedPath);
+  const after = await readTrackedStories(trackedPath);
+
+  assert.deepEqual(result.entries, before.entries);
+  assert.deepEqual(after, before);
+});
+
 test('syncTrackedAfterFetch sets pendingUpdate when count grows', async () => {
   const trackedPath = tempTrackedPath();
 
@@ -131,6 +172,21 @@ test('syncTrackedAfterFetch does not change entries when count is unchanged or l
   await trackCluster('cluster-a', 4, trackedPath);
   const before = await readTrackedStories(trackedPath);
   const result = await syncTrackedAfterFetch({ 'cluster-a': 3 }, trackedPath);
+  const after = await readTrackedStories(trackedPath);
+
+  assert.deepEqual(result.entries, before.entries);
+  assert.deepEqual(after, before);
+});
+
+test('syncTrackedAfterFetch ignores invalid member counts in map', async () => {
+  const trackedPath = tempTrackedPath();
+
+  await trackCluster('cluster-a', 2, trackedPath);
+  const before = await readTrackedStories(trackedPath);
+  const result = await syncTrackedAfterFetch(
+    { 'cluster-a': Number.NaN },
+    trackedPath,
+  );
   const after = await readTrackedStories(trackedPath);
 
   assert.deepEqual(result.entries, before.entries);
