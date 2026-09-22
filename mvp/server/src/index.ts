@@ -17,7 +17,14 @@ import {
   sortNewestFirst,
   buildRadarFeed,
 } from './services/index.js';
-import { getArticleById, readArticles, readMeta } from './store/index.js';
+import {
+  acceptCluster,
+  getArticleById,
+  readArticles,
+  readBriefMembership,
+  readMeta,
+  unacceptCluster,
+} from './store/index.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.resolve(__dirname, '../../.env'), override: true });
@@ -108,13 +115,84 @@ app.get('/api/articles', async (_req, res) => {
   }
 });
 
+function parseClusterId(body: unknown): string | null {
+  const raw = (body as { clusterId?: unknown } | null)?.clusterId;
+  if (typeof raw !== 'string') {
+    return null;
+  }
+  const trimmed = raw.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+/**
+ * Brief membership: accepted cluster ids for the session operator.
+ */
+app.get('/api/brief/membership', async (_req, res) => {
+  try {
+    const membership = await readBriefMembership();
+    res.json({
+      ok: true,
+      acceptedClusterIds: membership.acceptedClusterIds,
+      updatedAt: membership.updatedAt,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('Brief membership read failed:', message);
+    res.status(500).json({ ok: false, error: message });
+  }
+});
+
+/**
+ * Accept a cluster onto the Brief (idempotent).
+ */
+app.post('/api/brief/accept', async (req, res) => {
+  try {
+    const clusterId = parseClusterId(req.body);
+    if (!clusterId) {
+      res.status(400).json({ ok: false, error: 'clusterId is required' });
+      return;
+    }
+
+    const result = await acceptCluster(clusterId);
+    res.json({ ok: true, acceptedClusterIds: result.acceptedClusterIds });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('Brief accept failed:', message);
+    res.status(500).json({ ok: false, error: message });
+  }
+});
+
+/**
+ * Remove a cluster from Brief membership (idempotent).
+ */
+app.post('/api/brief/unaccept', async (req, res) => {
+  try {
+    const clusterId = parseClusterId(req.body);
+    if (!clusterId) {
+      res.status(400).json({ ok: false, error: 'clusterId is required' });
+      return;
+    }
+
+    const result = await unacceptCluster(clusterId);
+    res.json({ ok: true, acceptedClusterIds: result.acceptedClusterIds });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('Brief unaccept failed:', message);
+    res.status(500).json({ ok: false, error: message });
+  }
+});
+
 /**
  * Radar feed: clustered CFP + curated RSS headlines only.
  */
 app.get('/api/radar', async (_req, res) => {
   try {
-    const [articles, meta] = await Promise.all([readArticles(), readMeta()]);
-    const clusters = buildRadarFeed(articles);
+    const [articles, meta, membership] = await Promise.all([
+      readArticles(),
+      readMeta(),
+      readBriefMembership(),
+    ]);
+    const clusters = buildRadarFeed(articles, membership.acceptedClusterIds);
     res.json({
       ok: true,
       clusters,

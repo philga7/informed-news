@@ -15,7 +15,14 @@ export {
 } from './articleStore.js';
 export { readMeta, updateMeta, writeMeta } from './metaStore.js';
 export {
+  acceptCluster,
+  readBriefMembership,
+  unacceptCluster,
+} from './briefMembershipStore.js';
+export type { BriefMembership } from './briefMembershipStore.js';
+export {
   ARTICLES_PATH,
+  BRIEF_MEMBERSHIP_PATH,
   CLUSTER_ENRICHMENTS_PATH,
   DATA_DIR,
   META_PATH,

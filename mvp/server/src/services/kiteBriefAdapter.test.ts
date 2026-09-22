@@ -12,6 +12,7 @@ import {
   buildOwnedCategoriesResponse,
   buildOwnedStoriesResponse,
   ownedBriefFixtureArticles,
+  filterArticlesForBrief,
   resolveOwnedBriefArticles,
 } from './kiteBriefAdapter.js';
 
@@ -389,11 +390,55 @@ test('resolveOwnedBriefArticles uses fixture when store empty', () => {
   assert.equal(empty.fromFixture, true);
   assert.equal(empty.articles[0]!.title, OWNED_FIXTURE_TITLE);
 
-  const live = resolveOwnedBriefArticles([
-    article({ id: 'live', title: 'Live ingest' }),
-  ]);
+  const live = resolveOwnedBriefArticles(
+    [article({ id: 'live', title: 'Live ingest' })],
+    ['solo:live'],
+  );
   assert.equal(live.fromFixture, false);
   assert.equal(live.articles[0]!.title, 'Live ingest');
+});
+
+test('resolveOwnedBriefArticles returns empty when store has articles but none accepted', () => {
+  const result = resolveOwnedBriefArticles(
+    [
+      article({ id: 'a1', title: 'One' }),
+      article({ id: 'a2', title: 'Two', clusterId: 'c1' }),
+    ],
+    [],
+  );
+  assert.equal(result.fromFixture, false);
+  assert.deepEqual(result.articles, []);
+});
+
+test('filterArticlesForBrief keeps accepted cluster members including new ingest', () => {
+  const articles = [
+    article({ id: 'old', title: 'Old member', clusterId: 'c1' }),
+    article({ id: 'new', title: 'New member', clusterId: 'c1' }),
+    article({ id: 'other', title: 'Other cluster', clusterId: 'c2' }),
+    article({ id: 'solo', title: 'Solo article', clusterId: null }),
+  ];
+
+  const filtered = filterArticlesForBrief(articles, ['c1', 'solo:solo']);
+  assert.deepEqual(
+    filtered.map((a) => a.id),
+    ['old', 'new', 'solo'],
+  );
+});
+
+test('resolveOwnedBriefArticles accepts solo cluster keys', () => {
+  const result = resolveOwnedBriefArticles(
+    [article({ id: 'solo-1', title: 'Solo story', clusterId: null })],
+    ['solo:solo-1'],
+  );
+  assert.equal(result.fromFixture, false);
+  assert.equal(result.articles.length, 1);
+  assert.equal(result.articles[0]!.id, 'solo-1');
+});
+
+test('resolveOwnedBriefArticles still uses fixture when store empty regardless of membership', () => {
+  const result = resolveOwnedBriefArticles([], ['c1', 'solo:x']);
+  assert.equal(result.fromFixture, true);
+  assert.equal(result.articles[0]!.title, OWNED_FIXTURE_TITLE);
 });
 
 test('fixture articles produce at least one story', () => {

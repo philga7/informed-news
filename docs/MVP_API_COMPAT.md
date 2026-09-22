@@ -43,8 +43,12 @@ Kite does **not** need to proxy these routes. Hit the API on `:3001` directly (d
 | POST | `/api/classify` | Session | Batch framing for unclassified items |
 | POST | `/api/classify/:id` | Session | Reclassify one article |
 | POST | `/api/enrich` | Session | Batch cluster enrichment (AI-assisted). Optional body/query: `{ limit?: number, force?: boolean }` |
+| GET | `/api/radar` | Session | Developing desk triage feed: clustered CFP + curated RSS; each cluster includes `accepted` from membership |
+| GET | `/api/brief/membership` | Session | Brief membership snapshot: `{ ok, acceptedClusterIds, updatedAt }` |
+| POST | `/api/brief/accept` | Session | Idempotent accept onto Brief; body `{ clusterId: string }` → `{ ok, acceptedClusterIds }` |
+| POST | `/api/brief/unaccept` | Session | Idempotent remove from Brief; body `{ clusterId: string }` → `{ ok, acceptedClusterIds }` |
 
-Public Kite brief routes under `/api/batches…` are **in addition** to this surface (NEWS-44); they are not a replacement for `/api/articles`.
+Public Kite brief routes under `/api/batches…` are **in addition** to this surface (NEWS-44); they are not a replacement for `/api/articles`. Brief **content** is accepted-only after [NEWS-65](https://informedcrew.atlassian.net/browse/NEWS-65); membership routes above gate what appears on `/`.
 
 ## Guarantees
 

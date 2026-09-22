@@ -11,6 +11,7 @@ import {
 import { CLASSIFY_RAW_DELIMITER } from './ollamaFraming.js';
 import type { EnrichClusterResult, EnrichMemberInput } from './ollamaEnrichment.js';
 import { enrichCluster } from './ollamaEnrichment.js';
+import { briefClusterKey } from './briefClusterKey.js';
 
 const DEFAULT_BATCH_LIMIT = 10;
 
@@ -61,7 +62,7 @@ function resolveBatchLimit(override?: number): number {
 }
 
 function groupKey(article: Article): string {
-  return article.clusterId?.trim() || `solo:${article.id}`;
+  return briefClusterKey(article);
 }
 
 function newestKey(article: Article): string {

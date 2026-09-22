@@ -20,3 +20,12 @@ export const RADAR_NETWORK_ERROR =
 export const RADAR_META_HELP =
 	'Radar pulls from Citizen Free Press and curated RSS at the time of the last fetch. Timestamps and errors below describe the ingest pipeline, not this UI.';
 
+export const RADAR_ACCEPT_LABEL = 'Accept';
+
+export const RADAR_UNACCEPT_LABEL = 'Unaccept';
+
+export const RADAR_ACCEPT_PENDING = 'Saving…';
+
+export const RADAR_ACCEPT_ERROR =
+	'Could not update Brief membership. Try again.';
+
