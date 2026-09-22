@@ -252,8 +252,8 @@
 		}
 	}
 
-	async function ackTrackedUpdate(clusterId: string): Promise<void> {
-		if (pendingAckClusterId || loading) return;
+	async function ackTrackedUpdate(clusterId: string): Promise<boolean> {
+		if (pendingAckClusterId || loading) return false;
 
 		pendingAckClusterId = clusterId;
 		ackError = null;
@@ -273,7 +273,7 @@
 				muteRules = [];
 				hiddenMutedCount = 0;
 				meta = null;
-				return;
+				return false;
 			}
 
 			const body = (await response.json().catch(() => null)) as
@@ -282,7 +282,7 @@
 
 			if (!response.ok || (body && body.ok === false)) {
 				ackError = (body && body.error) || RADAR_TRACKED_ACK_ERROR;
-				return;
+				return false;
 			}
 
 			if (body && Array.isArray(body.entries)) {
@@ -290,9 +290,12 @@
 			} else {
 				await loadRadar();
 			}
+
+			return true;
 		} catch (err) {
 			console.error('Error acknowledging tracked update', err);
 			ackError = RADAR_NETWORK_ERROR;
+			return false;
 		} finally {
 			pendingAckClusterId = null;
 		}
@@ -300,7 +303,8 @@
 
 	async function openOnBrief(clusterId: string, pendingUpdate: boolean): Promise<void> {
 		if (pendingUpdate) {
-			await ackTrackedUpdate(clusterId);
+			const ok = await ackTrackedUpdate(clusterId);
+			if (!ok) return;
 		}
 		await goto('/');
 	}
@@ -828,10 +832,10 @@
 												<button
 													type="button"
 													class="text-xs font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700 disabled:opacity-50 dark:text-blue-400 dark:hover:text-blue-300"
-													disabled={pendingAckClusterId === row.entry.clusterId}
+													disabled={pendingAckClusterId !== null}
 													on:click={() => ackTrackedUpdate(row.entry.clusterId)}
 												>
-													{#if pendingAckClusterId === row.entry.clusterId}
+													{#if pendingAckClusterId !== null}
 														{RADAR_TRACKED_DISMISS_PENDING}
 													{:else}
 														{RADAR_TRACKED_DISMISS_LABEL}
@@ -842,7 +846,7 @@
 												<button
 													type="button"
 													class="text-xs font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700 disabled:opacity-50 dark:text-blue-400 dark:hover:text-blue-300"
-													disabled={pendingAckClusterId === row.entry.clusterId}
+													disabled={row.entry.pendingUpdate && pendingAckClusterId !== null}
 													on:click={() => openOnBrief(row.entry.clusterId, row.entry.pendingUpdate)}
 												>
 													Open on Brief
