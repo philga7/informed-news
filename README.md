@@ -94,7 +94,7 @@ Root [`vercel.json`](vercel.json) still deploys the **archived** `_legacy/mvp-we
 
 ## Roadmap (NEWS)
 
-Agent-facing order of work: **[docs/ROADMAP.md](docs/ROADMAP.md)** (current next: [NEWS-57](https://informedcrew.atlassian.net/browse/NEWS-57) Developing desk — radar → accept → track/mute; start [NEWS-66](https://informedcrew.atlassian.net/browse/NEWS-66)).
+Agent-facing order of work: **[docs/ROADMAP.md](docs/ROADMAP.md)** (current next: [NEWS-57](https://informedcrew.atlassian.net/browse/NEWS-57) Developing desk — radar → accept → track/mute; start [NEWS-59](https://informedcrew.atlassian.net/browse/NEWS-59)).
 
 Done so far: Epic A ([NEWS-33](https://informedcrew.atlassian.net/browse/NEWS-33)), Epic H ([NEWS-48](https://informedcrew.atlassian.net/browse/NEWS-48)). NEWS-53 absorbed into NEWS-57. Historical pivot plan: [`.cursor/plans/osint_jira_pivot_d6b40f87.plan.md`](.cursor/plans/osint_jira_pivot_d6b40f87.plan.md).
 
