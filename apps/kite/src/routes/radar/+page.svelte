@@ -465,10 +465,12 @@
 			error = null;
 			acceptError = null;
 			trackError = null;
+			ackError = null;
 			muteLoadError = null;
 			muteActionError = null;
 			pendingClusterId = null;
 			pendingTrackClusterId = null;
+			pendingAckClusterId = null;
 			unauthenticated = true;
 		}
 	}

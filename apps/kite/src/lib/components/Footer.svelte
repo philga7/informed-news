@@ -44,7 +44,7 @@ type TrackedResponse =
 			error: string;
 	  };
 
-let pendingTrackedCount = 0;
+let pendingTrackedCount = $state(0);
 
 // Handle about click
 function handleAboutClick() {
