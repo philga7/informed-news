@@ -27,11 +27,14 @@ export {
   untrackCluster,
 } from './trackedStoriesStore.js';
 export type { TrackedEntry, TrackedStories } from './trackedStoriesStore.js';
+export { addMuteRule, readMuteRules, removeMuteRule } from './muteRulesStore.js';
+export type { MuteRule, MuteRulesStore } from './muteRulesStore.js';
 export {
   ARTICLES_PATH,
   BRIEF_MEMBERSHIP_PATH,
   CLUSTER_ENRICHMENTS_PATH,
   DATA_DIR,
+  MUTE_RULES_PATH,
   META_PATH,
   TRACKED_STORIES_PATH,
 } from './paths.js';
