@@ -1,5 +1,6 @@
 import type { Article } from '../types/article.js';
 import type { ClusterEnrichmentPayload } from '../types/clusterEnrichment.js';
+import { briefClusterKey } from './briefClusterKey.js';
 
 /** Stable batch id for the live owned brief (not a Kagi UUID). */
 export const OWNED_BATCH_ID = 'owned-latest';
@@ -382,7 +383,7 @@ export function articlesToKiteStories(
   const order: string[] = [];
 
   for (const article of articles) {
-    const key = article.clusterId?.trim() || `solo:${article.id}`;
+    const key = briefClusterKey(article);
     if (!groups.has(key)) {
       groups.set(key, []);
       order.push(key);

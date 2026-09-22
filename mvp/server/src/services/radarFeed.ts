@@ -1,4 +1,5 @@
 import type { Article, SourceKind, StoreMeta } from '../types/article.js';
+import { briefClusterKey } from './briefClusterKey.js';
 
 export type RadarHeadlineSourceKind = Extract<SourceKind, 'cfp' | 'rss'>;
 
@@ -13,7 +14,7 @@ export type RadarHeadline = {
 };
 
 export type RadarCluster = {
-  clusterId: string; // existing id or `singleton:<articleId>`
+  clusterId: string; // existing id or `solo:<articleId>`
   headlines: RadarHeadline[]; // ≥1, newest first within cluster
   newestAt: string | null;
 };
@@ -26,12 +27,6 @@ export type RadarResponse = {
 
 function isRadarSource(sourceKind: SourceKind): sourceKind is RadarHeadlineSourceKind {
   return sourceKind === 'cfp' || sourceKind === 'rss';
-}
-
-function groupKey(article: Article): string {
-  const id = article.id;
-  const clusterId = article.clusterId?.trim();
-  return clusterId && clusterId.length > 0 ? clusterId : `singleton:${id}`;
 }
 
 function newestKey(article: Article): string {
@@ -54,7 +49,7 @@ function toHeadline(article: Article): RadarHeadline {
  * Build the radar feed clusters from the full article store.
  *
  * - Filters to sourceKind `cfp` | `rss` only (excludes `xcancel`).
- * - Groups by existing `clusterId`; null/empty → `singleton:<articleId>`.
+ * - Groups by existing `clusterId`; null/empty → `solo:<articleId>`.
  * - Sorts clusters by `newestAt` (desc); headlines newest-first within cluster.
  */
 export function buildRadarFeed(articles: Article[]): RadarCluster[] {
@@ -62,7 +57,7 @@ export function buildRadarFeed(articles: Article[]): RadarCluster[] {
 
   const groups = new Map<string, Article[]>();
   for (const article of filtered) {
-    const key = groupKey(article);
+    const key = briefClusterKey(article);
     const list = groups.get(key) ?? [];
     list.push(article);
     groups.set(key, list);

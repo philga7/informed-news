@@ -46,7 +46,7 @@ test('buildRadarFeed filters to CFP + RSS only', () => {
   assert.deepEqual(ids.sort(), ['a1', 'a2']);
 });
 
-test('buildRadarFeed groups by clusterId or singleton key', () => {
+test('buildRadarFeed groups by clusterId or solo key', () => {
   const a1 = article({
     id: 'a1',
     title: 'Cluster member old',
@@ -80,7 +80,7 @@ test('buildRadarFeed groups by clusterId or singleton key', () => {
   // Newest headline first within cluster
   assert.equal(c1!.headlines[0]!.id, 'a2');
 
-  const solo = byId.get('singleton:a3');
+  const solo = byId.get('solo:a3');
   assert.ok(solo);
   assert.equal(solo!.headlines.length, 1);
   assert.equal(solo!.headlines[0]!.id, 'a3');
