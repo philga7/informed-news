@@ -21,6 +21,8 @@ import { timeTravelBatch } from '$lib/stores/timeTravelBatch.svelte';
 import { formatTimeAgo } from '$lib/utils/formatTimeAgo';
 import { getNextUpdateCountdown } from '$lib/utils/getTimeAgo';
 import { FEATURES } from '$lib/features';
+import { BRIEF_SEED_ADD_LABEL } from '$lib/briefSeed';
+import { openBriefSeedModal } from '$lib/briefSeedUi.svelte';
 import AppNavigation from './AppNavigation.svelte';
 import ChaosIndex from './ChaosIndex.svelte';
 
@@ -618,6 +620,18 @@ $effect(() => {
             onOpenChange={onChaosModalChange}
           />
         </div>
+      {/if}
+
+      {#if !isSharedView}
+        <button
+          onclick={() => openBriefSeedModal()}
+          title={BRIEF_SEED_ADD_LABEL}
+          aria-label={BRIEF_SEED_ADD_LABEL}
+          class="px-1.5 py-1 text-xs font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 sm:rounded-lg sm:hover:bg-gray-100 sm:dark:hover:bg-gray-800 sm:no-underline"
+          type="button"
+        >
+          {BRIEF_SEED_ADD_LABEL}
+        </button>
       {/if}
 
       <!-- Time Travel button - available for everyone during beta -->

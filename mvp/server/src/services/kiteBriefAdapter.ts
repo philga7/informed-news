@@ -422,7 +422,8 @@ export function articlesToKiteStories(
           ? enrichments[key]
           : undefined;
     const story: KiteBriefStory = {
-      id: primary.clusterId?.trim() || primary.id,
+      // Membership key (briefClusterKey), not bare article id — required for Unaccept of solos.
+      id: key,
       cluster_number: clusterNumber++,
       category: OWNED_CATEGORY_NAME,
       title: primary.title,

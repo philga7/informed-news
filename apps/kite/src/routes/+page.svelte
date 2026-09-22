@@ -22,12 +22,14 @@ import NHLScores from '$lib/components/nhl/NHLScores.svelte';
 import NHLStandings from '$lib/components/nhl/NHLStandings.svelte';
 import OnThisDay from '$lib/components/OnThisDay.svelte';
 import Settings from '$lib/components/Settings.svelte';
+import ManualBriefSeedModal from '$lib/components/ManualBriefSeedModal.svelte';
 import SourceOverlay from '$lib/components/SourceOverlay.svelte';
 import StoryList from '$lib/components/StoryList.svelte';
 import { SearchModal } from '$lib/components/search';
 import StoryCardSkeleton from '$lib/components/story/StoryCardSkeleton.svelte';
 import TemporaryCategoryTooltip from '$lib/components/TemporaryCategoryTooltip.svelte';
 import TimeTravel from '$lib/components/TimeTravel.svelte';
+import { briefSeedModalState } from '$lib/briefSeedUi.svelte';
 import Toast from '$lib/components/Toast.svelte';
 import WikipediaPopup from '$lib/components/WikipediaPopup.svelte';
 import Weather from '$lib/components/weather/Weather.svelte';
@@ -859,6 +861,8 @@ if (browser && typeof window !== 'undefined') {
     displaySettings.showIntro = true;
   }}
 />
+
+<ManualBriefSeedModal isOpen={briefSeedModalState.isOpen} />
 
 <TimeTravel />
 

@@ -109,6 +109,7 @@ test('articlesToKiteStories maps solo articles and prefers framing summary', () 
   ]);
 
   assert.equal(stories.length, 1);
+  assert.equal(stories[0]!.id, 'solo:a1');
   assert.equal(stories[0]!.title, 'Headline A');
   assert.equal(stories[0]!.short_summary, 'AI framing summary for A');
   assert.equal(stories[0]!.category, OWNED_CATEGORY_NAME);
@@ -140,6 +141,27 @@ test('articlesToKiteStories groups by clusterId', () => {
   const clustered = stories.find((s) => s.id === 'evt-1')!;
   assert.equal(clustered.articles.length, 2);
   assert.equal(clustered.title, 'Cluster lead');
+  const solo = stories.find((s) => s.id === 'solo:solo')!;
+  assert.equal(solo.title, 'Standalone');
+});
+
+test('articlesToKiteStories uses membership key for manual seeds with clusterId=id', () => {
+  const stories = articlesToKiteStories([
+    article({
+      id: 'manual-abc',
+      title: 'Manual headline',
+      clusterId: 'manual-abc',
+      sourceKind: 'manual',
+      canonicalUrl: 'manual://seed/abc',
+      snippet: 'Note',
+      publisherUrl: null,
+      publisherDomain: null,
+      bodyStatus: 'not_applicable',
+    }),
+  ]);
+
+  assert.equal(stories.length, 1);
+  assert.equal(stories[0]!.id, 'manual-abc');
 });
 
 test('articlesToKiteStories maps primary_image and per-article image when present', () => {
