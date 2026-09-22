@@ -348,12 +348,20 @@ export function createApp(deps: CreateAppDeps = {}): Express {
    */
   app.get('/api/radar', async (_req, res) => {
     try {
-      const [articles, meta, membership] = await Promise.all([
+      const [articles, meta, membership, tracked] = await Promise.all([
         readAllArticles(),
         readServerMeta(),
         readMembership(),
+        readTracked(),
       ]);
-      const clusters = buildRadarFeed(articles, membership.acceptedClusterIds);
+      const clusters = buildRadarFeed(
+        articles,
+        membership.acceptedClusterIds,
+        tracked.entries.map((entry) => ({
+          clusterId: entry.clusterId,
+          pendingUpdate: entry.pendingUpdate,
+        })),
+      );
       res.json({
         ok: true,
         clusters,

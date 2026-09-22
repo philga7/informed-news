@@ -12,7 +12,13 @@
 		RADAR_NETWORK_ERROR,
 		RADAR_PAGE_DESCRIPTION,
 		RADAR_PAGE_TITLE,
+		RADAR_TRACKED_SECTION_HELP,
+		RADAR_TRACKED_SECTION_TITLE,
+		RADAR_TRACK_ERROR,
+		RADAR_TRACK_LABEL,
+		RADAR_TRACK_PENDING,
 		RADAR_UNACCEPT_LABEL,
+		RADAR_UNTRACK_LABEL,
 	} from '$lib/radar';
 
 	type RadarHeadline = {
@@ -30,11 +36,20 @@
 		headlines: RadarHeadline[];
 		newestAt: string | null;
 		accepted: boolean;
+		tracked: boolean;
+		pendingUpdate?: boolean;
 	};
 
 	type RadarMeta = {
 		lastFetchAt: string | null;
 		lastError: string | null;
+	};
+
+	type TrackedEntry = {
+		clusterId: string;
+		trackedAt: string;
+		memberCountSnapshot: number;
+		pendingUpdate: boolean;
 	};
 
 	type RadarResponse =
@@ -48,9 +63,21 @@
 				error: string;
 		  };
 
+	type TrackedResponse =
+		| {
+				ok: true;
+				entries: TrackedEntry[];
+				updatedAt: string | null;
+		  }
+		| {
+				ok: false;
+				error: string;
+		  };
+
 	let loading = true;
 	let unauthenticated = false;
 	let clusters: RadarCluster[] = [];
+	let trackedEntries: TrackedEntry[] = [];
 	let meta: RadarMeta | null = null;
 	let error: string | null = null;
 
@@ -58,7 +85,22 @@
 	let loginError: string | null = null;
 	let loggingIn = false;
 	let pendingClusterId: string | null = null;
+	let pendingTrackClusterId: string | null = null;
 	let acceptError: string | null = null;
+	let trackError: string | null = null;
+
+	function trackedClusterRows(): Array<
+		| { kind: 'resolved'; entry: TrackedEntry; cluster: RadarCluster }
+		| { kind: 'stub'; entry: TrackedEntry }
+	> {
+		const byClusterId = new Map(clusters.map((c) => [c.clusterId, c]));
+		const entries = [...trackedEntries].sort((a, b) => b.trackedAt.localeCompare(a.trackedAt));
+		return entries.map((entry) => {
+			const resolved = byClusterId.get(entry.clusterId);
+			if (resolved) return { kind: 'resolved', entry, cluster: resolved };
+			return { kind: 'stub', entry };
+		});
+	}
 
 	function formatDateTime(value: string | null): string {
 		if (!value) return 'not yet run';
@@ -79,28 +121,37 @@
 		loading = true;
 		error = null;
 		acceptError = null;
+		trackError = null;
 
 		try {
-			const response = await fetch('/api/radar', {
-				credentials: 'include',
-			});
+			const [radarResponse, trackedResponse] = await Promise.all([
+				fetch('/api/radar', { credentials: 'include' }),
+				fetch('/api/brief/tracked', { credentials: 'include' }),
+			]);
 
-			if (response.status === 401) {
+			if (radarResponse.status === 401 || trackedResponse.status === 401) {
 				unauthenticated = true;
 				clusters = [];
+				trackedEntries = [];
 				meta = null;
 				return;
 			}
 
-			const data = (await response.json()) as RadarResponse;
-
-			if (!data.ok) {
-				error = data.error || RADAR_ERROR_GENERIC;
+			const radar = (await radarResponse.json()) as RadarResponse;
+			if (!radar.ok) {
+				error = radar.error || RADAR_ERROR_GENERIC;
 				return;
 			}
 
-			clusters = data.clusters;
-			meta = data.meta;
+			clusters = radar.clusters;
+			meta = radar.meta;
+
+			const tracked = (await trackedResponse.json().catch(() => null)) as TrackedResponse | null;
+			if (tracked && tracked.ok) {
+				trackedEntries = tracked.entries;
+			} else if (tracked && tracked.ok === false) {
+				trackedEntries = [];
+			}
 		} catch (err) {
 			console.error('Error loading radar', err);
 			error = RADAR_NETWORK_ERROR;
@@ -162,10 +213,13 @@
 			console.error('Error during radar logout', err);
 		} finally {
 			clusters = [];
+			trackedEntries = [];
 			meta = null;
 			error = null;
 			acceptError = null;
+			trackError = null;
 			pendingClusterId = null;
+			pendingTrackClusterId = null;
 			unauthenticated = true;
 		}
 	}
@@ -173,6 +227,12 @@
 	function setClusterAccepted(clusterId: string, accepted: boolean): void {
 		clusters = clusters.map((cluster) =>
 			cluster.clusterId === clusterId ? { ...cluster, accepted } : cluster,
+		);
+	}
+
+	function setClusterTracked(clusterId: string, tracked: boolean): void {
+		clusters = clusters.map((cluster) =>
+			cluster.clusterId === clusterId ? { ...cluster, tracked } : cluster,
 		);
 	}
 
@@ -202,6 +262,7 @@
 				setClusterAccepted(cluster.clusterId, previousAccepted);
 				unauthenticated = true;
 				clusters = [];
+				trackedEntries = [];
 				meta = null;
 				return;
 			}
@@ -216,12 +277,72 @@
 					(body && body.error) || RADAR_ACCEPT_ERROR;
 				return;
 			}
+
+			if (nextAccepted) {
+				// Accept defaults to track on the server (NEWS-59).
+				setClusterTracked(cluster.clusterId, true);
+				if (!trackedEntries.some((entry) => entry.clusterId === cluster.clusterId)) {
+					await loadRadar();
+				}
+			}
 		} catch (err) {
 			console.error('Error toggling Brief membership', err);
 			setClusterAccepted(cluster.clusterId, previousAccepted);
 			acceptError = RADAR_NETWORK_ERROR;
 		} finally {
 			pendingClusterId = null;
+		}
+	}
+
+	async function toggleTrack(clusterId: string, currentlyTracked: boolean): Promise<void> {
+		if (pendingTrackClusterId || loading) return;
+		const previousTracked = currentlyTracked;
+		const nextTracked = !currentlyTracked;
+		trackError = null;
+		pendingTrackClusterId = clusterId;
+		setClusterTracked(clusterId, nextTracked);
+
+		try {
+			const response = await fetch(
+				nextTracked ? '/api/brief/track' : '/api/brief/untrack',
+				{
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					credentials: 'include',
+					body: JSON.stringify({ clusterId }),
+				},
+			);
+
+			if (response.status === 401) {
+				setClusterTracked(clusterId, previousTracked);
+				unauthenticated = true;
+				clusters = [];
+				trackedEntries = [];
+				meta = null;
+				return;
+			}
+
+			const body = (await response.json().catch(() => null)) as
+				| { ok?: boolean; error?: string; entries?: TrackedEntry[] }
+				| null;
+
+			if (!response.ok || (body && body.ok === false)) {
+				setClusterTracked(clusterId, previousTracked);
+				trackError = (body && body.error) || RADAR_TRACK_ERROR;
+				return;
+			}
+
+			if (body && Array.isArray(body.entries)) {
+				trackedEntries = body.entries;
+			} else {
+				await loadRadar();
+			}
+		} catch (err) {
+			console.error('Error toggling tracked stories', err);
+			setClusterTracked(clusterId, previousTracked);
+			trackError = RADAR_NETWORK_ERROR;
+		} finally {
+			pendingTrackClusterId = null;
 		}
 	}
 
@@ -308,6 +429,12 @@
 				</p>
 			{/if}
 
+			{#if trackError}
+				<p class="mt-4 text-sm text-red-600 dark:text-red-400">
+					{trackError}
+				</p>
+			{/if}
+
 			{#if meta}
 				<div
 					class="mt-6 space-y-1 text-xs text-gray-500 dark:text-gray-400"
@@ -326,7 +453,120 @@
 				</div>
 			{/if}
 
-			{#if clusters.length === 0 && !error}
+			{#if trackedEntries.length > 0}
+					<section class="mt-8 space-y-4" aria-label="Tracked clusters">
+						<header class="space-y-1">
+							<h2 class="text-sm font-semibold tracking-tight text-gray-900 dark:text-gray-100">
+								{RADAR_TRACKED_SECTION_TITLE}
+							</h2>
+							<p class="text-xs leading-relaxed text-gray-600 dark:text-gray-400">
+								{RADAR_TRACKED_SECTION_HELP}
+							</p>
+						</header>
+
+						<ul class="space-y-3">
+							{#each trackedClusterRows() as row (row.entry.clusterId)}
+								<li class="rounded-md border border-gray-200 bg-white/70 p-3 shadow-sm backdrop-blur dark:border-gray-700 dark:bg-gray-900/60">
+									<div class="flex items-start justify-between gap-3">
+										<div class="min-w-0">
+											{#if row.kind === 'resolved'}
+												{#if row.cluster.newestAt}
+													<p class="text-xs text-gray-500 dark:text-gray-400">
+														Latest in cluster:
+														<span class="font-medium">{formatDateTime(row.cluster.newestAt)}</span>
+													</p>
+												{/if}
+											{:else}
+												<p class="text-xs text-gray-500 dark:text-gray-400">
+													Cluster:
+													<span class="font-mono text-[11px]">{row.entry.clusterId}</span>
+												</p>
+											{/if}
+										</div>
+
+										<div class="shrink-0 flex items-center gap-3">
+											{#if row.kind === 'resolved' && row.cluster.accepted}
+												<a
+													href="/"
+													class="text-xs font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+												>
+													Open on Brief
+												</a>
+											{/if}
+											{#if row.kind === 'resolved'}
+												<button
+													type="button"
+													class="text-xs font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700 disabled:opacity-50 dark:text-blue-400 dark:hover:text-blue-300"
+													disabled={pendingClusterId === row.entry.clusterId}
+													aria-pressed={row.cluster.accepted}
+													on:click={() => toggleAccept(row.cluster)}
+												>
+													{#if pendingClusterId === row.entry.clusterId}
+														{RADAR_ACCEPT_PENDING}
+													{:else if row.cluster.accepted}
+														{RADAR_UNACCEPT_LABEL}
+													{:else}
+														{RADAR_ACCEPT_LABEL}
+													{/if}
+												</button>
+											{/if}
+											<button
+												type="button"
+												class="text-xs font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700 disabled:opacity-50 dark:text-blue-400 dark:hover:text-blue-300"
+												disabled={pendingTrackClusterId === row.entry.clusterId}
+												aria-pressed={true}
+												on:click={() => toggleTrack(row.entry.clusterId, true)}
+											>
+												{#if pendingTrackClusterId === row.entry.clusterId}
+													{RADAR_TRACK_PENDING}
+												{:else}
+													{RADAR_UNTRACK_LABEL}
+												{/if}
+											</button>
+										</div>
+									</div>
+
+									{#if row.kind === 'resolved'}
+										<ul class="mt-2 space-y-1">
+											{#each row.cluster.headlines as headline (headline.id)}
+												<li class="flex flex-col gap-0.5">
+													<a
+														href={headline.canonicalUrl}
+														target="_blank"
+														rel="noreferrer"
+														class="text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+													>
+														{headline.title}
+													</a>
+													<div
+														class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-gray-500 dark:text-gray-400"
+													>
+														{#if headline.publisherDomain}
+															<span>{headline.publisherDomain}</span>
+														{/if}
+														<span
+															class="inline-flex items-center rounded-full border border-gray-300 px-2 py-0.5 text-[10px] uppercase tracking-wide dark:border-gray-600"
+														>
+															{headline.sourceKind === 'cfp' ? 'CFP' : 'RSS'}
+														</span>
+														{#if headline.citationLabel}
+															<span>· {headline.citationLabel}</span>
+														{/if}
+														{#if headline.publishedAt}
+															<span>· {formatDateTime(headline.publishedAt)}</span>
+														{/if}
+													</div>
+												</li>
+											{/each}
+										</ul>
+									{/if}
+								</li>
+							{/each}
+						</ul>
+					</section>
+			{/if}
+
+			{#if clusters.length === 0 && !error && trackedEntries.length === 0}
 				<p class="mt-8 text-sm text-gray-600 dark:text-gray-300">
 					{RADAR_EMPTY_COPY}
 				</p>
@@ -343,21 +583,38 @@
 								{:else}
 									<span class="text-xs text-gray-500 dark:text-gray-400"></span>
 								{/if}
-								<button
-									type="button"
-									class="shrink-0 text-xs font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700 disabled:opacity-50 dark:text-blue-400 dark:hover:text-blue-300"
-									disabled={pendingClusterId === cluster.clusterId}
-									aria-pressed={cluster.accepted}
-									on:click={() => toggleAccept(cluster)}
-								>
-									{#if pendingClusterId === cluster.clusterId}
-										{RADAR_ACCEPT_PENDING}
-									{:else if cluster.accepted}
-										{RADAR_UNACCEPT_LABEL}
-									{:else}
-										{RADAR_ACCEPT_LABEL}
-									{/if}
-								</button>
+								<div class="shrink-0 flex items-center gap-3">
+									<button
+										type="button"
+										class="text-xs font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700 disabled:opacity-50 dark:text-blue-400 dark:hover:text-blue-300"
+										disabled={pendingTrackClusterId === cluster.clusterId}
+										aria-pressed={cluster.tracked}
+										on:click={() => toggleTrack(cluster.clusterId, cluster.tracked)}
+									>
+										{#if pendingTrackClusterId === cluster.clusterId}
+											{RADAR_TRACK_PENDING}
+										{:else if cluster.tracked}
+											{RADAR_UNTRACK_LABEL}
+										{:else}
+											{RADAR_TRACK_LABEL}
+										{/if}
+									</button>
+									<button
+										type="button"
+										class="text-xs font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700 disabled:opacity-50 dark:text-blue-400 dark:hover:text-blue-300"
+										disabled={pendingClusterId === cluster.clusterId}
+										aria-pressed={cluster.accepted}
+										on:click={() => toggleAccept(cluster)}
+									>
+										{#if pendingClusterId === cluster.clusterId}
+											{RADAR_ACCEPT_PENDING}
+										{:else if cluster.accepted}
+											{RADAR_UNACCEPT_LABEL}
+										{:else}
+											{RADAR_ACCEPT_LABEL}
+										{/if}
+									</button>
+								</div>
 							</div>
 
 							<ul class="mt-2 space-y-1">

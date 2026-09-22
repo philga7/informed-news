@@ -18,12 +18,19 @@ export type RadarCluster = {
   headlines: RadarHeadline[]; // ≥1, newest first within cluster
   newestAt: string | null;
   accepted: boolean;
+  tracked: boolean;
+  pendingUpdate?: boolean; // from track store when tracked
 };
 
 export type RadarResponse = {
   ok: true;
   clusters: RadarCluster[];
   meta: Pick<StoreMeta, 'lastFetchAt' | 'lastError'>;
+};
+
+export type RadarTrackedEntry = {
+  clusterId: string;
+  pendingUpdate: boolean;
 };
 
 function isRadarSource(sourceKind: SourceKind): sourceKind is RadarHeadlineSourceKind {
@@ -53,12 +60,17 @@ function toHeadline(article: Article): RadarHeadline {
  * - Groups by existing `clusterId`; null/empty → `solo:<articleId>`.
  * - Sorts clusters by `newestAt` (desc); headlines newest-first within cluster.
  * - Sets `accepted` from Brief membership ids (default: none accepted).
+ * - Sets `tracked` and `pendingUpdate` from tracked-stories store (default: none tracked).
  */
 export function buildRadarFeed(
   articles: Article[],
   acceptedClusterIds: Iterable<string> = [],
+  trackedEntries: Iterable<RadarTrackedEntry> = [],
 ): RadarCluster[] {
   const accepted = new Set(acceptedClusterIds);
+  const trackedByClusterId = new Map(
+    [...trackedEntries].map((entry) => [entry.clusterId, entry]),
+  );
   const filtered = articles.filter((a) => isRadarSource(a.sourceKind));
 
   const groups = new Map<string, Article[]>();
@@ -88,6 +100,10 @@ export function buildRadarFeed(
       headlines: sortedMembers.map(toHeadline),
       newestAt: newest || null,
       accepted: accepted.has(clusterId),
+      tracked: trackedByClusterId.has(clusterId),
+      ...(trackedByClusterId.has(clusterId)
+        ? { pendingUpdate: trackedByClusterId.get(clusterId)!.pendingUpdate }
+        : {}),
     });
   }
 
