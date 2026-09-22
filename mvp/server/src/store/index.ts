@@ -21,11 +21,19 @@ export {
 } from './briefMembershipStore.js';
 export type { BriefMembership } from './briefMembershipStore.js';
 export {
+  readTrackedStories,
+  syncTrackedAfterFetch,
+  trackCluster,
+  untrackCluster,
+} from './trackedStoriesStore.js';
+export type { TrackedEntry, TrackedStories } from './trackedStoriesStore.js';
+export {
   ARTICLES_PATH,
   BRIEF_MEMBERSHIP_PATH,
   CLUSTER_ENRICHMENTS_PATH,
   DATA_DIR,
   META_PATH,
+  TRACKED_STORIES_PATH,
 } from './paths.js';
 export {
   getClusterEnrichment,
