@@ -10,7 +10,7 @@ Inspired by Wesleyan Quadrilateral discernment (primary text / tradition / reaso
 |------|-----|----------------|
 | **Primary text** | What do elevated primary sources say? | Official releases, filings, first-party records — *prima* among witnesses, not infallible |
 | **Durable method** | How has this *kind* of claim been handled before? | Institutional practice, serious-desk norms — not “what cable always says” |
-| **Reason** | Does coherence and calibrated judgment hold? | TypeSafe atomic questions + confidence; status derived in **code** — not vibe or prose |
+| **Reason** | Does coherence and calibrated judgment hold? | TypeSafe atomic questions + confidence; status derived in **code** — not vibe or prose. Module: `mvp/server/src/services/typesafeClaimQuestions.ts` (NEWS-71) |
 | **Experience** | What do sensors / field / first-person add? | Real but fallible; must be disciplined by the other three |
 
 ## Rules of thumb

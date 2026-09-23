@@ -75,6 +75,8 @@ Claim desk routes under [NEWS-69](https://informedcrew.atlassian.net/browse/NEWS
 
 **Store-only ([NEWS-70](https://informedcrew.atlassian.net/browse/NEWS-70)):** Runtime data files under `mvp/data/`: `claims.json`, `evidence-links.json`, `claim-membership.json`, `tracked-claims.json` (no HTTP yet).
 
+**TypeSafe spine ([NEWS-71](https://informedcrew.atlassian.net/browse/NEWS-71)):** Server-side TypeSafe client + claim judge question library (`typesafeClaimQuestions.ts`) + confidence gates landed; no HTTP yet. `POST /api/claims/extract` (Ollama propose + TypeSafe judge batch) remains [NEWS-72](https://informedcrew.atlassian.net/browse/NEWS-72). Claim status stays code-derived per [NEWS-70](https://informedcrew.atlassian.net/browse/NEWS-70).
+
 Story `/api/radar` and `/api/brief/*` remain during transition. Judgment-of-record for claims is TypeSafe, not `POST /api/classify`. See [ROADMAP.md](ROADMAP.md), [CLAIMS_DISCERNMENT.md](CLAIMS_DISCERNMENT.md).
 
 ## Out of scope
