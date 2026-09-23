@@ -71,8 +71,9 @@ Do **not** treat `_legacy/` (including `_legacy/mvp-web`) as the primary product
 
 ### Framing / AI
 
-- Classification goes through existing Ollama framing services
-- Always treat framing as AI-assisted analysis, not ground truth
+- Story framing/classify still goes through existing Ollama framing services (legacy path)
+- Epic **J** claims desk: TypeSafe = judgment-of-record; Ollama = propose candidates + verbiage only ([docs/CLAIMS_DISCERNMENT.md](docs/CLAIMS_DISCERNMENT.md))
+- Always treat AI-assisted analysis as not ground truth — status/evidence, not verdicts
 - Do not invent alternate model stacks without an explicit request
 
 ### Security
@@ -104,7 +105,9 @@ Do **not** treat `_legacy/` (including `_legacy/mvp-web`) as the primary product
 
 Informed News work uses the **NEWS** project on Atlassian (`informedcrew.atlassian.net`). Prefer JQL `project = NEWS`.
 
-**Item ordering:** [docs/ROADMAP.md](docs/ROADMAP.md) — desk v1 Done-demo complete (**NEWS-57**); ask before Later children or Epic **B**. Do not pick parked B–G epics unless the user reorders.
+**Item ordering:** [docs/ROADMAP.md](docs/ROADMAP.md) — **Current next:** Epic **J** ([NEWS-69](https://informedcrew.atlassian.net/browse/NEWS-69)) claims/evidence desk (conflict). Desk v1 (**NEWS-57**) Done-demo complete; Later children parked. Discernment: [docs/CLAIMS_DISCERNMENT.md](docs/CLAIMS_DISCERNMENT.md). Ask before parked Later or Epic **B**. Do not pick parked B–G epics unless the user reorders.
+
+**AI split (Epic J):** TypeSafe / Jev = structured judgments (Choice / Score / Noul + confidence). Ollama = claim-candidate proposal + Brief verbiage only — not classifier-of-record for claims. No Verified badges or claim verdicts.
 
 ## Agent skill loop
 

@@ -2,6 +2,10 @@
 
 Informed News serves the Kite shell from **our** brief API by default — not `https://kite.kagi.com` (CC BY-NC).
 
+## Direction (Epic J — in progress)
+
+Product next is the **claims / evidence** desk ([NEWS-69](https://informedcrew.atlassian.net/browse/NEWS-69)): Brief will lead with **accepted claims** plus **linked story clusters** for context; Radar becomes a **claim inbox**. Stories remain ingest/cluster **input**. Until those APIs ship, this document describes the **live story-desk** path (Accept / Track / Mute on `clusterId`). Honesty invariant for claims: status + evidence only — no Verified badges ([CLAIMS_DISCERNMENT.md](CLAIMS_DISCERNMENT.md)).
+
 ## Default path
 
 1. `npm run dev` starts `mvp/server` (:3001) and Kite (:5173).

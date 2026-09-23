@@ -65,8 +65,19 @@ Public Kite brief routes under `/api/batches…` are **in addition** to this sur
 - Framing/classify stays on this API; Kite Brief consumes adapted JSON via the owned-brief adapter, not by deleting these endpoints.
 - Retiring the React feed (`_legacy/mvp-web`, NEWS-46) must not remove these routes.
 
+## Planned (Epic J — not frozen yet)
+
+Claim desk routes under [NEWS-69](https://informedcrew.atlassian.net/browse/NEWS-69) will be added here when shipped (do not invent clients against these until listed in **Frozen routes**):
+
+- `GET /api/claims/radar` — claim inbox
+- `POST /api/claims/extract` — Ollama propose + TypeSafe judge batch
+- Claim Accept / Track / Mute / ack on `claimId` (parallel to brief story membership)
+
+Story `/api/radar` and `/api/brief/*` remain during transition. Judgment-of-record for claims is TypeSafe, not `POST /api/classify`. See [ROADMAP.md](ROADMAP.md), [CLAIMS_DISCERNMENT.md](CLAIMS_DISCERNMENT.md).
+
 ## Out of scope
 
 - Making `/api/articles` public without a session
 - Replacing this API with Crucix or a new gateway (later epics)
 - Perfect parity with every historical `_legacy/mvp-web` client quirk
+- Claim “Verified” / truth-verdict endpoints

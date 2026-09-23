@@ -94,9 +94,9 @@ Root [`vercel.json`](vercel.json) still deploys the **archived** `_legacy/mvp-we
 
 ## Roadmap (NEWS)
 
-Agent-facing order of work: **[docs/ROADMAP.md](docs/ROADMAP.md)** (desk v1 Done-demo complete ([NEWS-57](https://informedcrew.atlassian.net/browse/NEWS-57)); ask before Later children or Epic [NEWS-34](https://informedcrew.atlassian.net/browse/NEWS-34)).
+Agent-facing order of work: **[docs/ROADMAP.md](docs/ROADMAP.md)** — **Current next:** Epic J claims/evidence desk ([NEWS-69](https://informedcrew.atlassian.net/browse/NEWS-69)); desk v1 Done-demo ([NEWS-57](https://informedcrew.atlassian.net/browse/NEWS-57)); ask before parked Later or Epic [NEWS-34](https://informedcrew.atlassian.net/browse/NEWS-34). Discernment: [docs/CLAIMS_DISCERNMENT.md](docs/CLAIMS_DISCERNMENT.md).
 
-Done so far: Epic A ([NEWS-33](https://informedcrew.atlassian.net/browse/NEWS-33)), Epic H ([NEWS-48](https://informedcrew.atlassian.net/browse/NEWS-48)). NEWS-53 absorbed into NEWS-57. Historical pivot plan: [`.cursor/plans/osint_jira_pivot_d6b40f87.plan.md`](.cursor/plans/osint_jira_pivot_d6b40f87.plan.md).
+Done so far: Epic A ([NEWS-33](https://informedcrew.atlassian.net/browse/NEWS-33)), Epic H ([NEWS-48](https://informedcrew.atlassian.net/browse/NEWS-48)), desk v1 under NEWS-57. NEWS-53 absorbed into NEWS-57. Plans: [`.cursor/plans/osint_jira_pivot_d6b40f87.plan.md`](.cursor/plans/osint_jira_pivot_d6b40f87.plan.md), [`.cursor/plans/claims_evidence_spine_8f4cde15.plan.md`](.cursor/plans/claims_evidence_spine_8f4cde15.plan.md).
 
 ## Legacy code
 
