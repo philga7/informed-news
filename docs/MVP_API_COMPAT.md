@@ -73,6 +73,8 @@ Claim desk routes under [NEWS-69](https://informedcrew.atlassian.net/browse/NEWS
 - `POST /api/claims/extract` — Ollama propose + TypeSafe judge batch
 - Claim Accept / Track / Mute / ack on `claimId` (parallel to brief story membership)
 
+**Store-only ([NEWS-70](https://informedcrew.atlassian.net/browse/NEWS-70)):** Runtime data files under `mvp/data/`: `claims.json`, `evidence-links.json`, `claim-membership.json`, `tracked-claims.json` (no HTTP yet).
+
 Story `/api/radar` and `/api/brief/*` remain during transition. Judgment-of-record for claims is TypeSafe, not `POST /api/classify`. See [ROADMAP.md](ROADMAP.md), [CLAIMS_DISCERNMENT.md](CLAIMS_DISCERNMENT.md).
 
 ## Out of scope
