@@ -81,6 +81,13 @@ function matchesSource(ruleSource: string, article: MuteArticleLike): boolean {
   return sourceCandidates(article).some((candidate) => candidate.includes(needle));
 }
 
+function headlineHaystack(article: MuteArticleLike): string {
+  return [article.title, article.snippet]
+    .filter((v): v is string => typeof v === 'string' && v.trim().length > 0)
+    .join('\n')
+    .toLowerCase();
+}
+
 export function articleMatchesMute(
   article: MuteArticleLike,
   rules: Iterable<MuteRule>,
@@ -99,6 +106,45 @@ export function articleMatchesMute(
 
     if (rule.source && !matchesSource(rule.source, article)) {
       continue;
+    }
+
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * A claim is muted if any rule keyword matches the claim text OR any linked
+ * headline title/snippet. When rule.source is set, it must match at least one
+ * linked article's source candidates.
+ */
+export function claimMatchesMute(
+  claim: { text: string },
+  linkedArticles: ReadonlyArray<MuteArticleLike>,
+  rules: Iterable<MuteRule>,
+): boolean {
+  const claimText = normalizeText(claim.text);
+
+  for (const rule of rules) {
+    const keyword = normalizeText(rule.keyword?.trim());
+    if (!keyword) {
+      continue;
+    }
+
+    const keywordMatched =
+      claimText.includes(keyword) ||
+      linkedArticles.some((a) => headlineHaystack(a).includes(keyword));
+
+    if (!keywordMatched) {
+      continue;
+    }
+
+    if (rule.source) {
+      const ok = linkedArticles.some((a) => matchesSource(rule.source!, a));
+      if (!ok) {
+        continue;
+      }
     }
 
     return true;

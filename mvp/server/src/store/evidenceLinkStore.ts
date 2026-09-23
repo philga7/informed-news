@@ -4,7 +4,8 @@ import path from 'node:path';
 import type { EvidenceLink, EvidenceStance, SourceTier } from '../types/claim.js';
 import { deriveClaimStatus } from '../services/deriveClaimStatus.js';
 import { getClaimById, readClaims, writeClaims } from './claimStore.js';
-import { CLAIMS_PATH, DATA_DIR, EVIDENCE_LINKS_PATH } from './paths.js';
+import { CLAIMS_PATH, DATA_DIR, EVIDENCE_LINKS_PATH, TRACKED_CLAIMS_PATH } from './paths.js';
+import { markTrackedClaimPending } from './trackedClaimsStore.js';
 
 async function ensureDataDir(): Promise<void> {
   await mkdir(DATA_DIR, { recursive: true });
@@ -179,6 +180,7 @@ export async function upsertEvidenceLink(
   input: UpsertEvidenceLinkInput,
   evidencePath: string = EVIDENCE_LINKS_PATH,
   claimsPath: string = CLAIMS_PATH,
+  trackedClaimsPath: string = TRACKED_CLAIMS_PATH,
 ): Promise<EvidenceLink | null> {
   const claimId = input.claimId.trim();
   if (claimId.length === 0) return null;
@@ -234,6 +236,12 @@ export async function upsertEvidenceLink(
   if (claimIndex >= 0) {
     claims[claimIndex] = { ...claims[claimIndex]!, status: nextStatus };
     await writeClaims(claims, claimsPath);
+  }
+
+  const evidenceWasAdded = !existing;
+  const stanceChanged = !!existing && existing.stance !== next.stance;
+  if (evidenceWasAdded || stanceChanged) {
+    await markTrackedClaimPending(claimId, trackedClaimsPath);
   }
 
   return next;

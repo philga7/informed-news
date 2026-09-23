@@ -18,3 +18,6 @@ export const MUTE_RULES_PATH = path.join(DATA_DIR, 'mute-rules.json');
 
 export const CLAIMS_PATH = path.join(DATA_DIR, 'claims.json');
 export const EVIDENCE_LINKS_PATH = path.join(DATA_DIR, 'evidence-links.json');
+
+export const CLAIM_MEMBERSHIP_PATH = path.join(DATA_DIR, 'claim-membership.json');
+export const TRACKED_CLAIMS_PATH = path.join(DATA_DIR, 'tracked-claims.json');

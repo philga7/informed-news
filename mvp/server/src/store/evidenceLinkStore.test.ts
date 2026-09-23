@@ -10,12 +10,14 @@ import {
   removeEvidenceLink,
   upsertEvidenceLink,
 } from './evidenceLinkStore.js';
+import { ackTrackedClaimUpdate, readTrackedClaims, trackClaim } from './trackedClaimsStore.js';
 
-function tempStorePaths(): { claimsPath: string; evidencePath: string } {
+function tempStorePaths(): { claimsPath: string; evidencePath: string; trackedClaimsPath: string } {
   const dir = mkdtempSync(path.join(tmpdir(), 'claim-evidence-'));
   return {
     claimsPath: path.join(dir, 'claims.json'),
     evidencePath: path.join(dir, 'evidence-links.json'),
+    trackedClaimsPath: path.join(dir, 'tracked-claims.json'),
   };
 }
 
@@ -140,6 +142,93 @@ test('upsertEvidenceLink refreshes claim status on stance change', async () => {
 
   const after = await getClaimById('c1', claimsPath);
   assert.equal(after?.status, 'contested');
+});
+
+test('upsertEvidenceLink marks tracked claim pending only on add or stance change', async () => {
+  const { claimsPath, evidencePath, trackedClaimsPath } = tempStorePaths();
+
+  await upsertClaim(
+    {
+      id: 'c1',
+      text: 'Claim',
+      claimType: 'event_occurrence',
+      entities: [],
+    },
+    claimsPath,
+  );
+
+  await trackClaim('c1', trackedClaimsPath);
+  const initial = await readTrackedClaims(trackedClaimsPath);
+  assert.equal(initial.entries[0]?.pendingUpdate, false);
+
+  // add evidence → pendingUpdate true
+  await upsertEvidenceLink(
+    {
+      id: 'e1',
+      claimId: 'c1',
+      articleId: 'a1',
+      url: null,
+      stance: 'supports',
+      sourceTier: 'sensor',
+      confidence: 0.9,
+      scores: null,
+    },
+    evidencePath,
+    claimsPath,
+    trackedClaimsPath,
+  );
+
+  const afterAdd = await readTrackedClaims(trackedClaimsPath);
+  assert.equal(afterAdd.entries[0]?.pendingUpdate, true);
+
+  // ack clears
+  await ackTrackedClaimUpdate('c1', trackedClaimsPath);
+  const afterAck = await readTrackedClaims(trackedClaimsPath);
+  assert.equal(afterAck.entries[0]?.pendingUpdate, false);
+
+  // update same stance (confidence change) → no pending
+  await upsertEvidenceLink(
+    {
+      id: 'e1',
+      claimId: 'c1',
+      articleId: 'a1',
+      url: null,
+      stance: 'supports',
+      sourceTier: 'sensor',
+      confidence: 0.8,
+      scores: null,
+    },
+    evidencePath,
+    claimsPath,
+    trackedClaimsPath,
+  );
+  const afterSameStance = await readTrackedClaims(trackedClaimsPath);
+  assert.equal(afterSameStance.entries[0]?.pendingUpdate, false);
+
+  // stance change → pendingUpdate true
+  await upsertEvidenceLink(
+    {
+      id: 'e1',
+      claimId: 'c1',
+      articleId: 'a1',
+      url: null,
+      stance: 'contradicts',
+      sourceTier: 'sensor',
+      confidence: 0.8,
+      scores: null,
+    },
+    evidencePath,
+    claimsPath,
+    trackedClaimsPath,
+  );
+  const afterStanceChange = await readTrackedClaims(trackedClaimsPath);
+  assert.equal(afterStanceChange.entries[0]?.pendingUpdate, true);
+
+  // removal does not set pending
+  await ackTrackedClaimUpdate('c1', trackedClaimsPath);
+  await removeEvidenceLink('e1', evidencePath, claimsPath);
+  const afterRemove = await readTrackedClaims(trackedClaimsPath);
+  assert.equal(afterRemove.entries[0]?.pendingUpdate, false);
 });
 
 test('upsertEvidenceLink is a no-op when both articleId and url are missing', async () => {
