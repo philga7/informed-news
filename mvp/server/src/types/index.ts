@@ -9,3 +9,15 @@ export type {
   StoreMeta,
 } from './article.js';
 export { BODY_TEXT_MAX_CHARS, truncateBodyText } from './article.js';
+
+export type {
+  Claim,
+  ClaimMembership,
+  ClaimStatus,
+  ClaimType,
+  EvidenceLink,
+  EvidenceStance,
+  SourceTier,
+  TrackedClaimEntry,
+  TrackedClaims,
+} from './claim.js';
