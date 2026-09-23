@@ -1,7 +1,7 @@
 import { TypeSafeClient } from '@typesafe-ai/sdk';
-import type { Questions, SystemOneRequest, SystemOneResult } from '@typesafe-ai/sdk';
+import type { Questions, SystemOneRequest } from '@typesafe-ai/sdk';
 
-// Pinned model to avoid drift; see NEWS-71 plan locked rulings.
+// Pinned model to avoid drift; `jev-latest` drifts over time (NEWS-71).
 const DEFAULT_MODEL = 'jev-1.13.0';
 
 let client: TypeSafeClient | null | undefined;
@@ -48,7 +48,8 @@ export function getTypeSafeClient(): TypeSafeClient | null {
       loggedInit = true;
     }
   } catch (err) {
-    console.error('❌ Failed to initialize TypeSafe client:', err);
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`❌ Failed to initialize TypeSafe client: ${message}`);
     client = null;
   }
 
@@ -60,54 +61,34 @@ export function getTypeSafeModelName(): string {
   return modelName;
 }
 
-export type TypeSafeSystemOneSuccess<Q extends Questions> = {
-  ok: true;
-  result: SystemOneResult<Q>;
-};
-
-export type TypeSafeSystemOneFailure = {
-  ok: false;
-  error: string;
-  model: string | null;
-};
-
-export type TypeSafeSystemOneResult<Q extends Questions> =
-  | TypeSafeSystemOneSuccess<Q>
-  | TypeSafeSystemOneFailure;
-
 /**
  * Wrapper around `TypeSafeClient.systemOne`.
  *
  * - Uses injected client when provided (tests)
  * - Otherwise uses singleton client from `getTypeSafeClient()`
- * - Missing API key/client returns `{ ok: false }` (no throw)
+ * - Throws when no client is configured (no network call)
+ * - Applies `getTypeSafeModelName()` when request.model is omitted
  */
 export async function systemOne<const Q extends Questions>(
   request: SystemOneRequest<Q>,
   injectedClient?: TypeSafeClient | null,
-): Promise<TypeSafeSystemOneResult<Q>> {
+): ReturnType<TypeSafeClient['systemOne']> {
   const active =
     injectedClient !== undefined ? injectedClient : getTypeSafeClient();
 
   if (!active) {
-    return {
-      ok: false,
-      error: 'TypeSafe service not available — TYPESAFE_API_KEY not configured',
-      model: null,
-    };
+    throw new Error('TypeSafe client not configured');
   }
 
-  try {
-    const result = await active.systemOne(request);
-    return { ok: true, result };
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return {
-      ok: false,
-      error: message,
-      model: request.model ?? getTypeSafeModelName(),
-    };
-  }
+  const requestWithModel: SystemOneRequest<Q> =
+    request.model?.trim()
+      ? request
+      : {
+          ...request,
+          model: getTypeSafeModelName(),
+        };
+
+  return active.systemOne(requestWithModel);
 }
 
 /** Reset cached client (tests / env reload). */
