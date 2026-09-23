@@ -12,8 +12,8 @@ Claims spine plan: [`.cursor/plans/claims_evidence_spine_8f4cde15.plan.md`](../.
 | Order | Key | Summary |
 |-------|-----|---------|
 | **1** | [NEWS-69](https://informedcrew.atlassian.net/browse/NEWS-69) | **J. Claims / evidence desk (conflict)** |
-| 1a | [NEWS-70](https://informedcrew.atlassian.net/browse/NEWS-70) | Claim + evidence stores and status derivation (no verdicts) |
-| 1b | [NEWS-71](https://informedcrew.atlassian.net/browse/NEWS-71) | TypeSafe client + claim question library + confidence gates |
+| 1a | [NEWS-70](https://informedcrew.atlassian.net/browse/NEWS-70) | Claim + evidence stores and status derivation (no verdicts) — **Done** |
+| **1b** | [NEWS-71](https://informedcrew.atlassian.net/browse/NEWS-71) | **TypeSafe client + claim question library + confidence gates** *(next)* |
 | 1c | [NEWS-72](https://informedcrew.atlassian.net/browse/NEWS-72) | Ollama propose candidates + TypeSafe judge extract pipeline |
 | 1d | [NEWS-73](https://informedcrew.atlassian.net/browse/NEWS-73) | Primary vs sensor source tiers + conflict primary starter set |
 | 1e | [NEWS-74](https://informedcrew.atlassian.net/browse/NEWS-74) | Claim Radar API + Kite claim inbox UI |
