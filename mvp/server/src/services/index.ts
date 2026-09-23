@@ -62,6 +62,18 @@ export {
   systemOne,
 } from './typesafeClient.js';
 export {
+  CHOICE_CONFIDENCE_FLOOR,
+  SCORE_CONFIDENCE_FLOOR,
+  buildClaimJudgeQuestions,
+  judgeClaimCandidate,
+  routeClaimJudgeAnswers,
+} from './typesafeClaimQuestions.js';
+export type {
+  ClaimJudgeAnswers,
+  ClaimJudgeResult,
+  ClaimJudgeState,
+} from './typesafeClaimQuestions.js';
+export {
   classifyUnclassifiedArticles,
   classifyArticleById,
   sortNewestFirst,
