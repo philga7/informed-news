@@ -8,6 +8,8 @@ Product next is the **claims / evidence** desk ([NEWS-69](https://informedcrew.a
 
 **Store foundation ([NEWS-70](https://informedcrew.atlassian.net/browse/NEWS-70)):** Claim/evidence JSON stores + status derivation are landed in `mvp/server`; HTTP APIs and Brief/Radar UI remain NEWS-74+.
 
+**Judgment spine ([NEWS-71](https://informedcrew.atlassian.net/browse/NEWS-71)):** TypeSafe client + claim question library + confidence gates are landed in `mvp/server`; extract pipeline remains [NEWS-72](https://informedcrew.atlassian.net/browse/NEWS-72); claim status stays **code-derived** ([NEWS-70](https://informedcrew.atlassian.net/browse/NEWS-70)).
+
 ## Default path
 
 1. `npm run dev` starts `mvp/server` (:3001) and Kite (:5173).
