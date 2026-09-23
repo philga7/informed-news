@@ -56,6 +56,12 @@ export type {
   FramingClassifyFailure,
 } from './ollamaFraming.js';
 export {
+  getTypeSafeClient,
+  getTypeSafeModelName,
+  resetTypeSafeClientForTests,
+  systemOne,
+} from './typesafeClient.js';
+export {
   classifyUnclassifiedArticles,
   classifyArticleById,
   sortNewestFirst,
