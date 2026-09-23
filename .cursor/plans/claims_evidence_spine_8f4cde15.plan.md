@@ -4,7 +4,7 @@ overview: "Pivot Informed News from story-centric desk to a conflict/geopolitics
 todos:
   - id: jira-epic-gate
     content: Create NEWS epic J + child stories; supersede NEWS-64; park Later story children; set docs/ROADMAP.md Current next
-    status: pending
+    status: completed
   - id: schema-stores
     content: Claim / EvidenceLink / membership / tracked / mute stores + status derivation (no verdicts)
     status: pending
@@ -28,7 +28,7 @@ todos:
     status: pending
   - id: docs-compat
     content: Update OWNED_BRIEF, MVP_API_COMPAT, AGENTS, ROADMAP; honesty copy throughout
-    status: pending
+    status: completed
 isProject: false
 ---
 
