@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { mkdtempSync } from 'node:fs';
+import { writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
@@ -39,5 +40,33 @@ test('upsertClaim defaults status and forces domain', async () => {
   assert.ok(stored);
   assert.equal(stored.domain, 'conflict');
   assert.equal(stored.status, 'insufficient_evidence');
+});
+
+test('readClaims keeps claims missing createdAt with fallback', async () => {
+  const claimsPath = tempClaimsPath();
+
+  await writeFile(
+    claimsPath,
+    `${JSON.stringify(
+      [
+        {
+          id: 'c1',
+          text: 'A claim without createdAt',
+          claimType: 'event_occurrence',
+          status: 'reported',
+          entities: [],
+          domain: 'conflict',
+        },
+      ],
+      null,
+      2,
+    )}\n`,
+    'utf8',
+  );
+
+  const claims = await readClaims(claimsPath);
+  assert.equal(claims.length, 1);
+  assert.equal(claims[0]?.id, 'c1');
+  assert.equal(claims[0]?.createdAt, new Date(0).toISOString());
 });
 

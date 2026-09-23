@@ -4,6 +4,8 @@ import path from 'node:path';
 import type { Claim, ClaimStatus } from '../types/claim.js';
 import { CLAIMS_PATH, DATA_DIR } from './paths.js';
 
+const FALLBACK_CREATED_AT = new Date(0).toISOString();
+
 async function ensureDataDir(): Promise<void> {
   await mkdir(DATA_DIR, { recursive: true });
 }
@@ -48,9 +50,9 @@ function normalizeClaim(raw: unknown): Claim | null {
         .filter((e) => e.length > 0)
     : [];
 
-  const createdAt =
+  const createdAtRaw =
     typeof record.createdAt === 'string' ? record.createdAt.trim() : '';
-  if (createdAt.length === 0) return null;
+  const createdAt = createdAtRaw.length > 0 ? createdAtRaw : FALLBACK_CREATED_AT;
 
   return {
     id,

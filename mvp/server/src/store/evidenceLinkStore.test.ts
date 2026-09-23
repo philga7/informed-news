@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { mkdtempSync } from 'node:fs';
+import { writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
@@ -175,5 +176,66 @@ test('upsertEvidenceLink is a no-op when both articleId and url are missing', as
 
   const claim = await getClaimById('c1', claimsPath);
   assert.equal(claim?.status, 'insufficient_evidence');
+});
+
+test('readEvidenceLinks trims articleId/url, converts empty to null, and skips invalid rows', async () => {
+  const { evidencePath } = tempStorePaths();
+
+  await writeFile(
+    evidencePath,
+    `${JSON.stringify(
+      [
+        {
+          id: 'e1',
+          claimId: 'c1',
+          articleId: '',
+          url: '   ',
+          stance: 'supports',
+          sourceTier: 'sensor',
+          confidence: 1,
+          scores: null,
+          createdAt: '2026-01-01T00:00:00.000Z',
+        },
+        {
+          id: 'e2',
+          claimId: 'c1',
+          articleId: '  a1  ',
+          url: '',
+          stance: 'mentions',
+          sourceTier: 'sensor',
+          confidence: 0.9,
+          scores: null,
+          createdAt: '2026-01-01T00:00:00.000Z',
+        },
+        {
+          id: 'e3',
+          claimId: 'c1',
+          articleId: null,
+          url: '  https://example.com/post  ',
+          stance: 'contradicts',
+          sourceTier: 'primary',
+          confidence: 0.8,
+          scores: null,
+          createdAt: '2026-01-01T00:00:00.000Z',
+        },
+      ],
+      null,
+      2,
+    )}\n`,
+    'utf8',
+  );
+
+  const links = await readEvidenceLinks(evidencePath);
+  assert.equal(links.length, 2);
+
+  const e2 = links.find((l) => l.id === 'e2');
+  assert.ok(e2);
+  assert.equal(e2.articleId, 'a1');
+  assert.equal(e2.url, null);
+
+  const e3 = links.find((l) => l.id === 'e3');
+  assert.ok(e3);
+  assert.equal(e3.articleId, null);
+  assert.equal(e3.url, 'https://example.com/post');
 });
 

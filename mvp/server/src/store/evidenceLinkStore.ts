@@ -14,6 +14,13 @@ async function ensureEvidenceDir(evidencePath: string): Promise<void> {
   await mkdir(path.dirname(evidencePath), { recursive: true });
 }
 
+function normalizeOptionalIdOrUrl(input: unknown): string | null {
+  if (input === null || input === undefined) return null;
+  if (typeof input !== 'string') return null;
+  const trimmed = input.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
 function normalizeStance(input: unknown): EvidenceStance | null {
   if (input === 'supports') return 'supports';
   if (input === 'contradicts') return 'contradicts';
@@ -39,12 +46,9 @@ function normalizeEvidenceLink(raw: unknown): EvidenceLink | null {
   const claimId = typeof record.claimId === 'string' ? record.claimId.trim() : '';
   if (claimId.length === 0) return null;
 
-  const articleId =
-    record.articleId === null || typeof record.articleId === 'string'
-      ? record.articleId
-      : null;
-  const url =
-    record.url === null || typeof record.url === 'string' ? record.url : null;
+  const articleId = normalizeOptionalIdOrUrl(record.articleId);
+  const url = normalizeOptionalIdOrUrl(record.url);
+  if (!articleId && !url) return null;
 
   const stance = normalizeStance(record.stance);
   if (!stance) return null;
@@ -70,8 +74,8 @@ function normalizeEvidenceLink(raw: unknown): EvidenceLink | null {
   return {
     id,
     claimId,
-    articleId: typeof articleId === 'string' ? articleId.trim() : null,
-    url: typeof url === 'string' ? url.trim() : null,
+    articleId,
+    url,
     stance,
     sourceTier,
     confidence,
