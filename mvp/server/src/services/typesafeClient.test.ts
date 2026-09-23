@@ -96,7 +96,7 @@ test('systemOne applies pinned model when omitted', async () => {
   } as unknown as TypeSafeClient;
 
   await withEnv({ TYPESAFE_MODEL: undefined }, async () => {
-    await systemOne(
+    const res = await systemOne(
       {
         state: 'hello',
         questions: { q: noul('Is this a test?') },
@@ -105,20 +105,28 @@ test('systemOne applies pinned model when omitted', async () => {
     );
 
     assert.equal(capturedModel, 'jev-1.13.0');
+    assert.equal(res.ok, true);
+    if (res.ok) {
+      assert.equal(res.result.model, 'jev-1.13.0');
+    }
   });
 });
 
-test('systemOne throws when no client is configured', async () => {
+test('systemOne returns ok:false when no client is configured', async () => {
   await withEnv({ TYPESAFE_API_KEY: undefined }, async () => {
     resetTypeSafeClientForTests();
-    await assert.rejects(
-      () =>
-        systemOne({
-          state: 'hello',
-          questions: { q: noul('Is this a test?') },
-        }),
-      /TypeSafe client not configured/,
-    );
+    const res = await systemOne({
+      state: 'hello',
+      questions: { q: noul('Is this a test?') },
+    });
+    assert.equal(res.ok, false);
+    if (!res.ok) {
+      assert.equal(
+        res.error,
+        'TypeSafe service not available — TYPESAFE_API_KEY not configured',
+      );
+      assert.equal(res.model, null);
+    }
   });
 });
 

@@ -1,5 +1,5 @@
 import { TypeSafeClient } from '@typesafe-ai/sdk';
-import type { Questions, SystemOneRequest } from '@typesafe-ai/sdk';
+import type { Questions, SystemOneRequest, SystemOneResult } from '@typesafe-ai/sdk';
 
 // Pinned model to avoid drift; `jev-latest` drifts over time (NEWS-71).
 const DEFAULT_MODEL = 'jev-1.13.0';
@@ -61,34 +61,63 @@ export function getTypeSafeModelName(): string {
   return modelName;
 }
 
+export type TypeSafeSystemOneSuccess<Q extends Questions> = {
+  ok: true;
+  result: SystemOneResult<Q>;
+};
+
+export type TypeSafeSystemOneFailure = {
+  ok: false;
+  error: string;
+  model: string | null;
+};
+
+export type TypeSafeSystemOneResult<Q extends Questions> =
+  | TypeSafeSystemOneSuccess<Q>
+  | TypeSafeSystemOneFailure;
+
 /**
  * Wrapper around `TypeSafeClient.systemOne`.
  *
  * - Uses injected client when provided (tests)
  * - Otherwise uses singleton client from `getTypeSafeClient()`
- * - Throws when no client is configured (no network call)
- * - Applies `getTypeSafeModelName()` when request.model is omitted
+ * - Missing API key/client returns `{ ok: false }` (no throw)
+ * - Applies `getTypeSafeModelName()` when request.model is omitted/blank
  */
 export async function systemOne<const Q extends Questions>(
   request: SystemOneRequest<Q>,
   injectedClient?: TypeSafeClient | null,
-): ReturnType<TypeSafeClient['systemOne']> {
+): Promise<TypeSafeSystemOneResult<Q>> {
   const active =
     injectedClient !== undefined ? injectedClient : getTypeSafeClient();
 
   if (!active) {
-    throw new Error('TypeSafe client not configured');
+    return {
+      ok: false,
+      error: 'TypeSafe service not available — TYPESAFE_API_KEY not configured',
+      model: null,
+    };
   }
 
   const requestWithModel: SystemOneRequest<Q> =
-    request.model?.trim()
+    typeof request.model === 'string' && request.model.trim()
       ? request
       : {
           ...request,
           model: getTypeSafeModelName(),
         };
 
-  return active.systemOne(requestWithModel);
+  try {
+    const result = await active.systemOne(requestWithModel);
+    return { ok: true, result };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return {
+      ok: false,
+      error: message,
+      model: requestWithModel.model ?? getTypeSafeModelName(),
+    };
+  }
 }
 
 /** Reset cached client (tests / env reload). */
