@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
-    "test": "node --import tsx --test src/store/migrateArticle.test.ts src/store/mergeArticleOnUpsert.test.ts src/store/briefMembershipStore.test.ts src/store/trackedStoriesStore.test.ts src/store/muteRulesStore.test.ts src/services/publisherBodyScrape.test.ts src/services/clusterArticles.test.ts src/services/briefClusterKey.test.ts src/services/muteMatch.test.ts src/services/deriveClaimStatus.test.ts src/services/kiteBriefAdapter.test.ts src/services/ollamaEnrichment.test.ts src/services/enrichClusters.test.ts src/services/loadRadarSources.test.ts src/services/curatedRssFetch.test.ts src/services/radarFeed.test.ts src/services/manualBriefSeed.test.ts src/app.test.ts",
+    "test": "node --import tsx --test src/store/migrateArticle.test.ts src/store/mergeArticleOnUpsert.test.ts src/store/briefMembershipStore.test.ts src/store/trackedStoriesStore.test.ts src/store/muteRulesStore.test.ts src/store/claimStore.test.ts src/store/evidenceLinkStore.test.ts src/services/publisherBodyScrape.test.ts src/services/clusterArticles.test.ts src/services/briefClusterKey.test.ts src/services/muteMatch.test.ts src/services/deriveClaimStatus.test.ts src/services/kiteBriefAdapter.test.ts src/services/ollamaEnrichment.test.ts src/services/enrichClusters.test.ts src/services/loadRadarSources.test.ts src/services/curatedRssFetch.test.ts src/services/radarFeed.test.ts src/services/manualBriefSeed.test.ts src/app.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

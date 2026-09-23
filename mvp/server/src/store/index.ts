@@ -33,8 +33,10 @@ export type { MuteRule, MuteRulesStore } from './muteRulesStore.js';
 export {
   ARTICLES_PATH,
   BRIEF_MEMBERSHIP_PATH,
+  CLAIMS_PATH,
   CLUSTER_ENRICHMENTS_PATH,
   DATA_DIR,
+  EVIDENCE_LINKS_PATH,
   MUTE_RULES_PATH,
   META_PATH,
   TRACKED_STORIES_PATH,
@@ -45,3 +47,18 @@ export {
   upsertClusterEnrichment,
   writeClusterEnrichments,
 } from './clusterEnrichmentStore.js';
+
+export {
+  getClaimById,
+  readClaims,
+  upsertClaim,
+  writeClaims,
+} from './claimStore.js';
+
+export {
+  listEvidenceForClaim,
+  readEvidenceLinks,
+  removeEvidenceLink,
+  upsertEvidenceLink,
+  writeEvidenceLinks,
+} from './evidenceLinkStore.js';
