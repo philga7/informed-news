@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { Article } from '../types/article.js';
-import type { Claim, ClaimType, EvidenceLink, EvidenceStance } from '../types/claim.js';
+import type { Claim, ClaimType, EvidenceLink, EvidenceStance, SourceTier } from '../types/claim.js';
 import type { ClaimReviewQueueEntry } from '../store/claimReviewQueueStore.js';
 import {
   enqueueClaimReview,
@@ -161,6 +161,10 @@ function evidenceScores(answers: ClaimJudgeResult & { ok: true }): Record<string
   };
 }
 
+function evidenceSourceTier(article: Article): SourceTier {
+  return article.sourceTier === 'primary' ? 'primary' : 'sensor';
+}
+
 async function selectArticles(
   options: ExtractClaimsOptions,
   limit: number,
@@ -169,22 +173,45 @@ async function selectArticles(
   isProcessedFn: (articleId: string) => Promise<boolean>,
 ): Promise<Article[]> {
   const articles = await readArticlesFn();
-  const idFilter =
+
+  const requestedIds =
     options.articleIds && options.articleIds.length > 0
-      ? new Set(options.articleIds.map((id) => id.trim()).filter(Boolean))
+      ? options.articleIds.map((id) => id.trim()).filter(Boolean)
       : null;
 
-  const sorted = sortNewestFirst(articles)
-    .filter((a) => a.sourceKind !== 'manual')
-    .filter((a) => (idFilter ? idFilter.has(a.id) : true));
-
-  const selected: Article[] = [];
-  for (const article of sorted) {
-    if (selected.length >= limit) break;
-    if (!force && (await isProcessedFn(article.id))) continue;
-    selected.push(article);
+  if (requestedIds) {
+    // Locked ruling: explicit articleIds honor given order.
+    const byId = new Map<string, Article>(
+      articles.filter((a) => a.sourceKind !== 'manual').map((a) => [a.id, a]),
+    );
+    const selected: Article[] = [];
+    const seen = new Set<string>();
+    for (const id of requestedIds) {
+      if (selected.length >= limit) break;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      const article = byId.get(id);
+      if (!article) continue;
+      if (!force && (await isProcessedFn(article.id))) continue;
+      selected.push(article);
+    }
+    return selected;
   }
-  return selected;
+
+  // Locked ruling: when selecting unprocessed in batch mode (no articleIds),
+  // prefer sensors first, then fill with primaries under limit.
+  const sorted = sortNewestFirst(articles).filter((a) => a.sourceKind !== 'manual');
+  const sensors: Article[] = [];
+  const primaries: Article[] = [];
+  for (const article of sorted) {
+    if (force) {
+      (evidenceSourceTier(article) === 'primary' ? primaries : sensors).push(article);
+      continue;
+    }
+    if (await isProcessedFn(article.id)) continue;
+    (evidenceSourceTier(article) === 'primary' ? primaries : sensors).push(article);
+  }
+  return sensors.concat(primaries).slice(0, limit);
 }
 
 /**
@@ -322,7 +349,7 @@ export async function extractClaimsFromArticles(
           articleId: article.id,
           url: article.canonicalUrl,
           stance,
-          sourceTier: 'sensor',
+          sourceTier: evidenceSourceTier(article),
           confidence: evidenceConfidence(judgeResult),
           scores: evidenceScores(judgeResult),
         },

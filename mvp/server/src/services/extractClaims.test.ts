@@ -128,6 +128,71 @@ test('extractClaims: new claim high-confidence persists claim+evidence without r
   assert.equal(links[0]!.sourceTier, 'sensor');
 });
 
+test('extractClaims: primary support yields supported_by_primary + primary evidence tier', async () => {
+  const paths = tempStorePaths();
+  const article = sampleArticle({ id: 'art-primary-1', sourceTier: 'primary' });
+
+  const proposeFn = async (_input: ProposeClaimsInput): Promise<ProposeClaimsResult> => ({
+    ok: true,
+    candidates: [{ text: 'Troops crossed the border overnight.', claimTypeGuess: null, quote: null }],
+    model: 'mock-propose',
+    rawText: '{}',
+  });
+
+  const judgeFn = async (_state: ClaimJudgeState): Promise<ClaimJudgeResult> =>
+    mockJudgeResult(highConfidenceAnswers());
+
+  const result = await extractClaimsFromArticles({
+    articleIds: [article.id],
+    readArticlesFn: async () => [article],
+    proposeFn,
+    judgeFn,
+    ...paths,
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.persistedClaims, 1);
+  assert.equal(result.persistedEvidence, 1);
+  assert.equal(result.claims.length, 1);
+  assert.equal(result.claims[0]!.status, 'supported_by_primary');
+
+  const claims = await readClaims(paths.claimsPath);
+  assert.equal(claims.length, 1);
+  assert.equal(claims[0]!.status, 'supported_by_primary');
+
+  const links = await readEvidenceLinks(paths.evidencePath);
+  assert.equal(links.length, 1);
+  assert.equal(links[0]!.claimId, claims[0]!.id);
+  assert.equal(links[0]!.sourceTier, 'primary');
+});
+
+test('extractClaims: sensor tier evidence stays sensor', async () => {
+  const paths = tempStorePaths();
+  const article = sampleArticle({ id: 'art-sensor-1', sourceTier: 'sensor' });
+
+  const proposeFn = async (): Promise<ProposeClaimsResult> => ({
+    ok: true,
+    candidates: [{ text: 'Troops crossed the border overnight.', claimTypeGuess: null, quote: null }],
+    model: 'mock-propose',
+    rawText: '{}',
+  });
+
+  const judgeFn = async (): Promise<ClaimJudgeResult> =>
+    mockJudgeResult(highConfidenceAnswers());
+
+  await extractClaimsFromArticles({
+    articleIds: [article.id],
+    readArticlesFn: async () => [article],
+    proposeFn,
+    judgeFn,
+    ...paths,
+  });
+
+  const links = await readEvidenceLinks(paths.evidencePath);
+  assert.equal(links.length, 1);
+  assert.equal(links[0]!.sourceTier, 'sensor');
+});
+
 test('extractClaims: low confidence persists and enqueues review', async () => {
   const paths = tempStorePaths();
   const article = sampleArticle({ id: 'art-low' });
@@ -404,4 +469,45 @@ test('extractClaims: judge receives newest 8 existing claims', async () => {
     'claim-8',
     'claim-9',
   ]);
+});
+
+test('extractClaims: batch selection prefers sensors before primaries', async () => {
+  const paths = tempStorePaths();
+  const calls: string[] = [];
+
+  const primaryNewer = sampleArticle({
+    id: 'art-primary-newer',
+    sourceTier: 'primary',
+    title: 'primary: newer',
+    publishedAt: '2026-09-12T12:00:00.000Z',
+  });
+  const sensorNewer = sampleArticle({
+    id: 'art-sensor-newer',
+    sourceTier: 'sensor',
+    title: 'sensor: newer',
+    publishedAt: '2026-09-11T12:00:00.000Z',
+  });
+  const sensorOlder = sampleArticle({
+    id: 'art-sensor-older',
+    title: 'sensor: older (implicit)',
+    publishedAt: '2026-09-10T12:00:00.000Z',
+  });
+
+  const proposeFn = async (input: ProposeClaimsInput): Promise<ProposeClaimsResult> => {
+    calls.push(input.title);
+    return { ok: true, candidates: [], model: 'mock-propose', rawText: '{}' };
+  };
+
+  await extractClaimsFromArticles({
+    limit: 2,
+    readArticlesFn: async () => [primaryNewer, sensorNewer, sensorOlder],
+    readClaimsFn: async () => [],
+    isArticleExtractProcessedFn: async () => false,
+    markArticlesExtractProcessedFn: async (ids: string[]) => ({ articleIds: ids }),
+    proposeFn,
+    judgeFn: async () => mockJudgeResult(highConfidenceAnswers()),
+    ...paths,
+  });
+
+  assert.deepEqual(calls, ['sensor: newer', 'sensor: older (implicit)']);
 });
