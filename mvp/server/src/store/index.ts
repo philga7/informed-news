@@ -41,9 +41,23 @@ export {
 } from './trackedClaimsStore.js';
 export type { TrackedClaimEntry, TrackedClaims } from './trackedClaimsStore.js';
 export {
+  enqueueClaimReview,
+  readClaimReviewQueue,
+  writeClaimReviewQueue,
+} from './claimReviewQueueStore.js';
+export type { ClaimReviewQueueEntry } from './claimReviewQueueStore.js';
+export {
+  isArticleExtractProcessed,
+  markArticlesExtractProcessed,
+  readClaimExtractProcessed,
+} from './claimExtractProcessedStore.js';
+export type { ClaimExtractProcessed } from './claimExtractProcessedStore.js';
+export {
   ARTICLES_PATH,
   BRIEF_MEMBERSHIP_PATH,
+  CLAIM_EXTRACT_PROCESSED_PATH,
   CLAIM_MEMBERSHIP_PATH,
+  CLAIM_REVIEW_QUEUE_PATH,
   CLAIMS_PATH,
   CLUSTER_ENRICHMENTS_PATH,
   DATA_DIR,
