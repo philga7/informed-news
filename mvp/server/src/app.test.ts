@@ -516,6 +516,106 @@ test('POST /api/brief/mutes persists rule; DELETE /api/brief/mutes/:id removes i
   }
 });
 
+test('POST /api/claims/extract requires session', async () => {
+  process.env.SESSION_SECRET = 'test-secret';
+  process.env.MVP_PASSWORD = 'pw';
+  delete process.env.MVP_PASSWORD_HASH;
+
+  const { createApp } = await import('./app.js');
+  const app = createApp({
+    extractClaimsFromArticles: async () => ({
+      ok: true,
+      limit: 10,
+      attempted: 0,
+      proposed: 0,
+      judged: 0,
+      persistedClaims: 0,
+      persistedEvidence: 0,
+      needsReview: 0,
+      failed: 0,
+      articlesProcessed: 0,
+      claims: [],
+      evidence: [],
+      reviewQueued: [],
+    }),
+  });
+
+  const { baseUrl, close } = await startServer(app);
+  try {
+    const resp = await fetch(`${baseUrl}/api/claims/extract`, { method: 'POST' });
+    assert.equal(resp.status, 401);
+    const body = (await resp.json()) as { ok: false; error: string };
+    assert.equal(body.ok, false);
+    assert.equal(body.error, 'Unauthorized');
+  } finally {
+    await close();
+  }
+});
+
+test('POST /api/claims/extract returns ok payload when authenticated', async () => {
+  process.env.SESSION_SECRET = 'test-secret';
+  process.env.MVP_PASSWORD = 'pw';
+  delete process.env.MVP_PASSWORD_HASH;
+
+  const { createApp } = await import('./app.js');
+  const app = createApp({
+    extractClaimsFromArticles: async () => ({
+      ok: true,
+      limit: 5,
+      attempted: 1,
+      proposed: 2,
+      judged: 2,
+      persistedClaims: 1,
+      persistedEvidence: 1,
+      needsReview: 0,
+      failed: 0,
+      articlesProcessed: 1,
+      claims: [],
+      evidence: [],
+      reviewQueued: [],
+    }),
+  });
+
+  const { baseUrl, close } = await startServer(app);
+  try {
+    const cookie = await login(baseUrl);
+    const resp = await fetch(`${baseUrl}/api/claims/extract`, {
+      method: 'POST',
+      headers: { cookie, 'content-type': 'application/json' },
+      body: JSON.stringify({ limit: 5 }),
+    });
+    assert.equal(resp.status, 200);
+    const body = (await resp.json()) as {
+      ok: true;
+      limit: number;
+      attempted: number;
+      proposed: number;
+      judged: number;
+      persistedClaims: number;
+      persistedEvidence: number;
+      needsReview: number;
+      failed: number;
+      articlesProcessed: number;
+      claims: unknown[];
+      evidence: unknown[];
+      reviewQueued: unknown[];
+    };
+    assert.equal(body.ok, true);
+    assert.equal(body.limit, 5);
+    assert.equal(body.attempted, 1);
+    assert.equal(body.proposed, 2);
+    assert.equal(body.judged, 2);
+    assert.equal(body.persistedClaims, 1);
+    assert.equal(body.persistedEvidence, 1);
+    assert.equal(body.articlesProcessed, 1);
+    assert.deepEqual(body.claims, []);
+    assert.deepEqual(body.evidence, []);
+    assert.deepEqual(body.reviewQueued, []);
+  } finally {
+    await close();
+  }
+});
+
 test('GET /api/radar hides muted clusters + counts them; tracked muted still returned', async () => {
   process.env.SESSION_SECRET = 'test-secret';
   process.env.MVP_PASSWORD = 'pw';

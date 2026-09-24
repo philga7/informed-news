@@ -21,3 +21,8 @@ export const EVIDENCE_LINKS_PATH = path.join(DATA_DIR, 'evidence-links.json');
 
 export const CLAIM_MEMBERSHIP_PATH = path.join(DATA_DIR, 'claim-membership.json');
 export const TRACKED_CLAIMS_PATH = path.join(DATA_DIR, 'tracked-claims.json');
+export const CLAIM_REVIEW_QUEUE_PATH = path.join(DATA_DIR, 'claim-review-queue.json');
+export const CLAIM_EXTRACT_PROCESSED_PATH = path.join(
+  DATA_DIR,
+  'claim-extract-processed.json',
+);

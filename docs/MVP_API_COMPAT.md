@@ -40,9 +40,10 @@ Kite does **not** need to proxy these routes. Hit the API on `:3001` directly (d
 | GET | `/api/articles` | Session | Newest-first list + meta (CFP / xcancel store) |
 | GET | `/api/articles/:id` | Session | One article including classification fields |
 | POST | `/api/fetch` | Session | Unified CFP then optional xcancel refresh |
-| POST | `/api/classify` | Session | Batch framing for unclassified items |
-| POST | `/api/classify/:id` | Session | Reclassify one article |
+| POST | `/api/classify` | Session | Batch **story framing** for unclassified items — not claim judgment-of-record (see `/api/claims/extract`) |
+| POST | `/api/classify/:id` | Session | Reclassify one article (framing only) |
 | POST | `/api/enrich` | Session | Batch cluster enrichment (AI-assisted). Optional body/query: `{ limit?: number, force?: boolean }` |
+| POST | `/api/claims/extract` | Session | Batch claim extraction: Ollama propose + TypeSafe judge ([NEWS-72](https://informedcrew.atlassian.net/browse/NEWS-72)). Optional body/query: `{ limit?: number, force?: boolean, articleIds?: string[] }` → `{ ok, limit, attempted, proposed, judged, persistedClaims, persistedEvidence, needsReview, failed, articlesProcessed, claims, evidence, reviewQueued }`. Low-confidence claims enqueue to `claim-review-queue.json`. |
 | GET | `/api/radar` | Session | Developing desk triage feed: clustered CFP + curated RSS; each cluster includes `accepted` from membership and `tracked` / optional `pendingUpdate` from the track store. Muted clusters are omitted from `clusters`; response includes `hiddenMutedCount` ([NEWS-60](https://informedcrew.atlassian.net/browse/NEWS-60)). |
 | GET | `/api/brief/membership` | Session | Brief membership snapshot: `{ ok, acceptedClusterIds, updatedAt }` |
 | POST | `/api/brief/accept` | Session | Idempotent accept onto Brief; body `{ clusterId: string }` → `{ ok, acceptedClusterIds }`. Also tracks the cluster by default ([NEWS-59](https://informedcrew.atlassian.net/browse/NEWS-59)). |
@@ -69,13 +70,14 @@ Public Kite brief routes under `/api/batches…` are **in addition** to this sur
 
 Claim desk routes under [NEWS-69](https://informedcrew.atlassian.net/browse/NEWS-69) will be added here when shipped (do not invent clients against these until listed in **Frozen routes**):
 
-- `GET /api/claims/radar` — claim inbox
-- `POST /api/claims/extract` — Ollama propose + TypeSafe judge batch
-- Claim Accept / Track / Mute / ack on `claimId` (parallel to brief story membership)
+- `GET /api/claims/radar` — claim inbox ([NEWS-74](https://informedcrew.atlassian.net/browse/NEWS-74))
+- Claim Accept / Track / Mute / ack on `claimId` (parallel to brief story membership; [NEWS-75](https://informedcrew.atlassian.net/browse/NEWS-75))
 
-**Store-only ([NEWS-70](https://informedcrew.atlassian.net/browse/NEWS-70)):** Runtime data files under `mvp/data/`: `claims.json`, `evidence-links.json`, `claim-membership.json`, `tracked-claims.json` (no HTTP yet).
+**Store-only ([NEWS-70](https://informedcrew.atlassian.net/browse/NEWS-70)):** Runtime data files under `mvp/data/`: `claims.json`, `evidence-links.json`, `claim-membership.json`, `tracked-claims.json`, `claim-review-queue.json` (extract writes the review queue; radar/accept HTTP still planned).
 
-**TypeSafe spine ([NEWS-71](https://informedcrew.atlassian.net/browse/NEWS-71)):** Server-side TypeSafe client + claim judge question library (`typesafeClaimQuestions.ts`) + confidence gates landed; no HTTP yet. `POST /api/claims/extract` (Ollama propose + TypeSafe judge batch) remains [NEWS-72](https://informedcrew.atlassian.net/browse/NEWS-72). Claim status stays code-derived per [NEWS-70](https://informedcrew.atlassian.net/browse/NEWS-70).
+**Extract pipeline ([NEWS-72](https://informedcrew.atlassian.net/browse/NEWS-72)):** Shipped — `POST /api/claims/extract` (session-gated) runs Ollama propose + TypeSafe judge batch; see **Frozen routes**. Claim status stays code-derived per [NEWS-70](https://informedcrew.atlassian.net/browse/NEWS-70).
+
+**TypeSafe spine ([NEWS-71](https://informedcrew.atlassian.net/browse/NEWS-71)):** Server-side TypeSafe client + claim judge question library (`typesafeClaimQuestions.ts`) + confidence gates landed; wired through extract ([NEWS-72](https://informedcrew.atlassian.net/browse/NEWS-72)).
 
 Story `/api/radar` and `/api/brief/*` remain during transition. Judgment-of-record for claims is TypeSafe, not `POST /api/classify`. See [ROADMAP.md](ROADMAP.md), [CLAIMS_DISCERNMENT.md](CLAIMS_DISCERNMENT.md).
 
