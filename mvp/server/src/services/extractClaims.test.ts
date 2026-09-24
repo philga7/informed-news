@@ -114,6 +114,8 @@ test('extractClaims: new claim high-confidence persists claim+evidence without r
   assert.equal(result.persistedEvidence, 1);
   assert.equal(result.needsReview, 0);
   assert.equal(result.reviewQueued.length, 0);
+  assert.equal(result.claims.length, 1);
+  assert.equal(result.claims[0]!.status, 'reported');
 
   const claims = await readClaims(paths.claimsPath);
   assert.equal(claims.length, 1);
@@ -292,4 +294,114 @@ test('extractClaims: already-processed skipped unless force', async () => {
 
   const processed = await readClaimExtractProcessed(paths.processedPath);
   assert.ok(processed.articleIds.includes(article.id));
+});
+
+test('extractClaims: propose ok:false does not mark article processed', async () => {
+  const paths = tempStorePaths();
+  const article = sampleArticle({ id: 'art-propose-fail' });
+
+  const proposeFn = async (): Promise<ProposeClaimsResult> => ({
+    ok: false,
+    error: 'Ollama unavailable',
+    model: null,
+    rawText: null,
+  });
+
+  const result = await extractClaimsFromArticles({
+    articleIds: [article.id],
+    readArticlesFn: async () => [article],
+    proposeFn,
+    judgeFn: async () => mockJudgeResult(highConfidenceAnswers()),
+    ...paths,
+  });
+
+  assert.equal(result.failed, 1);
+  assert.equal(result.articlesProcessed, 0);
+  assert.equal(await isArticleExtractProcessed(article.id, paths.processedPath), false);
+});
+
+test('extractClaims: all judge failures leave article unprocessed', async () => {
+  const paths = tempStorePaths();
+  const article = sampleArticle({ id: 'art-judge-fail' });
+
+  const proposeFn = async (): Promise<ProposeClaimsResult> => ({
+    ok: true,
+    candidates: [
+      { text: 'First candidate.', claimTypeGuess: null, quote: null },
+      { text: 'Second candidate.', claimTypeGuess: null, quote: null },
+    ],
+    model: 'mock-propose',
+    rawText: '{}',
+  });
+
+  const judgeFn = async (): Promise<ClaimJudgeResult> => ({
+    ok: false,
+    error: 'TYPESAFE_API_KEY not configured',
+    model: null,
+  });
+
+  const result = await extractClaimsFromArticles({
+    articleIds: [article.id],
+    readArticlesFn: async () => [article],
+    proposeFn,
+    judgeFn,
+    ...paths,
+  });
+
+  assert.equal(result.proposed, 2);
+  assert.equal(result.failed, 2);
+  assert.equal(result.articlesProcessed, 0);
+  assert.equal(await isArticleExtractProcessed(article.id, paths.processedPath), false);
+});
+
+test('extractClaims: judge receives newest 8 existing claims', async () => {
+  const paths = tempStorePaths();
+  const seeded: Claim[] = [];
+  for (let i = 0; i < 10; i += 1) {
+    seeded.push({
+      id: `claim-${i}`,
+      text: `Seeded claim ${i}.`,
+      claimType: 'event_occurrence',
+      status: 'insufficient_evidence',
+      entities: [],
+      createdAt: `2026-01-${String(i + 1).padStart(2, '0')}T00:00:00.000Z`,
+      domain: 'conflict',
+    });
+  }
+  await writeClaims(seeded, paths.claimsPath);
+
+  const article = sampleArticle({ id: 'art-newest-8' });
+  let capturedExistingIds: string[] = [];
+
+  const proposeFn = async (): Promise<ProposeClaimsResult> => ({
+    ok: true,
+    candidates: [{ text: 'New border incident.', claimTypeGuess: null, quote: null }],
+    model: 'mock-propose',
+    rawText: '{}',
+  });
+
+  const judgeFn = async (state: ClaimJudgeState): Promise<ClaimJudgeResult> => {
+    capturedExistingIds = state.existingClaims.map((c) => c.id);
+    return mockJudgeResult(highConfidenceAnswers());
+  };
+
+  await extractClaimsFromArticles({
+    articleIds: [article.id],
+    readArticlesFn: async () => [article],
+    proposeFn,
+    judgeFn,
+    ...paths,
+  });
+
+  assert.equal(capturedExistingIds.length, 8);
+  assert.deepEqual(capturedExistingIds, [
+    'claim-2',
+    'claim-3',
+    'claim-4',
+    'claim-5',
+    'claim-6',
+    'claim-7',
+    'claim-8',
+    'claim-9',
+  ]);
 });

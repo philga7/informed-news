@@ -6,7 +6,7 @@ Informed News serves the Kite shell from **our** brief API by default — not `h
 
 Product next is the **claims / evidence** desk ([NEWS-69](https://informedcrew.atlassian.net/browse/NEWS-69)): Brief will lead with **accepted claims** plus **linked story clusters** for context; Radar becomes a **claim inbox**. Stories remain ingest/cluster **input**. Until those APIs ship, this document describes the **live story-desk** path (Accept / Track / Mute on `clusterId`). Honesty invariant for claims: status + evidence only — no Verified badges ([CLAIMS_DISCERNMENT.md](CLAIMS_DISCERNMENT.md)).
 
-**Store foundation ([NEWS-70](https://informedcrew.atlassian.net/browse/NEWS-70)):** Claim/evidence JSON stores + status derivation are landed in `mvp/server`; HTTP APIs and Brief/Radar UI remain NEWS-74+.
+**Store foundation ([NEWS-70](https://informedcrew.atlassian.net/browse/NEWS-70)):** Claim/evidence JSON stores + status derivation are landed in `mvp/server`; extract HTTP ships in NEWS-72 — Radar/accept HTTP and Brief/Radar UI remain NEWS-74+.
 
 **Judgment spine ([NEWS-71](https://informedcrew.atlassian.net/browse/NEWS-71)):** TypeSafe client + claim question library + confidence gates are landed in `mvp/server`. **Extract ([NEWS-72](https://informedcrew.atlassian.net/browse/NEWS-72)):** `POST /api/claims/extract` ships Ollama propose + TypeSafe judge batch (session-gated); claim status stays **code-derived** ([NEWS-70](https://informedcrew.atlassian.net/browse/NEWS-70)).
 

@@ -164,22 +164,32 @@ async function chatWithTimeout(
   prompt: string,
   timeoutMs = DEFAULT_TIMEOUT_MS,
 ): Promise<string> {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
   const timeoutPromise = new Promise<never>((_, reject) => {
-    setTimeout(() => reject(new Error('Ollama API request timed out')), timeoutMs);
+    timeoutId = setTimeout(
+      () => reject(new Error('Ollama API request timed out')),
+      timeoutMs,
+    );
   });
 
-  const callPromise = ollama.chat({
-    model,
-    messages: [{ role: 'user', content: prompt }],
-    stream: false,
-  });
+  try {
+    const callPromise = ollama.chat({
+      model,
+      messages: [{ role: 'user', content: prompt }],
+      stream: false,
+    });
 
-  const response = await Promise.race([callPromise, timeoutPromise]);
-  const content = response.message?.content;
-  if (typeof content !== 'string' || !content.trim()) {
-    throw new Error('Ollama returned empty message content');
+    const response = await Promise.race([callPromise, timeoutPromise]);
+    const content = response.message?.content;
+    if (typeof content !== 'string' || !content.trim()) {
+      throw new Error('Ollama returned empty message content');
+    }
+    return content;
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
   }
-  return content;
 }
 
 /**

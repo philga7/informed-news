@@ -7,6 +7,7 @@ import {
   isArticleExtractProcessed,
   markArticlesExtractProcessed,
   readArticles,
+  getClaimById,
   readClaims,
   upsertClaim,
   upsertEvidenceLink,
@@ -188,7 +189,7 @@ async function selectArticles(
 
 /**
  * Propose → judge → persist → queue for claim candidates from articles.
- * Existing claims passed to the judge are capped at the first 8 from readClaims().
+ * Existing claims passed to the judge are capped at the newest 8 from readClaims() store order.
  */
 export async function extractClaimsFromArticles(
   options: ExtractClaimsOptions = {},
@@ -253,13 +254,13 @@ export async function extractClaimsFromArticles(
       continue;
     }
 
-    await markProcessedFn([article.id]);
-    result.articlesProcessed += 1;
     result.proposed += proposeResult.candidates.length;
 
-    // First 8 from readClaims() — store order as returned by readClaims().
-    const existingClaims = (await readClaimsFn(claimsPath)).slice(0, 8);
+    // Newest 8 from readClaims() — upsertClaim appends, so tail is most recent.
+    const existingClaims = (await readClaimsFn(claimsPath)).slice(-8);
     const excerpt = articleExcerpt(article);
+
+    let anyJudgeSucceeded = false;
 
     for (const candidate of proposeResult.candidates) {
       const judgeResult = await judgeFn({
@@ -278,6 +279,7 @@ export async function extractClaimsFromArticles(
         continue;
       }
 
+      anyJudgeSucceeded = true;
       result.judged += 1;
 
       if (isClearNonAssertable(judgeResult.answers.isAssertable.noul)) {
@@ -304,7 +306,6 @@ export async function extractClaimsFromArticles(
           claimsPath,
         );
         claimId = claim.id;
-        result.claims.push(claim);
         result.persistedClaims += 1;
       } else {
         const existing = existingClaims.find((c) => c.id === alignment);
@@ -337,6 +338,14 @@ export async function extractClaimsFromArticles(
       result.evidence.push(link);
       result.persistedEvidence += 1;
 
+      const persistedClaim = await getClaimById(claimId, claimsPath);
+      if (persistedClaim) {
+        const alreadyInResponse = result.claims.some((c) => c.id === claimId);
+        if (!alreadyInResponse) {
+          result.claims.push(persistedClaim);
+        }
+      }
+
       if (judgeResult.needsReview) {
         result.needsReview += 1;
         const entry: ClaimReviewQueueEntry = {
@@ -359,6 +368,13 @@ export async function extractClaimsFromArticles(
           result.reviewQueued.push(added);
         }
       }
+    }
+
+    const shouldMarkProcessed =
+      proposeResult.candidates.length === 0 || anyJudgeSucceeded;
+    if (shouldMarkProcessed) {
+      await markProcessedFn([article.id]);
+      result.articlesProcessed += 1;
     }
   }
 
