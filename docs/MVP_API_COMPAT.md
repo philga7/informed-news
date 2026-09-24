@@ -44,7 +44,8 @@ Kite does **not** need to proxy these routes. Hit the API on `:3001` directly (d
 | POST | `/api/classify/:id` | Session | Reclassify one article (framing only) |
 | POST | `/api/enrich` | Session | Batch cluster enrichment (AI-assisted). Optional body/query: `{ limit?: number, force?: boolean }` |
 | POST | `/api/claims/extract` | Session | Batch claim extraction: Ollama propose + TypeSafe judge ([NEWS-72](https://informedcrew.atlassian.net/browse/NEWS-72)). Optional body/query: `{ limit?: number, force?: boolean, articleIds?: string[] }` → `{ ok, limit, attempted, proposed, judged, persistedClaims, persistedEvidence, needsReview, failed, articlesProcessed, claims, evidence, reviewQueued }`. Batch mode (no `articleIds`) selects **sensor-tier articles first**, then fills with primaries under `limit` ([NEWS-73](https://informedcrew.atlassian.net/browse/NEWS-73)). Persisted evidence links copy `sourceTier` from the source article. Low-confidence claims enqueue to `claim-review-queue.json`. |
-| GET | `/api/radar` | Session | Developing desk triage feed: clustered CFP + curated RSS; each cluster includes `accepted` from membership and `tracked` / optional `pendingUpdate` from the track store. Muted clusters are omitted from `clusters`; response includes `hiddenMutedCount` ([NEWS-60](https://informedcrew.atlassian.net/browse/NEWS-60)). |
+| GET | `/api/claims/radar` | Session | Claim inbox feed ([NEWS-74](https://informedcrew.atlassian.net/browse/NEWS-74)): `{ ok: true, claims, needsReview, hiddenMutedCount }`. Each item includes `claimId`, `text`, `status`, `confidence` (max linked evidence score or `null`), evidence counts (`supports` / `contradicts` / `mentions`, `primary` / `sensor`), `clusterKeys`, up to 8 `linkedHeadlines`, and optional `reviewReasons`. Review-queue claims appear only in `needsReview`; muted claims are omitted and counted in `hiddenMutedCount`. |
+| GET | `/api/radar` | Session | Story headline-cluster feed (transition): clustered CFP + curated RSS; each cluster includes `accepted` from membership and `tracked` / optional `pendingUpdate` from the track store. Muted clusters are omitted from `clusters`; response includes `hiddenMutedCount` ([NEWS-60](https://informedcrew.atlassian.net/browse/NEWS-60)). Kite `/radar` uses this for the collapsible headline-clusters section; primary inbox is `GET /api/claims/radar`. |
 | GET | `/api/brief/membership` | Session | Brief membership snapshot: `{ ok, acceptedClusterIds, updatedAt }` |
 | POST | `/api/brief/accept` | Session | Idempotent accept onto Brief; body `{ clusterId: string }` → `{ ok, acceptedClusterIds }`. Also tracks the cluster by default ([NEWS-59](https://informedcrew.atlassian.net/browse/NEWS-59)). |
 | POST | `/api/brief/unaccept` | Session | Idempotent remove from Brief; body `{ clusterId: string }` → `{ ok, acceptedClusterIds }` |
@@ -70,10 +71,9 @@ Public Kite brief routes under `/api/batches…` are **in addition** to this sur
 
 Claim desk routes under [NEWS-69](https://informedcrew.atlassian.net/browse/NEWS-69) will be added here when shipped (do not invent clients against these until listed in **Frozen routes**):
 
-- `GET /api/claims/radar` — claim inbox ([NEWS-74](https://informedcrew.atlassian.net/browse/NEWS-74))
 - Claim Accept / Track / Mute / ack on `claimId` (parallel to brief story membership; [NEWS-75](https://informedcrew.atlassian.net/browse/NEWS-75))
 
-**Store-only ([NEWS-70](https://informedcrew.atlassian.net/browse/NEWS-70)):** Runtime data files under `mvp/data/`: `claims.json`, `evidence-links.json`, `claim-membership.json`, `tracked-claims.json`, `claim-review-queue.json` (extract writes the review queue; radar/accept HTTP still planned).
+**Store-only ([NEWS-70](https://informedcrew.atlassian.net/browse/NEWS-70)):** Runtime data files under `mvp/data/`: `claims.json`, `evidence-links.json`, `claim-membership.json`, `tracked-claims.json`, `claim-review-queue.json` (extract writes the review queue; claim accept/track HTTP still planned — [NEWS-75](https://informedcrew.atlassian.net/browse/NEWS-75)).
 
 **Extract pipeline ([NEWS-72](https://informedcrew.atlassian.net/browse/NEWS-72)):** Shipped — `POST /api/claims/extract` (session-gated) runs Ollama propose + TypeSafe judge batch; see **Frozen routes**. Claim status stays code-derived per [NEWS-70](https://informedcrew.atlassian.net/browse/NEWS-70).
 

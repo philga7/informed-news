@@ -3,13 +3,31 @@ import { PRODUCT_NAME } from './brand';
 export const RADAR_PAGE_TITLE = `Radar — ${PRODUCT_NAME}`;
 
 export const RADAR_PAGE_DESCRIPTION =
-	`${PRODUCT_NAME} radar shows clustered headlines from Citizen Free Press and curated RSS sources for operator triage. This view is session-gated and may be empty early on.`;
+	`${PRODUCT_NAME} radar shows a claim inbox and a secondary headline-cluster feed for operator triage. This view is session-gated and may be empty early on.`;
 
 export const RADAR_LOGIN_INTRO =
-	'Radar is currently limited to the MVP operator session. Enter the same password used for the local API to view clustered headlines.';
+	'Radar is currently limited to the MVP operator session. Enter the same password used for the local API to view the claim inbox.';
+
+export const RADAR_CLAIMS_NEEDS_REVIEW_TITLE = 'Needs review';
+
+export const RADAR_CLAIMS_SECTION_TITLE = 'Claims';
+
+export const RADAR_CLAIMS_EMPTY_COPY =
+	'No claims yet — run Refresh / fetch on the API to populate this inbox.';
+
+export const RADAR_CLAIMS_LOAD_ERROR =
+	'Unable to load the claim inbox right now. Try again in a moment.';
+
+export const RADAR_CLAIMS_LINKED_HEADLINES_LABEL = 'Linked headlines';
+
+export const RADAR_CLAIMS_SHOW_HEADLINES = 'Show';
+
+export const RADAR_CLAIMS_HIDE_HEADLINES = 'Hide';
+
+export const RADAR_HEADLINE_CLUSTERS_SECTION_TITLE = 'Headline clusters';
 
 export const RADAR_EMPTY_COPY =
-	'No radar items yet — run Refresh / fetch on the API.';
+	'No headline clusters yet — run Refresh / fetch on the API.';
 
 export const RADAR_ERROR_GENERIC =
 	'Unable to load radar right now. Try again in a moment.';

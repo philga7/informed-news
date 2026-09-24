@@ -20,6 +20,7 @@ import {
   buildRadarFeed,
   briefClusterKey,
   clusterMatchesMute,
+  loadClaimsRadar,
 } from './services/index.js';
 import {
   acceptCluster,
@@ -62,6 +63,7 @@ export type CreateAppDeps = {
   readMuteRules?: typeof readMuteRules;
   addMuteRule?: typeof addMuteRule;
   removeMuteRule?: typeof removeMuteRule;
+  loadClaimsRadar?: typeof loadClaimsRadar;
 };
 
 function parseClusterId(body: unknown): string | null {
@@ -119,6 +121,7 @@ export function createApp(deps: CreateAppDeps = {}): Express {
   const classifyOne = deps.classifyArticleById ?? classifyArticleById;
   const extractClaims = deps.extractClaimsFromArticles ?? extractClaimsFromArticles;
   const enrich = deps.enrichUnenrichedClusters ?? enrichUnenrichedClusters;
+  const loadRadarClaims = deps.loadClaimsRadar ?? loadClaimsRadar;
 
   const app = express();
 
@@ -491,6 +494,20 @@ export function createApp(deps: CreateAppDeps = {}): Express {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.error('Radar feed failed:', message);
+      res.status(500).json({ ok: false, error: message });
+    }
+  });
+
+  /**
+   * Claims radar inbox: claims + evidence summary + linked headlines.
+   */
+  app.get('/api/claims/radar', async (_req, res) => {
+    try {
+      const feed = await loadRadarClaims();
+      res.json({ ok: true, ...feed });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('Claims radar feed failed:', message);
       res.status(500).json({ ok: false, error: message });
     }
   });
