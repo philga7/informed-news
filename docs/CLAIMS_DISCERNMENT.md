@@ -15,7 +15,7 @@ Inspired by Wesleyan Quadrilateral discernment (primary text / tradition / reaso
 
 ## Rules of thumb
 
-- Software **assembles witnesses**; humans **Accept / review** (`needs_review` when confidence is low).
+- Software **assembles witnesses**; humans **Accept / review** (`needs_review` when confidence is low). `POST /api/claims/extract` ([NEWS-72](https://informedcrew.atlassian.net/browse/NEWS-72)) enqueues low-confidence claims to `claim-review-queue.json`; Radar inbox UI is [NEWS-74](https://informedcrew.atlassian.net/browse/NEWS-74).
 - Echoing ten outlets is **not** durable method and **not** reason — cluster size ≠ confidence.
 - No single lens gets a truth seal. UI speaks **status + evidence** (`reported`, `supported_by_primary`, `contested`, `insufficient_evidence`) — never Verified badges or claim verdicts.
 - Ollama may propose candidates and write Brief verbiage; it is **not** judgment-of-record.
