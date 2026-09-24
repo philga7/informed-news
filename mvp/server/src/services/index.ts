@@ -129,6 +129,16 @@ export type {
   RadarHeadlineSourceKind,
   RadarResponse,
 } from './radarFeed.js';
+export {
+  buildClaimsRadarFeed,
+  loadClaimsRadar,
+} from './claimsRadar.js';
+export type {
+  ClaimRadarEvidenceCounts,
+  ClaimRadarItem,
+  ClaimRadarLinkedHeadline,
+  ClaimsRadarResponse,
+} from './claimsRadar.js';
 export { articleMatchesMute, claimMatchesMute, clusterMatchesMute } from './muteMatch.js';
 export { briefClusterKey, isSoloClusterKey } from './briefClusterKey.js';
 export {

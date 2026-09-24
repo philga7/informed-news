@@ -552,6 +552,66 @@ test('POST /api/claims/extract requires session', async () => {
   }
 });
 
+test('GET /api/claims/radar requires session', async () => {
+  process.env.SESSION_SECRET = 'test-secret';
+  process.env.MVP_PASSWORD = 'pw';
+  delete process.env.MVP_PASSWORD_HASH;
+
+  const { createApp } = await import('./app.js');
+  const app = createApp({
+    loadClaimsRadar: async () => ({
+      claims: [],
+      needsReview: [],
+      hiddenMutedCount: 0,
+    }),
+  });
+
+  const { baseUrl, close } = await startServer(app);
+  try {
+    const resp = await fetch(`${baseUrl}/api/claims/radar`);
+    assert.equal(resp.status, 401);
+    const body = (await resp.json()) as { ok: false; error: string };
+    assert.equal(body.ok, false);
+    assert.equal(body.error, 'Unauthorized');
+  } finally {
+    await close();
+  }
+});
+
+test('GET /api/claims/radar returns empty payload when authenticated', async () => {
+  process.env.SESSION_SECRET = 'test-secret';
+  process.env.MVP_PASSWORD = 'pw';
+  delete process.env.MVP_PASSWORD_HASH;
+
+  const { createApp } = await import('./app.js');
+  const app = createApp({
+    loadClaimsRadar: async () => ({
+      claims: [],
+      needsReview: [],
+      hiddenMutedCount: 0,
+    }),
+  });
+
+  const { baseUrl, close } = await startServer(app);
+  try {
+    const cookie = await login(baseUrl);
+    const resp = await fetch(`${baseUrl}/api/claims/radar`, { headers: { cookie } });
+    assert.equal(resp.status, 200);
+    const body = (await resp.json()) as {
+      ok: true;
+      claims: unknown[];
+      needsReview: unknown[];
+      hiddenMutedCount: number;
+    };
+    assert.equal(body.ok, true);
+    assert.deepEqual(body.claims, []);
+    assert.deepEqual(body.needsReview, []);
+    assert.equal(body.hiddenMutedCount, 0);
+  } finally {
+    await close();
+  }
+});
+
 test('POST /api/claims/extract returns ok payload when authenticated', async () => {
   process.env.SESSION_SECRET = 'test-secret';
   process.env.MVP_PASSWORD = 'pw';
