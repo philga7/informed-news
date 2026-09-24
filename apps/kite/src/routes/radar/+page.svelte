@@ -6,8 +6,16 @@
 		RADAR_ACCEPT_ERROR,
 		RADAR_ACCEPT_LABEL,
 		RADAR_ACCEPT_PENDING,
+		RADAR_CLAIMS_EMPTY_COPY,
+		RADAR_CLAIMS_HIDE_HEADLINES,
+		RADAR_CLAIMS_LINKED_HEADLINES_LABEL,
+		RADAR_CLAIMS_LOAD_ERROR,
+		RADAR_CLAIMS_NEEDS_REVIEW_TITLE,
+		RADAR_CLAIMS_SECTION_TITLE,
+		RADAR_CLAIMS_SHOW_HEADLINES,
 		RADAR_EMPTY_COPY,
 		RADAR_ERROR_GENERIC,
+		RADAR_HEADLINE_CLUSTERS_SECTION_TITLE,
 		RADAR_HIDDEN_MUTED_PREFIX,
 		RADAR_LOGIN_INTRO,
 		RADAR_META_HELP,
@@ -37,6 +45,52 @@
 		RADAR_UNACCEPT_LABEL,
 		RADAR_UNTRACK_LABEL,
 	} from '$lib/radar';
+
+	type ClaimRadarLinkedHeadline = {
+		id: string;
+		title: string;
+		sourceKind: string;
+		publisherDomain: string | null;
+		publishedAt: string | null;
+		canonicalUrl: string;
+		sourceTier: 'primary' | 'sensor';
+		stance: 'supports' | 'contradicts' | 'mentions';
+	};
+
+	type ClaimRadarEvidenceCounts = {
+		total: number;
+		supports: number;
+		contradicts: number;
+		mentions: number;
+		primary: number;
+		sensor: number;
+	};
+
+	type ClaimRadarItem = {
+		claimId: string;
+		text: string;
+		claimType: string;
+		status: string;
+		createdAt: string;
+		confidence: number | null;
+		evidence: ClaimRadarEvidenceCounts;
+		clusterKeys: string[];
+		linkedHeadlines: ClaimRadarLinkedHeadline[];
+		needsReview: boolean;
+		reviewReasons: string[];
+	};
+
+	type ClaimsRadarResponse =
+		| {
+				ok: true;
+				claims: ClaimRadarItem[];
+				needsReview: ClaimRadarItem[];
+				hiddenMutedCount: number;
+		  }
+		| {
+				ok: false;
+				error: string;
+		  };
 
 	type RadarHeadline = {
 		id: string;
@@ -113,11 +167,14 @@
 
 	let loading = true;
 	let unauthenticated = false;
+	let needsReviewClaims: ClaimRadarItem[] = [];
+	let claims: ClaimRadarItem[] = [];
 	let clusters: RadarCluster[] = [];
 	let trackedEntries: TrackedEntry[] = [];
 	let hiddenMutedCount = 0;
 	let meta: RadarMeta | null = null;
-	let error: string | null = null;
+	let claimsError: string | null = null;
+	let clustersError: string | null = null;
 
 	let password = '';
 	let loginError: string | null = null;
@@ -136,6 +193,8 @@
 	let muteActionError: string | null = null;
 	let keyword = '';
 	let source = '';
+
+	let expandedClaimIds = new Set<string>();
 
 	function trackedClusterRows(): Array<
 		| { kind: 'resolved'; entry: TrackedEntry; cluster: RadarCluster }
@@ -162,12 +221,36 @@
 		});
 	}
 
+	function humanizeLabel(value: string): string {
+		if (!value) return '';
+		return value
+			.replace(/[_-]+/g, ' ')
+			.replace(/\s+/g, ' ')
+			.trim()
+			.replace(/\b\w/g, (c) => c.toUpperCase());
+	}
+
+	function formatConfidence(value: number | null): string {
+		if (value === null || value === undefined) return '—';
+		if (!Number.isFinite(value)) return '—';
+		const percent = Math.round(value * 100);
+		return `${percent}%`;
+	}
+
+	function toggleClaimExpanded(claimId: string): void {
+		const next = new Set(expandedClaimIds);
+		if (next.has(claimId)) next.delete(claimId);
+		else next.add(claimId);
+		expandedClaimIds = next;
+	}
+
 	async function loadRadar(initial = false): Promise<void> {
 		if (initial) {
 			unauthenticated = false;
 		}
 		loading = true;
-		error = null;
+		claimsError = null;
+		clustersError = null;
 		acceptError = null;
 		trackError = null;
 		ackError = null;
@@ -175,36 +258,73 @@
 		muteActionError = null;
 
 		try {
-			const [radarResponse, trackedResponse, mutesResponse] = await Promise.all([
+			const [claimsResponse, radarResponse, trackedResponse, mutesResponse] = await Promise.all([
+				fetch('/api/claims/radar', { credentials: 'include' }),
 				fetch('/api/radar', { credentials: 'include' }),
 				fetch('/api/brief/tracked', { credentials: 'include' }),
 				fetch('/api/brief/mutes', { credentials: 'include' }),
 			]);
 
 			if (
+				claimsResponse.status === 401 ||
 				radarResponse.status === 401 ||
 				trackedResponse.status === 401 ||
 				mutesResponse.status === 401
 			) {
 				unauthenticated = true;
+				needsReviewClaims = [];
+				claims = [];
 				clusters = [];
 				trackedEntries = [];
 				muteRules = [];
 				hiddenMutedCount = 0;
 				meta = null;
+				claimsError = null;
+				clustersError = null;
 				return;
 			}
 
-			const radar = (await radarResponse.json()) as RadarResponse;
-			if (!radar.ok) {
-				error = radar.error || RADAR_ERROR_GENERIC;
-				return;
+			let claimsHiddenMutedCount = 0;
+			if (!claimsResponse.ok) {
+				const body = (await claimsResponse.json().catch(() => null)) as ClaimsRadarResponse | null;
+				claimsError = (body && !body.ok && body.error) || RADAR_CLAIMS_LOAD_ERROR;
+				needsReviewClaims = [];
+				claims = [];
+			} else {
+				const body = (await claimsResponse.json().catch(() => null)) as ClaimsRadarResponse | null;
+				if (body && body.ok) {
+					needsReviewClaims = body.needsReview;
+					claims = body.claims;
+					claimsHiddenMutedCount =
+						typeof body.hiddenMutedCount === 'number' ? body.hiddenMutedCount : 0;
+				} else {
+					claimsError = (body && !body.ok && body.error) || RADAR_CLAIMS_LOAD_ERROR;
+					needsReviewClaims = [];
+					claims = [];
+				}
 			}
 
-			clusters = radar.clusters;
-			hiddenMutedCount =
-				typeof radar.hiddenMutedCount === 'number' ? radar.hiddenMutedCount : 0;
-			meta = radar.meta;
+			let clustersHiddenMutedCount = 0;
+			if (!radarResponse.ok) {
+				const body = (await radarResponse.json().catch(() => null)) as RadarResponse | null;
+				clustersError = (body && !body.ok && body.error) || RADAR_ERROR_GENERIC;
+				clusters = [];
+				meta = null;
+			} else {
+				const body = (await radarResponse.json().catch(() => null)) as RadarResponse | null;
+				if (body && body.ok) {
+					clusters = body.clusters;
+					clustersHiddenMutedCount =
+						typeof body.hiddenMutedCount === 'number' ? body.hiddenMutedCount : 0;
+					meta = body.meta;
+				} else {
+					clustersError = (body && !body.ok && body.error) || RADAR_ERROR_GENERIC;
+					clusters = [];
+					meta = null;
+				}
+			}
+
+			hiddenMutedCount = Math.max(claimsHiddenMutedCount, clustersHiddenMutedCount);
 
 			if (!mutesResponse.ok) {
 				muteRules = [];
@@ -246,7 +366,8 @@
 			}
 		} catch (err) {
 			console.error('Error loading radar', err);
-			error = RADAR_NETWORK_ERROR;
+			claimsError = RADAR_NETWORK_ERROR;
+			clustersError = RADAR_NETWORK_ERROR;
 		} finally {
 			loading = false;
 		}
@@ -268,11 +389,15 @@
 
 			if (response.status === 401) {
 				unauthenticated = true;
+				needsReviewClaims = [];
+				claims = [];
 				clusters = [];
 				trackedEntries = [];
 				muteRules = [];
 				hiddenMutedCount = 0;
 				meta = null;
+				claimsError = null;
+				clustersError = null;
 				return false;
 			}
 
@@ -336,11 +461,15 @@
 
 			if (response.status === 401) {
 				unauthenticated = true;
+				needsReviewClaims = [];
+				claims = [];
 				clusters = [];
 				trackedEntries = [];
 				muteRules = [];
 				hiddenMutedCount = 0;
 				meta = null;
+				claimsError = null;
+				clustersError = null;
 				return;
 			}
 
@@ -378,11 +507,15 @@
 
 			if (response.status === 401) {
 				unauthenticated = true;
+				needsReviewClaims = [];
+				claims = [];
 				clusters = [];
 				trackedEntries = [];
 				muteRules = [];
 				hiddenMutedCount = 0;
 				meta = null;
+				claimsError = null;
+				clustersError = null;
 				return;
 			}
 
@@ -457,12 +590,15 @@
 		} catch (err) {
 			console.error('Error during radar logout', err);
 		} finally {
+			needsReviewClaims = [];
+			claims = [];
 			clusters = [];
 			trackedEntries = [];
 			muteRules = [];
 			hiddenMutedCount = 0;
 			meta = null;
-			error = null;
+			claimsError = null;
+			clustersError = null;
 			acceptError = null;
 			trackError = null;
 			ackError = null;
@@ -512,9 +648,15 @@
 			if (response.status === 401) {
 				setClusterAccepted(cluster.clusterId, previousAccepted);
 				unauthenticated = true;
+				needsReviewClaims = [];
+				claims = [];
 				clusters = [];
 				trackedEntries = [];
+				muteRules = [];
+				hiddenMutedCount = 0;
 				meta = null;
+				claimsError = null;
+				clustersError = null;
 				return;
 			}
 
@@ -567,9 +709,15 @@
 			if (response.status === 401) {
 				setClusterTracked(clusterId, previousTracked);
 				unauthenticated = true;
+				needsReviewClaims = [];
+				claims = [];
 				clusters = [];
 				trackedEntries = [];
+				muteRules = [];
+				hiddenMutedCount = 0;
 				meta = null;
+				claimsError = null;
+				clustersError = null;
 				return;
 			}
 
@@ -617,13 +765,8 @@
 		</p>
 		<h1 class="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Radar</h1>
 		<p class="mt-3 text-base text-gray-600 dark:text-gray-300">
-			Clustered headlines from Citizen Free Press and curated RSS sources, for dense triage
-			rather than full Brief story cards.
+			Claim inbox for extract triage, plus a secondary headline-cluster feed for story desk actions.
 		</p>
-		<p class="mt-4 text-xs leading-relaxed text-gray-600 dark:text-gray-400">
-			{RADAR_META_HELP}
-		</p>
-
 		{#if loading}
 			<p class="mt-8 text-sm text-gray-600 dark:text-gray-300">Loading radar…</p>
 		{:else if unauthenticated}
@@ -668,9 +811,9 @@
 				</form>
 			</section>
 		{:else}
-			{#if error}
+			{#if claimsError}
 				<p class="mt-8 text-sm text-red-600 dark:text-red-400">
-					{error}
+					{claimsError}
 				</p>
 			{/if}
 
@@ -692,27 +835,336 @@
 				</p>
 			{/if}
 
-			{#if meta}
-				<div
-					class="mt-6 space-y-1 text-xs text-gray-500 dark:text-gray-400"
-					aria-label="Radar ingest status"
-				>
-					{#if hiddenMutedCount > 0}
-						<p class="font-medium">
-							{RADAR_HIDDEN_MUTED_PREFIX} {hiddenMutedCount}
-						</p>
-					{/if}
-					<p>
-						<span class="font-medium">Last fetch:</span>
-						<span class="ml-1">{formatDateTime(meta.lastFetchAt)}</span>
+			{#if hiddenMutedCount > 0}
+				<p class="mt-6 text-xs font-medium text-gray-500 dark:text-gray-400">
+					{RADAR_HIDDEN_MUTED_PREFIX} {hiddenMutedCount}
+				</p>
+			{/if}
+
+			{#if needsReviewClaims.length > 0}
+				<section class="mt-8 space-y-4" aria-label="Claims needing review">
+					<header class="space-y-1">
+						<h2 class="text-sm font-semibold tracking-tight text-gray-900 dark:text-gray-100">
+							{RADAR_CLAIMS_NEEDS_REVIEW_TITLE}
+						</h2>
+					</header>
+
+					<ul class="space-y-3">
+						{#each needsReviewClaims as claim (claim.claimId)}
+							<li class="rounded-md border border-gray-200 bg-white/70 p-3 shadow-sm backdrop-blur dark:border-gray-700 dark:bg-gray-900/60">
+								<div class="flex items-start justify-between gap-3">
+									<div class="min-w-0">
+										<p class="text-sm font-medium text-gray-900 dark:text-gray-100">
+											{claim.text}
+										</p>
+										<div class="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-gray-500 dark:text-gray-400">
+											<span class="inline-flex items-center rounded-full border border-gray-300 px-2 py-0.5 text-[10px] tracking-wide dark:border-gray-600">
+												{humanizeLabel(claim.status)}
+											</span>
+											<span class="inline-flex items-center rounded-full border border-gray-300 px-2 py-0.5 text-[10px] tracking-wide dark:border-gray-600">
+												{humanizeLabel(claim.claimType)}
+											</span>
+											<span class="inline-flex items-center rounded-full border border-gray-300 px-2 py-0.5 text-[10px] tracking-wide dark:border-gray-600">
+												Evidence {claim.evidence.total} (S{claim.evidence.supports} C{claim.evidence.contradicts} M{claim.evidence.mentions})
+											</span>
+											<span class="inline-flex items-center rounded-full border border-gray-300 px-2 py-0.5 text-[10px] tracking-wide dark:border-gray-600">
+												Primary {claim.evidence.primary} · Sensor {claim.evidence.sensor}
+											</span>
+											<span class="inline-flex items-center rounded-full border border-gray-300 px-2 py-0.5 text-[10px] tracking-wide dark:border-gray-600">
+												Confidence {formatConfidence(claim.confidence)}
+											</span>
+										</div>
+
+										{#if claim.reviewReasons && claim.reviewReasons.length > 0}
+											<ul class="mt-2 list-disc pl-5 text-[11px] text-gray-600 dark:text-gray-300">
+												{#each claim.reviewReasons as reason (reason)}
+													<li>{reason}</li>
+												{/each}
+											</ul>
+										{/if}
+									</div>
+
+									{#if claim.linkedHeadlines.length > 0}
+										<button
+											type="button"
+											class="shrink-0 text-xs font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+											aria-expanded={expandedClaimIds.has(claim.claimId)}
+											on:click={() => toggleClaimExpanded(claim.claimId)}
+										>
+											{expandedClaimIds.has(claim.claimId) ? RADAR_CLAIMS_HIDE_HEADLINES : RADAR_CLAIMS_SHOW_HEADLINES}
+											({claim.linkedHeadlines.length})
+										</button>
+									{/if}
+								</div>
+
+								{#if expandedClaimIds.has(claim.claimId)}
+									<div class="mt-3 border-t border-gray-200 pt-3 dark:border-gray-700">
+										<p class="text-[11px] font-medium text-gray-700 dark:text-gray-300">
+											{RADAR_CLAIMS_LINKED_HEADLINES_LABEL}
+										</p>
+										<ul class="mt-2 space-y-2">
+											{#each claim.linkedHeadlines as headline (headline.id)}
+												<li class="flex flex-col gap-0.5">
+													<a
+														href={headline.canonicalUrl}
+														target="_blank"
+														rel="noreferrer"
+														class="text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+													>
+														{headline.title}
+													</a>
+													<div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-gray-500 dark:text-gray-400">
+														{#if headline.publisherDomain}
+															<span>{headline.publisherDomain}</span>
+														{/if}
+														<span class="inline-flex items-center rounded-full border border-gray-300 px-2 py-0.5 text-[10px] uppercase tracking-wide dark:border-gray-600">
+															{headline.sourceTier === 'primary' ? 'PRIMARY' : 'SENSOR'}
+														</span>
+														<span class="inline-flex items-center rounded-full border border-gray-300 px-2 py-0.5 text-[10px] uppercase tracking-wide dark:border-gray-600">
+															{headline.stance}
+														</span>
+														{#if headline.publishedAt}
+															<span>· {formatDateTime(headline.publishedAt)}</span>
+														{/if}
+													</div>
+												</li>
+											{/each}
+										</ul>
+									</div>
+								{/if}
+							</li>
+						{/each}
+					</ul>
+				</section>
+			{/if}
+
+			<section class="mt-8 space-y-4" aria-label="Claims">
+				<header class="space-y-1">
+					<h2 class="text-sm font-semibold tracking-tight text-gray-900 dark:text-gray-100">
+						{RADAR_CLAIMS_SECTION_TITLE}
+					</h2>
+				</header>
+
+				{#if needsReviewClaims.length === 0 && claims.length === 0 && !claimsError}
+					<p class="text-xs leading-relaxed text-gray-600 dark:text-gray-400">
+						{RADAR_CLAIMS_EMPTY_COPY}
 					</p>
-					{#if meta.lastError}
-						<p>
-							<span class="font-medium">Last ingest error:</span>
-							<span class="ml-1">{meta.lastError}</span>
+				{:else if claims.length > 0}
+					<ul class="space-y-3">
+						{#each claims as claim (claim.claimId)}
+							<li class="rounded-md border border-gray-200 bg-white/70 p-3 shadow-sm backdrop-blur dark:border-gray-700 dark:bg-gray-900/60">
+								<div class="flex items-start justify-between gap-3">
+									<div class="min-w-0">
+										<p class="text-sm font-medium text-gray-900 dark:text-gray-100">
+											{claim.text}
+										</p>
+										<div class="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-gray-500 dark:text-gray-400">
+											<span class="inline-flex items-center rounded-full border border-gray-300 px-2 py-0.5 text-[10px] tracking-wide dark:border-gray-600">
+												{humanizeLabel(claim.status)}
+											</span>
+											<span class="inline-flex items-center rounded-full border border-gray-300 px-2 py-0.5 text-[10px] tracking-wide dark:border-gray-600">
+												{humanizeLabel(claim.claimType)}
+											</span>
+											<span class="inline-flex items-center rounded-full border border-gray-300 px-2 py-0.5 text-[10px] tracking-wide dark:border-gray-600">
+												Evidence {claim.evidence.total} (S{claim.evidence.supports} C{claim.evidence.contradicts} M{claim.evidence.mentions})
+											</span>
+											<span class="inline-flex items-center rounded-full border border-gray-300 px-2 py-0.5 text-[10px] tracking-wide dark:border-gray-600">
+												Primary {claim.evidence.primary} · Sensor {claim.evidence.sensor}
+											</span>
+											<span class="inline-flex items-center rounded-full border border-gray-300 px-2 py-0.5 text-[10px] tracking-wide dark:border-gray-600">
+												Confidence {formatConfidence(claim.confidence)}
+											</span>
+										</div>
+									</div>
+
+									{#if claim.linkedHeadlines.length > 0}
+										<button
+											type="button"
+											class="shrink-0 text-xs font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+											aria-expanded={expandedClaimIds.has(claim.claimId)}
+											on:click={() => toggleClaimExpanded(claim.claimId)}
+										>
+											{expandedClaimIds.has(claim.claimId) ? RADAR_CLAIMS_HIDE_HEADLINES : RADAR_CLAIMS_SHOW_HEADLINES}
+											({claim.linkedHeadlines.length})
+										</button>
+									{/if}
+								</div>
+
+								{#if expandedClaimIds.has(claim.claimId)}
+									<div class="mt-3 border-t border-gray-200 pt-3 dark:border-gray-700">
+										<p class="text-[11px] font-medium text-gray-700 dark:text-gray-300">
+											{RADAR_CLAIMS_LINKED_HEADLINES_LABEL}
+										</p>
+										<ul class="mt-2 space-y-2">
+											{#each claim.linkedHeadlines as headline (headline.id)}
+												<li class="flex flex-col gap-0.5">
+													<a
+														href={headline.canonicalUrl}
+														target="_blank"
+														rel="noreferrer"
+														class="text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+													>
+														{headline.title}
+													</a>
+													<div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-gray-500 dark:text-gray-400">
+														{#if headline.publisherDomain}
+															<span>{headline.publisherDomain}</span>
+														{/if}
+														<span class="inline-flex items-center rounded-full border border-gray-300 px-2 py-0.5 text-[10px] uppercase tracking-wide dark:border-gray-600">
+															{headline.sourceTier === 'primary' ? 'PRIMARY' : 'SENSOR'}
+														</span>
+														<span class="inline-flex items-center rounded-full border border-gray-300 px-2 py-0.5 text-[10px] uppercase tracking-wide dark:border-gray-600">
+															{headline.stance}
+														</span>
+														{#if headline.publishedAt}
+															<span>· {formatDateTime(headline.publishedAt)}</span>
+														{/if}
+													</div>
+												</li>
+											{/each}
+										</ul>
+									</div>
+								{/if}
+							</li>
+						{/each}
+					</ul>
+				{/if}
+			</section>
+
+			{#if trackedEntries.length > 0}
+				<section class="mt-8 space-y-4" aria-label="Tracked clusters">
+					<header class="space-y-1">
+						<h2 class="text-sm font-semibold tracking-tight text-gray-900 dark:text-gray-100">
+							{RADAR_TRACKED_SECTION_TITLE}
+						</h2>
+						<p class="text-xs leading-relaxed text-gray-600 dark:text-gray-400">
+							{RADAR_TRACKED_SECTION_HELP}
 						</p>
-					{/if}
-				</div>
+					</header>
+
+					<ul class="space-y-3">
+						{#each trackedClusterRows() as row (row.entry.clusterId)}
+							<li class="rounded-md border border-gray-200 bg-white/70 p-3 shadow-sm backdrop-blur dark:border-gray-700 dark:bg-gray-900/60">
+								<div class="flex items-start justify-between gap-3">
+									<div class="min-w-0">
+										{#if row.kind === 'resolved'}
+											{#if row.cluster.newestAt}
+												<p class="text-xs text-gray-500 dark:text-gray-400">
+													Latest in cluster:
+													<span class="font-medium">{formatDateTime(row.cluster.newestAt)}</span>
+												</p>
+											{/if}
+										{:else}
+											<p class="text-xs text-gray-500 dark:text-gray-400">
+												Cluster:
+												<span class="font-mono text-[11px]">{row.entry.clusterId}</span>
+											</p>
+										{/if}
+										{#if row.entry.pendingUpdate}
+											<p class="mt-1 inline-flex items-center gap-2 text-[11px] font-medium text-amber-700 dark:text-amber-300">
+												<span class="h-2 w-2 rounded-full bg-amber-500" aria-hidden="true"></span>
+												{RADAR_TRACKED_UPDATE_BADGE}
+											</p>
+										{/if}
+										{#if row.entry.muted}
+											<p class="mt-1 text-[11px] font-medium text-gray-600 dark:text-gray-400">
+												{RADAR_MUTED_LABEL}
+											</p>
+										{/if}
+									</div>
+
+									<div class="shrink-0 flex items-center gap-3">
+										{#if row.entry.pendingUpdate}
+											<button
+												type="button"
+												class="text-xs font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700 disabled:opacity-50 dark:text-blue-400 dark:hover:text-blue-300"
+												disabled={pendingAckClusterId !== null}
+												on:click={() => ackTrackedUpdate(row.entry.clusterId)}
+											>
+												{#if pendingAckClusterId !== null}
+													{RADAR_TRACKED_DISMISS_PENDING}
+												{:else}
+													{RADAR_TRACKED_DISMISS_LABEL}
+												{/if}
+											</button>
+										{/if}
+										{#if row.kind === 'resolved' && row.cluster.accepted}
+											<button
+												type="button"
+												class="text-xs font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700 disabled:opacity-50 dark:text-blue-400 dark:hover:text-blue-300"
+												disabled={row.entry.pendingUpdate && pendingAckClusterId !== null}
+												on:click={() => openOnBrief(row.entry.clusterId, row.entry.pendingUpdate)}
+											>
+												Open on Brief
+											</button>
+										{/if}
+										{#if row.kind === 'resolved'}
+											<button
+												type="button"
+												class="text-xs font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700 disabled:opacity-50 dark:text-blue-400 dark:hover:text-blue-300"
+												disabled={pendingClusterId === row.entry.clusterId}
+												aria-pressed={row.cluster.accepted}
+												on:click={() => toggleAccept(row.cluster)}
+											>
+												{#if pendingClusterId === row.entry.clusterId}
+													{RADAR_ACCEPT_PENDING}
+												{:else if row.cluster.accepted}
+													{RADAR_UNACCEPT_LABEL}
+												{:else}
+													{RADAR_ACCEPT_LABEL}
+												{/if}
+											</button>
+										{/if}
+										<button
+											type="button"
+											class="text-xs font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700 disabled:opacity-50 dark:text-blue-400 dark:hover:text-blue-300"
+											disabled={pendingTrackClusterId === row.entry.clusterId}
+											aria-pressed={true}
+											on:click={() => toggleTrack(row.entry.clusterId, true)}
+										>
+											{#if pendingTrackClusterId === row.entry.clusterId}
+												{RADAR_TRACK_PENDING}
+											{:else}
+												{RADAR_UNTRACK_LABEL}
+											{/if}
+										</button>
+									</div>
+								</div>
+
+								{#if row.kind === 'resolved'}
+									<ul class="mt-2 space-y-1">
+										{#each row.cluster.headlines as headline (headline.id)}
+											<li class="flex flex-col gap-0.5">
+												<a
+													href={headline.canonicalUrl}
+													target="_blank"
+													rel="noreferrer"
+													class="text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+												>
+													{headline.title}
+												</a>
+												<div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-gray-500 dark:text-gray-400">
+													{#if headline.publisherDomain}
+														<span>{headline.publisherDomain}</span>
+													{/if}
+													<span class="inline-flex items-center rounded-full border border-gray-300 px-2 py-0.5 text-[10px] uppercase tracking-wide dark:border-gray-600">
+														{headline.sourceKind === 'cfp' ? 'CFP' : 'RSS'}
+													</span>
+													{#if headline.citationLabel}
+														<span>· {headline.citationLabel}</span>
+													{/if}
+													{#if headline.publishedAt}
+														<span>· {formatDateTime(headline.publishedAt)}</span>
+													{/if}
+												</div>
+											</li>
+										{/each}
+									</ul>
+								{/if}
+							</li>
+						{/each}
+					</ul>
+				</section>
 			{/if}
 
 			<section class="mt-8 space-y-4" aria-label="Mute rules">
@@ -787,237 +1239,126 @@
 				{/if}
 			</section>
 
-			{#if trackedEntries.length > 0}
-					<section class="mt-8 space-y-4" aria-label="Tracked clusters">
-						<header class="space-y-1">
-							<h2 class="text-sm font-semibold tracking-tight text-gray-900 dark:text-gray-100">
-								{RADAR_TRACKED_SECTION_TITLE}
-							</h2>
-							<p class="text-xs leading-relaxed text-gray-600 dark:text-gray-400">
-								{RADAR_TRACKED_SECTION_HELP}
+			<details
+				class="mt-8 rounded-md border border-gray-200 bg-white/60 p-4 shadow-sm backdrop-blur dark:border-gray-700 dark:bg-gray-900/50"
+				aria-label="Headline clusters"
+			>
+				<summary class="cursor-pointer text-sm font-semibold tracking-tight text-gray-900 dark:text-gray-100">
+					{RADAR_HEADLINE_CLUSTERS_SECTION_TITLE}
+					<span class="ml-2 text-xs font-medium text-gray-500 dark:text-gray-400">({clusters.length})</span>
+				</summary>
+
+				<div class="mt-3 space-y-4">
+					<p class="text-xs leading-relaxed text-gray-600 dark:text-gray-400">
+						{RADAR_META_HELP}
+					</p>
+
+					{#if clustersError}
+						<p class="text-xs text-red-600 dark:text-red-400">{clustersError}</p>
+					{/if}
+
+					{#if meta}
+						<div class="space-y-1 text-xs text-gray-500 dark:text-gray-400" aria-label="Radar ingest status">
+							<p>
+								<span class="font-medium">Last fetch:</span>
+								<span class="ml-1">{formatDateTime(meta.lastFetchAt)}</span>
 							</p>
-						</header>
+							{#if meta.lastError}
+								<p>
+									<span class="font-medium">Last ingest error:</span>
+									<span class="ml-1">{meta.lastError}</span>
+								</p>
+							{/if}
+						</div>
+					{/if}
 
-						<ul class="space-y-3">
-							{#each trackedClusterRows() as row (row.entry.clusterId)}
-								<li class="rounded-md border border-gray-200 bg-white/70 p-3 shadow-sm backdrop-blur dark:border-gray-700 dark:bg-gray-900/60">
-									<div class="flex items-start justify-between gap-3">
-										<div class="min-w-0">
-											{#if row.kind === 'resolved'}
-												{#if row.cluster.newestAt}
-													<p class="text-xs text-gray-500 dark:text-gray-400">
-														Latest in cluster:
-														<span class="font-medium">{formatDateTime(row.cluster.newestAt)}</span>
-													</p>
-												{/if}
-											{:else}
-												<p class="text-xs text-gray-500 dark:text-gray-400">
-													Cluster:
-													<span class="font-mono text-[11px]">{row.entry.clusterId}</span>
-												</p>
-											{/if}
-											{#if row.entry.pendingUpdate}
-												<p class="mt-1 inline-flex items-center gap-2 text-[11px] font-medium text-amber-700 dark:text-amber-300">
-													<span class="h-2 w-2 rounded-full bg-amber-500" aria-hidden="true"></span>
-													{RADAR_TRACKED_UPDATE_BADGE}
-												</p>
-											{/if}
-											{#if row.entry.muted}
-												<p class="mt-1 text-[11px] font-medium text-gray-600 dark:text-gray-400">
-													{RADAR_MUTED_LABEL}
-												</p>
-											{/if}
-										</div>
-
+					{#if clusters.length === 0 && !clustersError}
+						<p class="text-xs text-gray-600 dark:text-gray-400">{RADAR_EMPTY_COPY}</p>
+					{:else if clusters.length > 0}
+						<section class="space-y-6" aria-label="Headline clusters list">
+							{#each clusters as cluster}
+								<article class="border-l border-gray-200 pl-4 dark:border-gray-700">
+									<div class="flex items-baseline justify-between gap-3">
+										{#if cluster.newestAt}
+											<p class="text-xs text-gray-500 dark:text-gray-400">
+												Latest in cluster:
+												<span class="font-medium">{formatDateTime(cluster.newestAt)}</span>
+											</p>
+										{:else}
+											<span class="text-xs text-gray-500 dark:text-gray-400"></span>
+										{/if}
 										<div class="shrink-0 flex items-center gap-3">
-											{#if row.entry.pendingUpdate}
-												<button
-													type="button"
-													class="text-xs font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700 disabled:opacity-50 dark:text-blue-400 dark:hover:text-blue-300"
-													disabled={pendingAckClusterId !== null}
-													on:click={() => ackTrackedUpdate(row.entry.clusterId)}
-												>
-													{#if pendingAckClusterId !== null}
-														{RADAR_TRACKED_DISMISS_PENDING}
-													{:else}
-														{RADAR_TRACKED_DISMISS_LABEL}
-													{/if}
-												</button>
-											{/if}
-											{#if row.kind === 'resolved' && row.cluster.accepted}
-												<button
-													type="button"
-													class="text-xs font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700 disabled:opacity-50 dark:text-blue-400 dark:hover:text-blue-300"
-													disabled={row.entry.pendingUpdate && pendingAckClusterId !== null}
-													on:click={() => openOnBrief(row.entry.clusterId, row.entry.pendingUpdate)}
-												>
-													Open on Brief
-												</button>
-											{/if}
-											{#if row.kind === 'resolved'}
-												<button
-													type="button"
-													class="text-xs font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700 disabled:opacity-50 dark:text-blue-400 dark:hover:text-blue-300"
-													disabled={pendingClusterId === row.entry.clusterId}
-													aria-pressed={row.cluster.accepted}
-													on:click={() => toggleAccept(row.cluster)}
-												>
-													{#if pendingClusterId === row.entry.clusterId}
-														{RADAR_ACCEPT_PENDING}
-													{:else if row.cluster.accepted}
-														{RADAR_UNACCEPT_LABEL}
-													{:else}
-														{RADAR_ACCEPT_LABEL}
-													{/if}
-												</button>
-											{/if}
 											<button
 												type="button"
 												class="text-xs font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700 disabled:opacity-50 dark:text-blue-400 dark:hover:text-blue-300"
-												disabled={pendingTrackClusterId === row.entry.clusterId}
-												aria-pressed={true}
-												on:click={() => toggleTrack(row.entry.clusterId, true)}
+												disabled={pendingTrackClusterId === cluster.clusterId}
+												aria-pressed={cluster.tracked}
+												on:click={() => toggleTrack(cluster.clusterId, cluster.tracked)}
 											>
-												{#if pendingTrackClusterId === row.entry.clusterId}
+												{#if pendingTrackClusterId === cluster.clusterId}
 													{RADAR_TRACK_PENDING}
-												{:else}
+												{:else if cluster.tracked}
 													{RADAR_UNTRACK_LABEL}
+												{:else}
+													{RADAR_TRACK_LABEL}
+												{/if}
+											</button>
+											<button
+												type="button"
+												class="text-xs font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700 disabled:opacity-50 dark:text-blue-400 dark:hover:text-blue-300"
+												disabled={pendingClusterId === cluster.clusterId}
+												aria-pressed={cluster.accepted}
+												on:click={() => toggleAccept(cluster)}
+											>
+												{#if pendingClusterId === cluster.clusterId}
+													{RADAR_ACCEPT_PENDING}
+												{:else if cluster.accepted}
+													{RADAR_UNACCEPT_LABEL}
+												{:else}
+													{RADAR_ACCEPT_LABEL}
 												{/if}
 											</button>
 										</div>
 									</div>
 
-									{#if row.kind === 'resolved'}
-										<ul class="mt-2 space-y-1">
-											{#each row.cluster.headlines as headline (headline.id)}
-												<li class="flex flex-col gap-0.5">
-													<a
-														href={headline.canonicalUrl}
-														target="_blank"
-														rel="noreferrer"
-														class="text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
-													>
-														{headline.title}
-													</a>
-													<div
-														class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-gray-500 dark:text-gray-400"
-													>
-														{#if headline.publisherDomain}
-															<span>{headline.publisherDomain}</span>
-														{/if}
-														<span
-															class="inline-flex items-center rounded-full border border-gray-300 px-2 py-0.5 text-[10px] uppercase tracking-wide dark:border-gray-600"
-														>
-															{headline.sourceKind === 'cfp' ? 'CFP' : 'RSS'}
-														</span>
-														{#if headline.citationLabel}
-															<span>· {headline.citationLabel}</span>
-														{/if}
-														{#if headline.publishedAt}
-															<span>· {formatDateTime(headline.publishedAt)}</span>
-														{/if}
-													</div>
-												</li>
-											{/each}
-										</ul>
-									{/if}
-								</li>
+									<ul class="mt-2 space-y-1">
+										{#each cluster.headlines as headline}
+											<li class="flex flex-col gap-0.5">
+												<a
+													href={headline.canonicalUrl}
+													target="_blank"
+													rel="noreferrer"
+													class="text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+												>
+													{headline.title}
+												</a>
+												<div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-gray-500 dark:text-gray-400">
+													{#if headline.publisherDomain}
+														<span>{headline.publisherDomain}</span>
+													{/if}
+													<span class="inline-flex items-center rounded-full border border-gray-300 px-2 py-0.5 text-[10px] uppercase tracking-wide dark:border-gray-600">
+														{headline.sourceKind === 'cfp' ? 'CFP' : 'RSS'}
+													</span>
+													{#if headline.citationLabel}
+														<span>· {headline.citationLabel}</span>
+													{/if}
+													{#if headline.publishedAt}
+														<span>· {formatDateTime(headline.publishedAt)}</span>
+													{/if}
+												</div>
+											</li>
+										{/each}
+									</ul>
+								</article>
 							{/each}
-						</ul>
-					</section>
-			{/if}
-
-			{#if clusters.length === 0 && !error && trackedEntries.length === 0}
-				<p class="mt-8 text-sm text-gray-600 dark:text-gray-300">
-					{RADAR_EMPTY_COPY}
-				</p>
-			{:else if clusters.length > 0}
-				<section class="mt-8 space-y-6" aria-label="Radar clusters">
-					{#each clusters as cluster}
-						<article class="border-l border-gray-200 pl-4 dark:border-gray-700">
-							<div class="flex items-baseline justify-between gap-3">
-								{#if cluster.newestAt}
-									<p class="text-xs text-gray-500 dark:text-gray-400">
-										Latest in cluster:
-										<span class="font-medium">{formatDateTime(cluster.newestAt)}</span>
-									</p>
-								{:else}
-									<span class="text-xs text-gray-500 dark:text-gray-400"></span>
-								{/if}
-								<div class="shrink-0 flex items-center gap-3">
-									<button
-										type="button"
-										class="text-xs font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700 disabled:opacity-50 dark:text-blue-400 dark:hover:text-blue-300"
-										disabled={pendingTrackClusterId === cluster.clusterId}
-										aria-pressed={cluster.tracked}
-										on:click={() => toggleTrack(cluster.clusterId, cluster.tracked)}
-									>
-										{#if pendingTrackClusterId === cluster.clusterId}
-											{RADAR_TRACK_PENDING}
-										{:else if cluster.tracked}
-											{RADAR_UNTRACK_LABEL}
-										{:else}
-											{RADAR_TRACK_LABEL}
-										{/if}
-									</button>
-									<button
-										type="button"
-										class="text-xs font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700 disabled:opacity-50 dark:text-blue-400 dark:hover:text-blue-300"
-										disabled={pendingClusterId === cluster.clusterId}
-										aria-pressed={cluster.accepted}
-										on:click={() => toggleAccept(cluster)}
-									>
-										{#if pendingClusterId === cluster.clusterId}
-											{RADAR_ACCEPT_PENDING}
-										{:else if cluster.accepted}
-											{RADAR_UNACCEPT_LABEL}
-										{:else}
-											{RADAR_ACCEPT_LABEL}
-										{/if}
-									</button>
-								</div>
-							</div>
-
-							<ul class="mt-2 space-y-1">
-								{#each cluster.headlines as headline}
-									<li class="flex flex-col gap-0.5">
-										<a
-											href={headline.canonicalUrl}
-											target="_blank"
-											rel="noreferrer"
-											class="text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
-										>
-											{headline.title}
-										</a>
-										<div
-											class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-gray-500 dark:text-gray-400"
-										>
-											{#if headline.publisherDomain}
-												<span>{headline.publisherDomain}</span>
-											{/if}
-											<span
-												class="inline-flex items-center rounded-full border border-gray-300 px-2 py-0.5 text-[10px] uppercase tracking-wide dark:border-gray-600"
-											>
-												{headline.sourceKind === 'cfp' ? 'CFP' : 'RSS'}
-											</span>
-											{#if headline.citationLabel}
-												<span>· {headline.citationLabel}</span>
-											{/if}
-											{#if headline.publishedAt}
-												<span>· {formatDateTime(headline.publishedAt)}</span>
-											{/if}
-										</div>
-									</li>
-								{/each}
-							</ul>
-						</article>
-					{/each}
-				</section>
-			{/if}
+						</section>
+					{/if}
+				</div>
+			</details>
 
 			<div class="mt-8 flex items-center justify-between">
 				<p class="text-xs text-gray-500 dark:text-gray-400">
-					Headlines only — open links to read full context at the cited sources.
+					Inbox only — open links to read full context at the cited sources.
 				</p>
 				<button
 					type="button"
