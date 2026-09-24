@@ -104,6 +104,15 @@ export {
   parseEnrichmentResponse,
 } from './ollamaEnrichment.js';
 export type { EnrichMemberInput, EnrichClusterResult } from './ollamaEnrichment.js';
+export { proposeClaimCandidates } from './ollamaProposeClaims.js';
+export type {
+  ClaimCandidate,
+  ProposeClaimsInput,
+  ProposeClaimsOptions,
+  ProposeClaimsResult,
+  ProposeClaimsSuccess,
+  ProposeClaimsFailure,
+} from './ollamaProposeClaims.js';
 export { enrichUnenrichedClusters } from './enrichClusters.js';
 export type { EnrichBatchOptions, EnrichBatchResult } from './enrichClusters.js';
 export { buildRadarFeed } from './radarFeed.js';
