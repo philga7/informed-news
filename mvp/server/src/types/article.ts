@@ -2,6 +2,8 @@
  * Structured framing / bias analysis from Ollama Cloud.
  * UI should label results: "AI-assisted framing analysis — not ground truth."
  */
+import type { SourceTier } from './claim.js';
+
 export type FramingGenre = 'news_blurb' | 'opinion' | 'analysis' | 'unclear';
 
 export type FramingDimensions = {
@@ -52,6 +54,8 @@ export type Article = {
   id: string;
   title: string;
   sourceKind: SourceKind;
+  /** Primary vs sensor source tiering for claims desk. Undefined treated as 'sensor'. */
+  sourceTier?: SourceTier;
   /** CFP item URL or tweet URL; input to the id hash */
   canonicalUrl: string;
   citations: ArticleCitation[];

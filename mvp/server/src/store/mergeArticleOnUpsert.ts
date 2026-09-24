@@ -97,7 +97,8 @@ export function mergeArticleOnUpsert(
   incoming: ArticleUpsertInput,
   id: string,
 ): Article {
-  const base: Article = { ...incoming, id };
+  const sourceTier = incoming.sourceTier ?? existing?.sourceTier ?? 'sensor';
+  const base: Article = { ...incoming, id, sourceTier };
 
   const withBody: Article =
     existing && shouldKeepExistingBody(existing, incoming)

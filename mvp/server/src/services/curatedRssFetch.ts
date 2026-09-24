@@ -111,6 +111,7 @@ export async function fetchCuratedRss(
         pending.push({
           title: item.title,
           sourceKind: 'rss',
+          sourceTier: source.sourceTier === 'primary' ? 'primary' : 'sensor',
           canonicalUrl,
           citations: citationsFromRss(source.name, canonicalUrl),
           publisherUrl,
