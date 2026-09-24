@@ -44,6 +44,23 @@ type TrackedResponse =
 			error: string;
 	  };
 
+type TrackedClaimEntry = {
+	claimId: string;
+	trackedAt: string;
+	pendingUpdate: boolean;
+};
+
+type TrackedClaimsResponse =
+	| {
+			ok: true;
+			entries: TrackedClaimEntry[];
+			updatedAt: string | null;
+	  }
+	| {
+			ok: false;
+			error: string;
+	  };
+
 let pendingTrackedCount = $state(0);
 
 // Handle about click
@@ -70,23 +87,33 @@ function getRSSFeedUrl(): string {
 
 async function loadPendingTrackedCount(): Promise<void> {
 	try {
-		const response = await fetch('/api/brief/tracked', { credentials: 'include' });
+		const [claimsResponse, briefResponse] = await Promise.all([
+			fetch('/api/claims/tracked', { credentials: 'include' }),
+			fetch('/api/brief/tracked', { credentials: 'include' }),
+		]);
 		// Ruling: no footer badge when unauthenticated.
-		if (response.status === 401) {
-			pendingTrackedCount = 0;
-			return;
-		}
-		if (!response.ok) {
+		if (claimsResponse.status === 401 || briefResponse.status === 401) {
 			pendingTrackedCount = 0;
 			return;
 		}
 
-		const body = (await response.json().catch(() => null)) as TrackedResponse | null;
-		if (body && body.ok && Array.isArray(body.entries)) {
-			pendingTrackedCount = body.entries.filter((entry) => entry.pendingUpdate).length;
-			return;
+		let claimCount = 0;
+		if (claimsResponse.ok) {
+			const body = (await claimsResponse.json().catch(() => null)) as TrackedClaimsResponse | null;
+			if (body && body.ok && Array.isArray(body.entries)) {
+				claimCount = body.entries.filter((entry) => entry.pendingUpdate).length;
+			}
 		}
-		pendingTrackedCount = 0;
+
+		let briefCount = 0;
+		if (briefResponse.ok) {
+			const body = (await briefResponse.json().catch(() => null)) as TrackedResponse | null;
+			if (body && body.ok && Array.isArray(body.entries)) {
+				briefCount = body.entries.filter((entry) => entry.pendingUpdate).length;
+			}
+		}
+
+		pendingTrackedCount = claimCount + briefCount;
 	} catch (err) {
 		console.error('Error loading tracked pending count', err);
 		pendingTrackedCount = 0;

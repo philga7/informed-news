@@ -24,21 +24,30 @@ import {
 } from './services/index.js';
 import {
   acceptCluster,
+  acceptClaim,
+  ackTrackedClaimUpdate,
   addMuteRule,
   ackTrackedUpdate,
   getArticleById,
+  getClaimById,
   readArticles,
   readBriefMembership,
+  readClaimMembership,
   readMuteRules,
   readMeta,
+  readTrackedClaims,
   readTrackedStories,
   removeMuteRule,
   syncTrackedAfterFetch,
+  trackClaim,
   trackCluster,
   unacceptCluster,
+  unacceptClaim,
+  untrackClaim,
   untrackCluster,
 } from './store/index.js';
 import type { TrackedEntry } from './store/index.js';
+import type { TrackedClaimEntry } from './store/index.js';
 import type { Article } from './types/article.js';
 
 export type CreateAppDeps = {
@@ -64,10 +73,27 @@ export type CreateAppDeps = {
   addMuteRule?: typeof addMuteRule;
   removeMuteRule?: typeof removeMuteRule;
   loadClaimsRadar?: typeof loadClaimsRadar;
+  readClaimMembership?: typeof readClaimMembership;
+  acceptClaim?: typeof acceptClaim;
+  unacceptClaim?: typeof unacceptClaim;
+  readTrackedClaims?: typeof readTrackedClaims;
+  trackClaim?: typeof trackClaim;
+  untrackClaim?: typeof untrackClaim;
+  ackTrackedClaimUpdate?: typeof ackTrackedClaimUpdate;
+  getClaimById?: typeof getClaimById;
 };
 
 function parseClusterId(body: unknown): string | null {
   const raw = (body as { clusterId?: unknown } | null)?.clusterId;
+  if (typeof raw !== 'string') {
+    return null;
+  }
+  const trimmed = raw.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function parseClaimId(body: unknown): string | null {
+  const raw = (body as { claimId?: unknown } | null)?.claimId;
   if (typeof raw !== 'string') {
     return null;
   }
@@ -122,6 +148,14 @@ export function createApp(deps: CreateAppDeps = {}): Express {
   const extractClaims = deps.extractClaimsFromArticles ?? extractClaimsFromArticles;
   const enrich = deps.enrichUnenrichedClusters ?? enrichUnenrichedClusters;
   const loadRadarClaims = deps.loadClaimsRadar ?? loadClaimsRadar;
+  const readClaimMember = deps.readClaimMembership ?? readClaimMembership;
+  const acceptOneClaim = deps.acceptClaim ?? acceptClaim;
+  const unacceptOneClaim = deps.unacceptClaim ?? unacceptClaim;
+  const readClaimTracked = deps.readTrackedClaims ?? readTrackedClaims;
+  const trackOneClaim = deps.trackClaim ?? trackClaim;
+  const untrackOneClaim = deps.untrackClaim ?? untrackClaim;
+  const ackTrackedClaim = deps.ackTrackedClaimUpdate ?? ackTrackedClaimUpdate;
+  const getClaim = deps.getClaimById ?? getClaimById;
 
   const app = express();
 
@@ -508,6 +542,157 @@ export function createApp(deps: CreateAppDeps = {}): Express {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.error('Claims radar feed failed:', message);
+      res.status(500).json({ ok: false, error: message });
+    }
+  });
+
+  /** Claim membership: accepted claimIds for the operator. */
+  app.get('/api/claims/membership', async (_req, res) => {
+    try {
+      const membership = await readClaimMember();
+      res.json({
+        ok: true,
+        acceptedClaimIds: membership.acceptedClaimIds,
+        updatedAt: membership.updatedAt,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('Claim membership read failed:', message);
+      res.status(500).json({ ok: false, error: message });
+    }
+  });
+
+  /**
+   * Accept a claim onto membership (idempotent).
+   * Also default-track it for developing-claim alerts (idempotent).
+   */
+  app.post('/api/claims/accept', async (req, res) => {
+    try {
+      const claimId = parseClaimId(req.body);
+      if (!claimId) {
+        res.status(400).json({ ok: false, error: 'claimId is required' });
+        return;
+      }
+
+      const existing = await getClaim(claimId);
+      if (!existing) {
+        res.status(404).json({ ok: false, error: 'Claim not found' });
+        return;
+      }
+
+      const result = await acceptOneClaim(claimId);
+      await trackOneClaim(claimId);
+
+      res.json({ ok: true, acceptedClaimIds: result.acceptedClaimIds });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('Claim accept failed:', message);
+      res.status(500).json({ ok: false, error: message });
+    }
+  });
+
+  /** Remove a claim from membership (idempotent). */
+  app.post('/api/claims/unaccept', async (req, res) => {
+    try {
+      const claimId = parseClaimId(req.body);
+      if (!claimId) {
+        res.status(400).json({ ok: false, error: 'claimId is required' });
+        return;
+      }
+
+      const result = await unacceptOneClaim(claimId);
+      res.json({ ok: true, acceptedClaimIds: result.acceptedClaimIds });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('Claim unaccept failed:', message);
+      res.status(500).json({ ok: false, error: message });
+    }
+  });
+
+  /** List tracked claims for the operator. */
+  app.get('/api/claims/tracked', async (_req, res) => {
+    try {
+      const tracked = await readClaimTracked();
+      res.json({
+        ok: true,
+        entries: tracked.entries satisfies TrackedClaimEntry[],
+        updatedAt: tracked.updatedAt,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('Tracked claims read failed:', message);
+      res.status(500).json({ ok: false, error: message });
+    }
+  });
+
+  /**
+   * Track a claim for updates (idempotent).
+   * Does NOT Accept the claim (Track ≠ Accept).
+   */
+  app.post('/api/claims/track', async (req, res) => {
+    try {
+      const claimId = parseClaimId(req.body);
+      if (!claimId) {
+        res.status(400).json({ ok: false, error: 'claimId is required' });
+        return;
+      }
+
+      const existing = await getClaim(claimId);
+      if (!existing) {
+        res.status(404).json({ ok: false, error: 'Claim not found' });
+        return;
+      }
+
+      const result = await trackOneClaim(claimId);
+      res.json({ ok: true, entries: result.entries satisfies TrackedClaimEntry[] });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('Claim track failed:', message);
+      res.status(500).json({ ok: false, error: message });
+    }
+  });
+
+  /** Untrack a claim (idempotent). */
+  app.post('/api/claims/untrack', async (req, res) => {
+    try {
+      const claimId = parseClaimId(req.body);
+      if (!claimId) {
+        res.status(400).json({ ok: false, error: 'claimId is required' });
+        return;
+      }
+
+      const result = await untrackOneClaim(claimId);
+      res.json({ ok: true, entries: result.entries satisfies TrackedClaimEntry[] });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('Claim untrack failed:', message);
+      res.status(500).json({ ok: false, error: message });
+    }
+  });
+
+  /**
+   * Ack a tracked claim update (idempotent).
+   * Clears pendingUpdate.
+   */
+  app.post('/api/claims/tracked/ack', async (req, res) => {
+    try {
+      const claimId = parseClaimId(req.body);
+      if (!claimId) {
+        res.status(400).json({ ok: false, error: 'claimId is required' });
+        return;
+      }
+
+      const existing = await getClaim(claimId);
+      if (!existing) {
+        res.status(404).json({ ok: false, error: 'Claim not found' });
+        return;
+      }
+
+      const result = await ackTrackedClaim(claimId);
+      res.json({ ok: true, entries: result.entries satisfies TrackedClaimEntry[] });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('Claim tracked ack failed:', message);
       res.status(500).json({ ok: false, error: message });
     }
   });
