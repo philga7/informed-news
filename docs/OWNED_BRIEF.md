@@ -4,9 +4,9 @@ Informed News serves the Kite shell from **our** brief API by default — not `h
 
 ## Direction (Epic J — in progress)
 
-Product next is the **claims / evidence** desk ([NEWS-69](https://informedcrew.atlassian.net/browse/NEWS-69)): Brief will lead with **accepted claims** plus **linked story clusters** for context; Radar is the **claim inbox** on `/radar` ([NEWS-74](https://informedcrew.atlassian.net/browse/NEWS-74)). Stories remain ingest/cluster **input**. This document still describes the **live story-desk** path (Accept / Track / Mute on `clusterId`) until claim Accept/Track ships ([NEWS-75](https://informedcrew.atlassian.net/browse/NEWS-75)). Honesty invariant for claims: status + evidence only — no Verified badges ([CLAIMS_DISCERNMENT.md](CLAIMS_DISCERNMENT.md)).
+Product next is the **claims / evidence** desk ([NEWS-69](https://informedcrew.atlassian.net/browse/NEWS-69)): Brief will lead with **accepted claims** plus **linked story clusters** for context ([NEWS-76](https://informedcrew.atlassian.net/browse/NEWS-76)); Radar is the **claim inbox** on `/radar` ([NEWS-74](https://informedcrew.atlassian.net/browse/NEWS-74)). Claim **Accept / Track / ack** on `claimId` ship on `/radar` ([NEWS-75](https://informedcrew.atlassian.net/browse/NEWS-75)); this document covers the **live story-desk** path on `/` (Accept / Track / Mute on `clusterId`) plus claim desk stores/APIs that feed Radar. Honesty invariant for claims: status + evidence only — Accept ≠ truth; no Verified badges ([CLAIMS_DISCERNMENT.md](CLAIMS_DISCERNMENT.md)).
 
-**Store foundation ([NEWS-70](https://informedcrew.atlassian.net/browse/NEWS-70)):** Claim/evidence JSON stores + status derivation are landed in `mvp/server`; extract HTTP ships in NEWS-72; claim inbox UI + `GET /api/claims/radar` ship in NEWS-74 — claim accept/track HTTP remains NEWS-75+.
+**Store foundation ([NEWS-70](https://informedcrew.atlassian.net/browse/NEWS-70)):** Claim/evidence JSON stores + status derivation are landed in `mvp/server`; extract HTTP ships in NEWS-72; claim inbox UI + `GET /api/claims/radar` ship in NEWS-74; claim accept/track HTTP ships in NEWS-75.
 
 **Judgment spine ([NEWS-71](https://informedcrew.atlassian.net/browse/NEWS-71)):** TypeSafe client + claim question library + confidence gates are landed in `mvp/server`. **Extract ([NEWS-72](https://informedcrew.atlassian.net/browse/NEWS-72)):** `POST /api/claims/extract` ships Ollama propose + TypeSafe judge batch (session-gated); claim status stays **code-derived** ([NEWS-70](https://informedcrew.atlassian.net/browse/NEWS-70)).
 
@@ -59,7 +59,28 @@ Cluster keys match Accept and Radar: real `clusterId`, or `solo:{articleId}` whe
 
 **Alert path (`pendingUpdate` — NEWS-61):** After successful `POST /api/fetch`, `syncTrackedAfterFetch` compares each entry’s member count (articles whose `briefClusterKey` equals the tracked `clusterId`) to `memberCountSnapshot`. When count grows → `pendingUpdate: true` (snapshot is **not** bumped until ack/view). A new Track sets snapshot to the current count and `pendingUpdate: false`. To clear an update, Kite calls `POST /api/brief/tracked/ack` (body `{ clusterId }`) which sets `pendingUpdate: false` and bumps `memberCountSnapshot` to the current member count. UI: Radar **Tracked** rows show an **Update** dot + **Dismiss**, and the Brief footer **Radar** link shows a small dot/count when any tracked entry is pending.
 
-**Radar:** Tracked section on `/radar` lists watched clusters; Track / Untrack beside Accept. If a tracked cluster is Accepted, primary action opens Brief `/` (expand lives there). See [ROUTE_MAP.md](ROUTE_MAP.md).
+**Radar:** Tracked stories section on `/radar` lists watched clusters; Track / Untrack beside Accept. If a tracked cluster is Accepted, primary action opens Brief `/` (expand lives there). See [ROUTE_MAP.md](ROUTE_MAP.md).
+
+### Claim membership and tracking (NEWS-75)
+
+Claim desk verbs mirror the story desk on **`claimId`** (not `clusterId`). Operators act on claim cards and the **Tracked claims** section on `/radar`; Brief hybrid UI for accepted claims is [NEWS-76](https://informedcrew.atlassian.net/browse/NEWS-76).
+
+| Action | Store | Effect |
+|--------|-------|--------|
+| **Accept** (`POST /api/claims/accept`) | `mvp/data/claim-membership.json` | Marks claim accepted (Brief eligibility when NEWS-76 lands). |
+| **Track** (`POST /api/claims/track`) | `mvp/data/tracked-claims.json` | Operator watches for **new evidence / stance changes**; does **not** Accept by itself. |
+
+**Track ≠ Accept.** **Untrack** (`POST /api/claims/untrack`) ≠ **Unaccept**; **Unaccept** (`POST /api/claims/unaccept`) ≠ **Untrack** (same mirror as story desk).
+
+**Default Track on Accept:** `POST /api/claims/accept` calls `trackClaim` after `acceptClaim` (idempotent). Explicit Untrack is still allowed afterward.
+
+**Alert path (`pendingUpdate`):** New evidence links or stance changes call `markTrackedClaimPending` in `evidenceLinkStore`. Tracked claim rows on Radar show an **Update** dot + **Dismiss**; ack via `POST /api/claims/tracked/ack` (body `{ claimId }`) clears `pendingUpdate`. Footer badge sums pending claim + story tracked entries.
+
+**Accept / track validation:** Accept, track, and ack return `404` when `claimId` is missing from the claims store. Unaccept and untrack of unknown ids remain idempotent success.
+
+**Mute:** Claims use the **same** global mute rules as stories (`mute-rules.json`, `/api/brief/mutes`). `claimMatchesMute` hides muted claims from the main claim inbox (`hiddenMutedCount`); there is no per-claimId mute store in v1.
+
+See [MVP_API_COMPAT.md](MVP_API_COMPAT.md) and [ROUTE_MAP.md](ROUTE_MAP.md).
 
 ### Global mute (NEWS-60)
 
@@ -76,7 +97,7 @@ Cluster keys match Accept and Radar: real `clusterId`, or `solo:{articleId}` whe
 
 **Brief:** `filterArticlesForBrief` / owned resolve path skips muted clusters even if Accepted or manual seed.
 
-**Radar:** Muted clusters are omitted from the main headline list. Response includes `hiddenMutedCount` (total muted clusters, including tracked). **Tracked override:** muted clusters that are still tracked appear in the Radar **Tracked** section with a muted indicator; alerts / `pendingUpdate` are not cleared by mute alone.
+**Radar:** Muted story clusters are omitted from the main headline list; muted **claims** are omitted from the claim inbox ([NEWS-75](https://informedcrew.atlassian.net/browse/NEWS-75)). Response includes `hiddenMutedCount` (total muted items in that lane). **Tracked override (stories):** muted clusters that are still tracked appear in the Radar **Tracked stories** section with a muted indicator; alerts / `pendingUpdate` are not cleared by mute alone.
 
 Session CRUD: `GET /api/brief/mutes`, `POST /api/brief/mutes` `{ keyword, source? }`, `DELETE /api/brief/mutes/:id`. `GET /api/brief/tracked` adds `muted: boolean` per entry. See [MVP_API_COMPAT.md](MVP_API_COMPAT.md).
 
