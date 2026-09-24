@@ -17,8 +17,8 @@ Claims spine plan: [`.cursor/plans/claims_evidence_spine_8f4cde15.plan.md`](../.
 | 1c | [NEWS-72](https://informedcrew.atlassian.net/browse/NEWS-72) | Ollama propose candidates + TypeSafe judge extract pipeline — **Done** |
 | 1d | [NEWS-73](https://informedcrew.atlassian.net/browse/NEWS-73) | Primary vs sensor source tiers + conflict primary starter set — **Done** |
 | 1e | [NEWS-74](https://informedcrew.atlassian.net/browse/NEWS-74) | Claim Radar API + Kite claim inbox UI — **Done** |
-| **1f** | [NEWS-75](https://informedcrew.atlassian.net/browse/NEWS-75) | **Accept / Track / Mute / badge on claimId** *(next)* |
-| 1g | [NEWS-76](https://informedcrew.atlassian.net/browse/NEWS-76) | Brief hybrid: accepted claims + linked clusters + Ollama verbiage |
+| 1f | [NEWS-75](https://informedcrew.atlassian.net/browse/NEWS-75) | Accept / Track / Mute / badge on claimId — **Done** |
+| **1g** | [NEWS-76](https://informedcrew.atlassian.net/browse/NEWS-76) | **Brief hybrid: accepted claims + linked clusters + Ollama verbiage** *(next)* |
 | 1h | [NEWS-77](https://informedcrew.atlassian.net/browse/NEWS-77) | Docs + ROADMAP pointer *(this file)* |
 
 **Product direction:** re-center on **claims + evidence** for conflict/geopolitics; **stories demote to input**. TypeSafe / Jev = structured judgments; Ollama = candidate proposal + Brief verbiage only. Hybrid UI: Radar = claim inbox; Brief = accepted claims + linked story clusters. Honesty: **status + evidence**, no Verified badges / claim verdicts. Discernment: [CLAIMS_DISCERNMENT.md](CLAIMS_DISCERNMENT.md).
