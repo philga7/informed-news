@@ -9,20 +9,6 @@ export const SCORE_CONFIDENCE_FLOOR = 0.6;
 const ASSERTABLE_UNCERTAIN_MIN_EXCLUSIVE = 0.4;
 const ASSERTABLE_UNCERTAIN_MAX_EXCLUSIVE = 0.6;
 
-const CLAIM_TYPES: readonly ClaimType[] = [
-  'event_occurrence',
-  'attribution',
-  'casualty_or_count',
-  'official_statement',
-  'territorial_or_control',
-];
-
-const EVIDENCE_STANCES: readonly EvidenceStance[] = [
-  'supports',
-  'contradicts',
-  'mentions',
-];
-
 const SOURCE_UTILITY_RUBRIC = [
   'Sensor reprint / low novelty',
   'Useful sensor detail',
