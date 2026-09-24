@@ -11,6 +11,7 @@ import {
   classifyUnclassifiedArticles,
   createKiteBriefRouter,
   createManualSeed,
+  enrichAcceptedClaims,
   enrichUnenrichedClusters,
   extractClaimsFromArticles,
   fetchAllSources,
@@ -69,6 +70,7 @@ export type CreateAppDeps = {
   classifyArticleById?: typeof classifyArticleById;
   extractClaimsFromArticles?: typeof extractClaimsFromArticles;
   enrichUnenrichedClusters?: typeof enrichUnenrichedClusters;
+  enrichAcceptedClaims?: typeof enrichAcceptedClaims;
   readMuteRules?: typeof readMuteRules;
   addMuteRule?: typeof addMuteRule;
   removeMuteRule?: typeof removeMuteRule;
@@ -99,6 +101,38 @@ function parseClaimId(body: unknown): string | null {
   }
   const trimmed = raw.trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+function parseClaimIds(raw: unknown): string[] | undefined {
+  if (Array.isArray(raw)) {
+    const claimIds = raw
+      .filter((value): value is string => typeof value === 'string')
+      .map((value) => value.trim())
+      .filter(Boolean);
+    return claimIds.length > 0 ? claimIds : undefined;
+  }
+
+  if (typeof raw === 'string' && raw.trim()) {
+    const claimIds = raw
+      .split(',')
+      .map((value) => value.trim())
+      .filter(Boolean);
+    return claimIds.length > 0 ? claimIds : undefined;
+  }
+
+  return undefined;
+}
+
+function parseBooleanLike(raw: unknown): boolean | undefined {
+  return raw === undefined || raw === ''
+    ? undefined
+    : typeof raw === 'boolean'
+      ? raw
+      : typeof raw === 'number'
+        ? raw !== 0
+        : typeof raw === 'string'
+          ? ['1', 'true', 'yes', 'on'].includes(raw.trim().toLowerCase())
+          : undefined;
 }
 
 function countMembersForClusterId(
@@ -147,6 +181,7 @@ export function createApp(deps: CreateAppDeps = {}): Express {
   const classifyOne = deps.classifyArticleById ?? classifyArticleById;
   const extractClaims = deps.extractClaimsFromArticles ?? extractClaimsFromArticles;
   const enrich = deps.enrichUnenrichedClusters ?? enrichUnenrichedClusters;
+  const enrichClaims = deps.enrichAcceptedClaims ?? enrichAcceptedClaims;
   const loadRadarClaims = deps.loadClaimsRadar ?? loadClaimsRadar;
   const readClaimMember = deps.readClaimMembership ?? readClaimMembership;
   const acceptOneClaim = deps.acceptClaim ?? acceptClaim;
@@ -773,24 +808,10 @@ export function createApp(deps: CreateAppDeps = {}): Express {
         limitRaw !== undefined && limitRaw !== '' ? Number(limitRaw) : undefined;
 
       const forceRaw = req.body?.force ?? req.query.force;
-      const force =
-        forceRaw === undefined || forceRaw === ''
-          ? undefined
-          : typeof forceRaw === 'boolean'
-            ? forceRaw
-            : typeof forceRaw === 'number'
-              ? forceRaw !== 0
-              : typeof forceRaw === 'string'
-                ? ['1', 'true', 'yes', 'on'].includes(forceRaw.trim().toLowerCase())
-                : undefined;
+      const force = parseBooleanLike(forceRaw);
 
       const articleIdsRaw = req.body?.articleIds ?? req.query.articleIds;
-      let articleIds: string[] | undefined;
-      if (Array.isArray(articleIdsRaw)) {
-        articleIds = articleIdsRaw.filter((id): id is string => typeof id === 'string');
-      } else if (typeof articleIdsRaw === 'string' && articleIdsRaw.trim()) {
-        articleIds = articleIdsRaw.split(',').map((s) => s.trim()).filter(Boolean);
-      }
+      const articleIds = parseClaimIds(articleIdsRaw);
 
       const result = await extractClaims({ limit, force, articleIds });
       res.json({
@@ -825,16 +846,7 @@ export function createApp(deps: CreateAppDeps = {}): Express {
         limitRaw !== undefined && limitRaw !== '' ? Number(limitRaw) : undefined;
 
       const forceRaw = req.body?.force ?? req.query.force;
-      const force =
-        forceRaw === undefined || forceRaw === ''
-          ? undefined
-          : typeof forceRaw === 'boolean'
-            ? forceRaw
-            : typeof forceRaw === 'number'
-              ? forceRaw !== 0
-              : typeof forceRaw === 'string'
-                ? ['1', 'true', 'yes', 'on'].includes(forceRaw.trim().toLowerCase())
-                : undefined;
+      const force = parseBooleanLike(forceRaw);
 
       const result = await enrich({ limit, force });
       res.json({
@@ -848,6 +860,33 @@ export function createApp(deps: CreateAppDeps = {}): Express {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.error('Batch enrich failed:', message);
+      res.status(500).json({ ok: false, error: message });
+    }
+  });
+
+  /**
+   * Enrich accepted claims with AI-assisted verbiage.
+   * Optional body/query: { claimIds?: string[], force?: boolean }
+   */
+  app.post('/api/claims/enrich', async (req, res) => {
+    try {
+      const forceRaw = req.body?.force ?? req.query.force;
+      const force = parseBooleanLike(forceRaw);
+      const claimIdsRaw = req.body?.claimIds ?? req.query.claimIds;
+      const claimIds = parseClaimIds(claimIdsRaw);
+
+      const result = await enrichClaims({ claimIds, force });
+      res.json({
+        ok: true,
+        attempted: result.attempted,
+        succeeded: result.succeeded,
+        failed: result.failed,
+        claimIds: result.claimIds,
+        skippedClaimIds: result.skippedClaimIds,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('Claim enrich failed:', message);
       res.status(500).json({ ok: false, error: message });
     }
   });

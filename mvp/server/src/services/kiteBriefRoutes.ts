@@ -2,7 +2,11 @@ import { Router } from 'express';
 import {
   readArticles,
   readBriefMembership,
+  readClaimEnrichments,
+  readClaimMembership,
+  readClaims,
   readClusterEnrichments,
+  readEvidenceLinks,
   readMuteRules,
 } from '../store/index.js';
 import {
@@ -13,12 +17,20 @@ import {
   ownedBriefFixtureEnrichments,
   resolveOwnedBriefArticles,
 } from './kiteBriefAdapter.js';
+import { loadBriefClaims } from './briefClaims.js';
+
+export type CreateKiteBriefRouterDeps = {
+  loadBriefClaims?: typeof loadBriefClaims;
+};
 
 /**
  * Public Kite-shaped brief endpoints (no session).
  * Proxied from apps/kite via KITE_API_BASE → this server's /api.
  */
-export function createKiteBriefRouter(): Router {
+export function createKiteBriefRouter(
+  deps: CreateKiteBriefRouterDeps = {},
+): Router {
+  const loadClaims = deps.loadBriefClaims ?? loadBriefClaims;
   const router = Router();
 
   async function loadArticles() {
@@ -101,6 +113,29 @@ export function createKiteBriefRouter(): Router {
       }
       const { articles } = await loadArticles();
       res.json(buildOwnedCategoriesResponse(articles));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      res.status(500).json({ error: message });
+    }
+  });
+
+  router.get('/batches/:batchId/claims', async (req, res) => {
+    try {
+      const batchId = req.params.batchId;
+      if (batchId !== OWNED_BATCH_ID && batchId !== 'latest') {
+        res.status(404).json({ error: 'Batch not found' });
+        return;
+      }
+
+      const body = await loadClaims({
+        readClaims,
+        readEvidenceLinks,
+        readArticles,
+        readMuteRules,
+        readClaimMembership,
+        readClaimEnrichments,
+      });
+      res.json({ ok: true, claims: body.claims });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       res.status(500).json({ error: message });

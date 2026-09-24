@@ -56,6 +56,7 @@ export {
   ARTICLES_PATH,
   BRIEF_MEMBERSHIP_PATH,
   CLAIM_EXTRACT_PROCESSED_PATH,
+  CLAIM_ENRICHMENTS_PATH,
   CLAIM_MEMBERSHIP_PATH,
   CLAIM_REVIEW_QUEUE_PATH,
   CLAIMS_PATH,
@@ -67,6 +68,13 @@ export {
   TRACKED_CLAIMS_PATH,
   TRACKED_STORIES_PATH,
 } from './paths.js';
+export {
+  getClaimEnrichment,
+  readClaimEnrichments,
+  upsertClaimEnrichment,
+  writeClaimEnrichments,
+} from './claimEnrichmentStore.js';
+
 export {
   getClusterEnrichment,
   readClusterEnrichments,
