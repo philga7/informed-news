@@ -47,6 +47,9 @@ export const RADAR_ACCEPT_PENDING = 'Saving…';
 export const RADAR_ACCEPT_ERROR =
 	'Could not update Brief membership. Try again.';
 
+export const RADAR_CLAIMS_ACCEPT_ERROR =
+	'Could not update claim membership. Try again.';
+
 export const RADAR_TRACKED_SECTION_TITLE = 'Tracked';
 
 export const RADAR_TRACKED_SECTION_HELP =
@@ -61,6 +64,14 @@ export const RADAR_TRACKED_DISMISS_PENDING = 'Dismissing…';
 export const RADAR_TRACKED_ACK_ERROR =
 	'Could not clear tracked update. Try again.';
 
+export const RADAR_CLAIMS_TRACKED_SECTION_TITLE = 'Tracked claims';
+
+export const RADAR_CLAIMS_TRACKED_SECTION_HELP =
+	'Claims you are watching for new evidence or stance changes. Tracking does not Accept a claim onto the Brief.';
+
+export const RADAR_CLAIMS_TRACKED_ACK_ERROR =
+	'Could not clear tracked claim update. Try again.';
+
 export const RADAR_TRACK_LABEL = 'Track';
 
 export const RADAR_UNTRACK_LABEL = 'Untrack';
@@ -69,6 +80,9 @@ export const RADAR_TRACK_PENDING = 'Saving…';
 
 export const RADAR_TRACK_ERROR =
 	'Could not update tracked stories. Try again.';
+
+export const RADAR_CLAIMS_TRACK_ERROR =
+	'Could not update tracked claims. Try again.';
 
 export const RADAR_HIDDEN_MUTED_PREFIX = 'Hidden';
 

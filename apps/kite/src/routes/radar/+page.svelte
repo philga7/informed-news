@@ -8,10 +8,15 @@
 		RADAR_ACCEPT_PENDING,
 		RADAR_CLAIMS_EMPTY_COPY,
 		RADAR_CLAIMS_HIDE_HEADLINES,
+		RADAR_CLAIMS_ACCEPT_ERROR,
 		RADAR_CLAIMS_LINKED_HEADLINES_LABEL,
 		RADAR_CLAIMS_LOAD_ERROR,
 		RADAR_CLAIMS_NEEDS_REVIEW_TITLE,
 		RADAR_CLAIMS_SECTION_TITLE,
+		RADAR_CLAIMS_TRACK_ERROR,
+		RADAR_CLAIMS_TRACKED_ACK_ERROR,
+		RADAR_CLAIMS_TRACKED_SECTION_HELP,
+		RADAR_CLAIMS_TRACKED_SECTION_TITLE,
 		RADAR_CLAIMS_SHOW_HEADLINES,
 		RADAR_EMPTY_COPY,
 		RADAR_ERROR_GENERIC,
@@ -78,6 +83,9 @@
 		linkedHeadlines: ClaimRadarLinkedHeadline[];
 		needsReview: boolean;
 		reviewReasons: string[];
+		accepted: boolean;
+		tracked: boolean;
+		pendingUpdate: boolean;
 	};
 
 	type ClaimsRadarResponse =
@@ -131,6 +139,12 @@
 		muted?: boolean;
 	};
 
+	type TrackedClaimEntry = {
+		claimId: string;
+		trackedAt: string;
+		pendingUpdate: boolean;
+	};
+
 	type RadarResponse =
 		| {
 				ok: true;
@@ -165,12 +179,24 @@
 				error: string;
 		  };
 
+	type TrackedClaimsResponse =
+		| {
+				ok: true;
+				entries: TrackedClaimEntry[];
+				updatedAt: string | null;
+		  }
+		| {
+				ok: false;
+				error: string;
+		  };
+
 	let loading = true;
 	let unauthenticated = false;
 	let needsReviewClaims: ClaimRadarItem[] = [];
 	let claims: ClaimRadarItem[] = [];
 	let clusters: RadarCluster[] = [];
 	let trackedEntries: TrackedEntry[] = [];
+	let trackedClaimEntries: TrackedClaimEntry[] = [];
 	let hiddenMutedCount = 0;
 	let meta: RadarMeta | null = null;
 	let claimsError: string | null = null;
@@ -182,9 +208,15 @@
 	let pendingClusterId: string | null = null;
 	let pendingTrackClusterId: string | null = null;
 	let pendingAckClusterId: string | null = null;
+	let pendingClaimId: string | null = null;
+	let pendingTrackClaimId: string | null = null;
+	let pendingAckClaimId: string | null = null;
 	let acceptError: string | null = null;
 	let trackError: string | null = null;
 	let ackError: string | null = null;
+	let claimAcceptError: string | null = null;
+	let claimTrackError: string | null = null;
+	let claimAckError: string | null = null;
 
 	let muteRules: MuteRule[] = [];
 	let muteLoadError: string | null = null;
@@ -207,6 +239,28 @@
 			if (resolved) return { kind: 'resolved', entry, cluster: resolved };
 			return { kind: 'stub', entry };
 		});
+	}
+
+	function trackedClaimRows(): Array<
+		| { kind: 'resolved'; entry: TrackedClaimEntry; claim: ClaimRadarItem }
+		| { kind: 'stub'; entry: TrackedClaimEntry }
+	> {
+		const byClaimId = new Map<string, ClaimRadarItem>(
+			[...needsReviewClaims, ...claims].map((c) => [c.claimId, c]),
+		);
+		const entries = [...trackedClaimEntries].sort((a, b) => b.trackedAt.localeCompare(a.trackedAt));
+		return entries.map((entry) => {
+			const resolved = byClaimId.get(entry.claimId);
+			if (resolved) return { kind: 'resolved', entry, claim: resolved };
+			return { kind: 'stub', entry };
+		});
+	}
+
+	function updateClaim(claimId: string, updater: (claim: ClaimRadarItem) => ClaimRadarItem): void {
+		needsReviewClaims = needsReviewClaims.map((claim) =>
+			claim.claimId === claimId ? updater(claim) : claim,
+		);
+		claims = claims.map((claim) => (claim.claimId === claimId ? updater(claim) : claim));
 	}
 
 	function formatDateTime(value: string | null): string {
@@ -254,14 +308,19 @@
 		acceptError = null;
 		trackError = null;
 		ackError = null;
+		claimAcceptError = null;
+		claimTrackError = null;
+		claimAckError = null;
 		muteLoadError = null;
 		muteActionError = null;
 
 		try {
-			const [claimsResponse, radarResponse, trackedResponse, mutesResponse] = await Promise.all([
+			const [claimsResponse, radarResponse, trackedResponse, trackedClaimsResponse, mutesResponse] =
+				await Promise.all([
 				fetch('/api/claims/radar', { credentials: 'include' }),
 				fetch('/api/radar', { credentials: 'include' }),
 				fetch('/api/brief/tracked', { credentials: 'include' }),
+				fetch('/api/claims/tracked', { credentials: 'include' }),
 				fetch('/api/brief/mutes', { credentials: 'include' }),
 			]);
 
@@ -269,6 +328,7 @@
 				claimsResponse.status === 401 ||
 				radarResponse.status === 401 ||
 				trackedResponse.status === 401 ||
+				trackedClaimsResponse.status === 401 ||
 				mutesResponse.status === 401
 			) {
 				unauthenticated = true;
@@ -276,6 +336,7 @@
 				claims = [];
 				clusters = [];
 				trackedEntries = [];
+				trackedClaimEntries = [];
 				muteRules = [];
 				hiddenMutedCount = 0;
 				meta = null;
@@ -364,6 +425,28 @@
 						RADAR_TRACK_ERROR;
 				}
 			}
+
+			if (!trackedClaimsResponse.ok) {
+				trackedClaimEntries = [];
+				const tracked = (await trackedClaimsResponse.json().catch(() => null)) as
+					| TrackedClaimsResponse
+					| null;
+				claimTrackError =
+					(tracked && !tracked.ok && tracked.error) ||
+					RADAR_CLAIMS_TRACK_ERROR;
+			} else {
+				const tracked = (await trackedClaimsResponse.json().catch(() => null)) as
+					| TrackedClaimsResponse
+					| null;
+				if (tracked && tracked.ok) {
+					trackedClaimEntries = tracked.entries;
+				} else {
+					trackedClaimEntries = [];
+					claimTrackError =
+						(tracked && !tracked.ok && tracked.error) ||
+						RADAR_CLAIMS_TRACK_ERROR;
+				}
+			}
 		} catch (err) {
 			console.error('Error loading radar', err);
 			claimsError = RADAR_NETWORK_ERROR;
@@ -393,6 +476,7 @@
 				claims = [];
 				clusters = [];
 				trackedEntries = [];
+				trackedClaimEntries = [];
 				muteRules = [];
 				hiddenMutedCount = 0;
 				meta = null;
@@ -465,6 +549,7 @@
 				claims = [];
 				clusters = [];
 				trackedEntries = [];
+				trackedClaimEntries = [];
 				muteRules = [];
 				hiddenMutedCount = 0;
 				meta = null;
@@ -511,6 +596,7 @@
 				claims = [];
 				clusters = [];
 				trackedEntries = [];
+				trackedClaimEntries = [];
 				muteRules = [];
 				hiddenMutedCount = 0;
 				meta = null;
@@ -594,6 +680,7 @@
 			claims = [];
 			clusters = [];
 			trackedEntries = [];
+			trackedClaimEntries = [];
 			muteRules = [];
 			hiddenMutedCount = 0;
 			meta = null;
@@ -602,11 +689,17 @@
 			acceptError = null;
 			trackError = null;
 			ackError = null;
+			claimAcceptError = null;
+			claimTrackError = null;
+			claimAckError = null;
 			muteLoadError = null;
 			muteActionError = null;
 			pendingClusterId = null;
 			pendingTrackClusterId = null;
 			pendingAckClusterId = null;
+			pendingClaimId = null;
+			pendingTrackClaimId = null;
+			pendingAckClaimId = null;
 			unauthenticated = true;
 		}
 	}
@@ -652,6 +745,7 @@
 				claims = [];
 				clusters = [];
 				trackedEntries = [];
+				trackedClaimEntries = [];
 				muteRules = [];
 				hiddenMutedCount = 0;
 				meta = null;
@@ -713,6 +807,7 @@
 				claims = [];
 				clusters = [];
 				trackedEntries = [];
+				trackedClaimEntries = [];
 				muteRules = [];
 				hiddenMutedCount = 0;
 				meta = null;
@@ -742,6 +837,200 @@
 			trackError = RADAR_NETWORK_ERROR;
 		} finally {
 			pendingTrackClusterId = null;
+		}
+	}
+
+	async function ackTrackedClaimUpdate(claimId: string): Promise<boolean> {
+		if (pendingAckClaimId || loading) return false;
+
+		const resolvedClaim =
+			needsReviewClaims.find((c) => c.claimId === claimId) ||
+			claims.find((c) => c.claimId === claimId) ||
+			null;
+		const previousClaimPending = resolvedClaim?.pendingUpdate ?? false;
+		const previousEntryPending =
+			trackedClaimEntries.find((e) => e.claimId === claimId)?.pendingUpdate ?? false;
+
+		pendingAckClaimId = claimId;
+		claimAckError = null;
+
+		updateClaim(claimId, (claim) => ({ ...claim, pendingUpdate: false }));
+		trackedClaimEntries = trackedClaimEntries.map((entry) =>
+			entry.claimId === claimId ? { ...entry, pendingUpdate: false } : entry,
+		);
+
+		try {
+			const response = await fetch('/api/claims/tracked/ack', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				credentials: 'include',
+				body: JSON.stringify({ claimId }),
+			});
+
+			if (response.status === 401) {
+				unauthenticated = true;
+				needsReviewClaims = [];
+				claims = [];
+				clusters = [];
+				trackedEntries = [];
+				trackedClaimEntries = [];
+				muteRules = [];
+				hiddenMutedCount = 0;
+				meta = null;
+				claimsError = null;
+				clustersError = null;
+				return false;
+			}
+
+			const body = (await response.json().catch(() => null)) as
+				| { ok?: boolean; error?: string; entries?: TrackedClaimEntry[] }
+				| null;
+
+			if (!response.ok || (body && body.ok === false)) {
+				updateClaim(claimId, (claim) => ({ ...claim, pendingUpdate: previousClaimPending }));
+				trackedClaimEntries = trackedClaimEntries.map((entry) =>
+					entry.claimId === claimId ? { ...entry, pendingUpdate: previousEntryPending } : entry,
+				);
+				claimAckError = (body && body.error) || RADAR_CLAIMS_TRACKED_ACK_ERROR;
+				return false;
+			}
+
+			if (body && Array.isArray(body.entries)) {
+				trackedClaimEntries = body.entries;
+			} else {
+				await loadRadar();
+			}
+
+			return true;
+		} catch (err) {
+			console.error('Error acknowledging tracked claim update', err);
+			updateClaim(claimId, (claim) => ({ ...claim, pendingUpdate: previousClaimPending }));
+			trackedClaimEntries = trackedClaimEntries.map((entry) =>
+				entry.claimId === claimId ? { ...entry, pendingUpdate: previousEntryPending } : entry,
+			);
+			claimAckError = RADAR_NETWORK_ERROR;
+			return false;
+		} finally {
+			pendingAckClaimId = null;
+		}
+	}
+
+	async function toggleClaimAccept(claim: ClaimRadarItem): Promise<void> {
+		if (pendingClaimId || loading) return;
+
+		const nextAccepted = !claim.accepted;
+		const previousAccepted = claim.accepted;
+		const previousTracked = claim.tracked;
+		const hadTrackedEntry = trackedClaimEntries.some((entry) => entry.claimId === claim.claimId);
+
+		claimAcceptError = null;
+		pendingClaimId = claim.claimId;
+
+		updateClaim(claim.claimId, (c) => ({
+			...c,
+			accepted: nextAccepted,
+			tracked: nextAccepted ? true : c.tracked,
+		}));
+
+		try {
+			const response = await fetch(nextAccepted ? '/api/claims/accept' : '/api/claims/unaccept', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				credentials: 'include',
+				body: JSON.stringify({ claimId: claim.claimId }),
+			});
+
+			if (response.status === 401) {
+				updateClaim(claim.claimId, (c) => ({ ...c, accepted: previousAccepted, tracked: previousTracked }));
+				unauthenticated = true;
+				needsReviewClaims = [];
+				claims = [];
+				clusters = [];
+				trackedEntries = [];
+				trackedClaimEntries = [];
+				muteRules = [];
+				hiddenMutedCount = 0;
+				meta = null;
+				claimsError = null;
+				clustersError = null;
+				return;
+			}
+
+			const body = (await response.json().catch(() => null)) as
+				| { ok?: boolean; error?: string; acceptedClaimIds?: string[] }
+				| null;
+
+			if (!response.ok || (body && body.ok === false)) {
+				updateClaim(claim.claimId, (c) => ({ ...c, accepted: previousAccepted, tracked: previousTracked }));
+				claimAcceptError = (body && body.error) || RADAR_CLAIMS_ACCEPT_ERROR;
+				return;
+			}
+
+			if (nextAccepted && !hadTrackedEntry) {
+				await loadRadar();
+			}
+		} catch (err) {
+			console.error('Error toggling claim membership', err);
+			updateClaim(claim.claimId, (c) => ({ ...c, accepted: previousAccepted, tracked: previousTracked }));
+			claimAcceptError = RADAR_NETWORK_ERROR;
+		} finally {
+			pendingClaimId = null;
+		}
+	}
+
+	async function toggleClaimTrack(claimId: string, currentlyTracked: boolean): Promise<void> {
+		if (pendingTrackClaimId || loading) return;
+		const previousTracked = currentlyTracked;
+		const nextTracked = !currentlyTracked;
+		claimTrackError = null;
+		pendingTrackClaimId = claimId;
+		updateClaim(claimId, (claim) => ({ ...claim, tracked: nextTracked }));
+
+		try {
+			const response = await fetch(nextTracked ? '/api/claims/track' : '/api/claims/untrack', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				credentials: 'include',
+				body: JSON.stringify({ claimId }),
+			});
+
+			if (response.status === 401) {
+				updateClaim(claimId, (claim) => ({ ...claim, tracked: previousTracked }));
+				unauthenticated = true;
+				needsReviewClaims = [];
+				claims = [];
+				clusters = [];
+				trackedEntries = [];
+				trackedClaimEntries = [];
+				muteRules = [];
+				hiddenMutedCount = 0;
+				meta = null;
+				claimsError = null;
+				clustersError = null;
+				return;
+			}
+
+			const body = (await response.json().catch(() => null)) as
+				| { ok?: boolean; error?: string; entries?: TrackedClaimEntry[] }
+				| null;
+
+			if (!response.ok || (body && body.ok === false)) {
+				updateClaim(claimId, (claim) => ({ ...claim, tracked: previousTracked }));
+				claimTrackError = (body && body.error) || RADAR_CLAIMS_TRACK_ERROR;
+				return;
+			}
+
+			if (body && Array.isArray(body.entries)) {
+				trackedClaimEntries = body.entries;
+			} else {
+				await loadRadar();
+			}
+		} catch (err) {
+			console.error('Error toggling tracked claims', err);
+			updateClaim(claimId, (claim) => ({ ...claim, tracked: previousTracked }));
+			claimTrackError = RADAR_NETWORK_ERROR;
+		} finally {
+			pendingTrackClaimId = null;
 		}
 	}
 
@@ -823,15 +1112,33 @@
 				</p>
 			{/if}
 
+			{#if claimAcceptError}
+				<p class="mt-4 text-sm text-red-600 dark:text-red-400">
+					{claimAcceptError}
+				</p>
+			{/if}
+
 			{#if trackError}
 				<p class="mt-4 text-sm text-red-600 dark:text-red-400">
 					{trackError}
 				</p>
 			{/if}
 
+			{#if claimTrackError}
+				<p class="mt-4 text-sm text-red-600 dark:text-red-400">
+					{claimTrackError}
+				</p>
+			{/if}
+
 			{#if ackError}
 				<p class="mt-4 text-sm text-red-600 dark:text-red-400">
 					{ackError}
+				</p>
+			{/if}
+
+			{#if claimAckError}
+				<p class="mt-4 text-sm text-red-600 dark:text-red-400">
+					{claimAckError}
 				</p>
 			{/if}
 
@@ -884,17 +1191,65 @@
 										{/if}
 									</div>
 
-									{#if claim.linkedHeadlines.length > 0}
-										<button
-											type="button"
-											class="shrink-0 text-xs font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
-											aria-expanded={expandedClaimIds.has(claim.claimId)}
-											on:click={() => toggleClaimExpanded(claim.claimId)}
-										>
-											{expandedClaimIds.has(claim.claimId) ? RADAR_CLAIMS_HIDE_HEADLINES : RADAR_CLAIMS_SHOW_HEADLINES}
-											({claim.linkedHeadlines.length})
-										</button>
-									{/if}
+									<div class="shrink-0 flex flex-col items-end gap-2">
+										<div class="flex items-center gap-3">
+											{#if claim.pendingUpdate}
+												<button
+													type="button"
+													class="text-xs font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700 disabled:opacity-50 dark:text-blue-400 dark:hover:text-blue-300"
+													disabled={pendingAckClaimId !== null}
+													on:click={() => ackTrackedClaimUpdate(claim.claimId)}
+												>
+													{#if pendingAckClaimId === claim.claimId}
+														{RADAR_TRACKED_DISMISS_PENDING}
+													{:else}
+														{RADAR_TRACKED_DISMISS_LABEL}
+													{/if}
+												</button>
+											{/if}
+											<button
+												type="button"
+												class="text-xs font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700 disabled:opacity-50 dark:text-blue-400 dark:hover:text-blue-300"
+												disabled={pendingClaimId === claim.claimId}
+												aria-pressed={claim.accepted}
+												on:click={() => toggleClaimAccept(claim)}
+											>
+												{#if pendingClaimId === claim.claimId}
+													{RADAR_ACCEPT_PENDING}
+												{:else if claim.accepted}
+													{RADAR_UNACCEPT_LABEL}
+												{:else}
+													{RADAR_ACCEPT_LABEL}
+												{/if}
+											</button>
+											<button
+												type="button"
+												class="text-xs font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700 disabled:opacity-50 dark:text-blue-400 dark:hover:text-blue-300"
+												disabled={pendingTrackClaimId === claim.claimId}
+												aria-pressed={claim.tracked}
+												on:click={() => toggleClaimTrack(claim.claimId, claim.tracked)}
+											>
+												{#if pendingTrackClaimId === claim.claimId}
+													{RADAR_TRACK_PENDING}
+												{:else if claim.tracked}
+													{RADAR_UNTRACK_LABEL}
+												{:else}
+													{RADAR_TRACK_LABEL}
+												{/if}
+											</button>
+										</div>
+										{#if claim.linkedHeadlines.length > 0}
+											<button
+												type="button"
+												class="text-xs font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+												aria-expanded={expandedClaimIds.has(claim.claimId)}
+												on:click={() => toggleClaimExpanded(claim.claimId)}
+											>
+												{expandedClaimIds.has(claim.claimId) ? RADAR_CLAIMS_HIDE_HEADLINES : RADAR_CLAIMS_SHOW_HEADLINES}
+												({claim.linkedHeadlines.length})
+											</button>
+										{/if}
+									</div>
 								</div>
 
 								{#if expandedClaimIds.has(claim.claimId)}
@@ -977,17 +1332,65 @@
 										</div>
 									</div>
 
-									{#if claim.linkedHeadlines.length > 0}
-										<button
-											type="button"
-											class="shrink-0 text-xs font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
-											aria-expanded={expandedClaimIds.has(claim.claimId)}
-											on:click={() => toggleClaimExpanded(claim.claimId)}
-										>
-											{expandedClaimIds.has(claim.claimId) ? RADAR_CLAIMS_HIDE_HEADLINES : RADAR_CLAIMS_SHOW_HEADLINES}
-											({claim.linkedHeadlines.length})
-										</button>
-									{/if}
+									<div class="shrink-0 flex flex-col items-end gap-2">
+										<div class="flex items-center gap-3">
+											{#if claim.pendingUpdate}
+												<button
+													type="button"
+													class="text-xs font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700 disabled:opacity-50 dark:text-blue-400 dark:hover:text-blue-300"
+													disabled={pendingAckClaimId !== null}
+													on:click={() => ackTrackedClaimUpdate(claim.claimId)}
+												>
+													{#if pendingAckClaimId === claim.claimId}
+														{RADAR_TRACKED_DISMISS_PENDING}
+													{:else}
+														{RADAR_TRACKED_DISMISS_LABEL}
+													{/if}
+												</button>
+											{/if}
+											<button
+												type="button"
+												class="text-xs font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700 disabled:opacity-50 dark:text-blue-400 dark:hover:text-blue-300"
+												disabled={pendingClaimId === claim.claimId}
+												aria-pressed={claim.accepted}
+												on:click={() => toggleClaimAccept(claim)}
+											>
+												{#if pendingClaimId === claim.claimId}
+													{RADAR_ACCEPT_PENDING}
+												{:else if claim.accepted}
+													{RADAR_UNACCEPT_LABEL}
+												{:else}
+													{RADAR_ACCEPT_LABEL}
+												{/if}
+											</button>
+											<button
+												type="button"
+												class="text-xs font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700 disabled:opacity-50 dark:text-blue-400 dark:hover:text-blue-300"
+												disabled={pendingTrackClaimId === claim.claimId}
+												aria-pressed={claim.tracked}
+												on:click={() => toggleClaimTrack(claim.claimId, claim.tracked)}
+											>
+												{#if pendingTrackClaimId === claim.claimId}
+													{RADAR_TRACK_PENDING}
+												{:else if claim.tracked}
+													{RADAR_UNTRACK_LABEL}
+												{:else}
+													{RADAR_TRACK_LABEL}
+												{/if}
+											</button>
+										</div>
+										{#if claim.linkedHeadlines.length > 0}
+											<button
+												type="button"
+												class="text-xs font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+												aria-expanded={expandedClaimIds.has(claim.claimId)}
+												on:click={() => toggleClaimExpanded(claim.claimId)}
+											>
+												{expandedClaimIds.has(claim.claimId) ? RADAR_CLAIMS_HIDE_HEADLINES : RADAR_CLAIMS_SHOW_HEADLINES}
+												({claim.linkedHeadlines.length})
+											</button>
+										{/if}
+									</div>
 								</div>
 
 								{#if expandedClaimIds.has(claim.claimId)}
@@ -1030,6 +1433,105 @@
 					</ul>
 				{/if}
 			</section>
+
+			{#if trackedClaimEntries.length > 0}
+				<section class="mt-8 space-y-4" aria-label="Tracked claims">
+					<header class="space-y-1">
+						<h2 class="text-sm font-semibold tracking-tight text-gray-900 dark:text-gray-100">
+							{RADAR_CLAIMS_TRACKED_SECTION_TITLE}
+						</h2>
+						<p class="text-xs leading-relaxed text-gray-600 dark:text-gray-400">
+							{RADAR_CLAIMS_TRACKED_SECTION_HELP}
+						</p>
+					</header>
+
+					<ul class="space-y-3">
+						{#each trackedClaimRows() as row (row.entry.claimId)}
+							<li class="rounded-md border border-gray-200 bg-white/70 p-3 shadow-sm backdrop-blur dark:border-gray-700 dark:bg-gray-900/60">
+								<div class="flex items-start justify-between gap-3">
+									<div class="min-w-0">
+										{#if row.kind === 'resolved'}
+											<p class="text-sm font-medium text-gray-900 dark:text-gray-100">
+												{row.claim.text}
+											</p>
+											<div class="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-gray-500 dark:text-gray-400">
+												<span class="inline-flex items-center rounded-full border border-gray-300 px-2 py-0.5 text-[10px] tracking-wide dark:border-gray-600">
+													{humanizeLabel(row.claim.status)}
+												</span>
+												<span class="inline-flex items-center rounded-full border border-gray-300 px-2 py-0.5 text-[10px] tracking-wide dark:border-gray-600">
+													{humanizeLabel(row.claim.claimType)}
+												</span>
+												<span class="inline-flex items-center rounded-full border border-gray-300 px-2 py-0.5 text-[10px] tracking-wide dark:border-gray-600">
+													Evidence {row.claim.evidence.total} (S{row.claim.evidence.supports} C{row.claim.evidence.contradicts} M{row.claim.evidence.mentions})
+												</span>
+											</div>
+										{:else}
+											<p class="text-xs text-gray-500 dark:text-gray-400">
+												Claim:
+												<span class="font-mono text-[11px]">{row.entry.claimId}</span>
+											</p>
+										{/if}
+
+										{#if row.entry.pendingUpdate}
+											<p class="mt-1 inline-flex items-center gap-2 text-[11px] font-medium text-amber-700 dark:text-amber-300">
+												<span class="h-2 w-2 rounded-full bg-amber-500" aria-hidden="true"></span>
+												{RADAR_TRACKED_UPDATE_BADGE}
+											</p>
+										{/if}
+									</div>
+
+									<div class="shrink-0 flex items-center gap-3">
+										{#if row.entry.pendingUpdate}
+											<button
+												type="button"
+												class="text-xs font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700 disabled:opacity-50 dark:text-blue-400 dark:hover:text-blue-300"
+												disabled={pendingAckClaimId !== null}
+												on:click={() => ackTrackedClaimUpdate(row.entry.claimId)}
+											>
+												{#if pendingAckClaimId === row.entry.claimId}
+													{RADAR_TRACKED_DISMISS_PENDING}
+												{:else}
+													{RADAR_TRACKED_DISMISS_LABEL}
+												{/if}
+											</button>
+										{/if}
+										{#if row.kind === 'resolved'}
+											<button
+												type="button"
+												class="text-xs font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700 disabled:opacity-50 dark:text-blue-400 dark:hover:text-blue-300"
+												disabled={pendingClaimId === row.entry.claimId}
+												aria-pressed={row.claim.accepted}
+												on:click={() => toggleClaimAccept(row.claim)}
+											>
+												{#if pendingClaimId === row.entry.claimId}
+													{RADAR_ACCEPT_PENDING}
+												{:else if row.claim.accepted}
+													{RADAR_UNACCEPT_LABEL}
+												{:else}
+													{RADAR_ACCEPT_LABEL}
+												{/if}
+											</button>
+										{/if}
+										<button
+											type="button"
+											class="text-xs font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700 disabled:opacity-50 dark:text-blue-400 dark:hover:text-blue-300"
+											disabled={pendingTrackClaimId === row.entry.claimId}
+											aria-pressed={true}
+											on:click={() => toggleClaimTrack(row.entry.claimId, true)}
+										>
+											{#if pendingTrackClaimId === row.entry.claimId}
+												{RADAR_TRACK_PENDING}
+											{:else}
+												{RADAR_UNTRACK_LABEL}
+											{/if}
+										</button>
+									</div>
+								</div>
+							</li>
+						{/each}
+					</ul>
+				</section>
+			{/if}
 
 			{#if trackedEntries.length > 0}
 				<section class="mt-8 space-y-4" aria-label="Tracked clusters">
