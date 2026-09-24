@@ -2,15 +2,12 @@ import type {
   Claim,
   ClaimMembership,
   EvidenceLink,
-  EvidenceStance,
-  SourceTier,
   TrackedClaims,
   TrackedClaimEntry,
 } from '../types/claim.js';
 import type { Article } from '../types/article.js';
 import type { ClaimReviewQueueEntry } from '../store/claimReviewQueueStore.js';
 import type { MuteRulesStore } from '../store/muteRulesStore.js';
-import { articleIdFromCanonicalUrl } from '../store/articleId.js';
 import {
   readClaimMembership,
   readClaimReviewQueue,
@@ -21,18 +18,15 @@ import {
   readTrackedClaims,
 } from '../store/index.js';
 import { briefClusterKey } from './briefClusterKey.js';
+import {
+  buildClaimArticleLookup,
+  buildClaimLinkedHeadlines,
+  type ClaimLinkedHeadline,
+  resolveClaimLinkedArticles,
+} from './claimEvidenceJoin.js';
 import { claimMatchesMute } from './muteMatch.js';
 
-export type ClaimRadarLinkedHeadline = {
-  id: string;
-  title: string;
-  sourceKind: string;
-  publisherDomain: string | null;
-  publishedAt: string | null;
-  canonicalUrl: string;
-  sourceTier: SourceTier;
-  stance: EvidenceStance;
-};
+export type ClaimRadarLinkedHeadline = ClaimLinkedHeadline;
 
 export type ClaimRadarEvidenceCounts = {
   total: number;
@@ -106,27 +100,6 @@ function maxEvidenceConfidence(links: ReadonlyArray<EvidenceLink>): number | nul
   return Number.isFinite(max) ? max : null;
 }
 
-function newestKey(article: Pick<Article, 'publishedAt' | 'fetchedAt'>): string {
-  return article.publishedAt || article.fetchedAt || '';
-}
-
-function resolveArticle(
-  link: Pick<EvidenceLink, 'articleId' | 'url'>,
-  byId: ReadonlyMap<string, Article>,
-  byCanonicalUrl: ReadonlyMap<string, Article>,
-): Article | null {
-  if (link.articleId) {
-    return byId.get(link.articleId) ?? null;
-  }
-  if (!link.url) return null;
-
-  const byUrl = byCanonicalUrl.get(link.url);
-  if (byUrl) return byUrl;
-
-  const derived = articleIdFromCanonicalUrl(link.url);
-  return byId.get(derived) ?? null;
-}
-
 function newestQueueReasonsForClaim(
   claimId: string,
   reviewQueue: ReadonlyArray<ClaimReviewQueueEntry>,
@@ -164,8 +137,7 @@ export function buildClaimsRadarFeed(
     evidenceByClaimId.set(link.claimId, list);
   }
 
-  const articleById = new Map(articles.map((a) => [a.id, a] as const));
-  const articleByCanonicalUrl = new Map(articles.map((a) => [a.canonicalUrl, a] as const));
+  const articleLookup = buildClaimArticleLookup(articles);
 
   const queuedClaimIds = new Set(reviewQueue.map((entry) => entry.claimId));
   const acceptedClaimIds = new Set(membership.acceptedClaimIds);
@@ -181,12 +153,7 @@ export function buildClaimsRadarFeed(
 
   for (const claim of claims) {
     const links = evidenceByClaimId.get(claim.id) ?? [];
-
-    const linkedArticles: Article[] = [];
-    for (const link of links) {
-      const resolved = resolveArticle(link, articleById, articleByCanonicalUrl);
-      if (resolved) linkedArticles.push(resolved);
-    }
+    const linkedArticles = resolveClaimLinkedArticles(links, articleLookup);
 
     if (claimMatchesMute(claim, linkedArticles, muteRules.rules)) {
       hiddenMutedCount += 1;
@@ -197,37 +164,7 @@ export function buildClaimsRadarFeed(
       new Set(linkedArticles.map((article) => briefClusterKey(article))),
     ).sort((a, b) => a.localeCompare(b));
 
-    const newestLinkByArticleIdOrUrl = new Map<string, EvidenceLink>();
-    for (const link of links) {
-      const key = link.articleId ?? link.url ?? '';
-      if (!key) continue;
-      const existing = newestLinkByArticleIdOrUrl.get(key);
-      if (!existing || link.createdAt.localeCompare(existing.createdAt) > 0) {
-        newestLinkByArticleIdOrUrl.set(key, link);
-      }
-    }
-
-    const headlineCandidates: Array<ClaimRadarLinkedHeadline & { sortKey: string }> = [];
-    for (const link of newestLinkByArticleIdOrUrl.values()) {
-      const resolved = resolveArticle(link, articleById, articleByCanonicalUrl);
-      if (!resolved) continue;
-      headlineCandidates.push({
-        id: resolved.id,
-        title: resolved.title,
-        sourceKind: resolved.sourceKind,
-        publisherDomain: resolved.publisherDomain,
-        publishedAt: resolved.publishedAt,
-        canonicalUrl: resolved.canonicalUrl,
-        sourceTier: link.sourceTier,
-        stance: link.stance,
-        sortKey: newestKey(resolved),
-      });
-    }
-
-    const linkedHeadlines = headlineCandidates
-      .sort((a, b) => b.sortKey.localeCompare(a.sortKey))
-      .slice(0, 8)
-      .map(({ sortKey: _sortKey, ...headline }) => headline);
+    const linkedHeadlines = buildClaimLinkedHeadlines(links, articleLookup);
 
     const needsReview = queuedClaimIds.has(claim.id);
     const reviewReasons = needsReview ? newestQueueReasonsForClaim(claim.id, reviewQueue) : [];

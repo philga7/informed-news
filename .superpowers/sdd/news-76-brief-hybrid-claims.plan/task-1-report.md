@@ -61,3 +61,36 @@ All passed.
 ## Concerns
 
 None at implementation time. The only notable behavior choice is that muted accepted claims can still be enriched through the accepted-membership route, which matches the membership-vs-visibility split described in the plan.
+
+## Fix Round 1
+
+Reviewer finding addressed: `briefClaims.ts` and `enrichClaims.ts` had forked the `claimsRadar` evidence-to-article join path.
+
+### What Changed
+
+- Extracted shared join helpers into `mvp/server/src/services/claimEvidenceJoin.ts`
+- Moved the shared `resolveArticle` behavior, newest-article sort key behavior, and linked-headline dedupe/sort/cap assembly into that module
+- Switched `mvp/server/src/services/claimsRadar.ts`, `mvp/server/src/services/briefClaims.ts`, and `mvp/server/src/services/enrichClaims.ts` to call the same shared helpers
+- Added `mvp/server/src/services/claimEvidenceJoin.test.ts`
+- Registered the new shared-helper test in `mvp/server/package.json`
+
+### Covering Tests
+
+- `src/services/claimEvidenceJoin.test.ts`
+- `src/services/claimsRadar.test.ts`
+- `src/services/briefClaims.test.ts`
+- `src/services/enrichClaims.test.ts`
+- `src/app.test.ts`
+
+### Commands
+
+```sh
+node --import tsx --test src/services/claimEvidenceJoin.test.ts src/services/claimsRadar.test.ts src/services/briefClaims.test.ts src/services/enrichClaims.test.ts src/app.test.ts
+npm test && npm run typecheck
+```
+
+### Output
+
+- Join-related verification passed: `34` tests, `34` passed, `0` failed
+- Full `mvp/server` `npm test` passed
+- Full `mvp/server` `npm run typecheck` passed

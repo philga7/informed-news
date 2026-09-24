@@ -1,7 +1,6 @@
 import type { Article } from '../types/article.js';
 import type { ClaimEnrichmentRecord } from '../types/briefClaim.js';
 import type { Claim, EvidenceLink } from '../types/claim.js';
-import { articleIdFromCanonicalUrl } from '../store/articleId.js';
 import {
   getClaimEnrichment,
   readArticles,
@@ -10,6 +9,10 @@ import {
   readEvidenceLinks,
   upsertClaimEnrichment,
 } from '../store/index.js';
+import {
+  buildClaimArticleLookup,
+  buildClaimLinkedHeadlines,
+} from './claimEvidenceJoin.js';
 import { CLASSIFY_RAW_DELIMITER } from './ollamaFraming.js';
 import type {
   ClaimHeadlineInput,
@@ -41,29 +44,6 @@ export type EnrichClaimsResult = {
   skippedClaimIds: string[];
 };
 
-function newestKey(article: Pick<Article, 'publishedAt' | 'fetchedAt'>): string {
-  return article.publishedAt || article.fetchedAt || '';
-}
-
-function resolveArticle(
-  link: Pick<EvidenceLink, 'articleId' | 'url'>,
-  byId: ReadonlyMap<string, Article>,
-  byCanonicalUrl: ReadonlyMap<string, Article>,
-): Article | null {
-  if (link.articleId) {
-    return byId.get(link.articleId) ?? null;
-  }
-  if (!link.url) return null;
-
-  const byUrl = byCanonicalUrl.get(link.url);
-  if (byUrl) {
-    return byUrl;
-  }
-
-  const derived = articleIdFromCanonicalUrl(link.url);
-  return byId.get(derived) ?? null;
-}
-
 function normalizeRequestedClaimIds(claimIds: string[] | undefined): string[] {
   if (!Array.isArray(claimIds)) {
     return [];
@@ -78,44 +58,6 @@ function normalizeRequestedClaimIds(claimIds: string[] | undefined): string[] {
     ),
   );
 }
-
-function buildLinkedHeadlines(
-  links: ReadonlyArray<EvidenceLink>,
-  articleById: ReadonlyMap<string, Article>,
-  articleByCanonicalUrl: ReadonlyMap<string, Article>,
-): ClaimHeadlineInput[] {
-  const newestLinkByArticleIdOrUrl = new Map<string, EvidenceLink>();
-  for (const link of links) {
-    const key = link.articleId ?? link.url ?? '';
-    if (!key) continue;
-
-    const existing = newestLinkByArticleIdOrUrl.get(key);
-    if (!existing || link.createdAt.localeCompare(existing.createdAt) > 0) {
-      newestLinkByArticleIdOrUrl.set(key, link);
-    }
-  }
-
-  const headlines: Array<ClaimHeadlineInput & { sortKey: string }> = [];
-  for (const link of newestLinkByArticleIdOrUrl.values()) {
-    const article = resolveArticle(link, articleById, articleByCanonicalUrl);
-    if (!article) continue;
-
-    headlines.push({
-      title: article.title,
-      stance: link.stance,
-      sourceTier: link.sourceTier,
-      publisherDomain: article.publisherDomain,
-      publishedAt: article.publishedAt,
-      sortKey: newestKey(article),
-    });
-  }
-
-  return headlines
-    .sort((a, b) => b.sortKey.localeCompare(a.sortKey))
-    .slice(0, 8)
-    .map(({ sortKey: _sortKey, ...headline }) => headline);
-}
-
 export async function enrichAcceptedClaims(
   options: EnrichClaimsOptions = {},
 ): Promise<EnrichClaimsResult> {
@@ -159,10 +101,7 @@ export async function enrichAcceptedClaims(
     evidenceByClaimId.set(link.claimId, list);
   }
 
-  const articleById = new Map(articles.map((article) => [article.id, article] as const));
-  const articleByCanonicalUrl = new Map(
-    articles.map((article) => [article.canonicalUrl, article] as const),
-  );
+  const articleLookup = buildClaimArticleLookup(articles);
 
   const attemptedClaimIds: string[] = [];
   let succeeded = 0;
@@ -177,7 +116,15 @@ export async function enrichAcceptedClaims(
     attemptedClaimIds.push(claim.id);
 
     const links = evidenceByClaimId.get(claim.id) ?? [];
-    const linkedHeadlines = buildLinkedHeadlines(links, articleById, articleByCanonicalUrl);
+    const linkedHeadlines = buildClaimLinkedHeadlines(links, articleLookup).map(
+      (headline): ClaimHeadlineInput => ({
+        title: headline.title,
+        stance: headline.stance,
+        sourceTier: headline.sourceTier,
+        publisherDomain: headline.publisherDomain,
+        publishedAt: headline.publishedAt,
+      }),
+    );
     const result = await enrichFn({
       claimText: claim.text,
       claimType: claim.claimType,
