@@ -93,6 +93,56 @@ test('fetchCuratedRss ingests RSS items as rss articles and strips fragments', a
   assert.equal(batch[0].sourceKind, 'rss');
 });
 
+test('fetchCuratedRss stamps sourceTier from RadarSource', async () => {
+  const sources: RadarSource[] = [
+    {
+      id: 'primary-source',
+      name: 'Primary Source',
+      domain: 'primary.example',
+      feedUrl: 'https://primary.example/rss.xml',
+      sourceTier: 'primary',
+    },
+    {
+      id: 'sensor-source',
+      name: 'Sensor Source',
+      domain: 'sensor.example',
+      feedUrl: 'https://sensor.example/rss.xml',
+      sourceTier: 'sensor',
+    },
+  ];
+  const items = await fixtureItems();
+
+  const upsertBatches: UpsertInput[] = [];
+
+  await fetchCuratedRss(
+    { sources, limit: 10 },
+    {
+      parseRssFeed: async () => items,
+      scrapePublisherBody: async () => ({
+        bodyText: null,
+        bodyStatus: 'unavailable',
+        publisherTitle: null,
+        imageUrl: null,
+        imageCaption: null,
+        imageCredit: null,
+      }),
+      upsertArticles: async (incoming) => {
+        upsertBatches.push(incoming);
+        return incoming.map((article, index) => ({
+          ...article,
+          id: `t-${upsertBatches.length}-${index + 1}`,
+        })) as Article[];
+      },
+    },
+  );
+
+  assert.equal(upsertBatches.length, 2);
+  assert.ok(upsertBatches[0]!.length >= 1);
+  assert.ok(upsertBatches[1]!.length >= 1);
+  assert.ok(upsertBatches[0]!.every((a) => a.sourceTier === 'primary'));
+  assert.ok(upsertBatches[1]!.every((a) => a.sourceTier === 'sensor'));
+});
+
 test('fetchCuratedRss returns skipped when sources are empty', async () => {
   const result = await fetchCuratedRss(
     { sources: [] },

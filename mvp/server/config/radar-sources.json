@@ -6,6 +6,7 @@
       "domain": "georgiarecorder.com",
       "feedUrl": "https://georgiarecorder.com/feed/localFeed/",
       "region": "georgia",
+      "sourceTier": "sensor",
       "enabled": true
     },
     {
@@ -14,6 +15,7 @@
       "domain": "capitol-beat.org",
       "feedUrl": "https://capitol-beat.org/feed/",
       "region": "georgia",
+      "sourceTier": "sensor",
       "enabled": true
     },
     {
@@ -22,6 +24,7 @@
       "domain": "11alive.com",
       "feedUrl": "https://www.11alive.com/feeds/syndication/rss/news/local",
       "region": "georgia",
+      "sourceTier": "sensor",
       "enabled": true
     },
     {
@@ -30,6 +33,7 @@
       "domain": "newsnationnow.com",
       "feedUrl": "https://www.newsnationnow.com/feed/",
       "region": "national",
+      "sourceTier": "sensor",
       "enabled": true
     },
     {
@@ -38,6 +42,7 @@
       "domain": "scotusblog.com",
       "feedUrl": "https://www.scotusblog.com/feed/",
       "region": "national",
+      "sourceTier": "sensor",
       "enabled": true
     },
     {
@@ -46,6 +51,7 @@
       "domain": "timesofisrael.com",
       "feedUrl": "https://www.timesofisrael.com/feed/",
       "region": "national",
+      "sourceTier": "sensor",
       "enabled": true
     },
     {
@@ -54,6 +60,7 @@
       "domain": "al-monitor.com",
       "feedUrl": "https://www.al-monitor.com/rss",
       "region": "national",
+      "sourceTier": "sensor",
       "enabled": true
     },
     {
@@ -62,6 +69,7 @@
       "domain": "goldseek.com",
       "feedUrl": "https://goldseek.com/rss.xml",
       "region": "national",
+      "sourceTier": "sensor",
       "enabled": true
     },
     {
@@ -70,6 +78,7 @@
       "domain": "macrumors.com",
       "feedUrl": "https://feeds.macrumors.com/MacRumors-All",
       "region": "national",
+      "sourceTier": "sensor",
       "enabled": true
     },
     {
@@ -78,6 +87,7 @@
       "domain": "foxnews.com",
       "feedUrl": "https://moxie.foxnews.com/google-publisher/latest.xml",
       "region": "national",
+      "sourceTier": "sensor",
       "enabled": true
     },
     {
@@ -86,6 +96,7 @@
       "domain": "abcnews.com",
       "feedUrl": "https://abcnews.com/abcnews/topstories",
       "region": "national",
+      "sourceTier": "sensor",
       "enabled": true
     },
     {
@@ -94,6 +105,7 @@
       "domain": "cbsnews.com",
       "feedUrl": "https://www.cbsnews.com/latest/rss/main",
       "region": "national",
+      "sourceTier": "sensor",
       "enabled": true
     },
     {
@@ -102,6 +114,7 @@
       "domain": "nbcnews.com",
       "feedUrl": "https://feeds.nbcnews.com/nbcnews/public/news",
       "region": "national",
+      "sourceTier": "sensor",
       "enabled": true
     },
     {
@@ -110,6 +123,34 @@
       "domain": "newsmax.com",
       "feedUrl": "https://www.newsmax.com/rss/Newsfront/16",
       "region": "national",
+      "sourceTier": "sensor",
+      "enabled": true
+    },
+    {
+      "id": "us-state-press",
+      "name": "US State Department press releases",
+      "domain": "state.gov",
+      "feedUrl": "https://www.state.gov/rss-feed/press-releases/feed/",
+      "region": "conflict",
+      "sourceTier": "primary",
+      "enabled": true
+    },
+    {
+      "id": "us-defense-releases",
+      "name": "US Defense Department news releases",
+      "domain": "defense.gov",
+      "feedUrl": "https://www.defense.gov/DesktopModules/ArticleCS/RSS.ashx?ContentType=1&Site=945&max=10",
+      "region": "conflict",
+      "sourceTier": "primary",
+      "enabled": true
+    },
+    {
+      "id": "un-news",
+      "name": "UN News",
+      "domain": "news.un.org",
+      "feedUrl": "https://news.un.org/feed/subscribe/en/news/all/rss.xml",
+      "region": "conflict",
+      "sourceTier": "primary",
       "enabled": true
     }
   ]

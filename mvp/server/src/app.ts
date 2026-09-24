@@ -178,6 +178,7 @@ export function createApp(deps: CreateAppDeps = {}): Express {
         feedUrl: result.cfp.feedUrl,
         limit: result.cfp.limit,
         fetched: result.fetched,
+        tiers: result.tiers,
         clustered: result.clustered,
         clusters: result.clusters,
         cfp: { fetched: result.cfp.fetched, articles: result.cfp.upserted },

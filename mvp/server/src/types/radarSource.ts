@@ -4,6 +4,8 @@ export type RadarSource = {
   domain: string;
   feedUrl: string;
   region?: string;
+  /** Source-of-record tiering for claims desk. Absent in config → treated as 'sensor'. */
+  sourceTier?: 'primary' | 'sensor';
   /** Defaults to true when absent in config. */
   enabled?: boolean;
 };

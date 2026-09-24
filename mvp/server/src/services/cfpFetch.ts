@@ -62,6 +62,7 @@ export async function fetchCfpArticles(
       articles.push({
         title: item.title,
         sourceKind: 'cfp',
+        sourceTier: 'sensor',
         canonicalUrl,
         citations: citationsFromCfp(canonicalUrl, publisherUrl),
         publisherUrl,

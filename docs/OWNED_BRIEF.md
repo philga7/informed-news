@@ -42,7 +42,7 @@ Brief shows **Accepted** clusters only (membership in `mvp/data/brief-membership
 - **Accepted solo key:** only that article appears while it stays unclustered (`solo:{articleId}`). If a later fetch merges it into a shared `clusterId`, v1 does **not** remap membership — Accept the new cluster key again (known gap; association = same key only).
 - **Global mute** ([NEWS-60](https://informedcrew.atlassian.net/browse/NEWS-60)): Accepted clusters that match a mute rule are **excluded from Brief** even though membership remains. Unaccept is unchanged; removing the rule restores Brief eligibility.
 - **Manual seed stories** (NEWS-66): Accepted by definition, not on Radar; Unaccept drops from Brief (see below).
-- **Radar** (`/radar`) is the triage lane for fresh CFP + curated RSS before Accept. See [ROADMAP.md](ROADMAP.md).
+- **Radar** (`/radar`) is the triage lane for fresh CFP + curated RSS before Accept. Ingest stamps each article `sourceTier` from radar config (CFP/xcancel default `sensor`; conflict primaries are `primary` — [NEWS-73](https://informedcrew.atlassian.net/browse/NEWS-73), [RADAR_SOURCES.md](RADAR_SOURCES.md)); used by claims extract, not Brief membership. See [ROADMAP.md](ROADMAP.md).
 
 ### Tracking developing stories (NEWS-59)
 

@@ -4,6 +4,18 @@ Locked starter set for [NEWS-54](https://informedcrew.atlassian.net/browse/NEWS-
 
 Until [NEWS-67](https://informedcrew.atlassian.net/browse/NEWS-67) (Later), change sources by editing in-repo config + restart. No admin CRUD in v1 Done-demo.
 
+## Source tiers (NEWS-73)
+
+Radar sources have an optional `sourceTier` used by the claims/evidence desk:
+
+- **sensor**: claim proposal fuel (default when absent)
+- **primary**: preferred evidence sources for conflict claims
+
+Notes:
+
+- CFP (and optional xcancel) are treated as **sensor** in code (not configured via `radar-sources.json`).
+- State.gov RSS returns **403** without a browser-like User-Agent; `mvp/server/src/services/rss.ts` must use `Mozilla/5.0 (compatible; InformedNews/1.0)` for RSS fetch.
+
 ## CFP (existing path)
 
 | Name | Domain | Feed URL |
@@ -36,6 +48,14 @@ Until [NEWS-67](https://informedcrew.atlassian.net/browse/NEWS-67) (Later), chan
 | nbc-news | NBC News | nbcnews.com | https://feeds.nbcnews.com/nbcnews/public/news |
 | newsmax-newsfront | Newsmax Newsfront | newsmax.com | https://www.newsmax.com/rss/Newsfront/16 |
 
+### Conflict primaries (locked starter set)
+
+| id | Name | Domain | Feed URL |
+|----|------|--------|----------|
+| us-state-press | US State Department press releases | state.gov | https://www.state.gov/rss-feed/press-releases/feed/ |
+| us-defense-releases | US Defense Department news releases | defense.gov | https://www.defense.gov/DesktopModules/ArticleCS/RSS.ashx?ContentType=1&Site=945&max=10 |
+| un-news | UN News | news.un.org | https://news.un.org/feed/subscribe/en/news/all/rss.xml |
+
 Notes:
 
 - Fox: store without URL fragments (`#_intcmp=…` is not part of the feed).
@@ -54,6 +74,7 @@ Committed JSON at `mvp/server/config/radar-sources.json`. Loaded by `mvp/server/
       "domain": "georgiarecorder.com",
       "feedUrl": "https://georgiarecorder.com/feed/localFeed/",
       "region": "georgia",
+      "sourceTier": "sensor",
       "enabled": true
     }
   ]
@@ -64,4 +85,4 @@ Empty/missing curated file → CFP-only (and optional xcancel if configured) sti
 
 ## Ingest (NEWS-55)
 
-[NEWS-55](https://informedcrew.atlassian.net/browse/NEWS-55): enabled sources from `radar-sources.json` are fetched on `POST /api/fetch` and upserted into the shared article store (`sourceKind: "rss"`). Response field `curated` reports counts and per-source errors. Ingested items are **not** Brief membership — Accept / manual seed still required ([NEWS-65](https://informedcrew.atlassian.net/browse/NEWS-65), [NEWS-66](https://informedcrew.atlassian.net/browse/NEWS-66)).
+[NEWS-55](https://informedcrew.atlassian.net/browse/NEWS-55): enabled sources from `radar-sources.json` are fetched on `POST /api/fetch` and upserted into the shared article store (`sourceKind: "rss"`). Response fields `curated` (counts and per-source errors) and `tiers` (`sensor` / `primary` fetched+upserted counts for this run — [NEWS-73](https://informedcrew.atlassian.net/browse/NEWS-73)) are documented in [MVP_API_COMPAT.md](MVP_API_COMPAT.md). Ingested items are **not** Brief membership — Accept / manual seed still required ([NEWS-65](https://informedcrew.atlassian.net/browse/NEWS-65), [NEWS-66](https://informedcrew.atlassian.net/browse/NEWS-66)).

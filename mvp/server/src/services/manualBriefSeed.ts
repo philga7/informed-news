@@ -115,6 +115,7 @@ export function buildManualSeedArticle(
     id,
     title,
     sourceKind: 'manual',
+    sourceTier: 'sensor',
     canonicalUrl,
     citations: validUrls.map((url) => ({ label: 'Source', url })),
     publisherUrl,

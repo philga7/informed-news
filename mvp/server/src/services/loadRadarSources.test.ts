@@ -30,11 +30,16 @@ const LOCKED_IDS = [
   'cbs-main',
   'nbc-news',
   'newsmax-newsfront',
+  'us-state-press',
+  'us-defense-releases',
+  'un-news',
 ];
 
-test('loadRadarSources returns 14 enabled sources from committed config', () => {
+const PRIMARY_IDS = ['us-state-press', 'us-defense-releases', 'un-news'] as const;
+
+test('loadRadarSources returns 17 enabled sources from committed config', () => {
   const sources = loadRadarSources();
-  assert.equal(sources.length, 14);
+  assert.equal(sources.length, 17);
   assert.equal(DEFAULT_RADAR_SOURCES_PATH.endsWith('config/radar-sources.json'), true);
 });
 
@@ -42,6 +47,21 @@ test('loadRadarSources ids match locked NEWS-54 list', () => {
   const sources = loadRadarSources();
   const ids = sources.map((source) => source.id).sort();
   assert.deepEqual(ids, [...LOCKED_IDS].sort());
+});
+
+test('loadRadarSources includes three primary sources with sourceTier primary', () => {
+  const sources = loadRadarSources();
+  for (const id of PRIMARY_IDS) {
+    const source = sources.find((s) => s.id === id);
+    assert.ok(source, `missing primary source ${id}`);
+    assert.equal(source!.sourceTier, 'primary');
+  }
+});
+
+test('loadRadarSources marks existing curated sources as sensor', () => {
+  const source = loadRadarSources().find((s) => s.id === 'georgia-recorder');
+  assert.ok(source);
+  assert.equal(source!.sourceTier, 'sensor');
 });
 
 test('fox-latest feedUrl has no URL fragment', () => {
@@ -68,6 +88,35 @@ test('loadRadarSources returns [] when any source entry is malformed', () => {
       feedUrl: 'https://example.com/rss.xml',
     },
     { id: 'missing-fields' },
+  ]);
+
+  assert.deepEqual(loadRadarSources(configPath), []);
+});
+
+test('loadRadarSources defaults missing sourceTier to sensor on returned objects', () => {
+  const configPath = writeTempConfig([
+    {
+      id: 'missing-tier',
+      name: 'Missing Tier',
+      domain: 'example.com',
+      feedUrl: 'https://example.com/rss.xml',
+    },
+  ]);
+
+  const sources = loadRadarSources(configPath);
+  assert.equal(sources.length, 1);
+  assert.equal(sources[0]!.sourceTier, 'sensor');
+});
+
+test('loadRadarSources returns [] when sourceTier is invalid', () => {
+  const configPath = writeTempConfig([
+    {
+      id: 'bad-tier',
+      name: 'Bad Tier',
+      domain: 'example.com',
+      feedUrl: 'https://example.com/rss.xml',
+      sourceTier: 'nope',
+    },
   ]);
 
   assert.deepEqual(loadRadarSources(configPath), []);

@@ -14,15 +14,44 @@ export type FetchAllOptions = CfpFetchOptions &
   XcancelFetchOptions &
   CuratedRssFetchOptions;
 
+export type FetchTierCounts = {
+  fetched: number;
+  upserted: number;
+};
+
+export type FetchTiers = {
+  sensor: FetchTierCounts;
+  primary: FetchTierCounts;
+};
+
 export type FetchAllResult = {
   cfp: CfpFetchResult;
   curated: CuratedRssFetchResult;
   xcancel: XcancelFetchResult;
   articles: Article[];
+  tiers: FetchTiers;
   fetched: number;
   clustered: number;
   clusters: number;
 };
+
+export function countFetchTiers(
+  articles: ReadonlyArray<Pick<Article, 'sourceTier'>>,
+): FetchTiers {
+  let sensor = 0;
+  let primary = 0;
+  for (const article of articles) {
+    if (article.sourceTier === 'primary') {
+      primary += 1;
+    } else {
+      sensor += 1;
+    }
+  }
+  return {
+    sensor: { fetched: sensor, upserted: sensor },
+    primary: { fetched: primary, upserted: primary },
+  };
+}
 
 function emptyXcancelFailure(
   message: string,
@@ -113,12 +142,14 @@ export async function fetchAllSources(
     ...curatedWithCluster.upserted,
     ...xcancelWithCluster.upserted,
   ];
+  const tiers = countFetchTiers(articles);
 
   return {
     cfp: cfpWithCluster,
     curated: curatedWithCluster,
     xcancel: xcancelWithCluster,
     articles,
+    tiers,
     fetched: cfp.fetched + curated.fetched + xcancel.fetched,
     clustered: clustered.clustered,
     clusters: clustered.clusters,

@@ -65,6 +65,26 @@ test('new items stay unclassified', () => {
   assert.equal(merged.fetchedAt, incoming.fetchedAt);
 });
 
+test('new items default sourceTier to sensor', () => {
+  const incoming = article({ fetchedAt: '2026-08-16T13:00:00.000Z' });
+  const merged = mergeArticleOnUpsert(undefined, incoming, incoming.id);
+  assert.equal(merged.sourceTier, 'sensor');
+});
+
+test('missing incoming sourceTier preserves existing', () => {
+  const existing = article({ sourceTier: 'primary' });
+  const incoming = article({ fetchedAt: '2026-08-16T13:00:00.000Z' });
+  const merged = mergeArticleOnUpsert(existing, incoming, existing.id);
+  assert.equal(merged.sourceTier, 'primary');
+});
+
+test('incoming sourceTier overwrites existing', () => {
+  const existing = article({ sourceTier: 'primary' });
+  const incoming = article({ sourceTier: 'sensor' });
+  const merged = mergeArticleOnUpsert(existing, incoming, existing.id);
+  assert.equal(merged.sourceTier, 'sensor');
+});
+
 test('unchanged title, snippet, and canonical URL keep classification', () => {
   const existing = article({
     classification: ANALYSIS,

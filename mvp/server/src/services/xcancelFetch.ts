@@ -344,6 +344,7 @@ function tweetToArticle(
   return {
     title: truncateTitle(tweet.text),
     sourceKind: 'xcancel',
+    sourceTier: 'sensor',
     canonicalUrl: xPermalink,
     citations: citationsFromXcancel(xcancelUrl, xPermalink),
     publisherUrl: null,
