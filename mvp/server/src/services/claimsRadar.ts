@@ -1,14 +1,24 @@
-import type { Claim, EvidenceLink, EvidenceStance, SourceTier } from '../types/claim.js';
+import type {
+  Claim,
+  ClaimMembership,
+  EvidenceLink,
+  EvidenceStance,
+  SourceTier,
+  TrackedClaims,
+  TrackedClaimEntry,
+} from '../types/claim.js';
 import type { Article } from '../types/article.js';
 import type { ClaimReviewQueueEntry } from '../store/claimReviewQueueStore.js';
 import type { MuteRulesStore } from '../store/muteRulesStore.js';
 import { articleIdFromCanonicalUrl } from '../store/articleId.js';
 import {
+  readClaimMembership,
   readClaimReviewQueue,
   readClaims,
   readEvidenceLinks,
   readMuteRules,
   readArticles,
+  readTrackedClaims,
 } from '../store/index.js';
 import { briefClusterKey } from './briefClusterKey.js';
 import { claimMatchesMute } from './muteMatch.js';
@@ -40,6 +50,9 @@ export type ClaimRadarItem = {
   status: string;
   createdAt: string;
   confidence: number | null;
+  accepted: boolean;
+  tracked: boolean;
+  pendingUpdate: boolean;
   evidence: ClaimRadarEvidenceCounts;
   clusterKeys: string[];
   linkedHeadlines: ClaimRadarLinkedHeadline[];
@@ -60,6 +73,8 @@ export type BuildClaimsRadarFeedInput = {
   articles: Article[];
   muteRules: MuteRulesStore;
   reviewQueue: ClaimReviewQueueEntry[];
+  membership: ClaimMembership;
+  tracked: TrackedClaims;
 };
 
 function evidenceCounts(links: ReadonlyArray<EvidenceLink>): ClaimRadarEvidenceCounts {
@@ -139,7 +154,8 @@ function newestQueueReasonsForClaim(
 export function buildClaimsRadarFeed(
   input: BuildClaimsRadarFeedInput,
 ): Omit<ClaimsRadarResponse, 'ok'> {
-  const { claims, evidenceLinks, articles, muteRules, reviewQueue } = input;
+  const { claims, evidenceLinks, articles, muteRules, reviewQueue, membership, tracked } =
+    input;
 
   const evidenceByClaimId = new Map<string, EvidenceLink[]>();
   for (const link of evidenceLinks) {
@@ -152,6 +168,12 @@ export function buildClaimsRadarFeed(
   const articleByCanonicalUrl = new Map(articles.map((a) => [a.canonicalUrl, a] as const));
 
   const queuedClaimIds = new Set(reviewQueue.map((entry) => entry.claimId));
+  const acceptedClaimIds = new Set(membership.acceptedClaimIds);
+
+  const trackedByClaimId = new Map<string, Pick<TrackedClaimEntry, 'pendingUpdate'>>();
+  for (const entry of tracked.entries) {
+    trackedByClaimId.set(entry.claimId, { pendingUpdate: entry.pendingUpdate });
+  }
 
   let hiddenMutedCount = 0;
   const claimsOut: ClaimRadarItem[] = [];
@@ -210,6 +232,7 @@ export function buildClaimsRadarFeed(
     const needsReview = queuedClaimIds.has(claim.id);
     const reviewReasons = needsReview ? newestQueueReasonsForClaim(claim.id, reviewQueue) : [];
 
+    const trackedEntry = trackedByClaimId.get(claim.id);
     const item: ClaimRadarItem = {
       claimId: claim.id,
       text: claim.text,
@@ -217,6 +240,9 @@ export function buildClaimsRadarFeed(
       status: claim.status,
       createdAt: claim.createdAt,
       confidence: maxEvidenceConfidence(links),
+      accepted: acceptedClaimIds.has(claim.id),
+      tracked: trackedEntry !== undefined,
+      pendingUpdate: trackedEntry?.pendingUpdate ?? false,
       evidence: evidenceCounts(links),
       clusterKeys,
       linkedHeadlines,
@@ -247,6 +273,8 @@ export type LoadClaimsRadarDeps = {
   readArticles?: typeof readArticles;
   readMuteRules?: typeof readMuteRules;
   readClaimReviewQueue?: typeof readClaimReviewQueue;
+  readClaimMembership?: typeof readClaimMembership;
+  readTrackedClaims?: typeof readTrackedClaims;
 };
 
 export async function loadClaimsRadar(
@@ -257,13 +285,18 @@ export async function loadClaimsRadar(
   const loadArticles = deps.readArticles ?? readArticles;
   const loadMutes = deps.readMuteRules ?? readMuteRules;
   const loadQueue = deps.readClaimReviewQueue ?? readClaimReviewQueue;
+  const loadMembership = deps.readClaimMembership ?? readClaimMembership;
+  const loadTracked = deps.readTrackedClaims ?? readTrackedClaims;
 
-  const [claims, evidenceLinks, articles, muteRules, reviewQueue] = await Promise.all([
+  const [claims, evidenceLinks, articles, muteRules, reviewQueue, membership, tracked] =
+    await Promise.all([
     loadClaims(),
     loadEvidence(),
     loadArticles(),
     loadMutes(),
     loadQueue(),
+    loadMembership(),
+    loadTracked(),
   ]);
 
   return buildClaimsRadarFeed({
@@ -272,6 +305,8 @@ export async function loadClaimsRadar(
     articles,
     muteRules,
     reviewQueue,
+    membership,
+    tracked,
   });
 }
 

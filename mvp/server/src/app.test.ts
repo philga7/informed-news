@@ -14,6 +14,17 @@ import {
   trackCluster,
 } from './store/trackedStoriesStore.js';
 import {
+  acceptClaim,
+  readClaimMembership,
+  unacceptClaim,
+} from './store/claimMembershipStore.js';
+import {
+  ackTrackedClaimUpdate,
+  markTrackedClaimPending,
+  readTrackedClaims,
+  trackClaim,
+} from './store/trackedClaimsStore.js';
+import {
   addMuteRule,
   readMuteRules,
   removeMuteRule,
@@ -33,6 +44,16 @@ function tempTrackedPath(): string {
 function tempMuteRulesPath(): string {
   const dir = mkdtempSync(path.join(tmpdir(), 'mute-rules-'));
   return path.join(dir, 'mute-rules.json');
+}
+
+function tempClaimMembershipPath(): string {
+  const dir = mkdtempSync(path.join(tmpdir(), 'claim-membership-'));
+  return path.join(dir, 'claim-membership.json');
+}
+
+function tempTrackedClaimsPath(): string {
+  const dir = mkdtempSync(path.join(tmpdir(), 'tracked-claims-'));
+  return path.join(dir, 'tracked-claims.json');
 }
 
 async function startServer(app: { listen: (...args: any[]) => Server }): Promise<{
@@ -552,6 +573,30 @@ test('POST /api/claims/extract requires session', async () => {
   }
 });
 
+test('POST /api/claims/accept requires session', async () => {
+  process.env.SESSION_SECRET = 'test-secret';
+  process.env.MVP_PASSWORD = 'pw';
+  delete process.env.MVP_PASSWORD_HASH;
+
+  const { createApp } = await import('./app.js');
+  const app = createApp();
+
+  const { baseUrl, close } = await startServer(app);
+  try {
+    const resp = await fetch(`${baseUrl}/api/claims/accept`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ claimId: 'claim-1' }),
+    });
+    assert.equal(resp.status, 401);
+    const body = (await resp.json()) as { ok: false; error: string };
+    assert.equal(body.ok, false);
+    assert.equal(body.error, 'Unauthorized');
+  } finally {
+    await close();
+  }
+});
+
 test('GET /api/claims/radar requires session', async () => {
   process.env.SESSION_SECRET = 'test-secret';
   process.env.MVP_PASSWORD = 'pw';
@@ -671,6 +716,223 @@ test('POST /api/claims/extract returns ok payload when authenticated', async () 
     assert.deepEqual(body.claims, []);
     assert.deepEqual(body.evidence, []);
     assert.deepEqual(body.reviewQueued, []);
+  } finally {
+    await close();
+  }
+});
+
+test('POST /api/claims/accept default-tracks claimId', async () => {
+  process.env.SESSION_SECRET = 'test-secret';
+  process.env.MVP_PASSWORD = 'pw';
+  delete process.env.MVP_PASSWORD_HASH;
+
+  const membershipPath = tempClaimMembershipPath();
+  const trackedPath = tempTrackedClaimsPath();
+
+  const { createApp } = await import('./app.js');
+  const app = createApp({
+    getClaimById: async (claimId) =>
+      claimId === 'claim-1'
+        ? ({
+            id: 'claim-1',
+            text: 'Example',
+            claimType: 'event_occurrence',
+            status: 'reported',
+            entities: [],
+            createdAt: '2026-09-21T00:00:00.000Z',
+            domain: 'conflict',
+          } as any)
+        : null,
+    acceptClaim: async (claimId) => await acceptClaim(claimId, membershipPath),
+    readClaimMembership: async () => await readClaimMembership(membershipPath),
+    trackClaim: async (claimId) => await trackClaim(claimId, trackedPath),
+    readTrackedClaims: async () => await readTrackedClaims(trackedPath),
+  });
+
+  const { baseUrl, close } = await startServer(app);
+  try {
+    const cookie = await login(baseUrl);
+    const acceptResp = await fetch(`${baseUrl}/api/claims/accept`, {
+      method: 'POST',
+      headers: { cookie, 'content-type': 'application/json' },
+      body: JSON.stringify({ claimId: 'claim-1' }),
+    });
+    assert.equal(acceptResp.status, 200);
+
+    const membershipResp = await fetch(`${baseUrl}/api/claims/membership`, {
+      headers: { cookie },
+    });
+    assert.equal(membershipResp.status, 200);
+    const membership = (await membershipResp.json()) as {
+      ok: true;
+      acceptedClaimIds: string[];
+    };
+    assert.equal(membership.ok, true);
+    assert.deepEqual(membership.acceptedClaimIds, ['claim-1']);
+
+    const trackedResp = await fetch(`${baseUrl}/api/claims/tracked`, {
+      headers: { cookie },
+    });
+    assert.equal(trackedResp.status, 200);
+    const tracked = (await trackedResp.json()) as {
+      ok: true;
+      entries: Array<{ claimId: string; pendingUpdate: boolean; trackedAt: string }>;
+    };
+    assert.equal(tracked.ok, true);
+    const entry = tracked.entries.find((e) => e.claimId === 'claim-1');
+    assert.ok(entry);
+    assert.equal(entry.pendingUpdate, false);
+    assert.equal(typeof entry.trackedAt, 'string');
+  } finally {
+    await close();
+  }
+});
+
+test('POST /api/claims/unaccept removes membership but does not untrack', async () => {
+  process.env.SESSION_SECRET = 'test-secret';
+  process.env.MVP_PASSWORD = 'pw';
+  delete process.env.MVP_PASSWORD_HASH;
+
+  const membershipPath = tempClaimMembershipPath();
+  const trackedPath = tempTrackedClaimsPath();
+
+  const { createApp } = await import('./app.js');
+  const app = createApp({
+    getClaimById: async () =>
+      ({
+        id: 'claim-1',
+        text: 'Example',
+        claimType: 'event_occurrence',
+        status: 'reported',
+        entities: [],
+        createdAt: '2026-09-21T00:00:00.000Z',
+        domain: 'conflict',
+      } as any),
+    acceptClaim: async (claimId) => await acceptClaim(claimId, membershipPath),
+    unacceptClaim: async (claimId) => await unacceptClaim(claimId, membershipPath),
+    readClaimMembership: async () => await readClaimMembership(membershipPath),
+    trackClaim: async (claimId) => await trackClaim(claimId, trackedPath),
+    readTrackedClaims: async () => await readTrackedClaims(trackedPath),
+  });
+
+  const { baseUrl, close } = await startServer(app);
+  try {
+    const cookie = await login(baseUrl);
+
+    const acceptResp = await fetch(`${baseUrl}/api/claims/accept`, {
+      method: 'POST',
+      headers: { cookie, 'content-type': 'application/json' },
+      body: JSON.stringify({ claimId: 'claim-1' }),
+    });
+    assert.equal(acceptResp.status, 200);
+
+    const unacceptResp = await fetch(`${baseUrl}/api/claims/unaccept`, {
+      method: 'POST',
+      headers: { cookie, 'content-type': 'application/json' },
+      body: JSON.stringify({ claimId: 'claim-1' }),
+    });
+    assert.equal(unacceptResp.status, 200);
+
+    const membershipResp = await fetch(`${baseUrl}/api/claims/membership`, {
+      headers: { cookie },
+    });
+    const membership = (await membershipResp.json()) as {
+      ok: true;
+      acceptedClaimIds: string[];
+    };
+    assert.equal(membership.ok, true);
+    assert.deepEqual(membership.acceptedClaimIds, []);
+
+    const trackedResp = await fetch(`${baseUrl}/api/claims/tracked`, {
+      headers: { cookie },
+    });
+    const tracked = (await trackedResp.json()) as {
+      ok: true;
+      entries: Array<{ claimId: string }>;
+    };
+    assert.equal(tracked.ok, true);
+    assert.ok(tracked.entries.some((e) => e.claimId === 'claim-1'));
+  } finally {
+    await close();
+  }
+});
+
+test('POST /api/claims/tracked/ack clears pendingUpdate for tracked claim', async () => {
+  process.env.SESSION_SECRET = 'test-secret';
+  process.env.MVP_PASSWORD = 'pw';
+  delete process.env.MVP_PASSWORD_HASH;
+
+  const trackedPath = tempTrackedClaimsPath();
+
+  // Seed tracked + pendingUpdate.
+  await trackClaim('claim-1', trackedPath);
+  await markTrackedClaimPending('claim-1', trackedPath);
+  const before = await readTrackedClaims(trackedPath);
+  assert.equal(before.entries.find((e) => e.claimId === 'claim-1')?.pendingUpdate, true);
+
+  const { createApp } = await import('./app.js');
+  const app = createApp({
+    getClaimById: async () =>
+      ({
+        id: 'claim-1',
+        text: 'Example',
+        claimType: 'event_occurrence',
+        status: 'reported',
+        entities: [],
+        createdAt: '2026-09-21T00:00:00.000Z',
+        domain: 'conflict',
+      } as any),
+    ackTrackedClaimUpdate: async (claimId) => await ackTrackedClaimUpdate(claimId, trackedPath),
+    readTrackedClaims: async () => await readTrackedClaims(trackedPath),
+  });
+
+  const { baseUrl, close } = await startServer(app);
+  try {
+    const cookie = await login(baseUrl);
+    const resp = await fetch(`${baseUrl}/api/claims/tracked/ack`, {
+      method: 'POST',
+      headers: { cookie, 'content-type': 'application/json' },
+      body: JSON.stringify({ claimId: 'claim-1' }),
+    });
+    assert.equal(resp.status, 200);
+    const body = (await resp.json()) as {
+      ok: true;
+      entries: Array<{ claimId: string; pendingUpdate: boolean }>;
+    };
+    assert.equal(body.ok, true);
+    const entry = body.entries.find((e) => e.claimId === 'claim-1');
+    assert.ok(entry);
+    assert.equal(entry.pendingUpdate, false);
+
+    const after = await readTrackedClaims(trackedPath);
+    assert.equal(after.entries.find((e) => e.claimId === 'claim-1')?.pendingUpdate, false);
+  } finally {
+    await close();
+  }
+});
+
+test('POST /api/claims/track returns 404 when claimId missing from store', async () => {
+  process.env.SESSION_SECRET = 'test-secret';
+  process.env.MVP_PASSWORD = 'pw';
+  delete process.env.MVP_PASSWORD_HASH;
+
+  const { createApp } = await import('./app.js');
+  const app = createApp({
+    getClaimById: async () => null,
+  });
+
+  const { baseUrl, close } = await startServer(app);
+  try {
+    const cookie = await login(baseUrl);
+    const resp = await fetch(`${baseUrl}/api/claims/track`, {
+      method: 'POST',
+      headers: { cookie, 'content-type': 'application/json' },
+      body: JSON.stringify({ claimId: 'missing' }),
+    });
+    assert.equal(resp.status, 404);
+    const body = (await resp.json()) as { ok: false; error: string };
+    assert.equal(body.ok, false);
+    assert.match(body.error, /not found/i);
   } finally {
     await close();
   }

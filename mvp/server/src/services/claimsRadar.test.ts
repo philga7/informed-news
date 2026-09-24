@@ -61,6 +61,8 @@ function link(
 }
 
 const emptyMutes = (): MuteRulesStore => ({ rules: [], updatedAt: null });
+const emptyMembership = () => ({ acceptedClaimIds: [], updatedAt: null });
+const emptyTracked = () => ({ entries: [], updatedAt: null });
 
 test('buildClaimsRadarFeed builds counts + max confidence + clusterKeys + linked headlines (cap 8)', () => {
   const c1 = claim({
@@ -102,6 +104,8 @@ test('buildClaimsRadarFeed builds counts + max confidence + clusterKeys + linked
     articles,
     muteRules: emptyMutes(),
     reviewQueue: [],
+    membership: emptyMembership(),
+    tracked: emptyTracked(),
   });
 
   assert.equal(out.hiddenMutedCount, 0);
@@ -111,6 +115,9 @@ test('buildClaimsRadarFeed builds counts + max confidence + clusterKeys + linked
   const item = out.claims[0]!;
   assert.equal(item.claimId, c1.id);
   assert.equal(item.confidence, 0.9);
+  assert.equal(item.accepted, false);
+  assert.equal(item.tracked, false);
+  assert.equal(item.pendingUpdate, false);
   assert.deepEqual(item.evidence, {
     total: 9,
     supports: 3,
@@ -145,6 +152,8 @@ test('buildClaimsRadarFeed omits muted claim and increments hiddenMutedCount', (
       updatedAt: '2026-09-22T00:00:00.000Z',
     },
     reviewQueue: [],
+    membership: emptyMembership(),
+    tracked: emptyTracked(),
   });
 
   assert.equal(out.hiddenMutedCount, 1);
@@ -193,6 +202,8 @@ test('buildClaimsRadarFeed partitions needsReview and uses newest queue reasons'
     articles: [],
     muteRules: emptyMutes(),
     reviewQueue,
+    membership: emptyMembership(),
+    tracked: emptyTracked(),
   });
 
   assert.equal(out.claims.length, 1);
@@ -258,9 +269,45 @@ test('buildClaimsRadarFeed sorts each partition by createdAt desc', () => {
         createdAt: '2026-09-22T00:00:00.000Z',
       },
     ],
+    membership: emptyMembership(),
+    tracked: emptyTracked(),
   });
 
   assert.deepEqual(out.claims.map((c) => c.claimId), ['c2', 'c1']);
   assert.deepEqual(out.needsReview.map((c) => c.claimId), ['q2', 'q1']);
+});
+
+test('buildClaimsRadarFeed sets accepted/tracked/pendingUpdate from membership + tracked stores', () => {
+  const c1 = claim({
+    id: 'claim-accepted-tracked',
+    text: 'Accepted and tracked',
+    claimType: 'event_occurrence',
+    createdAt: '2026-09-21T00:00:00.000Z',
+  });
+
+  const out = buildClaimsRadarFeed({
+    claims: [c1],
+    evidenceLinks: [],
+    articles: [],
+    muteRules: emptyMutes(),
+    reviewQueue: [],
+    membership: { acceptedClaimIds: [c1.id], updatedAt: '2026-09-22T00:00:00.000Z' },
+    tracked: {
+      entries: [
+        {
+          claimId: c1.id,
+          trackedAt: '2026-09-22T00:00:00.000Z',
+          pendingUpdate: true,
+        },
+      ],
+      updatedAt: '2026-09-22T00:00:00.000Z',
+    },
+  });
+
+  assert.equal(out.claims.length, 1);
+  const item = out.claims[0]!;
+  assert.equal(item.accepted, true);
+  assert.equal(item.tracked, true);
+  assert.equal(item.pendingUpdate, true);
 });
 
