@@ -19,6 +19,12 @@ function sourceIsEnabled(source: RadarSource): boolean {
   return source.enabled !== false;
 }
 
+function normalizeSourceTier(value: unknown): 'primary' | 'sensor' | null {
+  if (value === 'primary') return 'primary';
+  if (value === 'sensor') return 'sensor';
+  return null;
+}
+
 function parseSource(entry: unknown): RadarSource | null {
   if (!entry || typeof entry !== 'object') {
     return null;
@@ -54,6 +60,15 @@ function parseSource(entry: unknown): RadarSource | null {
 
   if (record.enabled !== undefined) {
     source.enabled = record.enabled;
+  }
+
+  if (record.sourceTier !== undefined) {
+    const tier = normalizeSourceTier(record.sourceTier);
+    if (!tier) return null;
+    source.sourceTier = tier;
+  } else {
+    // Backward compatible default (also always set for downstream ease).
+    source.sourceTier = 'sensor';
   }
 
   return source;
