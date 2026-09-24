@@ -19,6 +19,7 @@ Inspired by Wesleyan Quadrilateral discernment (primary text / tradition / reaso
 - Echoing ten outlets is **not** durable method and **not** reason — cluster size ≠ confidence.
 - No single lens gets a truth seal. UI speaks **status + evidence** (`reported`, `supported_by_primary`, `contested`, `insufficient_evidence`) — never Verified badges or claim verdicts.
 - Ollama may propose candidates and write Brief verbiage; it is **not** judgment-of-record.
+- **Source tier ([NEWS-73](https://informedcrew.atlassian.net/browse/NEWS-73)):** Radar feeds, persisted articles, and evidence links carry `sourceTier` (`primary` \| `sensor`) stamped at ingest/extract — primaries are preferred evidence witnesses; sensors are proposal fuel.
 
 ## Related
 
