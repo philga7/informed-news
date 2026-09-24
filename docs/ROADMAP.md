@@ -15,8 +15,8 @@ Claims spine plan: [`.cursor/plans/claims_evidence_spine_8f4cde15.plan.md`](../.
 | 1a | [NEWS-70](https://informedcrew.atlassian.net/browse/NEWS-70) | Claim + evidence stores and status derivation (no verdicts) — **Done** |
 | 1b | [NEWS-71](https://informedcrew.atlassian.net/browse/NEWS-71) | TypeSafe client + claim question library + confidence gates — **Done** |
 | 1c | [NEWS-72](https://informedcrew.atlassian.net/browse/NEWS-72) | Ollama propose candidates + TypeSafe judge extract pipeline — **Done** |
-| **1d** | [NEWS-73](https://informedcrew.atlassian.net/browse/NEWS-73) | **Primary vs sensor source tiers + conflict primary starter set** *(next)* |
-| 1e | [NEWS-74](https://informedcrew.atlassian.net/browse/NEWS-74) | Claim Radar API + Kite claim inbox UI |
+| 1d | [NEWS-73](https://informedcrew.atlassian.net/browse/NEWS-73) | Primary vs sensor source tiers + conflict primary starter set — **Done** |
+| **1e** | [NEWS-74](https://informedcrew.atlassian.net/browse/NEWS-74) | **Claim Radar API + Kite claim inbox UI** *(next)* |
 | 1f | [NEWS-75](https://informedcrew.atlassian.net/browse/NEWS-75) | Accept / Track / Mute / badge on claimId |
 | 1g | [NEWS-76](https://informedcrew.atlassian.net/browse/NEWS-76) | Brief hybrid: accepted claims + linked clusters + Ollama verbiage |
 | 1h | [NEWS-77](https://informedcrew.atlassian.net/browse/NEWS-77) | Docs + ROADMAP pointer *(this file)* |
