@@ -4,9 +4,9 @@ Informed News serves the Kite shell from **our** brief API by default — not `h
 
 ## Direction (Epic J — in progress)
 
-Product next is the **claims / evidence** desk ([NEWS-69](https://informedcrew.atlassian.net/browse/NEWS-69)): Brief will lead with **accepted claims** plus **linked story clusters** for context; Radar becomes a **claim inbox**. Stories remain ingest/cluster **input**. Until those APIs ship, this document describes the **live story-desk** path (Accept / Track / Mute on `clusterId`). Honesty invariant for claims: status + evidence only — no Verified badges ([CLAIMS_DISCERNMENT.md](CLAIMS_DISCERNMENT.md)).
+Product next is the **claims / evidence** desk ([NEWS-69](https://informedcrew.atlassian.net/browse/NEWS-69)): Brief will lead with **accepted claims** plus **linked story clusters** for context; Radar is the **claim inbox** on `/radar` ([NEWS-74](https://informedcrew.atlassian.net/browse/NEWS-74)). Stories remain ingest/cluster **input**. This document still describes the **live story-desk** path (Accept / Track / Mute on `clusterId`) until claim Accept/Track ships ([NEWS-75](https://informedcrew.atlassian.net/browse/NEWS-75)). Honesty invariant for claims: status + evidence only — no Verified badges ([CLAIMS_DISCERNMENT.md](CLAIMS_DISCERNMENT.md)).
 
-**Store foundation ([NEWS-70](https://informedcrew.atlassian.net/browse/NEWS-70)):** Claim/evidence JSON stores + status derivation are landed in `mvp/server`; extract HTTP ships in NEWS-72 — Radar/accept HTTP and Brief/Radar UI remain NEWS-74+.
+**Store foundation ([NEWS-70](https://informedcrew.atlassian.net/browse/NEWS-70)):** Claim/evidence JSON stores + status derivation are landed in `mvp/server`; extract HTTP ships in NEWS-72; claim inbox UI + `GET /api/claims/radar` ship in NEWS-74 — claim accept/track HTTP remains NEWS-75+.
 
 **Judgment spine ([NEWS-71](https://informedcrew.atlassian.net/browse/NEWS-71)):** TypeSafe client + claim question library + confidence gates are landed in `mvp/server`. **Extract ([NEWS-72](https://informedcrew.atlassian.net/browse/NEWS-72)):** `POST /api/claims/extract` ships Ollama propose + TypeSafe judge batch (session-gated); claim status stays **code-derived** ([NEWS-70](https://informedcrew.atlassian.net/browse/NEWS-70)).
 
