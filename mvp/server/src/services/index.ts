@@ -79,6 +79,13 @@ export {
   sortNewestFirst,
   framingBodyText,
 } from './classifyArticles.js';
+export {
+  extractClaimsFromArticles,
+} from './extractClaims.js';
+export type {
+  ExtractClaimsOptions,
+  ExtractClaimsResult,
+} from './extractClaims.js';
 export type {
   ClassifyBatchOptions,
   ClassifyBatchResult,

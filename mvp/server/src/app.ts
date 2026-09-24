@@ -12,6 +12,7 @@ import {
   createKiteBriefRouter,
   createManualSeed,
   enrichUnenrichedClusters,
+  extractClaimsFromArticles,
   fetchAllSources,
   ManualSeedValidationError,
   parseManualSeedBody,
@@ -56,6 +57,7 @@ export type CreateAppDeps = {
   getArticleById?: typeof getArticleById;
   classifyUnclassifiedArticles?: typeof classifyUnclassifiedArticles;
   classifyArticleById?: typeof classifyArticleById;
+  extractClaimsFromArticles?: typeof extractClaimsFromArticles;
   enrichUnenrichedClusters?: typeof enrichUnenrichedClusters;
   readMuteRules?: typeof readMuteRules;
   addMuteRule?: typeof addMuteRule;
@@ -115,6 +117,7 @@ export function createApp(deps: CreateAppDeps = {}): Express {
   const getById = deps.getArticleById ?? getArticleById;
   const classifyBatch = deps.classifyUnclassifiedArticles ?? classifyUnclassifiedArticles;
   const classifyOne = deps.classifyArticleById ?? classifyArticleById;
+  const extractClaims = deps.extractClaimsFromArticles ?? extractClaimsFromArticles;
   const enrich = deps.enrichUnenrichedClusters ?? enrichUnenrichedClusters;
 
   const app = express();
@@ -552,6 +555,59 @@ export function createApp(deps: CreateAppDeps = {}): Express {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.error('Classify by id failed:', message);
+      res.status(500).json({ ok: false, error: message });
+    }
+  });
+
+  /**
+   * Extract claims from articles (propose → judge → persist).
+   * Optional body/query: { limit?: number, force?: boolean, articleIds?: string[] }
+   */
+  app.post('/api/claims/extract', async (req, res) => {
+    try {
+      const limitRaw = req.body?.limit ?? req.query.limit;
+      const limit =
+        limitRaw !== undefined && limitRaw !== '' ? Number(limitRaw) : undefined;
+
+      const forceRaw = req.body?.force ?? req.query.force;
+      const force =
+        forceRaw === undefined || forceRaw === ''
+          ? undefined
+          : typeof forceRaw === 'boolean'
+            ? forceRaw
+            : typeof forceRaw === 'number'
+              ? forceRaw !== 0
+              : typeof forceRaw === 'string'
+                ? ['1', 'true', 'yes', 'on'].includes(forceRaw.trim().toLowerCase())
+                : undefined;
+
+      const articleIdsRaw = req.body?.articleIds ?? req.query.articleIds;
+      let articleIds: string[] | undefined;
+      if (Array.isArray(articleIdsRaw)) {
+        articleIds = articleIdsRaw.filter((id): id is string => typeof id === 'string');
+      } else if (typeof articleIdsRaw === 'string' && articleIdsRaw.trim()) {
+        articleIds = articleIdsRaw.split(',').map((s) => s.trim()).filter(Boolean);
+      }
+
+      const result = await extractClaims({ limit, force, articleIds });
+      res.json({
+        ok: result.ok,
+        limit: result.limit,
+        attempted: result.attempted,
+        proposed: result.proposed,
+        judged: result.judged,
+        persistedClaims: result.persistedClaims,
+        persistedEvidence: result.persistedEvidence,
+        needsReview: result.needsReview,
+        failed: result.failed,
+        articlesProcessed: result.articlesProcessed,
+        claims: result.claims,
+        evidence: result.evidence,
+        reviewQueued: result.reviewQueued,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('Claims extract failed:', message);
       res.status(500).json({ ok: false, error: message });
     }
   });
