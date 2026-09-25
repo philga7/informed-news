@@ -61,6 +61,19 @@ function getContainerWidthClass(): string {
 	}
 }
 
+const NON_BRIEF_STORY_CATEGORIES = new Set([
+	'onthisday',
+	'nhl',
+	'nfl',
+	'formula_1',
+	'bitcoin',
+	'cryptocurrency',
+]);
+
+function isBriefStoryViewCategory(categoryId: string): boolean {
+	return !NON_BRIEF_STORY_CATEGORIES.has(categoryId.toLowerCase());
+}
+
 import { useCategoryManager } from '$lib/hooks/useCategoryManager.svelte';
 import { useDataHandlers } from '$lib/hooks/useDataHandlers.svelte';
 import { usePageDerived } from '$lib/hooks/usePageDerived.svelte';
@@ -751,10 +764,6 @@ if (browser && typeof window !== 'undefined') {
           </div>
         {/if}
 
-        {#if !state.isSharedArticleView}
-          <BriefClaimsLead batchId={state.currentBatchId} isLatestBatch={state.isLatestBatch} />
-        {/if}
-
         {#if state.isLoadingCategory}
           <div class="min-h-[300px]" aria-live="polite" aria-busy="true">
             <span class="sr-only">{s("loading.stories") || "Loading stories..."}</span>
@@ -763,6 +772,7 @@ if (browser && typeof window !== 'undefined') {
             {/each}
           </div>
         {:else if derived.isSinglePageMode}
+          <BriefClaimsLead batchId={state.currentBatchId} isLatestBatch={state.isLatestBatch} />
           <section class="mt-8 mb-4 space-y-1" aria-label="Accepted stories">
             <h2 class="text-sm font-semibold tracking-tight text-gray-900 dark:text-gray-100">
               {BRIEF_STORIES_SECTION_TITLE}
@@ -799,11 +809,14 @@ if (browser && typeof window !== 'undefined') {
             onWikipediaClick={helpers.handleWikipediaClick}
           />
         {:else}
-          <section class="mt-8 mb-4 space-y-1" aria-label="Accepted stories">
-            <h2 class="text-sm font-semibold tracking-tight text-gray-900 dark:text-gray-100">
-              {BRIEF_STORIES_SECTION_TITLE}
-            </h2>
-          </section>
+          {#if isBriefStoryViewCategory(state.currentCategory)}
+            <BriefClaimsLead batchId={state.currentBatchId} isLatestBatch={state.isLatestBatch} />
+            <section class="mt-8 mb-4 space-y-1" aria-label="Accepted stories">
+              <h2 class="text-sm font-semibold tracking-tight text-gray-900 dark:text-gray-100">
+                {BRIEF_STORIES_SECTION_TITLE}
+              </h2>
+            </section>
+          {/if}
           {#if state.currentCategory.toLowerCase() === "nhl"}
             <NHLScores />
             <NHLStandings />

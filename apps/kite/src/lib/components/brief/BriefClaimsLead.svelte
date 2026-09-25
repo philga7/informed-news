@@ -4,7 +4,6 @@
 		BRIEF_CLAIMS_HIDE_HEADLINES,
 		BRIEF_CLAIMS_LINKED_HEADLINES_LABEL,
 		BRIEF_CLAIMS_LOAD_ERROR,
-		BRIEF_CLAIMS_LOGIN_HINT,
 		BRIEF_CLAIMS_SECTION_TITLE,
 		BRIEF_CLAIMS_SHOW_HEADLINES,
 		BRIEF_CLAIMS_UNACCEPT_LABEL,
@@ -131,7 +130,6 @@
 				>
 					Open Radar login
 				</a>
-				<span class="ms-1 text-gray-500 dark:text-gray-400">({BRIEF_CLAIMS_LOGIN_HINT})</span>
 			{/if}
 		</p>
 	{/if}
