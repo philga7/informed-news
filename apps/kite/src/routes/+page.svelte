@@ -772,12 +772,14 @@ if (browser && typeof window !== 'undefined') {
             {/each}
           </div>
         {:else if derived.isSinglePageMode}
-          <BriefClaimsLead batchId={state.currentBatchId} isLatestBatch={state.isLatestBatch} />
-          <section class="mt-8 mb-4 space-y-1" aria-label="Accepted stories">
-            <h2 class="text-sm font-semibold tracking-tight text-gray-900 dark:text-gray-100">
-              {BRIEF_STORIES_SECTION_TITLE}
-            </h2>
-          </section>
+          {#if !state.isSharedArticleView}
+            <BriefClaimsLead batchId={state.currentBatchId} isLatestBatch={state.isLatestBatch} />
+            <section class="mt-8 mb-4 space-y-1" aria-label="Accepted stories">
+              <h2 class="text-sm font-semibold tracking-tight text-gray-900 dark:text-gray-100">
+                {BRIEF_STORIES_SECTION_TITLE}
+              </h2>
+            </section>
+          {/if}
           <StoryList
             bind:this={state.storyList}
             stories={derived.singlePageStories}
@@ -809,7 +811,7 @@ if (browser && typeof window !== 'undefined') {
             onWikipediaClick={helpers.handleWikipediaClick}
           />
         {:else}
-          {#if isBriefStoryViewCategory(state.currentCategory)}
+          {#if !state.isSharedArticleView && isBriefStoryViewCategory(state.currentCategory)}
             <BriefClaimsLead batchId={state.currentBatchId} isLatestBatch={state.isLatestBatch} />
             <section class="mt-8 mb-4 space-y-1" aria-label="Accepted stories">
               <h2 class="text-sm font-semibold tracking-tight text-gray-900 dark:text-gray-100">
