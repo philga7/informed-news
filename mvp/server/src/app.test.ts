@@ -20,6 +20,12 @@ import {
   unacceptClaim,
 } from './store/claimMembershipStore.js';
 import {
+  dismissClaimReview as storeDismissClaimReview,
+  enqueueClaimReview,
+  readClaimReviewQueue,
+  writeClaimReviewQueue,
+} from './store/claimReviewQueueStore.js';
+import {
   ackTrackedClaimUpdate,
   markTrackedClaimPending,
   readTrackedClaims,
@@ -58,6 +64,11 @@ function tempClaimMembershipPath(): string {
 function tempTrackedClaimsPath(): string {
   const dir = mkdtempSync(path.join(tmpdir(), 'tracked-claims-'));
   return path.join(dir, 'tracked-claims.json');
+}
+
+function tempClaimReviewQueuePath(): string {
+  const dir = mkdtempSync(path.join(tmpdir(), 'claim-review-queue-'));
+  return path.join(dir, 'claim-review-queue.json');
 }
 
 async function startServer(app: { listen: (...args: any[]) => Server }): Promise<{
@@ -738,6 +749,52 @@ test('POST /api/claims/accept requires session', async () => {
   }
 });
 
+test('POST /api/claims/review/dismiss requires session', async () => {
+  process.env.SESSION_SECRET = 'test-secret';
+  process.env.MVP_PASSWORD = 'pw';
+  delete process.env.MVP_PASSWORD_HASH;
+
+  const { createApp } = await import('./app.js');
+  const app = createApp();
+
+  const { baseUrl, close } = await startServer(app);
+  try {
+    const resp = await fetch(`${baseUrl}/api/claims/review/dismiss`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ claimId: 'claim-1' }),
+    });
+    assert.equal(resp.status, 401);
+    const body = (await resp.json()) as { ok: false; error: string };
+    assert.equal(body.ok, false);
+    assert.equal(body.error, 'Unauthorized');
+  } finally {
+    await close();
+  }
+});
+
+test('POST /api/claims/review/dismiss-all requires session', async () => {
+  process.env.SESSION_SECRET = 'test-secret';
+  process.env.MVP_PASSWORD = 'pw';
+  delete process.env.MVP_PASSWORD_HASH;
+
+  const { createApp } = await import('./app.js');
+  const app = createApp();
+
+  const { baseUrl, close } = await startServer(app);
+  try {
+    const resp = await fetch(`${baseUrl}/api/claims/review/dismiss-all`, {
+      method: 'POST',
+    });
+    assert.equal(resp.status, 401);
+    const body = (await resp.json()) as { ok: false; error: string };
+    assert.equal(body.ok, false);
+    assert.equal(body.error, 'Unauthorized');
+  } finally {
+    await close();
+  }
+});
+
 test('GET /api/claims/radar requires session', async () => {
   process.env.SESSION_SECRET = 'test-secret';
   process.env.MVP_PASSWORD = 'pw';
@@ -949,6 +1006,20 @@ test('POST /api/claims/accept default-tracks claimId', async () => {
 
   const membershipPath = tempClaimMembershipPath();
   const trackedPath = tempTrackedClaimsPath();
+  const reviewQueuePath = tempClaimReviewQueuePath();
+
+  await enqueueClaimReview(
+    {
+      id: 'review-1',
+      claimId: 'claim-1',
+      evidenceLinkId: 'link-1',
+      articleId: 'article-1',
+      reviewReasons: ['needs_review'],
+      candidateText: 'Example',
+      createdAt: '2026-09-21T00:00:00.000Z',
+    },
+    reviewQueuePath,
+  );
 
   const { createApp } = await import('./app.js');
   const app = createApp({
@@ -968,6 +1039,8 @@ test('POST /api/claims/accept default-tracks claimId', async () => {
     readClaimMembership: async () => await readClaimMembership(membershipPath),
     trackClaim: async (claimId) => await trackClaim(claimId, trackedPath),
     readTrackedClaims: async () => await readTrackedClaims(trackedPath),
+    dismissClaimReview: async (claimId) =>
+      await storeDismissClaimReview(claimId, reviewQueuePath),
   });
 
   const { baseUrl, close } = await startServer(app);
@@ -1004,6 +1077,182 @@ test('POST /api/claims/accept default-tracks claimId', async () => {
     assert.ok(entry);
     assert.equal(entry.pendingUpdate, false);
     assert.equal(typeof entry.trackedAt, 'string');
+
+    const queue = await readClaimReviewQueue(reviewQueuePath);
+    assert.deepEqual(queue, []);
+  } finally {
+    await close();
+  }
+});
+
+test('POST /api/claims/review/dismiss returns 404 when claimId missing from store', async () => {
+  process.env.SESSION_SECRET = 'test-secret';
+  process.env.MVP_PASSWORD = 'pw';
+  delete process.env.MVP_PASSWORD_HASH;
+
+  const { createApp } = await import('./app.js');
+  const app = createApp({
+    getClaimById: async () => null,
+  });
+
+  const { baseUrl, close } = await startServer(app);
+  try {
+    const cookie = await login(baseUrl);
+    const resp = await fetch(`${baseUrl}/api/claims/review/dismiss`, {
+      method: 'POST',
+      headers: { cookie, 'content-type': 'application/json' },
+      body: JSON.stringify({ claimId: 'missing' }),
+    });
+    assert.equal(resp.status, 404);
+    const body = (await resp.json()) as { ok: false; error: string };
+    assert.equal(body.ok, false);
+    assert.match(body.error, /not found/i);
+  } finally {
+    await close();
+  }
+});
+
+test('POST /api/claims/review/dismiss is idempotent when queue has no matching claim', async () => {
+  process.env.SESSION_SECRET = 'test-secret';
+  process.env.MVP_PASSWORD = 'pw';
+  delete process.env.MVP_PASSWORD_HASH;
+
+  const reviewQueuePath = tempClaimReviewQueuePath();
+  await writeClaimReviewQueue([], reviewQueuePath);
+
+  const { createApp } = await import('./app.js');
+  const app = createApp({
+    getClaimById: async () =>
+      ({
+        id: 'claim-1',
+        text: 'Example',
+        claimType: 'event_occurrence',
+        status: 'reported',
+        entities: [],
+        createdAt: '2026-09-21T00:00:00.000Z',
+        domain: 'conflict',
+      } as any),
+    dismissClaimReview: async (claimId) =>
+      await storeDismissClaimReview(claimId, reviewQueuePath),
+  });
+
+  const { baseUrl, close } = await startServer(app);
+  try {
+    const cookie = await login(baseUrl);
+    const resp = await fetch(`${baseUrl}/api/claims/review/dismiss`, {
+      method: 'POST',
+      headers: { cookie, 'content-type': 'application/json' },
+      body: JSON.stringify({ claimId: 'claim-1' }),
+    });
+    assert.equal(resp.status, 200);
+    const body = (await resp.json()) as {
+      ok: true;
+      dismissedClaimIds: string[];
+    };
+    assert.equal(body.ok, true);
+    assert.deepEqual(body.dismissedClaimIds, []);
+
+    const queue = await readClaimReviewQueue(reviewQueuePath);
+    assert.deepEqual(queue, []);
+  } finally {
+    await close();
+  }
+});
+
+test('POST /api/claims/review/dismiss-all only clears visible needs-review claim ids', async () => {
+  process.env.SESSION_SECRET = 'test-secret';
+  process.env.MVP_PASSWORD = 'pw';
+  delete process.env.MVP_PASSWORD_HASH;
+
+  const reviewQueuePath = tempClaimReviewQueuePath();
+  await writeClaimReviewQueue(
+    [
+      {
+        id: 'review-1',
+        claimId: 'claim-visible',
+        evidenceLinkId: 'link-1',
+        articleId: 'article-1',
+        reviewReasons: ['needs_review'],
+        candidateText: 'Visible review item',
+        createdAt: '2026-09-21T00:00:00.000Z',
+      },
+      {
+        id: 'review-2',
+        claimId: 'claim-hidden-muted',
+        evidenceLinkId: 'link-2',
+        articleId: 'article-2',
+        reviewReasons: ['needs_review'],
+        candidateText: 'Muted review item',
+        createdAt: '2026-09-21T01:00:00.000Z',
+      },
+      {
+        id: 'review-3',
+        claimId: 'claim-other',
+        evidenceLinkId: 'link-3',
+        articleId: 'article-3',
+        reviewReasons: ['needs_review'],
+        candidateText: 'Another review item',
+        createdAt: '2026-09-21T02:00:00.000Z',
+      },
+    ],
+    reviewQueuePath,
+  );
+
+  const { createApp } = await import('./app.js');
+  const app = createApp({
+    loadClaimsRadar: async () => ({
+      claims: [],
+      needsReview: [
+        {
+          claimId: 'claim-visible',
+          text: 'Visible claim',
+          claimType: 'event_occurrence',
+          status: 'reported',
+          createdAt: '2026-09-21T00:00:00.000Z',
+          confidence: null,
+          accepted: false,
+          tracked: false,
+          pendingUpdate: false,
+          evidence: {
+            total: 0,
+            supports: 0,
+            contradicts: 0,
+            mentions: 0,
+            primary: 0,
+            sensor: 0,
+          },
+          clusterKeys: [],
+          linkedHeadlines: [],
+          needsReview: true,
+          reviewReasons: ['needs_review'],
+        },
+      ],
+      hiddenMutedCount: 1,
+    }),
+    dismissClaimReview: async (claimId) =>
+      await storeDismissClaimReview(claimId, reviewQueuePath),
+  });
+
+  const { baseUrl, close } = await startServer(app);
+  try {
+    const cookie = await login(baseUrl);
+    const resp = await fetch(`${baseUrl}/api/claims/review/dismiss-all`, {
+      method: 'POST',
+      headers: { cookie },
+    });
+    assert.equal(resp.status, 200);
+    const body = (await resp.json()) as {
+      ok: true;
+      dismissedClaimIds: string[];
+    };
+    assert.equal(body.ok, true);
+    assert.deepEqual(body.dismissedClaimIds, ['claim-visible']);
+
+    const queue = await readClaimReviewQueue(reviewQueuePath);
+    assert.deepEqual(
+      queue.map((entry) => entry.claimId).sort(),
+      ['claim-hidden-muted', 'claim-other'],
+    );
   } finally {
     await close();
   }

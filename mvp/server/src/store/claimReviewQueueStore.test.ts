@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 import {
+  dismissClaimReview,
   enqueueClaimReview,
   readClaimReviewQueue,
   writeClaimReviewQueue,
@@ -90,4 +91,44 @@ test('enqueueClaimReview allows different triples', async () => {
 
   const stored = await readClaimReviewQueue(queuePath);
   assert.equal(stored.length, 2);
+});
+
+test('dismissClaimReview removes all queue entries for a claim id', async () => {
+  const queuePath = tempQueuePath();
+
+  await writeClaimReviewQueue(
+    [
+      sampleEntry(),
+      sampleEntry({
+        id: 'entry-2',
+        claimId: 'claim-1',
+        evidenceLinkId: 'link-2',
+        articleId: 'article-2',
+      }),
+      sampleEntry({
+        id: 'entry-3',
+        claimId: 'claim-2',
+        evidenceLinkId: 'link-3',
+        articleId: 'article-3',
+      }),
+    ],
+    queuePath,
+  );
+
+  const result = await dismissClaimReview('claim-1', queuePath);
+  assert.deepEqual(result.dismissedClaimIds, ['claim-1']);
+
+  const stored = await readClaimReviewQueue(queuePath);
+  assert.deepEqual(stored.map((entry) => entry.claimId), ['claim-2']);
+});
+
+test('dismissClaimReview is idempotent when queue has no matching claim', async () => {
+  const queuePath = tempQueuePath();
+  await writeClaimReviewQueue([sampleEntry()], queuePath);
+
+  const result = await dismissClaimReview('missing', queuePath);
+  assert.deepEqual(result.dismissedClaimIds, []);
+
+  const stored = await readClaimReviewQueue(queuePath);
+  assert.deepEqual(stored.map((entry) => entry.claimId), ['claim-1']);
 });
