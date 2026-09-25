@@ -105,7 +105,7 @@ Do **not** treat `_legacy/` (including `_legacy/mvp-web`) as the primary product
 
 Informed News work uses the **NEWS** project on Atlassian (`informedcrew.atlassian.net`). Prefer JQL `project = NEWS`.
 
-**Item ordering:** [docs/ROADMAP.md](docs/ROADMAP.md) — **Current next:** [NEWS-78](https://informedcrew.atlassian.net/browse/NEWS-78) Mark reviewed (Needs review dequeue). Then [NEWS-79](https://informedcrew.atlassian.net/browse/NEWS-79) extract gating. Epic **J** Done. Desk v1 (**NEWS-57**) Done-demo complete; Later children parked. Discernment: [docs/CLAIMS_DISCERNMENT.md](docs/CLAIMS_DISCERNMENT.md). Ask before parked Later or Epic **B**. Do not pick parked B–G epics unless the user reorders.
+**Item ordering:** [docs/ROADMAP.md](docs/ROADMAP.md) — **Current next:** [NEWS-79](https://informedcrew.atlassian.net/browse/NEWS-79) extract gating. Epic **J** Done; [NEWS-78](https://informedcrew.atlassian.net/browse/NEWS-78) Mark reviewed Done. Desk v1 (**NEWS-57**) Done-demo complete; Later children parked. Discernment: [docs/CLAIMS_DISCERNMENT.md](docs/CLAIMS_DISCERNMENT.md). Ask before parked Later or Epic **B**. Do not pick parked B–G epics unless the user reorders.
 
 **AI split (Epic J):** TypeSafe / Jev = structured judgments (Choice / Score / Noul + confidence). Ollama = claim-candidate proposal + Brief verbiage only — not classifier-of-record for claims. No Verified badges or claim verdicts.
 
