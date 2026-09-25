@@ -1,322 +1,335 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
-	import { goto } from '$app/navigation';
-	import { PRODUCT_NAME } from '$lib/brand';
-	import {
-		RADAR_ACCEPT_ERROR,
-		RADAR_ACCEPT_LABEL,
-		RADAR_ACCEPT_PENDING,
-		RADAR_CLAIMS_EMPTY_COPY,
-		RADAR_CLAIMS_HIDE_HEADLINES,
-		RADAR_CLAIMS_ACCEPT_ERROR,
-		RADAR_CLAIMS_LINKED_HEADLINES_LABEL,
-		RADAR_CLAIMS_LOAD_ERROR,
-		RADAR_CLAIMS_NEEDS_REVIEW_TITLE,
-		RADAR_CLAIMS_SECTION_TITLE,
-		RADAR_CLAIMS_TRACK_ERROR,
-		RADAR_CLAIMS_TRACKED_ACK_ERROR,
-		RADAR_CLAIMS_TRACKED_SECTION_HELP,
-		RADAR_CLAIMS_TRACKED_SECTION_TITLE,
-		RADAR_CLAIMS_SHOW_HEADLINES,
-		RADAR_EMPTY_COPY,
-		RADAR_ERROR_GENERIC,
-		RADAR_HEADLINE_CLUSTERS_SECTION_TITLE,
-		RADAR_HIDDEN_MUTED_PREFIX,
-		RADAR_LOGIN_INTRO,
-		RADAR_META_HELP,
-		RADAR_MUTED_LABEL,
-		RADAR_MUTES_ADD_LABEL,
-		RADAR_MUTES_DELETE_ERROR,
-		RADAR_MUTES_DELETE_LABEL,
-		RADAR_MUTES_EMPTY_COPY,
-		RADAR_MUTES_KEYWORD_LABEL,
-		RADAR_MUTES_LOAD_ERROR,
-		RADAR_MUTES_SAVE_ERROR,
-		RADAR_MUTES_SECTION_HELP,
-		RADAR_MUTES_SECTION_TITLE,
-		RADAR_MUTES_SOURCE_LABEL,
-		RADAR_NETWORK_ERROR,
-		RADAR_PAGE_DESCRIPTION,
-		RADAR_PAGE_TITLE,
-		RADAR_TRACKED_SECTION_HELP,
-		RADAR_TRACKED_SECTION_TITLE,
-		RADAR_TRACKED_ACK_ERROR,
-		RADAR_TRACKED_DISMISS_LABEL,
-		RADAR_TRACKED_DISMISS_PENDING,
-		RADAR_TRACKED_UPDATE_BADGE,
-		RADAR_TRACK_ERROR,
-		RADAR_TRACK_LABEL,
-		RADAR_TRACK_PENDING,
-		RADAR_UNACCEPT_LABEL,
-		RADAR_UNTRACK_LABEL,
-	} from '$lib/radar';
+import { onMount } from 'svelte';
+import { goto } from '$app/navigation';
+import { PRODUCT_NAME } from '$lib/brand';
+import {
+	RADAR_ACCEPT_ERROR,
+	RADAR_ACCEPT_LABEL,
+	RADAR_ACCEPT_PENDING,
+	RADAR_CLAIMS_ACCEPT_ERROR,
+	RADAR_CLAIMS_EMPTY_COPY,
+	RADAR_CLAIMS_HIDE_HEADLINES,
+	RADAR_CLAIMS_LINKED_HEADLINES_LABEL,
+	RADAR_CLAIMS_LOAD_ERROR,
+	RADAR_CLAIMS_MARK_ALL_REVIEWED_CONFIRM_TEMPLATE,
+	RADAR_CLAIMS_MARK_ALL_REVIEWED_LABEL,
+	RADAR_CLAIMS_MARK_REVIEWED_ERROR,
+	RADAR_CLAIMS_MARK_REVIEWED_LABEL,
+	RADAR_CLAIMS_MARK_REVIEWED_PENDING,
+	RADAR_CLAIMS_NEEDS_REVIEW_TITLE,
+	RADAR_CLAIMS_SECTION_TITLE,
+	RADAR_CLAIMS_SHOW_HEADLINES,
+	RADAR_CLAIMS_TRACK_ERROR,
+	RADAR_CLAIMS_TRACKED_ACK_ERROR,
+	RADAR_CLAIMS_TRACKED_SECTION_HELP,
+	RADAR_CLAIMS_TRACKED_SECTION_TITLE,
+	RADAR_EMPTY_COPY,
+	RADAR_ERROR_GENERIC,
+	RADAR_HEADLINE_CLUSTERS_SECTION_TITLE,
+	RADAR_HIDDEN_MUTED_PREFIX,
+	RADAR_LOGIN_INTRO,
+	RADAR_META_HELP,
+	RADAR_MUTED_LABEL,
+	RADAR_MUTES_ADD_LABEL,
+	RADAR_MUTES_DELETE_ERROR,
+	RADAR_MUTES_DELETE_LABEL,
+	RADAR_MUTES_EMPTY_COPY,
+	RADAR_MUTES_KEYWORD_LABEL,
+	RADAR_MUTES_LOAD_ERROR,
+	RADAR_MUTES_SAVE_ERROR,
+	RADAR_MUTES_SECTION_HELP,
+	RADAR_MUTES_SECTION_TITLE,
+	RADAR_MUTES_SOURCE_LABEL,
+	RADAR_NETWORK_ERROR,
+	RADAR_PAGE_DESCRIPTION,
+	RADAR_PAGE_TITLE,
+	RADAR_TRACK_ERROR,
+	RADAR_TRACK_LABEL,
+	RADAR_TRACK_PENDING,
+	RADAR_TRACKED_ACK_ERROR,
+	RADAR_TRACKED_DISMISS_LABEL,
+	RADAR_TRACKED_DISMISS_PENDING,
+	RADAR_TRACKED_SECTION_HELP,
+	RADAR_TRACKED_SECTION_TITLE,
+	RADAR_TRACKED_UPDATE_BADGE,
+	RADAR_UNACCEPT_LABEL,
+	RADAR_UNTRACK_LABEL,
+} from '$lib/radar';
 
-	type ClaimRadarLinkedHeadline = {
-		id: string;
-		title: string;
-		sourceKind: string;
-		publisherDomain: string | null;
-		publishedAt: string | null;
-		canonicalUrl: string;
-		sourceTier: 'primary' | 'sensor';
-		stance: 'supports' | 'contradicts' | 'mentions';
-	};
+type ClaimRadarLinkedHeadline = {
+	id: string;
+	title: string;
+	sourceKind: string;
+	publisherDomain: string | null;
+	publishedAt: string | null;
+	canonicalUrl: string;
+	sourceTier: 'primary' | 'sensor';
+	stance: 'supports' | 'contradicts' | 'mentions';
+};
 
-	type ClaimRadarEvidenceCounts = {
-		total: number;
-		supports: number;
-		contradicts: number;
-		mentions: number;
-		primary: number;
-		sensor: number;
-	};
+type ClaimRadarEvidenceCounts = {
+	total: number;
+	supports: number;
+	contradicts: number;
+	mentions: number;
+	primary: number;
+	sensor: number;
+};
 
-	type ClaimRadarItem = {
-		claimId: string;
-		text: string;
-		claimType: string;
-		status: string;
-		createdAt: string;
-		confidence: number | null;
-		evidence: ClaimRadarEvidenceCounts;
-		clusterKeys: string[];
-		linkedHeadlines: ClaimRadarLinkedHeadline[];
-		needsReview: boolean;
-		reviewReasons: string[];
-		accepted: boolean;
-		tracked: boolean;
-		pendingUpdate: boolean;
-	};
+type ClaimRadarItem = {
+	claimId: string;
+	text: string;
+	claimType: string;
+	status: string;
+	createdAt: string;
+	confidence: number | null;
+	evidence: ClaimRadarEvidenceCounts;
+	clusterKeys: string[];
+	linkedHeadlines: ClaimRadarLinkedHeadline[];
+	needsReview: boolean;
+	reviewReasons: string[];
+	accepted: boolean;
+	tracked: boolean;
+	pendingUpdate: boolean;
+};
 
-	type ClaimsRadarResponse =
-		| {
-				ok: true;
-				claims: ClaimRadarItem[];
-				needsReview: ClaimRadarItem[];
-				hiddenMutedCount: number;
-		  }
-		| {
-				ok: false;
-				error: string;
-		  };
+type ClaimsRadarResponse =
+	| {
+			ok: true;
+			claims: ClaimRadarItem[];
+			needsReview: ClaimRadarItem[];
+			hiddenMutedCount: number;
+	  }
+	| {
+			ok: false;
+			error: string;
+	  };
 
-	type RadarHeadline = {
-		id: string;
-		title: string;
-		sourceKind: 'cfp' | 'rss';
-		publisherDomain: string | null;
-		publishedAt: string | null;
-		canonicalUrl: string;
-		citationLabel: string | null;
-	};
+type RadarHeadline = {
+	id: string;
+	title: string;
+	sourceKind: 'cfp' | 'rss';
+	publisherDomain: string | null;
+	publishedAt: string | null;
+	canonicalUrl: string;
+	citationLabel: string | null;
+};
 
-	type RadarCluster = {
-		clusterId: string;
-		headlines: RadarHeadline[];
-		newestAt: string | null;
-		accepted: boolean;
-		tracked: boolean;
-		pendingUpdate?: boolean;
-	};
+type RadarCluster = {
+	clusterId: string;
+	headlines: RadarHeadline[];
+	newestAt: string | null;
+	accepted: boolean;
+	tracked: boolean;
+	pendingUpdate?: boolean;
+};
 
-	type MuteRule = {
-		id: string;
-		keyword: string;
-		source: string | null;
-		createdAt: string;
-	};
+type MuteRule = {
+	id: string;
+	keyword: string;
+	source: string | null;
+	createdAt: string;
+};
 
-	type RadarMeta = {
-		lastFetchAt: string | null;
-		lastError: string | null;
-	};
+type RadarMeta = {
+	lastFetchAt: string | null;
+	lastError: string | null;
+};
 
-	type TrackedEntry = {
-		clusterId: string;
-		trackedAt: string;
-		memberCountSnapshot: number;
-		pendingUpdate: boolean;
-		muted?: boolean;
-	};
+type TrackedEntry = {
+	clusterId: string;
+	trackedAt: string;
+	memberCountSnapshot: number;
+	pendingUpdate: boolean;
+	muted?: boolean;
+};
 
-	type TrackedClaimEntry = {
-		claimId: string;
-		trackedAt: string;
-		pendingUpdate: boolean;
-	};
+type TrackedClaimEntry = {
+	claimId: string;
+	trackedAt: string;
+	pendingUpdate: boolean;
+};
 
-	type RadarResponse =
-		| {
-				ok: true;
-				clusters: RadarCluster[];
-				hiddenMutedCount: number;
-				meta: RadarMeta;
-		  }
-		| {
-				ok: false;
-				error: string;
-		  };
+type RadarResponse =
+	| {
+			ok: true;
+			clusters: RadarCluster[];
+			hiddenMutedCount: number;
+			meta: RadarMeta;
+	  }
+	| {
+			ok: false;
+			error: string;
+	  };
 
-	type MutesResponse =
-		| {
-				ok: true;
-				rules: MuteRule[];
-				updatedAt: string | null;
-		  }
-		| {
-				ok: false;
-				error: string;
-		  };
+type MutesResponse =
+	| {
+			ok: true;
+			rules: MuteRule[];
+			updatedAt: string | null;
+	  }
+	| {
+			ok: false;
+			error: string;
+	  };
 
-	type TrackedResponse =
-		| {
-				ok: true;
-				entries: TrackedEntry[];
-				updatedAt: string | null;
-		  }
-		| {
-				ok: false;
-				error: string;
-		  };
+type TrackedResponse =
+	| {
+			ok: true;
+			entries: TrackedEntry[];
+			updatedAt: string | null;
+	  }
+	| {
+			ok: false;
+			error: string;
+	  };
 
-	type TrackedClaimsResponse =
-		| {
-				ok: true;
-				entries: TrackedClaimEntry[];
-				updatedAt: string | null;
-		  }
-		| {
-				ok: false;
-				error: string;
-		  };
+type TrackedClaimsResponse =
+	| {
+			ok: true;
+			entries: TrackedClaimEntry[];
+			updatedAt: string | null;
+	  }
+	| {
+			ok: false;
+			error: string;
+	  };
 
-	let loading = true;
-	let unauthenticated = false;
-	let needsReviewClaims: ClaimRadarItem[] = [];
-	let claims: ClaimRadarItem[] = [];
-	let clusters: RadarCluster[] = [];
-	let trackedEntries: TrackedEntry[] = [];
-	let trackedClaimEntries: TrackedClaimEntry[] = [];
-	let hiddenMutedCount = 0;
-	let meta: RadarMeta | null = null;
-	let claimsError: string | null = null;
-	let clustersError: string | null = null;
+let loading = true;
+let unauthenticated = false;
+let needsReviewClaims: ClaimRadarItem[] = [];
+let claims: ClaimRadarItem[] = [];
+let clusters: RadarCluster[] = [];
+let trackedEntries: TrackedEntry[] = [];
+let trackedClaimEntries: TrackedClaimEntry[] = [];
+let hiddenMutedCount = 0;
+let meta: RadarMeta | null = null;
+let claimsError: string | null = null;
+let clustersError: string | null = null;
 
-	let password = '';
-	let loginError: string | null = null;
-	let loggingIn = false;
-	let pendingClusterId: string | null = null;
-	let pendingTrackClusterId: string | null = null;
-	let pendingAckClusterId: string | null = null;
-	let pendingClaimId: string | null = null;
-	let pendingTrackClaimId: string | null = null;
-	let pendingAckClaimId: string | null = null;
-	let acceptError: string | null = null;
-	let trackError: string | null = null;
-	let ackError: string | null = null;
-	let claimAcceptError: string | null = null;
-	let claimTrackError: string | null = null;
-	let claimAckError: string | null = null;
+let password = '';
+let loginError: string | null = null;
+let loggingIn = false;
+let pendingClusterId: string | null = null;
+let pendingTrackClusterId: string | null = null;
+let pendingAckClusterId: string | null = null;
+let pendingClaimId: string | null = null;
+let pendingTrackClaimId: string | null = null;
+let pendingAckClaimId: string | null = null;
+let pendingReviewedClaimId: string | null = null;
+let pendingReviewAll = false;
+let acceptError: string | null = null;
+let trackError: string | null = null;
+let ackError: string | null = null;
+let claimAcceptError: string | null = null;
+let claimTrackError: string | null = null;
+let claimAckError: string | null = null;
+let claimReviewError: string | null = null;
 
-	let muteRules: MuteRule[] = [];
-	let muteLoadError: string | null = null;
-	let pendingMute = false;
-	let pendingDeleteMuteId: string | null = null;
-	let muteActionError: string | null = null;
-	let keyword = '';
-	let source = '';
+let muteRules: MuteRule[] = [];
+let muteLoadError: string | null = null;
+let pendingMute = false;
+let pendingDeleteMuteId: string | null = null;
+let muteActionError: string | null = null;
+let keyword = '';
+let source = '';
 
-	let expandedClaimIds = new Set<string>();
+let expandedClaimIds = new Set<string>();
 
-	function trackedClusterRows(): Array<
-		| { kind: 'resolved'; entry: TrackedEntry; cluster: RadarCluster }
-		| { kind: 'stub'; entry: TrackedEntry }
-	> {
-		const byClusterId = new Map(clusters.map((c) => [c.clusterId, c]));
-		const entries = [...trackedEntries].sort((a, b) => b.trackedAt.localeCompare(a.trackedAt));
-		return entries.map((entry) => {
-			const resolved = byClusterId.get(entry.clusterId);
-			if (resolved) return { kind: 'resolved', entry, cluster: resolved };
-			return { kind: 'stub', entry };
-		});
+function trackedClusterRows(): Array<
+	| { kind: 'resolved'; entry: TrackedEntry; cluster: RadarCluster }
+	| { kind: 'stub'; entry: TrackedEntry }
+> {
+	const byClusterId = new Map(clusters.map((c) => [c.clusterId, c]));
+	const entries = [...trackedEntries].sort((a, b) => b.trackedAt.localeCompare(a.trackedAt));
+	return entries.map((entry) => {
+		const resolved = byClusterId.get(entry.clusterId);
+		if (resolved) return { kind: 'resolved', entry, cluster: resolved };
+		return { kind: 'stub', entry };
+	});
+}
+
+function trackedClaimRows(): Array<
+	| { kind: 'resolved'; entry: TrackedClaimEntry; claim: ClaimRadarItem }
+	| { kind: 'stub'; entry: TrackedClaimEntry }
+> {
+	const byClaimId = new Map<string, ClaimRadarItem>(
+		[...needsReviewClaims, ...claims].map((c) => [c.claimId, c]),
+	);
+	const entries = [...trackedClaimEntries].sort((a, b) => b.trackedAt.localeCompare(a.trackedAt));
+	return entries.map((entry) => {
+		const resolved = byClaimId.get(entry.claimId);
+		if (resolved) return { kind: 'resolved', entry, claim: resolved };
+		return { kind: 'stub', entry };
+	});
+}
+
+function updateClaim(claimId: string, updater: (claim: ClaimRadarItem) => ClaimRadarItem): void {
+	needsReviewClaims = needsReviewClaims.map((claim) =>
+		claim.claimId === claimId ? updater(claim) : claim,
+	);
+	claims = claims.map((claim) => (claim.claimId === claimId ? updater(claim) : claim));
+}
+
+function formatDateTime(value: string | null): string {
+	if (!value) return 'not yet run';
+	const date = new Date(value);
+	if (Number.isNaN(date.getTime())) {
+		return value;
 	}
+	return date.toLocaleString(undefined, {
+		dateStyle: 'medium',
+		timeStyle: 'short',
+	});
+}
 
-	function trackedClaimRows(): Array<
-		| { kind: 'resolved'; entry: TrackedClaimEntry; claim: ClaimRadarItem }
-		| { kind: 'stub'; entry: TrackedClaimEntry }
-	> {
-		const byClaimId = new Map<string, ClaimRadarItem>(
-			[...needsReviewClaims, ...claims].map((c) => [c.claimId, c]),
-		);
-		const entries = [...trackedClaimEntries].sort((a, b) => b.trackedAt.localeCompare(a.trackedAt));
-		return entries.map((entry) => {
-			const resolved = byClaimId.get(entry.claimId);
-			if (resolved) return { kind: 'resolved', entry, claim: resolved };
-			return { kind: 'stub', entry };
-		});
+function humanizeLabel(value: string): string {
+	if (!value) return '';
+	return value
+		.replace(/[_-]+/g, ' ')
+		.replace(/\s+/g, ' ')
+		.trim()
+		.replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function formatConfidence(value: number | null): string {
+	if (value === null || value === undefined) return '—';
+	if (!Number.isFinite(value)) return '—';
+	const percent = Math.round(value * 100);
+	return `${percent}%`;
+}
+
+function toggleClaimExpanded(claimId: string): void {
+	const next = new Set(expandedClaimIds);
+	if (next.has(claimId)) next.delete(claimId);
+	else next.add(claimId);
+	expandedClaimIds = next;
+}
+
+function markAllReviewedConfirm(count: number): string {
+	return RADAR_CLAIMS_MARK_ALL_REVIEWED_CONFIRM_TEMPLATE.replace('{count}', String(count));
+}
+
+async function loadRadar(initial = false): Promise<void> {
+	if (initial) {
+		unauthenticated = false;
 	}
+	loading = true;
+	claimsError = null;
+	clustersError = null;
+	acceptError = null;
+	trackError = null;
+	ackError = null;
+	claimAcceptError = null;
+	claimTrackError = null;
+	claimAckError = null;
+	claimReviewError = null;
+	muteLoadError = null;
+	muteActionError = null;
 
-	function updateClaim(claimId: string, updater: (claim: ClaimRadarItem) => ClaimRadarItem): void {
-		needsReviewClaims = needsReviewClaims.map((claim) =>
-			claim.claimId === claimId ? updater(claim) : claim,
-		);
-		claims = claims.map((claim) => (claim.claimId === claimId ? updater(claim) : claim));
-	}
-
-	function formatDateTime(value: string | null): string {
-		if (!value) return 'not yet run';
-		const date = new Date(value);
-		if (Number.isNaN(date.getTime())) {
-			return value;
-		}
-		return date.toLocaleString(undefined, {
-			dateStyle: 'medium',
-			timeStyle: 'short',
-		});
-	}
-
-	function humanizeLabel(value: string): string {
-		if (!value) return '';
-		return value
-			.replace(/[_-]+/g, ' ')
-			.replace(/\s+/g, ' ')
-			.trim()
-			.replace(/\b\w/g, (c) => c.toUpperCase());
-	}
-
-	function formatConfidence(value: number | null): string {
-		if (value === null || value === undefined) return '—';
-		if (!Number.isFinite(value)) return '—';
-		const percent = Math.round(value * 100);
-		return `${percent}%`;
-	}
-
-	function toggleClaimExpanded(claimId: string): void {
-		const next = new Set(expandedClaimIds);
-		if (next.has(claimId)) next.delete(claimId);
-		else next.add(claimId);
-		expandedClaimIds = next;
-	}
-
-	async function loadRadar(initial = false): Promise<void> {
-		if (initial) {
-			unauthenticated = false;
-		}
-		loading = true;
-		claimsError = null;
-		clustersError = null;
-		acceptError = null;
-		trackError = null;
-		ackError = null;
-		claimAcceptError = null;
-		claimTrackError = null;
-		claimAckError = null;
-		muteLoadError = null;
-		muteActionError = null;
-
-		try {
-			const [claimsResponse, radarResponse, trackedResponse, trackedClaimsResponse, mutesResponse] =
-				await Promise.all([
+	try {
+		const [claimsResponse, radarResponse, trackedResponse, trackedClaimsResponse, mutesResponse] =
+			await Promise.all([
 				fetch('/api/claims/radar', { credentials: 'include' }),
 				fetch('/api/radar', { credentials: 'include' }),
 				fetch('/api/brief/tracked', { credentials: 'include' }),
@@ -324,358 +337,14 @@
 				fetch('/api/brief/mutes', { credentials: 'include' }),
 			]);
 
-			if (
-				claimsResponse.status === 401 ||
-				radarResponse.status === 401 ||
-				trackedResponse.status === 401 ||
-				trackedClaimsResponse.status === 401 ||
-				mutesResponse.status === 401
-			) {
-				unauthenticated = true;
-				needsReviewClaims = [];
-				claims = [];
-				clusters = [];
-				trackedEntries = [];
-				trackedClaimEntries = [];
-				muteRules = [];
-				hiddenMutedCount = 0;
-				meta = null;
-				claimsError = null;
-				clustersError = null;
-				return;
-			}
-
-			let claimsHiddenMutedCount = 0;
-			if (!claimsResponse.ok) {
-				const body = (await claimsResponse.json().catch(() => null)) as ClaimsRadarResponse | null;
-				claimsError = (body && !body.ok && body.error) || RADAR_CLAIMS_LOAD_ERROR;
-				needsReviewClaims = [];
-				claims = [];
-			} else {
-				const body = (await claimsResponse.json().catch(() => null)) as ClaimsRadarResponse | null;
-				if (body && body.ok) {
-					needsReviewClaims = body.needsReview;
-					claims = body.claims;
-					claimsHiddenMutedCount =
-						typeof body.hiddenMutedCount === 'number' ? body.hiddenMutedCount : 0;
-				} else {
-					claimsError = (body && !body.ok && body.error) || RADAR_CLAIMS_LOAD_ERROR;
-					needsReviewClaims = [];
-					claims = [];
-				}
-			}
-
-			let clustersHiddenMutedCount = 0;
-			if (!radarResponse.ok) {
-				const body = (await radarResponse.json().catch(() => null)) as RadarResponse | null;
-				clustersError = (body && !body.ok && body.error) || RADAR_ERROR_GENERIC;
-				clusters = [];
-				meta = null;
-			} else {
-				const body = (await radarResponse.json().catch(() => null)) as RadarResponse | null;
-				if (body && body.ok) {
-					clusters = body.clusters;
-					clustersHiddenMutedCount =
-						typeof body.hiddenMutedCount === 'number' ? body.hiddenMutedCount : 0;
-					meta = body.meta;
-				} else {
-					clustersError = (body && !body.ok && body.error) || RADAR_ERROR_GENERIC;
-					clusters = [];
-					meta = null;
-				}
-			}
-
-			hiddenMutedCount = Math.max(claimsHiddenMutedCount, clustersHiddenMutedCount);
-
-			if (!mutesResponse.ok) {
-				muteRules = [];
-				const mutes = (await mutesResponse.json().catch(() => null)) as MutesResponse | null;
-				muteLoadError =
-					(mutes && !mutes.ok && mutes.error) ||
-					RADAR_MUTES_LOAD_ERROR;
-			} else {
-				const mutes = (await mutesResponse.json().catch(() => null)) as MutesResponse | null;
-				if (mutes && mutes.ok) {
-					muteRules = mutes.rules;
-				} else {
-					muteRules = [];
-					muteLoadError =
-						(mutes && !mutes.ok && mutes.error) ||
-						RADAR_MUTES_LOAD_ERROR;
-				}
-			}
-
-			// Do not leave a stale tracked list mounted after transient failures.
-			// Any tracked-endpoint failure (non-401) clears trackedEntries rather than keeping
-			// the last successful list as if it were current.
-			if (!trackedResponse.ok) {
-				trackedEntries = [];
-				const tracked = (await trackedResponse.json().catch(() => null)) as TrackedResponse | null;
-				trackError =
-					(tracked && !tracked.ok && tracked.error) ||
-					RADAR_TRACK_ERROR;
-			} else {
-				const tracked = (await trackedResponse.json().catch(() => null)) as TrackedResponse | null;
-				if (tracked && tracked.ok) {
-					trackedEntries = tracked.entries;
-				} else {
-					trackedEntries = [];
-					trackError =
-						(tracked && !tracked.ok && tracked.error) ||
-						RADAR_TRACK_ERROR;
-				}
-			}
-
-			if (!trackedClaimsResponse.ok) {
-				trackedClaimEntries = [];
-				const tracked = (await trackedClaimsResponse.json().catch(() => null)) as
-					| TrackedClaimsResponse
-					| null;
-				claimTrackError =
-					(tracked && !tracked.ok && tracked.error) ||
-					RADAR_CLAIMS_TRACK_ERROR;
-			} else {
-				const tracked = (await trackedClaimsResponse.json().catch(() => null)) as
-					| TrackedClaimsResponse
-					| null;
-				if (tracked && tracked.ok) {
-					trackedClaimEntries = tracked.entries;
-				} else {
-					trackedClaimEntries = [];
-					claimTrackError =
-						(tracked && !tracked.ok && tracked.error) ||
-						RADAR_CLAIMS_TRACK_ERROR;
-				}
-			}
-		} catch (err) {
-			console.error('Error loading radar', err);
-			claimsError = RADAR_NETWORK_ERROR;
-			clustersError = RADAR_NETWORK_ERROR;
-		} finally {
-			loading = false;
-		}
-	}
-
-	async function ackTrackedUpdate(clusterId: string): Promise<boolean> {
-		if (pendingAckClusterId || loading) return false;
-
-		pendingAckClusterId = clusterId;
-		ackError = null;
-
-		try {
-			const response = await fetch('/api/brief/tracked/ack', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				credentials: 'include',
-				body: JSON.stringify({ clusterId }),
-			});
-
-			if (response.status === 401) {
-				unauthenticated = true;
-				needsReviewClaims = [];
-				claims = [];
-				clusters = [];
-				trackedEntries = [];
-				trackedClaimEntries = [];
-				muteRules = [];
-				hiddenMutedCount = 0;
-				meta = null;
-				claimsError = null;
-				clustersError = null;
-				return false;
-			}
-
-			const body = (await response.json().catch(() => null)) as
-				| { ok?: boolean; error?: string; entries?: TrackedEntry[] }
-				| null;
-
-			if (!response.ok || (body && body.ok === false)) {
-				ackError = (body && body.error) || RADAR_TRACKED_ACK_ERROR;
-				return false;
-			}
-
-			if (body && Array.isArray(body.entries)) {
-				trackedEntries = body.entries;
-			} else {
-				await loadRadar();
-			}
-
-			return true;
-		} catch (err) {
-			console.error('Error acknowledging tracked update', err);
-			ackError = RADAR_NETWORK_ERROR;
-			return false;
-		} finally {
-			pendingAckClusterId = null;
-		}
-	}
-
-	async function openOnBrief(clusterId: string, pendingUpdate: boolean): Promise<void> {
-		if (pendingUpdate) {
-			const ok = await ackTrackedUpdate(clusterId);
-			if (!ok) return;
-		}
-		await goto('/');
-	}
-
-	async function addMuteRule(event: SubmitEvent): Promise<void> {
-		event.preventDefault();
-		if (pendingMute || loading) return;
-
-		const nextKeyword = keyword.trim();
-		const nextSource = source.trim();
-		if (!nextKeyword) {
-			muteActionError = 'Keyword is required.';
-			return;
-		}
-
-		muteActionError = null;
-		pendingMute = true;
-
-		try {
-			const response = await fetch('/api/brief/mutes', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				credentials: 'include',
-				body: JSON.stringify({
-					keyword: nextKeyword,
-					...(nextSource ? { source: nextSource } : {}),
-				}),
-			});
-
-			if (response.status === 401) {
-				unauthenticated = true;
-				needsReviewClaims = [];
-				claims = [];
-				clusters = [];
-				trackedEntries = [];
-				trackedClaimEntries = [];
-				muteRules = [];
-				hiddenMutedCount = 0;
-				meta = null;
-				claimsError = null;
-				clustersError = null;
-				return;
-			}
-
-			const body = (await response.json().catch(() => null)) as
-				| { ok?: boolean; error?: string; rules?: MuteRule[] }
-				| null;
-
-			if (!response.ok || (body && body.ok === false)) {
-				muteActionError =
-					(body && body.error) || RADAR_MUTES_SAVE_ERROR;
-				return;
-			}
-
-			keyword = '';
-			source = '';
-			await loadRadar();
-		} catch (err) {
-			console.error('Error creating mute rule', err);
-			muteActionError = RADAR_NETWORK_ERROR;
-		} finally {
-			pendingMute = false;
-		}
-	}
-
-	async function deleteMuteRule(id: string): Promise<void> {
-		if (pendingDeleteMuteId || loading) return;
-		pendingDeleteMuteId = id;
-		muteActionError = null;
-
-		try {
-			const response = await fetch(`/api/brief/mutes/${encodeURIComponent(id)}`, {
-				method: 'DELETE',
-				credentials: 'include',
-			});
-
-			if (response.status === 401) {
-				unauthenticated = true;
-				needsReviewClaims = [];
-				claims = [];
-				clusters = [];
-				trackedEntries = [];
-				trackedClaimEntries = [];
-				muteRules = [];
-				hiddenMutedCount = 0;
-				meta = null;
-				claimsError = null;
-				clustersError = null;
-				return;
-			}
-
-			const body = (await response.json().catch(() => null)) as
-				| { ok?: boolean; error?: string; rules?: MuteRule[] }
-				| null;
-
-			if (!response.ok || (body && body.ok === false)) {
-				muteActionError =
-					(body && body.error) || RADAR_MUTES_DELETE_ERROR;
-				return;
-			}
-
-			await loadRadar();
-		} catch (err) {
-			console.error('Error deleting mute rule', err);
-			muteActionError = RADAR_NETWORK_ERROR;
-		} finally {
-			pendingDeleteMuteId = null;
-		}
-	}
-
-	async function handleLogin(event: SubmitEvent): Promise<void> {
-		event.preventDefault();
-
-		if (!password || loggingIn) return;
-
-		loginError = null;
-		loggingIn = true;
-
-		try {
-			const response = await fetch('/api/login', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-				},
-				credentials: 'include',
-				body: JSON.stringify({ password }),
-			});
-
-			const body = (await response.json().catch(() => null)) as
-				| { ok?: boolean; error?: string }
-				| null;
-
-			if (!response.ok || (body && body.ok === false)) {
-				loginError =
-					(body && body.error) ||
-					'Login failed. Check the password and try again.';
-				return;
-			}
-
-			password = '';
-			unauthenticated = false;
-			await loadRadar();
-		} catch (err) {
-			console.error('Error during radar login', err);
-			loginError = RADAR_NETWORK_ERROR;
-		} finally {
-			loggingIn = false;
-		}
-	}
-
-	async function handleLogout(): Promise<void> {
-		try {
-			await fetch('/api/logout', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-				},
-				credentials: 'include',
-			});
-		} catch (err) {
-			console.error('Error during radar logout', err);
-		} finally {
+		if (
+			claimsResponse.status === 401 ||
+			radarResponse.status === 401 ||
+			trackedResponse.status === 401 ||
+			trackedClaimsResponse.status === 401 ||
+			mutesResponse.status === 401
+		) {
+			unauthenticated = true;
 			needsReviewClaims = [];
 			claims = [];
 			clusters = [];
@@ -686,357 +355,806 @@
 			meta = null;
 			claimsError = null;
 			clustersError = null;
-			acceptError = null;
-			trackError = null;
-			ackError = null;
-			claimAcceptError = null;
-			claimTrackError = null;
-			claimAckError = null;
-			muteLoadError = null;
-			muteActionError = null;
-			pendingClusterId = null;
-			pendingTrackClusterId = null;
-			pendingAckClusterId = null;
-			pendingClaimId = null;
-			pendingTrackClaimId = null;
-			pendingAckClaimId = null;
+			return;
+		}
+
+		let claimsHiddenMutedCount = 0;
+		if (!claimsResponse.ok) {
+			const body = (await claimsResponse.json().catch(() => null)) as ClaimsRadarResponse | null;
+			claimsError = (body && !body.ok && body.error) || RADAR_CLAIMS_LOAD_ERROR;
+			needsReviewClaims = [];
+			claims = [];
+		} else {
+			const body = (await claimsResponse.json().catch(() => null)) as ClaimsRadarResponse | null;
+			if (body && body.ok) {
+				needsReviewClaims = body.needsReview;
+				claims = body.claims;
+				claimsHiddenMutedCount =
+					typeof body.hiddenMutedCount === 'number' ? body.hiddenMutedCount : 0;
+			} else {
+				claimsError = (body && !body.ok && body.error) || RADAR_CLAIMS_LOAD_ERROR;
+				needsReviewClaims = [];
+				claims = [];
+			}
+		}
+
+		let clustersHiddenMutedCount = 0;
+		if (!radarResponse.ok) {
+			const body = (await radarResponse.json().catch(() => null)) as RadarResponse | null;
+			clustersError = (body && !body.ok && body.error) || RADAR_ERROR_GENERIC;
+			clusters = [];
+			meta = null;
+		} else {
+			const body = (await radarResponse.json().catch(() => null)) as RadarResponse | null;
+			if (body && body.ok) {
+				clusters = body.clusters;
+				clustersHiddenMutedCount =
+					typeof body.hiddenMutedCount === 'number' ? body.hiddenMutedCount : 0;
+				meta = body.meta;
+			} else {
+				clustersError = (body && !body.ok && body.error) || RADAR_ERROR_GENERIC;
+				clusters = [];
+				meta = null;
+			}
+		}
+
+		hiddenMutedCount = Math.max(claimsHiddenMutedCount, clustersHiddenMutedCount);
+
+		if (!mutesResponse.ok) {
+			muteRules = [];
+			const mutes = (await mutesResponse.json().catch(() => null)) as MutesResponse | null;
+			muteLoadError = (mutes && !mutes.ok && mutes.error) || RADAR_MUTES_LOAD_ERROR;
+		} else {
+			const mutes = (await mutesResponse.json().catch(() => null)) as MutesResponse | null;
+			if (mutes && mutes.ok) {
+				muteRules = mutes.rules;
+			} else {
+				muteRules = [];
+				muteLoadError = (mutes && !mutes.ok && mutes.error) || RADAR_MUTES_LOAD_ERROR;
+			}
+		}
+
+		// Do not leave a stale tracked list mounted after transient failures.
+		// Any tracked-endpoint failure (non-401) clears trackedEntries rather than keeping
+		// the last successful list as if it were current.
+		if (!trackedResponse.ok) {
+			trackedEntries = [];
+			const tracked = (await trackedResponse.json().catch(() => null)) as TrackedResponse | null;
+			trackError = (tracked && !tracked.ok && tracked.error) || RADAR_TRACK_ERROR;
+		} else {
+			const tracked = (await trackedResponse.json().catch(() => null)) as TrackedResponse | null;
+			if (tracked && tracked.ok) {
+				trackedEntries = tracked.entries;
+			} else {
+				trackedEntries = [];
+				trackError = (tracked && !tracked.ok && tracked.error) || RADAR_TRACK_ERROR;
+			}
+		}
+
+		if (!trackedClaimsResponse.ok) {
+			trackedClaimEntries = [];
+			const tracked = (await trackedClaimsResponse
+				.json()
+				.catch(() => null)) as TrackedClaimsResponse | null;
+			claimTrackError = (tracked && !tracked.ok && tracked.error) || RADAR_CLAIMS_TRACK_ERROR;
+		} else {
+			const tracked = (await trackedClaimsResponse
+				.json()
+				.catch(() => null)) as TrackedClaimsResponse | null;
+			if (tracked && tracked.ok) {
+				trackedClaimEntries = tracked.entries;
+			} else {
+				trackedClaimEntries = [];
+				claimTrackError = (tracked && !tracked.ok && tracked.error) || RADAR_CLAIMS_TRACK_ERROR;
+			}
+		}
+	} catch (err) {
+		console.error('Error loading radar', err);
+		claimsError = RADAR_NETWORK_ERROR;
+		clustersError = RADAR_NETWORK_ERROR;
+	} finally {
+		loading = false;
+	}
+}
+
+async function ackTrackedUpdate(clusterId: string): Promise<boolean> {
+	if (pendingAckClusterId || loading) return false;
+
+	pendingAckClusterId = clusterId;
+	ackError = null;
+
+	try {
+		const response = await fetch('/api/brief/tracked/ack', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			credentials: 'include',
+			body: JSON.stringify({ clusterId }),
+		});
+
+		if (response.status === 401) {
 			unauthenticated = true;
+			needsReviewClaims = [];
+			claims = [];
+			clusters = [];
+			trackedEntries = [];
+			trackedClaimEntries = [];
+			muteRules = [];
+			hiddenMutedCount = 0;
+			meta = null;
+			claimsError = null;
+			clustersError = null;
+			return false;
 		}
+
+		const body = (await response.json().catch(() => null)) as {
+			ok?: boolean;
+			error?: string;
+			entries?: TrackedEntry[];
+		} | null;
+
+		if (!response.ok || (body && body.ok === false)) {
+			ackError = (body && body.error) || RADAR_TRACKED_ACK_ERROR;
+			return false;
+		}
+
+		if (body && Array.isArray(body.entries)) {
+			trackedEntries = body.entries;
+		} else {
+			await loadRadar();
+		}
+
+		return true;
+	} catch (err) {
+		console.error('Error acknowledging tracked update', err);
+		ackError = RADAR_NETWORK_ERROR;
+		return false;
+	} finally {
+		pendingAckClusterId = null;
+	}
+}
+
+async function openOnBrief(clusterId: string, pendingUpdate: boolean): Promise<void> {
+	if (pendingUpdate) {
+		const ok = await ackTrackedUpdate(clusterId);
+		if (!ok) return;
+	}
+	await goto('/');
+}
+
+async function addMuteRule(event: SubmitEvent): Promise<void> {
+	event.preventDefault();
+	if (pendingMute || loading) return;
+
+	const nextKeyword = keyword.trim();
+	const nextSource = source.trim();
+	if (!nextKeyword) {
+		muteActionError = 'Keyword is required.';
+		return;
 	}
 
-	function setClusterAccepted(clusterId: string, accepted: boolean): void {
-		clusters = clusters.map((cluster) =>
-			cluster.clusterId === clusterId ? { ...cluster, accepted } : cluster,
-		);
+	muteActionError = null;
+	pendingMute = true;
+
+	try {
+		const response = await fetch('/api/brief/mutes', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			credentials: 'include',
+			body: JSON.stringify({
+				keyword: nextKeyword,
+				...(nextSource ? { source: nextSource } : {}),
+			}),
+		});
+
+		if (response.status === 401) {
+			unauthenticated = true;
+			needsReviewClaims = [];
+			claims = [];
+			clusters = [];
+			trackedEntries = [];
+			trackedClaimEntries = [];
+			muteRules = [];
+			hiddenMutedCount = 0;
+			meta = null;
+			claimsError = null;
+			clustersError = null;
+			return;
+		}
+
+		const body = (await response.json().catch(() => null)) as {
+			ok?: boolean;
+			error?: string;
+			rules?: MuteRule[];
+		} | null;
+
+		if (!response.ok || (body && body.ok === false)) {
+			muteActionError = (body && body.error) || RADAR_MUTES_SAVE_ERROR;
+			return;
+		}
+
+		keyword = '';
+		source = '';
+		await loadRadar();
+	} catch (err) {
+		console.error('Error creating mute rule', err);
+		muteActionError = RADAR_NETWORK_ERROR;
+	} finally {
+		pendingMute = false;
 	}
+}
 
-	function setClusterTracked(clusterId: string, tracked: boolean): void {
-		clusters = clusters.map((cluster) =>
-			cluster.clusterId === clusterId ? { ...cluster, tracked } : cluster,
-		);
+async function deleteMuteRule(id: string): Promise<void> {
+	if (pendingDeleteMuteId || loading) return;
+	pendingDeleteMuteId = id;
+	muteActionError = null;
+
+	try {
+		const response = await fetch(`/api/brief/mutes/${encodeURIComponent(id)}`, {
+			method: 'DELETE',
+			credentials: 'include',
+		});
+
+		if (response.status === 401) {
+			unauthenticated = true;
+			needsReviewClaims = [];
+			claims = [];
+			clusters = [];
+			trackedEntries = [];
+			trackedClaimEntries = [];
+			muteRules = [];
+			hiddenMutedCount = 0;
+			meta = null;
+			claimsError = null;
+			clustersError = null;
+			return;
+		}
+
+		const body = (await response.json().catch(() => null)) as {
+			ok?: boolean;
+			error?: string;
+			rules?: MuteRule[];
+		} | null;
+
+		if (!response.ok || (body && body.ok === false)) {
+			muteActionError = (body && body.error) || RADAR_MUTES_DELETE_ERROR;
+			return;
+		}
+
+		await loadRadar();
+	} catch (err) {
+		console.error('Error deleting mute rule', err);
+		muteActionError = RADAR_NETWORK_ERROR;
+	} finally {
+		pendingDeleteMuteId = null;
 	}
+}
 
-	async function toggleAccept(cluster: RadarCluster): Promise<void> {
-		if (pendingClusterId || loading) return;
+async function handleLogin(event: SubmitEvent): Promise<void> {
+	event.preventDefault();
 
-		const nextAccepted = !cluster.accepted;
-		const previousAccepted = cluster.accepted;
+	if (!password || loggingIn) return;
+
+	loginError = null;
+	loggingIn = true;
+
+	try {
+		const response = await fetch('/api/login', {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+			},
+			credentials: 'include',
+			body: JSON.stringify({ password }),
+		});
+
+		const body = (await response.json().catch(() => null)) as {
+			ok?: boolean;
+			error?: string;
+		} | null;
+
+		if (!response.ok || (body && body.ok === false)) {
+			loginError = (body && body.error) || 'Login failed. Check the password and try again.';
+			return;
+		}
+
+		password = '';
+		unauthenticated = false;
+		await loadRadar();
+	} catch (err) {
+		console.error('Error during radar login', err);
+		loginError = RADAR_NETWORK_ERROR;
+	} finally {
+		loggingIn = false;
+	}
+}
+
+async function handleLogout(): Promise<void> {
+	try {
+		await fetch('/api/logout', {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+			},
+			credentials: 'include',
+		});
+	} catch (err) {
+		console.error('Error during radar logout', err);
+	} finally {
+		needsReviewClaims = [];
+		claims = [];
+		clusters = [];
+		trackedEntries = [];
+		trackedClaimEntries = [];
+		muteRules = [];
+		hiddenMutedCount = 0;
+		meta = null;
+		claimsError = null;
+		clustersError = null;
 		acceptError = null;
-		pendingClusterId = cluster.clusterId;
-		setClusterAccepted(cluster.clusterId, nextAccepted);
-
-		try {
-			const response = await fetch(
-				nextAccepted ? '/api/brief/accept' : '/api/brief/unaccept',
-				{
-					method: 'POST',
-					headers: {
-						'Content-Type': 'application/json',
-					},
-					credentials: 'include',
-					body: JSON.stringify({ clusterId: cluster.clusterId }),
-				},
-			);
-
-			if (response.status === 401) {
-				setClusterAccepted(cluster.clusterId, previousAccepted);
-				unauthenticated = true;
-				needsReviewClaims = [];
-				claims = [];
-				clusters = [];
-				trackedEntries = [];
-				trackedClaimEntries = [];
-				muteRules = [];
-				hiddenMutedCount = 0;
-				meta = null;
-				claimsError = null;
-				clustersError = null;
-				return;
-			}
-
-			const body = (await response.json().catch(() => null)) as
-				| { ok?: boolean; error?: string }
-				| null;
-
-			if (!response.ok || (body && body.ok === false)) {
-				setClusterAccepted(cluster.clusterId, previousAccepted);
-				acceptError =
-					(body && body.error) || RADAR_ACCEPT_ERROR;
-				return;
-			}
-
-			if (nextAccepted) {
-				// Accept defaults to track on the server (NEWS-59).
-				setClusterTracked(cluster.clusterId, true);
-				if (!trackedEntries.some((entry) => entry.clusterId === cluster.clusterId)) {
-					await loadRadar();
-				}
-			}
-		} catch (err) {
-			console.error('Error toggling Brief membership', err);
-			setClusterAccepted(cluster.clusterId, previousAccepted);
-			acceptError = RADAR_NETWORK_ERROR;
-		} finally {
-			pendingClusterId = null;
-		}
-	}
-
-	async function toggleTrack(clusterId: string, currentlyTracked: boolean): Promise<void> {
-		if (pendingTrackClusterId || loading) return;
-		const previousTracked = currentlyTracked;
-		const nextTracked = !currentlyTracked;
 		trackError = null;
-		pendingTrackClusterId = clusterId;
-		setClusterTracked(clusterId, nextTracked);
-
-		try {
-			const response = await fetch(
-				nextTracked ? '/api/brief/track' : '/api/brief/untrack',
-				{
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					credentials: 'include',
-					body: JSON.stringify({ clusterId }),
-				},
-			);
-
-			if (response.status === 401) {
-				setClusterTracked(clusterId, previousTracked);
-				unauthenticated = true;
-				needsReviewClaims = [];
-				claims = [];
-				clusters = [];
-				trackedEntries = [];
-				trackedClaimEntries = [];
-				muteRules = [];
-				hiddenMutedCount = 0;
-				meta = null;
-				claimsError = null;
-				clustersError = null;
-				return;
-			}
-
-			const body = (await response.json().catch(() => null)) as
-				| { ok?: boolean; error?: string; entries?: TrackedEntry[] }
-				| null;
-
-			if (!response.ok || (body && body.ok === false)) {
-				setClusterTracked(clusterId, previousTracked);
-				trackError = (body && body.error) || RADAR_TRACK_ERROR;
-				return;
-			}
-
-			if (body && Array.isArray(body.entries)) {
-				trackedEntries = body.entries;
-			} else {
-				await loadRadar();
-			}
-		} catch (err) {
-			console.error('Error toggling tracked stories', err);
-			setClusterTracked(clusterId, previousTracked);
-			trackError = RADAR_NETWORK_ERROR;
-		} finally {
-			pendingTrackClusterId = null;
-		}
-	}
-
-	async function ackTrackedClaimUpdate(claimId: string): Promise<boolean> {
-		if (pendingAckClaimId || loading) return false;
-
-		const resolvedClaim =
-			needsReviewClaims.find((c) => c.claimId === claimId) ||
-			claims.find((c) => c.claimId === claimId) ||
-			null;
-		const previousClaimPending = resolvedClaim?.pendingUpdate ?? false;
-		const previousEntryPending =
-			trackedClaimEntries.find((e) => e.claimId === claimId)?.pendingUpdate ?? false;
-
-		pendingAckClaimId = claimId;
+		ackError = null;
+		claimAcceptError = null;
+		claimTrackError = null;
 		claimAckError = null;
+		claimReviewError = null;
+		muteLoadError = null;
+		muteActionError = null;
+		pendingClusterId = null;
+		pendingTrackClusterId = null;
+		pendingAckClusterId = null;
+		pendingClaimId = null;
+		pendingTrackClaimId = null;
+		pendingAckClaimId = null;
+		pendingReviewedClaimId = null;
+		pendingReviewAll = false;
+		unauthenticated = true;
+	}
+}
 
-		updateClaim(claimId, (claim) => ({ ...claim, pendingUpdate: false }));
-		trackedClaimEntries = trackedClaimEntries.map((entry) =>
-			entry.claimId === claimId ? { ...entry, pendingUpdate: false } : entry,
-		);
+function setClusterAccepted(clusterId: string, accepted: boolean): void {
+	clusters = clusters.map((cluster) =>
+		cluster.clusterId === clusterId ? { ...cluster, accepted } : cluster,
+	);
+}
 
-		try {
-			const response = await fetch('/api/claims/tracked/ack', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				credentials: 'include',
-				body: JSON.stringify({ claimId }),
-			});
+function setClusterTracked(clusterId: string, tracked: boolean): void {
+	clusters = clusters.map((cluster) =>
+		cluster.clusterId === clusterId ? { ...cluster, tracked } : cluster,
+	);
+}
 
-			if (response.status === 401) {
-				unauthenticated = true;
-				needsReviewClaims = [];
-				claims = [];
-				clusters = [];
-				trackedEntries = [];
-				trackedClaimEntries = [];
-				muteRules = [];
-				hiddenMutedCount = 0;
-				meta = null;
-				claimsError = null;
-				clustersError = null;
-				return false;
-			}
+async function toggleAccept(cluster: RadarCluster): Promise<void> {
+	if (pendingClusterId || loading) return;
 
-			const body = (await response.json().catch(() => null)) as
-				| { ok?: boolean; error?: string; entries?: TrackedClaimEntry[] }
-				| null;
+	const nextAccepted = !cluster.accepted;
+	const previousAccepted = cluster.accepted;
+	acceptError = null;
+	pendingClusterId = cluster.clusterId;
+	setClusterAccepted(cluster.clusterId, nextAccepted);
 
-			if (!response.ok || (body && body.ok === false)) {
-				updateClaim(claimId, (claim) => ({ ...claim, pendingUpdate: previousClaimPending }));
-				trackedClaimEntries = trackedClaimEntries.map((entry) =>
-					entry.claimId === claimId ? { ...entry, pendingUpdate: previousEntryPending } : entry,
-				);
-				claimAckError = (body && body.error) || RADAR_CLAIMS_TRACKED_ACK_ERROR;
-				return false;
-			}
+	try {
+		const response = await fetch(nextAccepted ? '/api/brief/accept' : '/api/brief/unaccept', {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+			},
+			credentials: 'include',
+			body: JSON.stringify({ clusterId: cluster.clusterId }),
+		});
 
-			if (body && Array.isArray(body.entries)) {
-				trackedClaimEntries = body.entries;
-			} else {
+		if (response.status === 401) {
+			setClusterAccepted(cluster.clusterId, previousAccepted);
+			unauthenticated = true;
+			needsReviewClaims = [];
+			claims = [];
+			clusters = [];
+			trackedEntries = [];
+			trackedClaimEntries = [];
+			muteRules = [];
+			hiddenMutedCount = 0;
+			meta = null;
+			claimsError = null;
+			clustersError = null;
+			return;
+		}
+
+		const body = (await response.json().catch(() => null)) as {
+			ok?: boolean;
+			error?: string;
+		} | null;
+
+		if (!response.ok || (body && body.ok === false)) {
+			setClusterAccepted(cluster.clusterId, previousAccepted);
+			acceptError = (body && body.error) || RADAR_ACCEPT_ERROR;
+			return;
+		}
+
+		if (nextAccepted) {
+			// Accept defaults to track on the server (NEWS-59).
+			setClusterTracked(cluster.clusterId, true);
+			if (!trackedEntries.some((entry) => entry.clusterId === cluster.clusterId)) {
 				await loadRadar();
 			}
+		}
+	} catch (err) {
+		console.error('Error toggling Brief membership', err);
+		setClusterAccepted(cluster.clusterId, previousAccepted);
+		acceptError = RADAR_NETWORK_ERROR;
+	} finally {
+		pendingClusterId = null;
+	}
+}
 
-			return true;
-		} catch (err) {
-			console.error('Error acknowledging tracked claim update', err);
+async function toggleTrack(clusterId: string, currentlyTracked: boolean): Promise<void> {
+	if (pendingTrackClusterId || loading) return;
+	const previousTracked = currentlyTracked;
+	const nextTracked = !currentlyTracked;
+	trackError = null;
+	pendingTrackClusterId = clusterId;
+	setClusterTracked(clusterId, nextTracked);
+
+	try {
+		const response = await fetch(nextTracked ? '/api/brief/track' : '/api/brief/untrack', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			credentials: 'include',
+			body: JSON.stringify({ clusterId }),
+		});
+
+		if (response.status === 401) {
+			setClusterTracked(clusterId, previousTracked);
+			unauthenticated = true;
+			needsReviewClaims = [];
+			claims = [];
+			clusters = [];
+			trackedEntries = [];
+			trackedClaimEntries = [];
+			muteRules = [];
+			hiddenMutedCount = 0;
+			meta = null;
+			claimsError = null;
+			clustersError = null;
+			return;
+		}
+
+		const body = (await response.json().catch(() => null)) as {
+			ok?: boolean;
+			error?: string;
+			entries?: TrackedEntry[];
+		} | null;
+
+		if (!response.ok || (body && body.ok === false)) {
+			setClusterTracked(clusterId, previousTracked);
+			trackError = (body && body.error) || RADAR_TRACK_ERROR;
+			return;
+		}
+
+		if (body && Array.isArray(body.entries)) {
+			trackedEntries = body.entries;
+		} else {
+			await loadRadar();
+		}
+	} catch (err) {
+		console.error('Error toggling tracked stories', err);
+		setClusterTracked(clusterId, previousTracked);
+		trackError = RADAR_NETWORK_ERROR;
+	} finally {
+		pendingTrackClusterId = null;
+	}
+}
+
+async function ackTrackedClaimUpdate(claimId: string): Promise<boolean> {
+	if (pendingAckClaimId || loading) return false;
+
+	const resolvedClaim =
+		needsReviewClaims.find((c) => c.claimId === claimId) ||
+		claims.find((c) => c.claimId === claimId) ||
+		null;
+	const previousClaimPending = resolvedClaim?.pendingUpdate ?? false;
+	const previousEntryPending =
+		trackedClaimEntries.find((e) => e.claimId === claimId)?.pendingUpdate ?? false;
+
+	pendingAckClaimId = claimId;
+	claimAckError = null;
+
+	updateClaim(claimId, (claim) => ({ ...claim, pendingUpdate: false }));
+	trackedClaimEntries = trackedClaimEntries.map((entry) =>
+		entry.claimId === claimId ? { ...entry, pendingUpdate: false } : entry,
+	);
+
+	try {
+		const response = await fetch('/api/claims/tracked/ack', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			credentials: 'include',
+			body: JSON.stringify({ claimId }),
+		});
+
+		if (response.status === 401) {
+			unauthenticated = true;
+			needsReviewClaims = [];
+			claims = [];
+			clusters = [];
+			trackedEntries = [];
+			trackedClaimEntries = [];
+			muteRules = [];
+			hiddenMutedCount = 0;
+			meta = null;
+			claimsError = null;
+			clustersError = null;
+			return false;
+		}
+
+		const body = (await response.json().catch(() => null)) as {
+			ok?: boolean;
+			error?: string;
+			entries?: TrackedClaimEntry[];
+		} | null;
+
+		if (!response.ok || (body && body.ok === false)) {
 			updateClaim(claimId, (claim) => ({ ...claim, pendingUpdate: previousClaimPending }));
 			trackedClaimEntries = trackedClaimEntries.map((entry) =>
 				entry.claimId === claimId ? { ...entry, pendingUpdate: previousEntryPending } : entry,
 			);
-			claimAckError = RADAR_NETWORK_ERROR;
+			claimAckError = (body && body.error) || RADAR_CLAIMS_TRACKED_ACK_ERROR;
 			return false;
-		} finally {
-			pendingAckClaimId = null;
 		}
+
+		if (body && Array.isArray(body.entries)) {
+			trackedClaimEntries = body.entries;
+		} else {
+			await loadRadar();
+		}
+
+		return true;
+	} catch (err) {
+		console.error('Error acknowledging tracked claim update', err);
+		updateClaim(claimId, (claim) => ({ ...claim, pendingUpdate: previousClaimPending }));
+		trackedClaimEntries = trackedClaimEntries.map((entry) =>
+			entry.claimId === claimId ? { ...entry, pendingUpdate: previousEntryPending } : entry,
+		);
+		claimAckError = RADAR_NETWORK_ERROR;
+		return false;
+	} finally {
+		pendingAckClaimId = null;
 	}
+}
 
-	async function toggleClaimAccept(claim: ClaimRadarItem): Promise<void> {
-		if (pendingClaimId || loading) return;
+async function toggleClaimAccept(claim: ClaimRadarItem): Promise<void> {
+	if (pendingClaimId || loading) return;
 
-		const nextAccepted = !claim.accepted;
-		const previousAccepted = claim.accepted;
-		const previousTracked = claim.tracked;
-		const hadTrackedEntry = trackedClaimEntries.some((entry) => entry.claimId === claim.claimId);
+	const nextAccepted = !claim.accepted;
+	const previousAccepted = claim.accepted;
+	const previousTracked = claim.tracked;
+	const hadTrackedEntry = trackedClaimEntries.some((entry) => entry.claimId === claim.claimId);
 
-		claimAcceptError = null;
-		pendingClaimId = claim.claimId;
+	claimAcceptError = null;
+	pendingClaimId = claim.claimId;
 
+	updateClaim(claim.claimId, (c) => ({
+		...c,
+		accepted: nextAccepted,
+		tracked: nextAccepted ? true : c.tracked,
+	}));
+
+	try {
+		const response = await fetch(nextAccepted ? '/api/claims/accept' : '/api/claims/unaccept', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			credentials: 'include',
+			body: JSON.stringify({ claimId: claim.claimId }),
+		});
+
+		if (response.status === 401) {
+			updateClaim(claim.claimId, (c) => ({
+				...c,
+				accepted: previousAccepted,
+				tracked: previousTracked,
+			}));
+			unauthenticated = true;
+			needsReviewClaims = [];
+			claims = [];
+			clusters = [];
+			trackedEntries = [];
+			trackedClaimEntries = [];
+			muteRules = [];
+			hiddenMutedCount = 0;
+			meta = null;
+			claimsError = null;
+			clustersError = null;
+			return;
+		}
+
+		const body = (await response.json().catch(() => null)) as {
+			ok?: boolean;
+			error?: string;
+			acceptedClaimIds?: string[];
+		} | null;
+
+		if (!response.ok || (body && body.ok === false)) {
+			updateClaim(claim.claimId, (c) => ({
+				...c,
+				accepted: previousAccepted,
+				tracked: previousTracked,
+			}));
+			claimAcceptError = (body && body.error) || RADAR_CLAIMS_ACCEPT_ERROR;
+			return;
+		}
+
+		if (nextAccepted && (claim.needsReview || !hadTrackedEntry)) {
+			await loadRadar();
+		}
+	} catch (err) {
+		console.error('Error toggling claim membership', err);
 		updateClaim(claim.claimId, (c) => ({
 			...c,
-			accepted: nextAccepted,
-			tracked: nextAccepted ? true : c.tracked,
+			accepted: previousAccepted,
+			tracked: previousTracked,
 		}));
-
-		try {
-			const response = await fetch(nextAccepted ? '/api/claims/accept' : '/api/claims/unaccept', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				credentials: 'include',
-				body: JSON.stringify({ claimId: claim.claimId }),
-			});
-
-			if (response.status === 401) {
-				updateClaim(claim.claimId, (c) => ({ ...c, accepted: previousAccepted, tracked: previousTracked }));
-				unauthenticated = true;
-				needsReviewClaims = [];
-				claims = [];
-				clusters = [];
-				trackedEntries = [];
-				trackedClaimEntries = [];
-				muteRules = [];
-				hiddenMutedCount = 0;
-				meta = null;
-				claimsError = null;
-				clustersError = null;
-				return;
-			}
-
-			const body = (await response.json().catch(() => null)) as
-				| { ok?: boolean; error?: string; acceptedClaimIds?: string[] }
-				| null;
-
-			if (!response.ok || (body && body.ok === false)) {
-				updateClaim(claim.claimId, (c) => ({ ...c, accepted: previousAccepted, tracked: previousTracked }));
-				claimAcceptError = (body && body.error) || RADAR_CLAIMS_ACCEPT_ERROR;
-				return;
-			}
-
-			if (nextAccepted && !hadTrackedEntry) {
-				await loadRadar();
-			}
-		} catch (err) {
-			console.error('Error toggling claim membership', err);
-			updateClaim(claim.claimId, (c) => ({ ...c, accepted: previousAccepted, tracked: previousTracked }));
-			claimAcceptError = RADAR_NETWORK_ERROR;
-		} finally {
-			pendingClaimId = null;
-		}
+		claimAcceptError = RADAR_NETWORK_ERROR;
+	} finally {
+		pendingClaimId = null;
 	}
+}
 
-	async function toggleClaimTrack(claimId: string, currentlyTracked: boolean): Promise<void> {
-		if (pendingTrackClaimId || loading) return;
-		const previousTracked = currentlyTracked;
-		const nextTracked = !currentlyTracked;
-		claimTrackError = null;
-		pendingTrackClaimId = claimId;
-		updateClaim(claimId, (claim) => ({ ...claim, tracked: nextTracked }));
+async function markClaimReviewed(claimId: string): Promise<void> {
+	if (pendingReviewedClaimId || pendingReviewAll || loading) return;
 
-		try {
-			const response = await fetch(nextTracked ? '/api/claims/track' : '/api/claims/untrack', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				credentials: 'include',
-				body: JSON.stringify({ claimId }),
-			});
+	pendingReviewedClaimId = claimId;
+	claimReviewError = null;
 
-			if (response.status === 401) {
-				updateClaim(claimId, (claim) => ({ ...claim, tracked: previousTracked }));
-				unauthenticated = true;
-				needsReviewClaims = [];
-				claims = [];
-				clusters = [];
-				trackedEntries = [];
-				trackedClaimEntries = [];
-				muteRules = [];
-				hiddenMutedCount = 0;
-				meta = null;
-				claimsError = null;
-				clustersError = null;
-				return;
-			}
+	try {
+		const response = await fetch('/api/claims/review/dismiss', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			credentials: 'include',
+			body: JSON.stringify({ claimId }),
+		});
 
-			const body = (await response.json().catch(() => null)) as
-				| { ok?: boolean; error?: string; entries?: TrackedClaimEntry[] }
-				| null;
+		if (response.status === 401) {
+			unauthenticated = true;
+			needsReviewClaims = [];
+			claims = [];
+			clusters = [];
+			trackedEntries = [];
+			trackedClaimEntries = [];
+			muteRules = [];
+			hiddenMutedCount = 0;
+			meta = null;
+			claimsError = null;
+			clustersError = null;
+			return;
+		}
 
-			if (!response.ok || (body && body.ok === false)) {
-				updateClaim(claimId, (claim) => ({ ...claim, tracked: previousTracked }));
-				claimTrackError = (body && body.error) || RADAR_CLAIMS_TRACK_ERROR;
-				return;
-			}
+		const body = (await response.json().catch(() => null)) as {
+			ok?: boolean;
+			error?: string;
+		} | null;
 
-			if (body && Array.isArray(body.entries)) {
-				trackedClaimEntries = body.entries;
-			} else {
-				await loadRadar();
-			}
-		} catch (err) {
-			console.error('Error toggling tracked claims', err);
+		if (!response.ok || (body && body.ok === false)) {
+			claimReviewError = (body && body.error) || RADAR_CLAIMS_MARK_REVIEWED_ERROR;
+			return;
+		}
+
+		await loadRadar();
+	} catch (err) {
+		console.error('Error marking claim reviewed', err);
+		claimReviewError = RADAR_NETWORK_ERROR;
+	} finally {
+		pendingReviewedClaimId = null;
+	}
+}
+
+async function markAllClaimsReviewed(): Promise<void> {
+	if (pendingReviewedClaimId || pendingReviewAll || loading || needsReviewClaims.length === 0)
+		return;
+	if (!confirm(markAllReviewedConfirm(needsReviewClaims.length))) return;
+
+	pendingReviewAll = true;
+	claimReviewError = null;
+
+	try {
+		const response = await fetch('/api/claims/review/dismiss-all', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			credentials: 'include',
+		});
+
+		if (response.status === 401) {
+			unauthenticated = true;
+			needsReviewClaims = [];
+			claims = [];
+			clusters = [];
+			trackedEntries = [];
+			trackedClaimEntries = [];
+			muteRules = [];
+			hiddenMutedCount = 0;
+			meta = null;
+			claimsError = null;
+			clustersError = null;
+			return;
+		}
+
+		const body = (await response.json().catch(() => null)) as {
+			ok?: boolean;
+			error?: string;
+		} | null;
+
+		if (!response.ok || (body && body.ok === false)) {
+			claimReviewError = (body && body.error) || RADAR_CLAIMS_MARK_REVIEWED_ERROR;
+			return;
+		}
+
+		await loadRadar();
+	} catch (err) {
+		console.error('Error marking all claims reviewed', err);
+		claimReviewError = RADAR_NETWORK_ERROR;
+	} finally {
+		pendingReviewAll = false;
+	}
+}
+
+async function toggleClaimTrack(claimId: string, currentlyTracked: boolean): Promise<void> {
+	if (pendingTrackClaimId || loading) return;
+	const previousTracked = currentlyTracked;
+	const nextTracked = !currentlyTracked;
+	claimTrackError = null;
+	pendingTrackClaimId = claimId;
+	updateClaim(claimId, (claim) => ({ ...claim, tracked: nextTracked }));
+
+	try {
+		const response = await fetch(nextTracked ? '/api/claims/track' : '/api/claims/untrack', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			credentials: 'include',
+			body: JSON.stringify({ claimId }),
+		});
+
+		if (response.status === 401) {
 			updateClaim(claimId, (claim) => ({ ...claim, tracked: previousTracked }));
-			claimTrackError = RADAR_NETWORK_ERROR;
-		} finally {
-			pendingTrackClaimId = null;
+			unauthenticated = true;
+			needsReviewClaims = [];
+			claims = [];
+			clusters = [];
+			trackedEntries = [];
+			trackedClaimEntries = [];
+			muteRules = [];
+			hiddenMutedCount = 0;
+			meta = null;
+			claimsError = null;
+			clustersError = null;
+			return;
 		}
-	}
 
-	onMount(() => {
-		void loadRadar(true);
-	});
+		const body = (await response.json().catch(() => null)) as {
+			ok?: boolean;
+			error?: string;
+			entries?: TrackedClaimEntry[];
+		} | null;
+
+		if (!response.ok || (body && body.ok === false)) {
+			updateClaim(claimId, (claim) => ({ ...claim, tracked: previousTracked }));
+			claimTrackError = (body && body.error) || RADAR_CLAIMS_TRACK_ERROR;
+			return;
+		}
+
+		if (body && Array.isArray(body.entries)) {
+			trackedClaimEntries = body.entries;
+		} else {
+			await loadRadar();
+		}
+	} catch (err) {
+		console.error('Error toggling tracked claims', err);
+		updateClaim(claimId, (claim) => ({ ...claim, tracked: previousTracked }));
+		claimTrackError = RADAR_NETWORK_ERROR;
+	} finally {
+		pendingTrackClaimId = null;
+	}
+}
+
+onMount(() => {
+	void loadRadar(true);
+});
 </script>
 
 <svelte:head>
@@ -1142,6 +1260,12 @@
 				</p>
 			{/if}
 
+			{#if claimReviewError}
+				<p class="mt-4 text-sm text-red-600 dark:text-red-400">
+					{claimReviewError}
+				</p>
+			{/if}
+
 			{#if hiddenMutedCount > 0}
 				<p class="mt-6 text-xs font-medium text-gray-500 dark:text-gray-400">
 					{RADAR_HIDDEN_MUTED_PREFIX} {hiddenMutedCount}
@@ -1150,10 +1274,24 @@
 
 			{#if needsReviewClaims.length > 0}
 				<section class="mt-8 space-y-4" aria-label="Claims needing review">
-					<header class="space-y-1">
-						<h2 class="text-sm font-semibold tracking-tight text-gray-900 dark:text-gray-100">
-							{RADAR_CLAIMS_NEEDS_REVIEW_TITLE}
-						</h2>
+					<header class="flex items-center justify-between gap-3">
+						<div class="space-y-1">
+							<h2 class="text-sm font-semibold tracking-tight text-gray-900 dark:text-gray-100">
+								{RADAR_CLAIMS_NEEDS_REVIEW_TITLE}
+							</h2>
+						</div>
+						<button
+							type="button"
+							class="shrink-0 text-xs font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700 disabled:opacity-50 dark:text-blue-400 dark:hover:text-blue-300"
+							disabled={pendingReviewAll || pendingReviewedClaimId !== null}
+							on:click={markAllClaimsReviewed}
+						>
+							{#if pendingReviewAll}
+								{RADAR_CLAIMS_MARK_REVIEWED_PENDING}
+							{:else}
+								{RADAR_CLAIMS_MARK_ALL_REVIEWED_LABEL}
+							{/if}
+						</button>
 					</header>
 
 					<ul class="space-y-3">
@@ -1235,6 +1373,18 @@
 													{RADAR_UNTRACK_LABEL}
 												{:else}
 													{RADAR_TRACK_LABEL}
+												{/if}
+											</button>
+											<button
+												type="button"
+												class="text-xs font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700 disabled:opacity-50 dark:text-blue-400 dark:hover:text-blue-300"
+												disabled={pendingReviewAll || pendingReviewedClaimId !== null}
+												on:click={() => markClaimReviewed(claim.claimId)}
+											>
+												{#if pendingReviewedClaimId === claim.claimId}
+													{RADAR_CLAIMS_MARK_REVIEWED_PENDING}
+												{:else}
+													{RADAR_CLAIMS_MARK_REVIEWED_LABEL}
 												{/if}
 											</button>
 										</div>

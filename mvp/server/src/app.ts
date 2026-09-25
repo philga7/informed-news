@@ -28,6 +28,7 @@ import {
   acceptClaim,
   ackTrackedClaimUpdate,
   addMuteRule,
+  dismissClaimReview,
   ackTrackedUpdate,
   getArticleById,
   getClaimById,
@@ -77,6 +78,7 @@ export type CreateAppDeps = {
   loadClaimsRadar?: typeof loadClaimsRadar;
   readClaimMembership?: typeof readClaimMembership;
   acceptClaim?: typeof acceptClaim;
+  dismissClaimReview?: typeof dismissClaimReview;
   unacceptClaim?: typeof unacceptClaim;
   readTrackedClaims?: typeof readTrackedClaims;
   trackClaim?: typeof trackClaim;
@@ -185,6 +187,7 @@ export function createApp(deps: CreateAppDeps = {}): Express {
   const loadRadarClaims = deps.loadClaimsRadar ?? loadClaimsRadar;
   const readClaimMember = deps.readClaimMembership ?? readClaimMembership;
   const acceptOneClaim = deps.acceptClaim ?? acceptClaim;
+  const dismissOneClaimReview = deps.dismissClaimReview ?? dismissClaimReview;
   const unacceptOneClaim = deps.unacceptClaim ?? unacceptClaim;
   const readClaimTracked = deps.readTrackedClaims ?? readTrackedClaims;
   const trackOneClaim = deps.trackClaim ?? trackClaim;
@@ -617,11 +620,56 @@ export function createApp(deps: CreateAppDeps = {}): Express {
 
       const result = await acceptOneClaim(claimId);
       await trackOneClaim(claimId);
+      await dismissOneClaimReview(claimId);
 
       res.json({ ok: true, acceptedClaimIds: result.acceptedClaimIds });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.error('Claim accept failed:', message);
+      res.status(500).json({ ok: false, error: message });
+    }
+  });
+
+  app.post('/api/claims/review/dismiss', async (req, res) => {
+    try {
+      const claimId = parseClaimId(req.body);
+      if (!claimId) {
+        res.status(400).json({ ok: false, error: 'claimId is required' });
+        return;
+      }
+
+      const existing = await getClaim(claimId);
+      if (!existing) {
+        res.status(404).json({ ok: false, error: 'Claim not found' });
+        return;
+      }
+
+      const result = await dismissOneClaimReview(claimId);
+      res.json({ ok: true, dismissedClaimIds: result.dismissedClaimIds });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('Claim review dismiss failed:', message);
+      res.status(500).json({ ok: false, error: message });
+    }
+  });
+
+  app.post('/api/claims/review/dismiss-all', async (_req, res) => {
+    try {
+      const feed = await loadRadarClaims();
+      const claimIds = Array.from(
+        new Set(feed.needsReview.map((claim) => claim.claimId)),
+      );
+      const dismissedClaimIds: string[] = [];
+
+      for (const claimId of claimIds) {
+        const result = await dismissOneClaimReview(claimId);
+        dismissedClaimIds.push(...result.dismissedClaimIds);
+      }
+
+      res.json({ ok: true, dismissedClaimIds });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('Claim review dismiss-all failed:', message);
       res.status(500).json({ ok: false, error: message });
     }
   });

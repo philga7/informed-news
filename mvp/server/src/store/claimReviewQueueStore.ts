@@ -152,3 +152,23 @@ export async function enqueueClaimReview(
   await writeClaimReviewQueue(next, queuePath);
   return { entries: next };
 }
+
+/** Remove all queue entries for a claim id (idempotent). */
+export async function dismissClaimReview(
+  claimId: string,
+  queuePath: string = CLAIM_REVIEW_QUEUE_PATH,
+): Promise<{ dismissedClaimIds: string[] }> {
+  const normalizedClaimId = claimId.trim();
+  if (normalizedClaimId.length === 0) {
+    return { dismissedClaimIds: [] };
+  }
+
+  const queue = await readClaimReviewQueue(queuePath);
+  const remaining = queue.filter((entry) => entry.claimId !== normalizedClaimId);
+  if (remaining.length === queue.length) {
+    return { dismissedClaimIds: [] };
+  }
+
+  await writeClaimReviewQueue(remaining, queuePath);
+  return { dismissedClaimIds: [normalizedClaimId] };
+}

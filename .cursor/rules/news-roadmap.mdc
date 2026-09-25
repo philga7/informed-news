@@ -7,6 +7,6 @@ alwaysApply: true
 
 Before choosing “what to build next” in the NEWS project, read [docs/ROADMAP.md](docs/ROADMAP.md).
 
-- **Current next** is documented in [docs/ROADMAP.md](docs/ROADMAP.md) (as of writing: **no ticket queued** — Epic **J** / NEWS-69 Done; ask before parked Later under NEWS-57 or Epic B).
+- **Current next** is documented in [docs/ROADMAP.md](docs/ROADMAP.md) (as of writing: **NEWS-78** Mark reviewed; then **NEWS-79** extract gating; Epic J Done; ask before parked Later under NEWS-57 or Epic B).
 - Parked epics B–G stay parked unless the user explicitly reorders.
 - If Jira status disagrees with the doc, Jira wins — update `docs/ROADMAP.md` in the same change set.

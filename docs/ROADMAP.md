@@ -9,7 +9,12 @@ Claims spine plan: [`.cursor/plans/claims_evidence_spine_8f4cde15.plan.md`](../.
 
 ## Current next
 
-No ticket is queued. Epic **J** ([NEWS-69](https://informedcrew.atlassian.net/browse/NEWS-69)) is **Done**. Choose next deliberately — ask before parked Later under [NEWS-57](https://informedcrew.atlassian.net/browse/NEWS-57) or Epic **B** ([NEWS-34](https://informedcrew.atlassian.net/browse/NEWS-34)). Do not invent from open To Do alone.
+| Order | Key | Summary |
+|-------|-----|---------|
+| **1** | [NEWS-78](https://informedcrew.atlassian.net/browse/NEWS-78) | **Mark reviewed: dequeue Needs review + Accept clears queue** *(next)* |
+| 2 | [NEWS-79](https://informedcrew.atlassian.net/browse/NEWS-79) | Extract gating: spend less on muted / low-value articles |
+
+Epic **J** ([NEWS-69](https://informedcrew.atlassian.net/browse/NEWS-69)) is **Done**. Ask before parked Later under [NEWS-57](https://informedcrew.atlassian.net/browse/NEWS-57) or Epic **B** ([NEWS-34](https://informedcrew.atlassian.net/browse/NEWS-34)).
 
 ### Complete: J. Claims / evidence desk
 

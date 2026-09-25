@@ -41,6 +41,7 @@ export {
 } from './trackedClaimsStore.js';
 export type { TrackedClaimEntry, TrackedClaims } from './trackedClaimsStore.js';
 export {
+  dismissClaimReview,
   enqueueClaimReview,
   readClaimReviewQueue,
   writeClaimReviewQueue,
