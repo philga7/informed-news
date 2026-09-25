@@ -4,7 +4,7 @@ Informed News serves the Kite shell from **our** brief API by default — not `h
 
 ## Direction (Epic J — in progress)
 
-Product next is the **claims / evidence** desk ([NEWS-69](https://informedcrew.atlassian.net/browse/NEWS-69)): Brief will lead with **accepted claims** plus **linked story clusters** for context ([NEWS-76](https://informedcrew.atlassian.net/browse/NEWS-76)); Radar is the **claim inbox** on `/radar` ([NEWS-74](https://informedcrew.atlassian.net/browse/NEWS-74)). Claim **Accept / Track / ack** on `claimId` ship on `/radar` ([NEWS-75](https://informedcrew.atlassian.net/browse/NEWS-75)); this document covers the **live story-desk** path on `/` (Accept / Track / Mute on `clusterId`) plus claim desk stores/APIs that feed Radar. Honesty invariant for claims: status + evidence only — Accept ≠ truth; no Verified badges ([CLAIMS_DISCERNMENT.md](CLAIMS_DISCERNMENT.md)).
+Product next is the **claims / evidence** desk ([NEWS-69](https://informedcrew.atlassian.net/browse/NEWS-69)): Brief `/` **leads with accepted claims** plus expandable **linked story clusters / outlets** ([NEWS-76](https://informedcrew.atlassian.net/browse/NEWS-76)); Radar is the **claim inbox** on `/radar` ([NEWS-74](https://informedcrew.atlassian.net/browse/NEWS-74)). Claim **Accept / Track / ack** on `claimId` ship on `/radar` ([NEWS-75](https://informedcrew.atlassian.net/browse/NEWS-75)); accepted-story `StoryList` remains **secondary** below claims on `/` (transition + manual seeds). This document covers both the **hybrid Brief claims lead** and the **live story-desk** path (Accept / Track / Mute on `clusterId`). Honesty invariant for claims: status + evidence only — Accept ≠ truth; no Verified badges ([CLAIMS_DISCERNMENT.md](CLAIMS_DISCERNMENT.md)).
 
 **Store foundation ([NEWS-70](https://informedcrew.atlassian.net/browse/NEWS-70)):** Claim/evidence JSON stores + status derivation are landed in `mvp/server`; extract HTTP ships in NEWS-72; claim inbox UI + `GET /api/claims/radar` ship in NEWS-74; claim accept/track HTTP ships in NEWS-75.
 
@@ -23,13 +23,18 @@ Product next is the **claims / evidence** desk ([NEWS-69](https://informedcrew.a
 | GET | `/api/batches/:batchId` | Same for `owned-latest` |
 | GET | `/api/batches/:batchId/categories` | Inbox category |
 | GET | `/api/batches/:batchId/categories/:categoryId/stories` | Stories from ingest |
+| GET | `/api/batches/latest/claims` | Accepted claims for Brief hybrid ([NEWS-76](https://informedcrew.atlassian.net/browse/NEWS-76)) |
+| GET | `/api/batches/:batchId/claims` | Same; `:batchId` must be `owned-latest` or `latest` |
 
 Batch id is always `owned-latest`. Category slug `world` / UUID `00000000-0000-4000-8000-000000000001` (matches Kite’s default `/world/latest` route).
+
+Claims response: `{ ok: true, claims: BriefClaimItem[] }` — accepted membership only, mute-excluded, sorted `createdAt` desc. See [MVP_API_COMPAT.md](MVP_API_COMPAT.md) for the full item shape.
 
 ## Source data
 
 - Prefer articles in `mvp/data/articles.json` (CFP / xcancel + framing; curated RSS via Developing desk).
 - Cluster-level enrichments are stored separately in `mvp/data/cluster-enrichments.json` (generated via `POST /api/enrich`).
+- Claim-level verbiage enrichments are stored separately in `mvp/data/claim-enrichments.json` (generated via session `POST /api/claims/enrich` — accepted claims only; Ollama `short_summary` + `talking_points`; never overwrites claim status).
 - If the store is **empty**, the adapter returns a single **fixture** story so Brief still loads (first-run / smoke).
 - If the store has articles but **none are Accepted**, Brief returns **no stories** — not the fixture.
 - Adapter: `mvp/server/src/services/kiteBriefAdapter.ts` (groups by `clusterId`, maps framing summary → `short_summary`).
@@ -61,13 +66,25 @@ Cluster keys match Accept and Radar: real `clusterId`, or `solo:{articleId}` whe
 
 **Radar:** Tracked stories section on `/radar` lists watched clusters; Track / Untrack beside Accept. If a tracked cluster is Accepted, primary action opens Brief `/` (expand lives there). See [ROUTE_MAP.md](ROUTE_MAP.md).
 
+### Brief hybrid — accepted claims lead (NEWS-76)
+
+On `/` (story views only — not onthisday, specialty widgets, or shared-article deep links):
+
+1. **Accepted claims** section loads from public `GET /api/batches/.../claims` (Kite proxy). Cards show code-derived **status** + evidence/confidence chips (humanized labels; never “Verified”).
+2. **Expand** toggles up to **8 linked headlines** per claim (same evidence→article join as Radar) plus optional **Ollama verbiage** when present — always with “AI-assisted — not ground truth.”
+3. **Unaccept** (session) calls `POST /api/claims/unaccept` and refreshes the claims list. **Accept** remains on `/radar` only.
+4. **Accepted stories** (`StoryList`) renders **below** claims as secondary — same accepted-cluster membership as before ([NEWS-65](https://informedcrew.atlassian.net/browse/NEWS-65)).
+5. Empty claims: honest copy (“No accepted claims yet. Accept on Radar.”) — **no fixture claims**. Story fixture path unchanged when the article store is empty.
+
+Session `POST /api/claims/enrich` (optional `{ claimIds?, force? }`) generates verbiage for accepted claims into `claim-enrichments.json`. Enrich is optional and does not block Accept.
+
 ### Claim membership and tracking (NEWS-75)
 
-Claim desk verbs mirror the story desk on **`claimId`** (not `clusterId`). Operators act on claim cards and the **Tracked claims** section on `/radar`; Brief hybrid UI for accepted claims is [NEWS-76](https://informedcrew.atlassian.net/browse/NEWS-76).
+Claim desk verbs mirror the story desk on **`claimId`** (not `clusterId`). Operators act on claim cards and the **Tracked claims** section on `/radar`; accepted claims appear on Brief `/` via the hybrid lead ([NEWS-76](https://informedcrew.atlassian.net/browse/NEWS-76)).
 
 | Action | Store | Effect |
 |--------|-------|--------|
-| **Accept** (`POST /api/claims/accept`) | `mvp/data/claim-membership.json` | Marks claim accepted (Brief eligibility when NEWS-76 lands). |
+| **Accept** (`POST /api/claims/accept`) | `mvp/data/claim-membership.json` | Claim appears on Brief `/` (minus global mute). |
 | **Track** (`POST /api/claims/track`) | `mvp/data/tracked-claims.json` | Operator watches for **new evidence / stance changes**; does **not** Accept by itself. |
 
 **Track ≠ Accept.** **Untrack** (`POST /api/claims/untrack`) ≠ **Unaccept**; **Unaccept** (`POST /api/claims/unaccept`) ≠ **Untrack** (same mirror as story desk).
@@ -78,7 +95,7 @@ Claim desk verbs mirror the story desk on **`claimId`** (not `clusterId`). Opera
 
 **Accept / track validation:** Accept, track, and ack return `404` when `claimId` is missing from the claims store. Unaccept and untrack of unknown ids remain idempotent success.
 
-**Mute:** Claims use the **same** global mute rules as stories (`mute-rules.json`, `/api/brief/mutes`). `claimMatchesMute` hides muted claims from the main claim inbox (`hiddenMutedCount`); there is no per-claimId mute store in v1.
+**Mute:** Claims use the **same** global mute rules as stories (`mute-rules.json`, `/api/brief/mutes`). `claimMatchesMute` hides muted claims from the Radar claim inbox (`hiddenMutedCount`) **and** from the Brief claims feed; membership is retained. There is no per-claimId mute store in v1.
 
 See [MVP_API_COMPAT.md](MVP_API_COMPAT.md) and [ROUTE_MAP.md](ROUTE_MAP.md).
 

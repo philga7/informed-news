@@ -1,4 +1,5 @@
 export { fetchCfpArticles } from './cfpFetch.js';
+export type { BriefClaimItem, BriefClaimVerbiage } from '../types/briefClaim.js';
 export type { CfpFetchOptions, CfpFetchResult } from './cfpFetch.js';
 export {
   fetchXcancelArticles,
@@ -104,6 +105,8 @@ export {
   resolveOwnedBriefArticles,
 } from './kiteBriefAdapter.js';
 export { createKiteBriefRouter } from './kiteBriefRoutes.js';
+export { buildBriefClaimsFeed, loadBriefClaims } from './briefClaims.js';
+export type { BuildBriefClaimsFeedInput, LoadBriefClaimsDeps } from './briefClaims.js';
 
 export {
   buildEnrichmentPrompt,
@@ -111,6 +114,16 @@ export {
   parseEnrichmentResponse,
 } from './ollamaEnrichment.js';
 export type { EnrichMemberInput, EnrichClusterResult } from './ollamaEnrichment.js';
+export {
+  buildClaimVerbiagePrompt,
+  generateClaimVerbiage,
+  parseClaimVerbiageResponse,
+} from './ollamaClaimVerbiage.js';
+export type {
+  ClaimHeadlineInput,
+  ClaimVerbiageInput,
+  ClaimVerbiageResult,
+} from './ollamaClaimVerbiage.js';
 export { proposeClaimCandidates } from './ollamaProposeClaims.js';
 export type {
   ClaimCandidate,
@@ -122,6 +135,8 @@ export type {
 } from './ollamaProposeClaims.js';
 export { enrichUnenrichedClusters } from './enrichClusters.js';
 export type { EnrichBatchOptions, EnrichBatchResult } from './enrichClusters.js';
+export { enrichAcceptedClaims } from './enrichClaims.js';
+export type { EnrichClaimsOptions, EnrichClaimsResult } from './enrichClaims.js';
 export { buildRadarFeed } from './radarFeed.js';
 export type {
   RadarCluster,

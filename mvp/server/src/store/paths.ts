@@ -26,3 +26,4 @@ export const CLAIM_EXTRACT_PROCESSED_PATH = path.join(
   DATA_DIR,
   'claim-extract-processed.json',
 );
+export const CLAIM_ENRICHMENTS_PATH = path.join(DATA_DIR, 'claim-enrichments.json');

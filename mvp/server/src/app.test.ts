@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 import type { Server } from 'node:http';
+import express from 'express';
 
 import type { Article } from './types/article.js';
 import { acceptCluster, readBriefMembership } from './store/briefMembershipStore.js';
@@ -29,6 +30,9 @@ import {
   readMuteRules,
   removeMuteRule,
 } from './store/muteRulesStore.js';
+import { loadBriefClaims } from './services/briefClaims.js';
+import { enrichAcceptedClaims } from './services/enrichClaims.js';
+import { createKiteBriefRouter } from './services/kiteBriefRoutes.js';
 import { createManualSeed } from './services/manualBriefSeed.js';
 
 function tempMembershipPath(): string {
@@ -537,6 +541,115 @@ test('POST /api/brief/mutes persists rule; DELETE /api/brief/mutes/:id removes i
   }
 });
 
+test('GET /api/batches/latest/claims returns empty array when no claims are accepted', async () => {
+  const app = express();
+  app.use(
+    '/api',
+    createKiteBriefRouter({
+      loadBriefClaims: async () =>
+        await loadBriefClaims({
+          readClaims: async () => [
+            {
+              id: 'claim-1',
+              text: 'Claim text',
+              claimType: 'event_occurrence',
+              status: 'reported',
+              entities: [],
+              createdAt: '2026-09-24T00:00:00.000Z',
+              domain: 'conflict',
+            },
+          ] as any,
+          readEvidenceLinks: async () => [],
+          readArticles: async () => [],
+          readMuteRules: async () => ({ rules: [], updatedAt: null }) as any,
+          readClaimMembership: async () => ({ acceptedClaimIds: [], updatedAt: null }),
+          readClaimEnrichments: async () => [],
+        }),
+    }),
+  );
+
+  const { baseUrl, close } = await startServer(app);
+  try {
+    const resp = await fetch(`${baseUrl}/api/batches/latest/claims`);
+    assert.equal(resp.status, 200);
+    const body = (await resp.json()) as { ok: true; claims: unknown[] };
+    assert.equal(body.ok, true);
+    assert.deepEqual(body.claims, []);
+  } finally {
+    await close();
+  }
+});
+
+test('GET /api/batches/latest/claims includes accepted unmuted claims and omits muted ones', async () => {
+  const app = express();
+  app.use(
+    '/api',
+    createKiteBriefRouter({
+      loadBriefClaims: async () =>
+        await loadBriefClaims({
+          readClaims: async () =>
+            [
+              {
+                id: 'claim-visible',
+                text: 'Visible claim',
+                claimType: 'event_occurrence',
+                status: 'supported_by_primary',
+                entities: [],
+                createdAt: '2026-09-24T00:00:00.000Z',
+                domain: 'conflict',
+              },
+              {
+                id: 'claim-muted',
+                text: 'Alpha muted claim',
+                claimType: 'event_occurrence',
+                status: 'reported',
+                entities: [],
+                createdAt: '2026-09-23T00:00:00.000Z',
+                domain: 'conflict',
+              },
+            ] as any,
+          readEvidenceLinks: async () => [],
+          readArticles: async () => [],
+          readMuteRules: async () =>
+            ({
+              rules: [
+                {
+                  id: 'mute-1',
+                  keyword: 'alpha',
+                  source: null,
+                  createdAt: '2026-09-24T00:00:00.000Z',
+                },
+              ],
+              updatedAt: '2026-09-24T00:00:00.000Z',
+            }) as any,
+          readClaimMembership: async () => ({
+            acceptedClaimIds: ['claim-visible', 'claim-muted'],
+            updatedAt: '2026-09-24T00:00:00.000Z',
+          }),
+          readClaimEnrichments: async () => [],
+        }),
+    }),
+  );
+
+  const { baseUrl, close } = await startServer(app);
+  try {
+    const resp = await fetch(`${baseUrl}/api/batches/latest/claims`);
+    assert.equal(resp.status, 200);
+    const body = (await resp.json()) as {
+      ok: true;
+      claims: Array<{ claimId: string; status: string }>;
+    };
+    assert.equal(body.ok, true);
+    assert.deepEqual(
+      body.claims.map((claim) => claim.claimId),
+      ['claim-visible'],
+    );
+    assert.equal(body.claims[0]!.status, 'supported_by_primary');
+  } finally {
+    await close();
+  }
+});
+
 test('POST /api/claims/extract requires session', async () => {
   process.env.SESSION_SECRET = 'test-secret';
   process.env.MVP_PASSWORD = 'pw';
@@ -564,6 +677,34 @@ test('POST /api/claims/extract requires session', async () => {
   const { baseUrl, close } = await startServer(app);
   try {
     const resp = await fetch(`${baseUrl}/api/claims/extract`, { method: 'POST' });
+    assert.equal(resp.status, 401);
+    const body = (await resp.json()) as { ok: false; error: string };
+    assert.equal(body.ok, false);
+    assert.equal(body.error, 'Unauthorized');
+  } finally {
+    await close();
+  }
+});
+
+test('POST /api/claims/enrich requires session', async () => {
+  process.env.SESSION_SECRET = 'test-secret';
+  process.env.MVP_PASSWORD = 'pw';
+  delete process.env.MVP_PASSWORD_HASH;
+
+  const { createApp } = await import('./app.js');
+  const app = createApp({
+    enrichAcceptedClaims: async () => ({
+      attempted: 0,
+      succeeded: 0,
+      failed: 0,
+      claimIds: [],
+      skippedClaimIds: [],
+    }),
+  });
+
+  const { baseUrl, close } = await startServer(app);
+  try {
+    const resp = await fetch(`${baseUrl}/api/claims/enrich`, { method: 'POST' });
     assert.equal(resp.status, 401);
     const body = (await resp.json()) as { ok: false; error: string };
     assert.equal(body.ok, false);
@@ -716,6 +857,86 @@ test('POST /api/claims/extract returns ok payload when authenticated', async () 
     assert.deepEqual(body.claims, []);
     assert.deepEqual(body.evidence, []);
     assert.deepEqual(body.reviewQueued, []);
+  } finally {
+    await close();
+  }
+});
+
+test('POST /api/claims/enrich skips non-accepted claim ids', async () => {
+  process.env.SESSION_SECRET = 'test-secret';
+  process.env.MVP_PASSWORD = 'pw';
+  delete process.env.MVP_PASSWORD_HASH;
+
+  const { createApp } = await import('./app.js');
+  const app = createApp({
+    enrichAcceptedClaims: async (options) =>
+      await enrichAcceptedClaims({
+        ...options,
+        readClaimsFn: async () =>
+          [
+            {
+              id: 'claim-1',
+              text: 'Accepted claim',
+              claimType: 'event_occurrence',
+              status: 'reported',
+              entities: [],
+              createdAt: '2026-09-24T00:00:00.000Z',
+              domain: 'conflict',
+            },
+            {
+              id: 'claim-2',
+              text: 'Unaccepted claim',
+              claimType: 'official_statement',
+              status: 'reported',
+              entities: [],
+              createdAt: '2026-09-23T00:00:00.000Z',
+              domain: 'conflict',
+            },
+          ] as any,
+        readEvidenceLinksFn: async () => [],
+        readArticlesFn: async () => [],
+        readClaimMembershipFn: async () => ({
+          acceptedClaimIds: ['claim-1'],
+          updatedAt: '2026-09-24T00:00:00.000Z',
+        }),
+        getClaimEnrichmentFn: async () => null,
+        upsertClaimEnrichmentFn: async (record) => record,
+        enrichFn: async () => ({
+          ok: true,
+          enrichment: {
+            short_summary: 'Summary.',
+            talking_points: ['Point A'],
+          },
+          model: 'glm-5.3-flash',
+          rawText: '{"short_summary":"Summary.","talking_points":["Point A"]}',
+        }),
+        nowIsoFn: () => '2026-09-24T12:00:00.000Z',
+      }),
+  });
+
+  const { baseUrl, close } = await startServer(app);
+  try {
+    const cookie = await login(baseUrl);
+    const resp = await fetch(`${baseUrl}/api/claims/enrich`, {
+      method: 'POST',
+      headers: { cookie, 'content-type': 'application/json' },
+      body: JSON.stringify({ claimIds: ['claim-1', 'claim-2'] }),
+    });
+    assert.equal(resp.status, 200);
+    const body = (await resp.json()) as {
+      ok: true;
+      attempted: number;
+      succeeded: number;
+      failed: number;
+      claimIds: string[];
+      skippedClaimIds: string[];
+    };
+    assert.equal(body.ok, true);
+    assert.equal(body.attempted, 1);
+    assert.equal(body.succeeded, 1);
+    assert.equal(body.failed, 0);
+    assert.deepEqual(body.claimIds, ['claim-1']);
+    assert.deepEqual(body.skippedClaimIds, ['claim-2']);
   } finally {
     await close();
   }

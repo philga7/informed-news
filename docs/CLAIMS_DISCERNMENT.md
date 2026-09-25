@@ -16,11 +16,11 @@ Inspired by Wesleyan Quadrilateral discernment (primary text / tradition / reaso
 ## Rules of thumb
 
 - Software **assembles witnesses**; humans **Accept / review** (`needs_review` when confidence is low). `POST /api/claims/extract` ([NEWS-72](https://informedcrew.atlassian.net/browse/NEWS-72)) enqueues low-confidence claims to `claim-review-queue.json`; the claim inbox is live on `/radar` ([NEWS-74](https://informedcrew.atlassian.net/browse/NEWS-74)).
-- **Accept / Track on `/radar`** ([NEWS-75](https://informedcrew.atlassian.net/browse/NEWS-75)): Accept marks operator interest (membership on `claimId`); Track watches for new evidence / stance changes. Accept default-tracks; Unaccept does not auto-untrack. **Accept ≠ truth** — it is desk workflow, not a verdict. Brief hybrid rendering of accepted claims is [NEWS-76](https://informedcrew.atlassian.net/browse/NEWS-76).
+- **Accept / Track on `/radar`** ([NEWS-75](https://informedcrew.atlassian.net/browse/NEWS-75)): Accept marks operator interest (membership on `claimId`); Track watches for new evidence / stance changes. Accept default-tracks; Unaccept does not auto-untrack. **Accept ≠ truth** — it is desk workflow, not a verdict. Brief `/` leads with accepted claims + linked headlines ([NEWS-76](https://informedcrew.atlassian.net/browse/NEWS-76)); Unaccept on Brief, Accept on Radar.
 - **Mute is shared** with the story desk: one `mute-rules.json` + `/api/brief/mutes` CRUD; `claimMatchesMute` hides matching claims from the claim inbox. No per-claimId mute list in v1.
 - Echoing ten outlets is **not** durable method and **not** reason — cluster size ≠ confidence.
 - No single lens gets a truth seal. UI speaks **status + evidence** (`reported`, `supported_by_primary`, `contested`, `insufficient_evidence`) — never Verified badges or claim verdicts.
-- Ollama may propose candidates and write Brief verbiage; it is **not** judgment-of-record.
+- Ollama may propose candidates ([NEWS-72](https://informedcrew.atlassian.net/browse/NEWS-72)) and write **Brief claim verbiage only** (`short_summary`, `talking_points` via `POST /api/claims/enrich` — accepted claims; [NEWS-76](https://informedcrew.atlassian.net/browse/NEWS-76)). Verbiage is AI-assisted copy marked “not ground truth”; it never overwrites code-derived `Claim.status` or evidence scores.
 - **Source tier ([NEWS-73](https://informedcrew.atlassian.net/browse/NEWS-73)):** Radar feeds, persisted articles, and evidence links carry `sourceTier` (`primary` \| `sensor`) stamped at ingest/extract — primaries are preferred evidence witnesses; sensors are proposal fuel.
 
 ## Related

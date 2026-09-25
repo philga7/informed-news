@@ -37,3 +37,6 @@ mvp/data/*.json
 informed_news
 informed_news.pub
 *.tsbuildinfo
+
+# SDD / agent scratch (never commit)
+.superpowers/
