@@ -9,11 +9,13 @@ Claims spine plan: [`.cursor/plans/claims_evidence_spine_8f4cde15.plan.md`](../.
 
 ## Current next
 
-No child story is queued — Epic **J** spine is complete. Decision gate: close [NEWS-69](https://informedcrew.atlassian.net/browse/NEWS-69), then choose next (parked Later / Epic B / new work). Do not invent from open To Do alone.
+No ticket is queued. Epic **J** ([NEWS-69](https://informedcrew.atlassian.net/browse/NEWS-69)) is **Done**. Choose next deliberately — ask before parked Later under [NEWS-57](https://informedcrew.atlassian.net/browse/NEWS-57) or Epic **B** ([NEWS-34](https://informedcrew.atlassian.net/browse/NEWS-34)). Do not invent from open To Do alone.
+
+### Complete: J. Claims / evidence desk
 
 | Order | Key | Summary |
 |-------|-----|---------|
-| **1** | [NEWS-69](https://informedcrew.atlassian.net/browse/NEWS-69) | **J. Claims / evidence desk (conflict)** — children Done; epic still open |
+| — | [NEWS-69](https://informedcrew.atlassian.net/browse/NEWS-69) | **J. Claims / evidence desk (conflict)** — **Done** |
 | 1a | [NEWS-70](https://informedcrew.atlassian.net/browse/NEWS-70) | Claim + evidence stores and status derivation (no verdicts) — **Done** |
 | 1b | [NEWS-71](https://informedcrew.atlassian.net/browse/NEWS-71) | TypeSafe client + claim question library + confidence gates — **Done** |
 | 1c | [NEWS-72](https://informedcrew.atlassian.net/browse/NEWS-72) | Ollama propose candidates + TypeSafe judge extract pipeline — **Done** |
@@ -23,9 +25,7 @@ No child story is queued — Epic **J** spine is complete. Decision gate: close 
 | 1g | [NEWS-76](https://informedcrew.atlassian.net/browse/NEWS-76) | Brief hybrid: accepted claims + linked clusters + Ollama verbiage — **Done** |
 | 1h | [NEWS-77](https://informedcrew.atlassian.net/browse/NEWS-77) | Docs + ROADMAP pointer — **Done** |
 
-**Epic J spine children (NEWS-70–77) are all Done in Jira.** Parent epic [NEWS-69](https://informedcrew.atlassian.net/browse/NEWS-69) is still open — close it when you want Epic J marked complete. After that, ask before parked Later under [NEWS-57](https://informedcrew.atlassian.net/browse/NEWS-57) or Epic **B** ([NEWS-34](https://informedcrew.atlassian.net/browse/NEWS-34)).
-
-**Product direction:** re-center on **claims + evidence** for conflict/geopolitics; **stories demote to input**. TypeSafe / Jev = structured judgments; Ollama = candidate proposal + Brief verbiage only. Hybrid UI: Radar = claim inbox; Brief = accepted claims + linked story clusters. Honesty: **status + evidence**, no Verified badges / claim verdicts. Discernment: [CLAIMS_DISCERNMENT.md](CLAIMS_DISCERNMENT.md).
+**Product direction (still binding):** re-center on **claims + evidence** for conflict/geopolitics; **stories demote to input**. TypeSafe / Jev = structured judgments; Ollama = candidate proposal + Brief verbiage only. Hybrid UI: Radar = claim inbox; Brief = accepted claims + linked story clusters. Honesty: **status + evidence**, no Verified badges / claim verdicts. Discernment: [CLAIMS_DISCERNMENT.md](CLAIMS_DISCERNMENT.md).
 
 ### Prior: Developing desk v1 (Done-demo)
 
@@ -61,8 +61,8 @@ Former [NEWS-53](https://informedcrew.atlassian.net/browse/NEWS-53) (Brief sourc
 | Done | H. Owned rich brief clusters | [NEWS-48](https://informedcrew.atlassian.net/browse/NEWS-48) | Expand sections (sources → enrich → images) |
 | Superseded | Brief source breadth | [NEWS-53](https://informedcrew.atlassian.net/browse/NEWS-53) | Absorbed into NEWS-57 |
 | Done (v1) | I. Developing desk | [NEWS-57](https://informedcrew.atlassian.net/browse/NEWS-57) | Story Radar → Accept → track/mute; Later parked |
-| **Current** | J. Claims / evidence desk | [NEWS-69](https://informedcrew.atlassian.net/browse/NEWS-69) | Children Done; epic still open in Jira until closed |
-| Parked | B. Crucix raw layer | [NEWS-34](https://informedcrew.atlassian.net/browse/NEWS-34) | After Epic J; primary evidence candidate |
+| Done | J. Claims / evidence desk | [NEWS-69](https://informedcrew.atlassian.net/browse/NEWS-69) | Claims spine shipped (Radar + Brief hybrid) |
+| Parked | B. Crucix raw layer | [NEWS-34](https://informedcrew.atlassian.net/browse/NEWS-34) | Next build-order candidate after J; ask first |
 | Parked | C. Geospatial raw layer | [NEWS-35](https://informedcrew.atlassian.net/browse/NEWS-35) | build-order-3 |
 | Parked | D. QA harness skeleton | [NEWS-36](https://informedcrew.atlassian.net/browse/NEWS-36) | build-order-4; later: [NEWS-31](https://informedcrew.atlassian.net/browse/NEWS-31) archives |
 | Parked | E. Bias / threat classification | [NEWS-37](https://informedcrew.atlassian.net/browse/NEWS-37) | build-order-5 |
@@ -75,4 +75,4 @@ Former [NEWS-53](https://informedcrew.atlassian.net/browse/NEWS-53) (Brief sourc
 2. Confirm live status with Jira (`statusCategory != Done`); if this file and Jira disagree, **Jira wins** and update this file in the same change set when you learn the board moved.
 3. Ship via `/news-ship-loop`. Mid-epic discoveries → new NEWS items, not silent rewrites of Done work.
 4. Product path stays Kite Brief + `mvp/server` ([AGENTS.md](../AGENTS.md)).
-5. Do not start NEWS-57 Later/Parked children or B–G while Epic J is still the active product focus unless the user reorders. After NEWS-69 is closed, still ask before B–G or parked Later.
+5. Ask before NEWS-57 Later/Parked children or Epics **B–G** — do not start them from open To Do alone.
