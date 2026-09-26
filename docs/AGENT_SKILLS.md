@@ -22,6 +22,11 @@ find-skills → grill-me → frontend-design / prototype / image-to-code
 
 Mid-epic: do not re-grill finished work. New discoveries → additional tickets (or edits to open ones). See “Adopting mid-epic” in the integration plan notes below.
 
+## Repo-local skills
+
+- `news-ship-loop` — repo-local NEWS ship ritual for Jira, git, and PR handoff.
+- `update-skills` — repo-local freshness checker for copied skills in this repository.
+
 ## Inventory
 
 | Skill | Stage | Upstream |
@@ -33,6 +38,7 @@ Mid-epic: do not re-grill finished work. New discoveries → additional tickets 
 | `image-to-code` | Shape | [leonxlnx/taste-skill](https://github.com/leonxlnx/taste-skill) |
 | `subagent-driven-development` | Build | [obra/superpowers](https://github.com/obra/superpowers) |
 | `news-ship-loop` | Ship | Informed News (repo-local) |
+| `update-skills` | Package / Maintain | Informed News (portable recipe) |
 | `agent-browser` | Verify | [vercel-labs/agent-browser](https://github.com/vercel-labs/agent-browser) |
 | `diagnosing-bugs` | Verify | mattpocock/skills |
 | `skill-creator` | Package | anthropics/skills |
@@ -65,6 +71,8 @@ Normalize the `image-to-code` directory name to match frontmatter `name: image-t
 ### Refresh / update
 
 Re-run the same `npx skills add …` commands from the repo root, then re-consolidate into `.cursor/skills/` if needed. Commit the updated `skills-lock.json` (written by the CLI) alongside skill trees so the lockfile matches what’s installed.
+
+For repo-local freshness checks, prefer `/update-skills` as the check-then-ask path. The `update-skills` skill itself is copied with this recipe as part of the skill tree, not installed with `npx skills add`.
 
 ## Optional: `agent-browser` CLI
 
