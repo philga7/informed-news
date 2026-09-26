@@ -50,7 +50,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
 node --input-type=module - "$REPO_ROOT" "${skills[@]}" <<'NODE'
 import { cp, mkdir, readFile, readdir, rm } from 'node:fs/promises';
 import path from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
 
 const repoRoot = process.argv[2];
@@ -68,7 +68,13 @@ const parseLocalSkillsPath = path.join(
 
 const lockfile = JSON.parse(await readFile(lockfilePath, 'utf8'));
 const { parseLocalSkills } = await import(pathToFileURL(parseLocalSkillsPath).href);
-const localSkillNames = new Set(parseLocalSkills(await readFile(docsPath, 'utf8')));
+const parsedLocalSkills = parseLocalSkills(await readFile(docsPath, 'utf8'));
+
+if (parsedLocalSkills.length === 0) {
+  throw new Error('Could not parse repo-local skills from docs/AGENT_SKILLS.md; refusing to apply.');
+}
+
+const localSkillNames = new Set(['news-ship-loop', 'update-skills', ...parsedLocalSkills]);
 
 for (const skillName of requestedSkills) {
   if (localSkillNames.has(skillName)) {
