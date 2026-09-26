@@ -130,6 +130,7 @@ Repo-local skills live under `.cursor/skills/` (see [docs/AGENT_SKILLS.md](docs/
 | `/image-to-code` | Generate/analyze design images, then match in code | Vision-led frontend from mocks/refs |
 | `/subagent-driven-development` | Fresh implementer subagent per task + review loop | Executing a **grilled** multi-step plan |
 | `/news-ship-loop` | NEWS Jira In Progress → PR/merge → Done + plan cleanup | Starting/finishing a NEWS-* item or merging its PR |
+| `/update-skills` | Check copied skills for freshness | Refreshing repo-local skills with the portable recipe |
 | `/agent-browser` | Scripted browser CLI (stub skill; install CLI separately) | Inspect/verify pages outside IDE browser |
 | `/diagnosing-bugs` | Gated debug loop: repro → minimize → fix → regression | Hard bugs / “why is this broken/slow?” |
 | `/skill-creator` | Author/improve skills and run evals | Packaging a workflow for reuse |
