@@ -1,40 +1,58 @@
 import assert from 'node:assert/strict';
-import { execFile as execFileCallback } from 'node:child_process';
+import { createRequire, syncBuiltinESMExports } from 'node:module';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
-import { promisify } from 'node:util';
-
-const execFile = promisify(execFileCallback);
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const skillRoot = path.resolve(scriptDir, '..');
-const checkScript = path.join(skillRoot, 'scripts', 'check.mjs');
 const fixturesRoot = path.join(skillRoot, 'fixtures');
 const repoRoot = path.join(fixturesRoot, 'repo');
-const commands = [];
+const require = createRequire(import.meta.url);
+const childProcess = require('node:child_process');
+const originalExecFile = childProcess.execFile;
+const spawnedCommands = [];
 
-async function runNode(args) {
-  commands.push(['node', ...args].join(' '));
-  return execFile(process.execPath, args, {
-    cwd: path.resolve(skillRoot, '..', '..', '..'),
-    env: {
-      ...process.env,
-      UPDATE_SKILLS_OFFLINE: '0',
-    },
-  });
+function formatCommand(file, args = []) {
+  return [file, ...args].join(' ');
 }
 
+function isApplyInvocation(file, args = []) {
+  return (
+    path.basename(file) === 'apply.sh' ||
+    args.some((arg) => typeof arg === 'string' && arg.includes('apply.sh'))
+  );
+}
+
+function patchedExecFile(file, args, options, callback) {
+  const normalizedArgs = Array.isArray(args) ? args : [];
+  const normalizedCallback =
+    typeof args === 'function' ? args : typeof options === 'function' ? options : callback;
+
+  spawnedCommands.push(formatCommand(file, normalizedArgs));
+
+  if (isApplyInvocation(file, normalizedArgs)) {
+    const error = new Error(`Fixture runner observed forbidden apply invocation: ${file}`);
+    if (typeof normalizedCallback === 'function') {
+      process.nextTick(() => normalizedCallback(error));
+      return { kill() {} };
+    }
+
+    throw error;
+  }
+
+  return originalExecFile.call(childProcess, file, args, options, callback);
+}
+
+childProcess.execFile = patchedExecFile;
+syncBuiltinESMExports();
+
 try {
-  const { stdout: jsonStdout } = await runNode([
-    checkScript,
-    '--repo-root',
-    repoRoot,
-    '--fixtures',
+  const { buildInventory, formatTextReport } = await import('../scripts/check.mjs');
+  const report = await buildInventory(repoRoot, {
     fixturesRoot,
-    '--json',
-  ]);
-  const report = JSON.parse(jsonStdout);
+    offline: false,
+  });
 
   assert.deepEqual(
     report.inventory.map((item) => ({
@@ -54,20 +72,18 @@ try {
   assert.match(outdatedSkill.skillSummaryLines.join('\n'), /Sections touched: Workflow/);
   assert.deepEqual(outdatedSkill.otherDifferences, [{ path: 'local-only.txt', type: 'removed' }]);
 
-  const { stdout: textStdout } = await runNode([
-    checkScript,
-    '--repo-root',
-    repoRoot,
-    '--fixtures',
-    fixturesRoot,
-  ]);
+  const textReport = formatTextReport(report);
+  assert.match(textReport, /current-match: locked \(current\)/);
+  assert.match(textReport, /outdated-skill: locked \(outdated\)/);
+  assert.match(textReport, /repo-local-skip: repo-local-skip \(not-checked\)/);
+  assert.match(textReport, /- removed: local-only\.txt/);
 
-  assert.match(textStdout, /current-match: locked \(current\)/);
-  assert.match(textStdout, /outdated-skill: locked \(outdated\)/);
-  assert.match(textStdout, /repo-local-skip: repo-local-skip \(not-checked\)/);
-  assert.match(textStdout, /- removed: local-only\.txt/);
   assert.ok(
-    commands.every((command) => !command.includes('apply.sh')),
+    spawnedCommands.some((command) => command.startsWith('git diff ')),
+    'fixture runner spy should observe internal child-process work'
+  );
+  assert.ok(
+    spawnedCommands.every((command) => !command.includes('apply.sh')),
     'fixture runner must not invoke apply.sh'
   );
 
@@ -75,4 +91,7 @@ try {
 } catch (error) {
   console.error(error instanceof Error ? error.stack : String(error));
   process.exitCode = 1;
+} finally {
+  childProcess.execFile = originalExecFile;
+  syncBuiltinESMExports();
 }
