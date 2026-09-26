@@ -22,6 +22,11 @@ find-skills → grill-me → frontend-design / prototype / image-to-code
 
 Mid-epic: do not re-grill finished work. New discoveries → additional tickets (or edits to open ones). See “Adopting mid-epic” in the integration plan notes below.
 
+## Repo-local skills
+
+- `news-ship-loop` — repo-local NEWS ship ritual for Jira, git, and PR handoff.
+- `update-skills` — repo-local freshness checker for copied skills in this repository.
+
 ## Inventory
 
 | Skill | Stage | Upstream |
