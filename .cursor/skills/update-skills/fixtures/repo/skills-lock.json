@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "skills": {
+    "current-match": {
+      "source": "example/skills",
+      "sourceType": "github",
+      "skillPath": "skills/current-match/SKILL.md",
+      "computedHash": "fixture-current"
+    },
+    "outdated-skill": {
+      "source": "example/skills",
+      "sourceType": "github",
+      "skillPath": "skills/outdated-skill/SKILL.md",
+      "computedHash": "fixture-outdated"
+    }
+  }
+}

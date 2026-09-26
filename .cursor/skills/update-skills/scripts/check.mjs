@@ -12,7 +12,7 @@ const execFile = promisify(execFileCallback);
 const DEFAULT_USER_AGENT = 'informed-news-update-skills-checker';
 
 function usage() {
-  return `Usage: node check.mjs --repo-root <path> [--json] [--skill <name>] [--offline]`;
+  return `Usage: node check.mjs --repo-root <path> [--json] [--skill <name>] [--offline] [--fixtures <path>]`;
 }
 
 function isTruthy(value) {
@@ -28,6 +28,7 @@ function parseArgs(argv, env = process.env) {
   let json = false;
   let skill = null;
   let offline = isTruthy(env.UPDATE_SKILLS_OFFLINE);
+  let fixturesRoot = null;
 
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
@@ -56,6 +57,24 @@ function parseArgs(argv, env = process.env) {
       skill = arg.slice('--skill='.length);
       if (!skill) {
         throw new Error('--skill requires a name');
+      }
+      continue;
+    }
+
+    if (arg === '--fixtures') {
+      const value = argv[index + 1];
+      if (!value || value.startsWith('--')) {
+        throw new Error('--fixtures requires a path');
+      }
+      fixturesRoot = value;
+      index += 1;
+      continue;
+    }
+
+    if (arg.startsWith('--fixtures=')) {
+      fixturesRoot = arg.slice('--fixtures='.length);
+      if (!fixturesRoot) {
+        throw new Error('--fixtures requires a path');
       }
       continue;
     }
@@ -89,7 +108,7 @@ function parseArgs(argv, env = process.env) {
     throw new Error('--repo-root is required');
   }
 
-  return { repoRoot, json, skill, offline };
+  return { repoRoot, json, skill, offline: offline || Boolean(fixturesRoot), fixturesRoot };
 }
 
 async function readJsonFile(filePath) {
@@ -528,7 +547,15 @@ async function compareSkillDirs(localSkillDir, upstreamSkillDir) {
   };
 }
 
-async function resolveUpstreamSkillDir(lockEntry, options = {}) {
+async function resolveUpstreamSkillDir(lockEntry, skillName, options = {}) {
+  if (options.fixturesRoot) {
+    const resolvedDir = path.join(options.fixturesRoot, 'upstream', skillName);
+    if (!(await pathExists(resolvedDir))) {
+      throw new Error(`Missing fixture upstream skill directory: ${resolvedDir}`);
+    }
+    return { dir: resolvedDir, cleanup: async () => {} };
+  }
+
   if (typeof options.resolveUpstreamSkillDir === 'function') {
     const resolvedDir = await options.resolveUpstreamSkillDir(lockEntry, options);
     return { dir: resolvedDir, cleanup: async () => {} };
@@ -570,6 +597,7 @@ export async function buildInventory(repoRoot, options = {}) {
 
   if (
     options.offline &&
+    !options.fixturesRoot &&
     typeof options.resolveUpstreamSkillDir !== 'function' &&
     inventory.some((item) => item.status === 'locked')
   ) {
@@ -585,7 +613,7 @@ export async function buildInventory(repoRoot, options = {}) {
     let upstreamRef = null;
 
     try {
-      upstreamRef = await resolveUpstreamSkillDir(lockEntry, options);
+      upstreamRef = await resolveUpstreamSkillDir(lockEntry, item.name, options);
       Object.assign(item, await compareSkillDirs(path.join(skillsRoot, item.name), upstreamRef.dir));
     } catch (error) {
       item.comparison = 'check-failed';
@@ -659,7 +687,10 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
   }
 
   try {
-    const report = await buildInventory(path.resolve(parsed.repoRoot), parsed);
+    const report = await buildInventory(path.resolve(parsed.repoRoot), {
+      ...parsed,
+      fixturesRoot: parsed.fixturesRoot ? path.resolve(parsed.fixturesRoot) : null,
+    });
     if (parsed.json) {
       console.log(JSON.stringify(report, null, 2));
       return;

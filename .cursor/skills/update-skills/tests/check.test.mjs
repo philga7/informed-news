@@ -3,6 +3,7 @@ import test from 'node:test';
 import { mkdtemp, mkdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { buildInventory, formatTextReport } from '../scripts/check.mjs';
 
 async function writeFiles(rootDir, files) {
@@ -119,5 +120,30 @@ test('offline mode refuses live compares without fixtures', async () => {
   await assert.rejects(
     () => buildInventory(repoRoot, { skill: 'demo-skill', offline: true }),
     /Offline mode refuses live GitHub compares without fixtures/
+  );
+});
+
+test('buildInventory uses fixture upstream trees in offline mode', async () => {
+  const fixturesRoot = path.resolve(
+    path.dirname(fileURLToPath(import.meta.url)),
+    '..',
+    'fixtures'
+  );
+  const report = await buildInventory(path.join(fixturesRoot, 'repo'), {
+    offline: true,
+    fixturesRoot,
+  });
+
+  assert.deepEqual(
+    report.inventory.map((item) => ({
+      name: item.name,
+      status: item.status,
+      comparison: item.comparison,
+    })),
+    [
+      { name: 'current-match', status: 'locked', comparison: 'current' },
+      { name: 'outdated-skill', status: 'locked', comparison: 'outdated' },
+      { name: 'repo-local-skip', status: 'repo-local-skip', comparison: 'not-checked' },
+    ]
   );
 });
