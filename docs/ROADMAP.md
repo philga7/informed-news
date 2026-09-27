@@ -9,11 +9,9 @@ Claims spine plan: [`.cursor/plans/claims_evidence_spine_8f4cde15.plan.md`](../.
 
 ## Current next
 
-| Order | Key | Summary |
-|-------|-----|---------|
-| **1** | [NEWS-79](https://informedcrew.atlassian.net/browse/NEWS-79) | **Extract gating: spend less on muted / low-value articles** *(next)* |
+**No queued next.** Ask the operator before starting parked Later under [NEWS-57](https://informedcrew.atlassian.net/browse/NEWS-57) or Epic **B** ([NEWS-34](https://informedcrew.atlassian.net/browse/NEWS-34), next build-order candidate).
 
-Epic **J** ([NEWS-69](https://informedcrew.atlassian.net/browse/NEWS-69)) is **Done**. Ask before parked Later under [NEWS-57](https://informedcrew.atlassian.net/browse/NEWS-57) or Epic **B** ([NEWS-34](https://informedcrew.atlassian.net/browse/NEWS-34)).
+Epic **J** ([NEWS-69](https://informedcrew.atlassian.net/browse/NEWS-69)) is **Done**.
 
 ### Complete: J. Claims / evidence desk
 
@@ -29,6 +27,7 @@ Epic **J** ([NEWS-69](https://informedcrew.atlassian.net/browse/NEWS-69)) is **D
 | 1g | [NEWS-76](https://informedcrew.atlassian.net/browse/NEWS-76) | Brief hybrid: accepted claims + linked clusters + Ollama verbiage — **Done** |
 | 1h | [NEWS-77](https://informedcrew.atlassian.net/browse/NEWS-77) | Docs + ROADMAP pointer — **Done** |
 | — | [NEWS-78](https://informedcrew.atlassian.net/browse/NEWS-78) | Mark reviewed: dequeue Needs review + Accept clears queue — **Done** |
+| — | [NEWS-79](https://informedcrew.atlassian.net/browse/NEWS-79) | Extract gating: skip muted articles in all modes + primary-first batch (low-value gate not shipped) — **Done** |
 
 **Product direction (still binding):** re-center on **claims + evidence** for conflict/geopolitics; **stories demote to input**. TypeSafe / Jev = structured judgments; Ollama = candidate proposal + Brief verbiage only. Hybrid UI: Radar = claim inbox; Brief = accepted claims + linked story clusters. Honesty: **status + evidence**, no Verified badges / claim verdicts. Discernment: [CLAIMS_DISCERNMENT.md](CLAIMS_DISCERNMENT.md).
 
