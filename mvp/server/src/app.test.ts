@@ -679,6 +679,7 @@ test('POST /api/claims/extract requires session', async () => {
       needsReview: 0,
       failed: 0,
       articlesProcessed: 0,
+      skippedMuted: 0,
       claims: [],
       evidence: [],
       reviewQueued: [],
@@ -873,6 +874,7 @@ test('POST /api/claims/extract returns ok payload when authenticated', async () 
       needsReview: 0,
       failed: 0,
       articlesProcessed: 1,
+      skippedMuted: 2,
       claims: [],
       evidence: [],
       reviewQueued: [],
@@ -899,6 +901,7 @@ test('POST /api/claims/extract returns ok payload when authenticated', async () 
       needsReview: number;
       failed: number;
       articlesProcessed: number;
+      skippedMuted: number;
       claims: unknown[];
       evidence: unknown[];
       reviewQueued: unknown[];
@@ -911,6 +914,7 @@ test('POST /api/claims/extract returns ok payload when authenticated', async () 
     assert.equal(body.persistedClaims, 1);
     assert.equal(body.persistedEvidence, 1);
     assert.equal(body.articlesProcessed, 1);
+    assert.equal(body.skippedMuted, 2);
     assert.deepEqual(body.claims, []);
     assert.deepEqual(body.evidence, []);
     assert.deepEqual(body.reviewQueued, []);

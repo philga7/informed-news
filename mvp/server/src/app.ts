@@ -873,6 +873,7 @@ export function createApp(deps: CreateAppDeps = {}): Express {
         needsReview: result.needsReview,
         failed: result.failed,
         articlesProcessed: result.articlesProcessed,
+        skippedMuted: result.skippedMuted,
         claims: result.claims,
         evidence: result.evidence,
         reviewQueued: result.reviewQueued,
