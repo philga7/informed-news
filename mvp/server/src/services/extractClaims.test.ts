@@ -664,6 +664,56 @@ test('extractClaims: force does not bypass mute', async () => {
   assert.equal(result.skippedMuted, 1);
 });
 
+test('extractClaims: explicit articleIds + force still skip muted articles', async () => {
+  const paths = tempStorePaths();
+  const calls: string[] = [];
+
+  const muted = sampleArticle({ id: 'art-muted', title: 'Ceasefire talks resume' });
+  const clean = sampleArticle({ id: 'art-clean', title: 'clean article' });
+
+  const result = await extractClaimsFromArticles({
+    articleIds: [muted.id, clean.id],
+    force: true,
+    readArticlesFn: async () => [muted, clean],
+    readClaimsFn: async () => [],
+    readMuteRulesFn: async () => ({ rules: [muteRule('ceasefire')], updatedAt: null }),
+    isArticleExtractProcessedFn: async () => true,
+    markArticlesExtractProcessedFn: async (ids: string[]) => ({ articleIds: ids }),
+    proposeFn: recordingProposeFn(calls),
+    judgeFn: async () => mockJudgeResult(highConfidenceAnswers()),
+    ...paths,
+  });
+
+  assert.deepEqual(calls, ['clean article']);
+  assert.equal(result.skippedMuted, 1);
+});
+
+test('extractClaims: explicit mode counts muted ids only before limit is reached', async () => {
+  const paths = tempStorePaths();
+  const calls: string[] = [];
+
+  const mutedA = sampleArticle({ id: 'art-muted-a', title: 'Ceasefire talks resume' });
+  const clean = sampleArticle({ id: 'art-clean', title: 'clean article' });
+  const mutedB = sampleArticle({ id: 'art-muted-b', title: 'Ceasefire collapses' });
+
+  const result = await extractClaimsFromArticles({
+    articleIds: [mutedA.id, clean.id, mutedB.id],
+    limit: 1,
+    readArticlesFn: async () => [mutedA, clean, mutedB],
+    readClaimsFn: async () => [],
+    readMuteRulesFn: async () => ({ rules: [muteRule('ceasefire')], updatedAt: null }),
+    isArticleExtractProcessedFn: async () => false,
+    markArticlesExtractProcessedFn: async (ids: string[]) => ({ articleIds: ids }),
+    proposeFn: recordingProposeFn(calls),
+    judgeFn: async () => mockJudgeResult(highConfidenceAnswers()),
+    ...paths,
+  });
+
+  assert.deepEqual(calls, ['clean article']);
+  assert.equal(result.attempted, 1);
+  assert.equal(result.skippedMuted, 1);
+});
+
 test('extractClaims: mute rule with non-matching source does not skip', async () => {
   const paths = tempStorePaths();
   const calls: string[] = [];

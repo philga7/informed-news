@@ -862,23 +862,29 @@ test('POST /api/claims/extract returns ok payload when authenticated', async () 
   delete process.env.MVP_PASSWORD_HASH;
 
   const { createApp } = await import('./app.js');
+  const injectedReadMuteRules = async () => ({ rules: [], updatedAt: null });
+  let capturedOptions: { readMuteRulesFn?: unknown } | undefined;
   const app = createApp({
-    extractClaimsFromArticles: async () => ({
-      ok: true,
-      limit: 5,
-      attempted: 1,
-      proposed: 2,
-      judged: 2,
-      persistedClaims: 1,
-      persistedEvidence: 1,
-      needsReview: 0,
-      failed: 0,
-      articlesProcessed: 1,
-      skippedMuted: 2,
-      claims: [],
-      evidence: [],
-      reviewQueued: [],
-    }),
+    readMuteRules: injectedReadMuteRules,
+    extractClaimsFromArticles: async (options) => {
+      capturedOptions = options;
+      return {
+        ok: true,
+        limit: 5,
+        attempted: 1,
+        proposed: 2,
+        judged: 2,
+        persistedClaims: 1,
+        persistedEvidence: 1,
+        needsReview: 0,
+        failed: 0,
+        articlesProcessed: 1,
+        skippedMuted: 2,
+        claims: [],
+        evidence: [],
+        reviewQueued: [],
+      };
+    },
   });
 
   const { baseUrl, close } = await startServer(app);
@@ -918,6 +924,7 @@ test('POST /api/claims/extract returns ok payload when authenticated', async () 
     assert.deepEqual(body.claims, []);
     assert.deepEqual(body.evidence, []);
     assert.deepEqual(body.reviewQueued, []);
+    assert.equal(capturedOptions?.readMuteRulesFn, injectedReadMuteRules);
   } finally {
     await close();
   }
