@@ -861,7 +861,12 @@ export function createApp(deps: CreateAppDeps = {}): Express {
       const articleIdsRaw = req.body?.articleIds ?? req.query.articleIds;
       const articleIds = parseClaimIds(articleIdsRaw);
 
-      const result = await extractClaims({ limit, force, articleIds });
+      const result = await extractClaims({
+        limit,
+        force,
+        articleIds,
+        readMuteRulesFn: readMutes,
+      });
       res.json({
         ok: result.ok,
         limit: result.limit,
@@ -873,6 +878,7 @@ export function createApp(deps: CreateAppDeps = {}): Express {
         needsReview: result.needsReview,
         failed: result.failed,
         articlesProcessed: result.articlesProcessed,
+        skippedMuted: result.skippedMuted,
         claims: result.claims,
         evidence: result.evidence,
         reviewQueued: result.reviewQueued,

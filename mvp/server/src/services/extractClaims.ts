@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { Article } from '../types/article.js';
 import type { Claim, ClaimType, EvidenceLink, EvidenceStance, SourceTier } from '../types/claim.js';
 import type { ClaimReviewQueueEntry } from '../store/claimReviewQueueStore.js';
+import type { MuteRule, MuteRulesStore } from '../store/muteRulesStore.js';
 import {
   enqueueClaimReview,
   isArticleExtractProcessed,
@@ -9,6 +10,7 @@ import {
   readArticles,
   getClaimById,
   readClaims,
+  readMuteRules,
   upsertClaim,
   upsertEvidenceLink,
 } from '../store/index.js';
@@ -17,8 +19,10 @@ import {
   CLAIM_REVIEW_QUEUE_PATH,
   CLAIMS_PATH,
   EVIDENCE_LINKS_PATH,
+  MUTE_RULES_PATH,
 } from '../store/paths.js';
 import { framingBodyText, sortNewestFirst } from './classifyArticles.js';
+import { articleMatchesMute } from './muteMatch.js';
 import {
   proposeClaimCandidates,
   type ProposeClaimsInput,
@@ -79,6 +83,8 @@ export type ExtractClaimsOptions = {
   evidencePath?: string;
   queuePath?: string;
   processedPath?: string;
+  muteRulesPath?: string;
+  readMuteRulesFn?: (mutePath?: string) => Promise<MuteRulesStore>;
 };
 
 export type ExtractClaimsResult = {
@@ -92,6 +98,7 @@ export type ExtractClaimsResult = {
   needsReview: number;
   failed: number;
   articlesProcessed: number;
+  skippedMuted: number;
   claims: Claim[];
   evidence: EvidenceLink[];
   reviewQueued: ClaimReviewQueueEntry[];
@@ -171,8 +178,10 @@ async function selectArticles(
   force: boolean,
   readArticlesFn: () => Promise<Article[]>,
   isProcessedFn: (articleId: string) => Promise<boolean>,
-): Promise<Article[]> {
+  muteRules: MuteRule[],
+): Promise<{ articles: Article[]; skippedMuted: number }> {
   const articles = await readArticlesFn();
+  let skippedMuted = 0;
 
   const requestedIds =
     options.articleIds && options.articleIds.length > 0
@@ -193,25 +202,28 @@ async function selectArticles(
       const article = byId.get(id);
       if (!article) continue;
       if (!force && (await isProcessedFn(article.id))) continue;
+      if (articleMatchesMute(article, muteRules)) {
+        skippedMuted += 1;
+        continue;
+      }
       selected.push(article);
     }
-    return selected;
+    return { articles: selected, skippedMuted };
   }
 
-  // Locked ruling: when selecting unprocessed in batch mode (no articleIds),
-  // prefer sensors first, then fill with primaries under limit.
+  // NEWS-79: batch mode (no articleIds) prefers primaries first, then sensors.
   const sorted = sortNewestFirst(articles).filter((a) => a.sourceKind !== 'manual');
   const sensors: Article[] = [];
   const primaries: Article[] = [];
   for (const article of sorted) {
-    if (force) {
-      (evidenceSourceTier(article) === 'primary' ? primaries : sensors).push(article);
+    if (!force && (await isProcessedFn(article.id))) continue;
+    if (articleMatchesMute(article, muteRules)) {
+      skippedMuted += 1;
       continue;
     }
-    if (await isProcessedFn(article.id)) continue;
     (evidenceSourceTier(article) === 'primary' ? primaries : sensors).push(article);
   }
-  return sensors.concat(primaries).slice(0, limit);
+  return { articles: primaries.concat(sensors).slice(0, limit), skippedMuted };
 }
 
 /**
@@ -242,13 +254,17 @@ export async function extractClaimsFromArticles(
   const enqueueReviewFn = options.enqueueClaimReviewFn ?? enqueueClaimReview;
   const proposeFn = options.proposeFn ?? proposeClaimCandidates;
   const judgeFn = options.judgeFn ?? judgeClaimCandidate;
+  const muteRulesPath = options.muteRulesPath ?? MUTE_RULES_PATH;
+  const readMuteRulesFn = options.readMuteRulesFn ?? readMuteRules;
 
-  const candidates = await selectArticles(
+  const muteRules = (await readMuteRulesFn(muteRulesPath)).rules;
+  const { articles: candidates, skippedMuted } = await selectArticles(
     options,
     limit,
     force,
     readArticlesFn,
     isProcessedFn,
+    muteRules,
   );
 
   const result: ExtractClaimsResult = {
@@ -262,6 +278,7 @@ export async function extractClaimsFromArticles(
     needsReview: 0,
     failed: 0,
     articlesProcessed: 0,
+    skippedMuted,
     claims: [],
     evidence: [],
     reviewQueued: [],

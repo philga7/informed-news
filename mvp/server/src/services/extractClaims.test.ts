@@ -10,6 +10,7 @@ import { isArticleExtractProcessed, readClaimExtractProcessed } from '../store/c
 import { readClaims } from '../store/claimStore.js';
 import { readEvidenceLinks } from '../store/evidenceLinkStore.js';
 import { writeClaims } from '../store/claimStore.js';
+import type { MuteRule } from '../store/muteRulesStore.js';
 import { extractClaimsFromArticles } from './extractClaims.js';
 import type { ClaimJudgeAnswers, ClaimJudgeResult, ClaimJudgeState } from './typesafeClaimQuestions.js';
 import type { ProposeClaimsInput, ProposeClaimsResult } from './ollamaProposeClaims.js';
@@ -21,6 +22,7 @@ function tempStorePaths() {
     evidencePath: path.join(dir, 'evidence-links.json'),
     queuePath: path.join(dir, 'claim-review-queue.json'),
     processedPath: path.join(dir, 'claim-extract-processed.json'),
+    muteRulesPath: path.join(dir, 'mute-rules.json'),
   };
 }
 
@@ -471,7 +473,7 @@ test('extractClaims: judge receives newest 8 existing claims', async () => {
   ]);
 });
 
-test('extractClaims: batch selection prefers sensors before primaries', async () => {
+test('extractClaims: batch selection prefers primaries before sensors', async () => {
   const paths = tempStorePaths();
   const calls: string[] = [];
 
@@ -509,5 +511,230 @@ test('extractClaims: batch selection prefers sensors before primaries', async ()
     ...paths,
   });
 
-  assert.deepEqual(calls, ['sensor: newer', 'sensor: older (implicit)']);
+  assert.deepEqual(calls, ['primary: newer', 'sensor: newer']);
+});
+
+test('extractClaims: batch selection takes all primaries (newest first) before any sensor', async () => {
+  const paths = tempStorePaths();
+  const calls: string[] = [];
+
+  const primaryOlder = sampleArticle({
+    id: 'art-primary-older',
+    sourceTier: 'primary',
+    title: 'primary: older',
+    publishedAt: '2026-09-10T12:00:00.000Z',
+  });
+  const primaryNewer = sampleArticle({
+    id: 'art-primary-newer',
+    sourceTier: 'primary',
+    title: 'primary: newer',
+    publishedAt: '2026-09-11T12:00:00.000Z',
+  });
+  const sensorNewest = sampleArticle({
+    id: 'art-sensor-newest',
+    sourceTier: 'sensor',
+    title: 'sensor: newest',
+    publishedAt: '2026-09-12T12:00:00.000Z',
+  });
+
+  const proposeFn = async (input: ProposeClaimsInput): Promise<ProposeClaimsResult> => {
+    calls.push(input.title);
+    return { ok: true, candidates: [], model: 'mock-propose', rawText: '{}' };
+  };
+
+  await extractClaimsFromArticles({
+    limit: 2,
+    readArticlesFn: async () => [primaryOlder, sensorNewest, primaryNewer],
+    readClaimsFn: async () => [],
+    isArticleExtractProcessedFn: async () => false,
+    markArticlesExtractProcessedFn: async (ids: string[]) => ({ articleIds: ids }),
+    proposeFn,
+    judgeFn: async () => mockJudgeResult(highConfidenceAnswers()),
+    ...paths,
+  });
+
+  assert.deepEqual(calls, ['primary: newer', 'primary: older']);
+});
+
+function muteRule(keyword: string, source: string | null = null): MuteRule {
+  return {
+    id: `mute-${keyword}`,
+    keyword,
+    source,
+    createdAt: '2026-09-01T00:00:00.000Z',
+  };
+}
+
+function recordingProposeFn(calls: string[]) {
+  return async (input: ProposeClaimsInput): Promise<ProposeClaimsResult> => {
+    calls.push(input.title);
+    return { ok: true, candidates: [], model: 'mock-propose', rawText: '{}' };
+  };
+}
+
+test('extractClaims: batch skips muted articles without consuming limit or marking processed', async () => {
+  const paths = tempStorePaths();
+  const calls: string[] = [];
+  const marked: string[] = [];
+
+  const muted = sampleArticle({
+    id: 'art-muted',
+    sourceTier: 'primary',
+    title: 'Ceasefire talks resume',
+    publishedAt: '2026-09-12T12:00:00.000Z',
+  });
+  const clean = sampleArticle({
+    id: 'art-clean',
+    title: 'clean: older',
+    publishedAt: '2026-09-10T12:00:00.000Z',
+  });
+
+  const result = await extractClaimsFromArticles({
+    limit: 1,
+    readArticlesFn: async () => [muted, clean],
+    readClaimsFn: async () => [],
+    readMuteRulesFn: async () => ({ rules: [muteRule('ceasefire')], updatedAt: null }),
+    isArticleExtractProcessedFn: async () => false,
+    markArticlesExtractProcessedFn: async (ids: string[]) => {
+      marked.push(...ids);
+      return { articleIds: ids };
+    },
+    proposeFn: recordingProposeFn(calls),
+    judgeFn: async () => mockJudgeResult(highConfidenceAnswers()),
+    ...paths,
+  });
+
+  assert.deepEqual(calls, ['clean: older']);
+  assert.equal(result.skippedMuted, 1);
+  assert.equal(result.attempted, 1);
+  assert.ok(!marked.includes(muted.id));
+});
+
+test('extractClaims: explicit articleIds skip muted articles', async () => {
+  const paths = tempStorePaths();
+  const calls: string[] = [];
+
+  const muted = sampleArticle({ id: 'art-muted', title: 'Ceasefire talks resume' });
+  const clean = sampleArticle({ id: 'art-clean', title: 'clean article' });
+
+  const result = await extractClaimsFromArticles({
+    articleIds: [muted.id, clean.id],
+    readArticlesFn: async () => [muted, clean],
+    readClaimsFn: async () => [],
+    readMuteRulesFn: async () => ({ rules: [muteRule('ceasefire')], updatedAt: null }),
+    isArticleExtractProcessedFn: async () => false,
+    markArticlesExtractProcessedFn: async (ids: string[]) => ({ articleIds: ids }),
+    proposeFn: recordingProposeFn(calls),
+    judgeFn: async () => mockJudgeResult(highConfidenceAnswers()),
+    ...paths,
+  });
+
+  assert.deepEqual(calls, ['clean article']);
+  assert.equal(result.skippedMuted, 1);
+});
+
+test('extractClaims: force does not bypass mute', async () => {
+  const paths = tempStorePaths();
+  const calls: string[] = [];
+
+  const muted = sampleArticle({
+    id: 'art-muted',
+    title: 'Ceasefire talks resume',
+    publishedAt: '2026-09-12T12:00:00.000Z',
+  });
+  const clean = sampleArticle({
+    id: 'art-clean',
+    title: 'clean article',
+    publishedAt: '2026-09-10T12:00:00.000Z',
+  });
+
+  const result = await extractClaimsFromArticles({
+    force: true,
+    readArticlesFn: async () => [muted, clean],
+    readClaimsFn: async () => [],
+    readMuteRulesFn: async () => ({ rules: [muteRule('ceasefire')], updatedAt: null }),
+    isArticleExtractProcessedFn: async () => true,
+    markArticlesExtractProcessedFn: async (ids: string[]) => ({ articleIds: ids }),
+    proposeFn: recordingProposeFn(calls),
+    judgeFn: async () => mockJudgeResult(highConfidenceAnswers()),
+    ...paths,
+  });
+
+  assert.deepEqual(calls, ['clean article']);
+  assert.equal(result.skippedMuted, 1);
+});
+
+test('extractClaims: explicit articleIds + force still skip muted articles', async () => {
+  const paths = tempStorePaths();
+  const calls: string[] = [];
+
+  const muted = sampleArticle({ id: 'art-muted', title: 'Ceasefire talks resume' });
+  const clean = sampleArticle({ id: 'art-clean', title: 'clean article' });
+
+  const result = await extractClaimsFromArticles({
+    articleIds: [muted.id, clean.id],
+    force: true,
+    readArticlesFn: async () => [muted, clean],
+    readClaimsFn: async () => [],
+    readMuteRulesFn: async () => ({ rules: [muteRule('ceasefire')], updatedAt: null }),
+    isArticleExtractProcessedFn: async () => true,
+    markArticlesExtractProcessedFn: async (ids: string[]) => ({ articleIds: ids }),
+    proposeFn: recordingProposeFn(calls),
+    judgeFn: async () => mockJudgeResult(highConfidenceAnswers()),
+    ...paths,
+  });
+
+  assert.deepEqual(calls, ['clean article']);
+  assert.equal(result.skippedMuted, 1);
+});
+
+test('extractClaims: explicit mode counts muted ids only before limit is reached', async () => {
+  const paths = tempStorePaths();
+  const calls: string[] = [];
+
+  const mutedA = sampleArticle({ id: 'art-muted-a', title: 'Ceasefire talks resume' });
+  const clean = sampleArticle({ id: 'art-clean', title: 'clean article' });
+  const mutedB = sampleArticle({ id: 'art-muted-b', title: 'Ceasefire collapses' });
+
+  const result = await extractClaimsFromArticles({
+    articleIds: [mutedA.id, clean.id, mutedB.id],
+    limit: 1,
+    readArticlesFn: async () => [mutedA, clean, mutedB],
+    readClaimsFn: async () => [],
+    readMuteRulesFn: async () => ({ rules: [muteRule('ceasefire')], updatedAt: null }),
+    isArticleExtractProcessedFn: async () => false,
+    markArticlesExtractProcessedFn: async (ids: string[]) => ({ articleIds: ids }),
+    proposeFn: recordingProposeFn(calls),
+    judgeFn: async () => mockJudgeResult(highConfidenceAnswers()),
+    ...paths,
+  });
+
+  assert.deepEqual(calls, ['clean article']);
+  assert.equal(result.attempted, 1);
+  assert.equal(result.skippedMuted, 1);
+});
+
+test('extractClaims: mute rule with non-matching source does not skip', async () => {
+  const paths = tempStorePaths();
+  const calls: string[] = [];
+
+  const article = sampleArticle({ id: 'art-border' });
+
+  const result = await extractClaimsFromArticles({
+    articleIds: [article.id],
+    readArticlesFn: async () => [article],
+    readClaimsFn: async () => [],
+    readMuteRulesFn: async () => ({
+      rules: [muteRule('border', 'other.com')],
+      updatedAt: null,
+    }),
+    isArticleExtractProcessedFn: async () => false,
+    markArticlesExtractProcessedFn: async (ids: string[]) => ({ articleIds: ids }),
+    proposeFn: recordingProposeFn(calls),
+    judgeFn: async () => mockJudgeResult(highConfidenceAnswers()),
+    ...paths,
+  });
+
+  assert.deepEqual(calls, ['Incident reported near border']);
+  assert.equal(result.skippedMuted, 0);
 });
