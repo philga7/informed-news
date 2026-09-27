@@ -43,6 +43,7 @@ Mid-epic: do not re-grill finished work. New discoveries → additional tickets 
 | `diagnosing-bugs` | Verify | mattpocock/skills |
 | `skill-creator` | Package | anthropics/skills |
 | `mcp-builder` | Package | anthropics/skills |
+| `jev` | Verify / Judge | [jkudish/jev-mcp](https://github.com/jkudish/jev-mcp) (pairs with the `jev` MCP server) |
 
 Licenses: keep each skill’s `LICENSE` / `LICENSE.txt` (MIT / Apache-2.0 mix).
 
@@ -55,7 +56,10 @@ npx skills add anthropics/skills --skill frontend-design --skill skill-creator -
 npx skills add vercel-labs/agent-browser -a cursor --copy -y
 npx skills add https://github.com/Leonxlnx/taste-skill --skill image-to-code -a cursor --copy -y
 npx skills add obra/superpowers --skill subagent-driven-development -a cursor --copy -y
+npx skills add jkudish/jev-mcp --skill jev -a cursor --copy -y
 ```
+
+The `jev` skill ships no in-folder `LICENSE` upstream; its MIT notice lives in [THIRD_PARTY.md](../THIRD_PARTY.md) so the folder stays identical to upstream for `/update-skills`.
 
 If the CLI writes to `.agents/skills/`, move that tree to `.cursor/skills/` and remove `.agents/skills` so only one discovery path is committed:
 
@@ -85,6 +89,21 @@ npx agent-browser install   # Chrome for Testing
 ```
 
 Or install globally / use `npx agent-browser` per the upstream README. Coexists with Cursor’s `cursor-ide-browser` MCP (IDE tabs vs scripted CLI).
+
+## Optional: Jev MCP (TypeSafe System One)
+
+`.cursor/mcp.json` registers `jev` → `npx -y @jkudish/jev-mcp@<pinned>` (community MIT package, Node 22+). It gives the agent typed judgment tools (`jev_verify`, `jev_screen`, `jev_classify`, `jev_rerank`, `jev_decide`, `jev_extract`, `jev_noul`, …) backed by TypeSafe's Jev; the `jev` skill tells the agent when to call them.
+
+The key is read from a per-user file outside the repo so the server never sees other `mvp/.env` secrets:
+
+```bash
+mkdir -p ~/.config/jev-mcp && chmod 700 ~/.config/jev-mcp
+(umask 177 && grep '^TYPESAFE_API_KEY=' mvp/.env > ~/.config/jev-mcp/env)
+```
+
+`JEV_PROVIDER=typesafe` blocks provider auto-detection; `JEV_MCP_MODEL` stays pinned to the same Jev version as `mvp/server` (NEWS-71). Verify in Cursor Settings → MCP (`jev` connected, 11 tools); logs under Output → MCP Logs.
+
+Dev tooling only: the product pipeline keeps calling TypeSafe via `@typesafe-ai/sdk` in `mvp/server`.
 
 ## Invoke
 

@@ -135,6 +135,7 @@ Repo-local skills live under `.cursor/skills/` (see [docs/AGENT_SKILLS.md](docs/
 | `/diagnosing-bugs` | Gated debug loop: repro → minimize → fix → regression | Hard bugs / “why is this broken/slow?” |
 | `/skill-creator` | Author/improve skills and run evals | Packaging a workflow for reuse |
 | `/mcp-builder` | Guide to build/test MCP servers | Adding a new MCP integration |
+| `/jev` | When to call the `jev` MCP tools (TypeSafe Jev typed judgments) | Verify claims vs evidence, screen fetched text, classify/rerank/decide by meaning (dev tooling, not the product pipeline) |
 
 Full install/copy recipe and licenses: [docs/AGENT_SKILLS.md](docs/AGENT_SKILLS.md).
 

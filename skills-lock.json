@@ -43,6 +43,12 @@
       "skillPath": "skills/image-to-code-skill/SKILL.md",
       "computedHash": "58517b03b2a01f4c9ba65861559d03df931400871bbc200978c975b24bb92c73"
     },
+    "jev": {
+      "source": "jkudish/jev-mcp",
+      "sourceType": "github",
+      "skillPath": "skills/jev/SKILL.md",
+      "computedHash": "d836292154695500e81554806e3e7a0afdb386ce904dfbeb205e70b0f281e075"
+    },
     "mcp-builder": {
       "source": "anthropics/skills",
       "sourceType": "github",

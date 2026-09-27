@@ -17,6 +17,16 @@
     },
     "Atlassian-MCP-Server": {
       "url": "https://mcp.atlassian.com/v1/mcp/authv2"
+    },
+    "jev": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@jkudish/jev-mcp@0.10.1"],
+      "envFile": "${userHome}/.config/jev-mcp/env",
+      "env": {
+        "JEV_PROVIDER": "typesafe",
+        "JEV_MCP_MODEL": "jev-1.13.0"
+      }
     }
   }
 }
