@@ -9,7 +9,11 @@ Claims spine plan: [`.cursor/plans/claims_evidence_spine_8f4cde15.plan.md`](../.
 
 ## Current next
 
-**No queued next.** Ask the operator before starting parked Later under [NEWS-57](https://informedcrew.atlassian.net/browse/NEWS-57) or Epic **B** ([NEWS-34](https://informedcrew.atlassian.net/browse/NEWS-34), next build-order candidate).
+| Order | Key | Summary |
+|-------|-----|---------|
+| **1** | [NEWS-83](https://informedcrew.atlassian.net/browse/NEWS-83) | **K. Operator review fixes** — intake for bugs/features from the operator's app walkthrough *(next)* |
+
+Epic **K** children (Bug / Story, labeled `radar` / `brief` / `claims` / `transparency` / `pipeline`) are filed as the review proceeds; order them in Jira (bugs first unless the operator reorders). Close K when the review list is empty; anything that grows into a feature area spins out into its own epic. Still ask before parked Later under [NEWS-57](https://informedcrew.atlassian.net/browse/NEWS-57) or Epic **B** ([NEWS-34](https://informedcrew.atlassian.net/browse/NEWS-34)).
 
 Epic **J** ([NEWS-69](https://informedcrew.atlassian.net/browse/NEWS-69)) is **Done**.
 
@@ -66,7 +70,8 @@ Former [NEWS-53](https://informedcrew.atlassian.net/browse/NEWS-53) (Brief sourc
 | Superseded | Brief source breadth | [NEWS-53](https://informedcrew.atlassian.net/browse/NEWS-53) | Absorbed into NEWS-57 |
 | Done (v1) | I. Developing desk | [NEWS-57](https://informedcrew.atlassian.net/browse/NEWS-57) | Story Radar → Accept → track/mute; Later parked |
 | Done | J. Claims / evidence desk | [NEWS-69](https://informedcrew.atlassian.net/browse/NEWS-69) | Claims spine shipped (Radar + Brief hybrid) |
-| Parked | B. Crucix raw layer | [NEWS-34](https://informedcrew.atlassian.net/browse/NEWS-34) | Next build-order candidate after J; ask first |
+| **Active** | K. Operator review fixes | [NEWS-83](https://informedcrew.atlassian.net/browse/NEWS-83) | Bugs/features from operator walkthrough; close when list empty |
+| Parked | B. Crucix raw layer | [NEWS-34](https://informedcrew.atlassian.net/browse/NEWS-34) | Next build-order candidate after K; ask first |
 | Parked | C. Geospatial raw layer | [NEWS-35](https://informedcrew.atlassian.net/browse/NEWS-35) | build-order-3 |
 | Parked | D. QA harness skeleton | [NEWS-36](https://informedcrew.atlassian.net/browse/NEWS-36) | build-order-4; later: [NEWS-31](https://informedcrew.atlassian.net/browse/NEWS-31) archives |
 | Parked | E. Bias / threat classification | [NEWS-37](https://informedcrew.atlassian.net/browse/NEWS-37) | build-order-5 |
