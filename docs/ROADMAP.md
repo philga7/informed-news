@@ -9,13 +9,25 @@ Claims spine plan: [`.cursor/plans/claims_evidence_spine_8f4cde15.plan.md`](../.
 
 ## Current next
 
+**Epic L. Topic-driven brief** ([NEWS-84](https://informedcrew.atlassian.net/browse/NEWS-84)) — product pivot grilled 2026-09-28. The operator's topic list drives sources and filtering; AI triages cheaply (Jev) and writes only for shown stories (Ollama); no review queue. Full decisions live in the epic description.
+
 | Order | Key | Summary |
 |-------|-----|---------|
-| **1** | [NEWS-83](https://informedcrew.atlassian.net/browse/NEWS-83) | **K. Operator review fixes** — intake for bugs/features from the operator's app walkthrough *(next)* |
+| **1** | [NEWS-85](https://informedcrew.atlassian.net/browse/NEWS-85) | Topics store, API, and Topics page (seeded with 23 topics) *(next)* |
+| 2 | [NEWS-86](https://informedcrew.atlassian.net/browse/NEWS-86) | Topic search ingest: Google News RSS + self-hosted SearXNG, merged |
+| 3 | [NEWS-87](https://informedcrew.atlassian.net/browse/NEWS-87) | Triage pipeline: dedupe, keyword + Jev headline gates, survivor-only scrape, budget caps, drop reasons |
+| 4 | [NEWS-88](https://informedcrew.atlassian.net/browse/NEWS-88) | Brief by topic: top 3 per topic, summaries for shown stories only, scheduled + manual refresh |
+| 5 | [NEWS-89](https://informedcrew.atlassian.net/browse/NEWS-89) | Full stories: tap-to-expand *(milestone 1)*; automatic worth-it bar, topic sections, living updates *(follow-up)* |
+| 6 | [NEWS-90](https://informedcrew.atlassian.net/browse/NEWS-90) | Filtered out view + "Less like this" feedback |
+| 7 | [NEWS-91](https://informedcrew.atlassian.net/browse/NEWS-91) | Retire review flow from default path; park claims desk; update docs |
+| Later | [NEWS-92](https://informedcrew.atlassian.net/browse/NEWS-92) | USAspending contract awards source for company Watch topics |
+| Later | [NEWS-93](https://informedcrew.atlassian.net/browse/NEWS-93) | Always-on hosting decision |
 
-Epic **K** children (Bug / Story, labeled `radar` / `brief` / `claims` / `transparency` / `pipeline`) are filed as the review proceeds; order them in Jira (bugs first unless the operator reorders). Close K when the review list is empty; anything that grows into a feature area spins out into its own epic. Still ask before parked Later under [NEWS-57](https://informedcrew.atlassian.net/browse/NEWS-57) or Epic **B** ([NEWS-34](https://informedcrew.atlassian.net/browse/NEWS-34)).
+**First milestone:** NEWS-85 → 86 → 87 → 88 plus tap-to-expand from NEWS-89 — open the app and get a filtered, topic-grouped Brief with no review step.
 
-Epic **J** ([NEWS-69](https://informedcrew.atlassian.net/browse/NEWS-69)) is **Done**.
+Epic **K** ([NEWS-83](https://informedcrew.atlassian.net/browse/NEWS-83)) stays open as the bug intake from the operator walkthrough (e.g. [NEWS-94](https://informedcrew.atlassian.net/browse/NEWS-94) primary-source plumbing). Still ask before parked Later under [NEWS-57](https://informedcrew.atlassian.net/browse/NEWS-57) or Epic **B** ([NEWS-34](https://informedcrew.atlassian.net/browse/NEWS-34)).
+
+Epic **J** ([NEWS-69](https://informedcrew.atlassian.net/browse/NEWS-69)) is **Done**; its claims desk is **parked** by Epic L (not part of the refresh path).
 
 ### Complete: J. Claims / evidence desk
 
@@ -33,7 +45,7 @@ Epic **J** ([NEWS-69](https://informedcrew.atlassian.net/browse/NEWS-69)) is **D
 | — | [NEWS-78](https://informedcrew.atlassian.net/browse/NEWS-78) | Mark reviewed: dequeue Needs review + Accept clears queue — **Done** |
 | — | [NEWS-79](https://informedcrew.atlassian.net/browse/NEWS-79) | Extract gating: skip muted articles in all modes + primary-first batch (low-value gate not shipped) — **Done** |
 
-**Product direction (still binding):** re-center on **claims + evidence** for conflict/geopolitics; **stories demote to input**. TypeSafe / Jev = structured judgments; Ollama = candidate proposal + Brief verbiage only. Hybrid UI: Radar = claim inbox; Brief = accepted claims + linked story clusters. Honesty: **status + evidence**, no Verified badges / claim verdicts. Discernment: [CLAIMS_DISCERNMENT.md](CLAIMS_DISCERNMENT.md).
+**Product direction (superseded by Epic L, NEWS-84):** Epic J re-centered on **claims + evidence** with Radar as a claim inbox. Epic L replaces the review-desk model with a topic-driven, no-review Brief; the claims desk is parked. Still binding: TypeSafe / Jev = structured judgments; Ollama = verbiage only; honesty = **status + evidence**, no Verified badges / verdicts. Discernment: [CLAIMS_DISCERNMENT.md](CLAIMS_DISCERNMENT.md).
 
 ### Prior: Developing desk v1 (Done-demo)
 
@@ -70,8 +82,9 @@ Former [NEWS-53](https://informedcrew.atlassian.net/browse/NEWS-53) (Brief sourc
 | Superseded | Brief source breadth | [NEWS-53](https://informedcrew.atlassian.net/browse/NEWS-53) | Absorbed into NEWS-57 |
 | Done (v1) | I. Developing desk | [NEWS-57](https://informedcrew.atlassian.net/browse/NEWS-57) | Story Radar → Accept → track/mute; Later parked |
 | Done | J. Claims / evidence desk | [NEWS-69](https://informedcrew.atlassian.net/browse/NEWS-69) | Claims spine shipped (Radar + Brief hybrid) |
-| **Active** | K. Operator review fixes | [NEWS-83](https://informedcrew.atlassian.net/browse/NEWS-83) | Bugs/features from operator walkthrough; close when list empty |
-| Parked | B. Crucix raw layer | [NEWS-34](https://informedcrew.atlassian.net/browse/NEWS-34) | Next build-order candidate after K; ask first |
+| **Active** | L. Topic-driven brief | [NEWS-84](https://informedcrew.atlassian.net/browse/NEWS-84) | Topics → search (Google News + SearXNG) → triage → Brief → full stories; no review queue |
+| Open | K. Operator review fixes | [NEWS-83](https://informedcrew.atlassian.net/browse/NEWS-83) | Bug intake from operator walkthrough; close when list empty |
+| Parked | B. Crucix raw layer | [NEWS-34](https://informedcrew.atlassian.net/browse/NEWS-34) | Next build-order candidate after L; ask first |
 | Parked | C. Geospatial raw layer | [NEWS-35](https://informedcrew.atlassian.net/browse/NEWS-35) | build-order-3 |
 | Parked | D. QA harness skeleton | [NEWS-36](https://informedcrew.atlassian.net/browse/NEWS-36) | build-order-4; later: [NEWS-31](https://informedcrew.atlassian.net/browse/NEWS-31) archives |
 | Parked | E. Bias / threat classification | [NEWS-37](https://informedcrew.atlassian.net/browse/NEWS-37) | build-order-5 |
