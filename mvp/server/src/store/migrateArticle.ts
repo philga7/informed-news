@@ -6,9 +6,11 @@ import type {
   SourceKind,
 } from '../types/article.js';
 import { truncateBodyText } from '../types/article.js';
+import type { SearchProvider } from '../types/topicSearch.js';
+import { SEARCH_PROVIDERS } from '../types/topicSearch.js';
 import { articleIdFromCanonicalUrl } from './articleId.js';
 
-const SOURCE_KINDS = new Set<SourceKind>(['cfp', 'xcancel', 'rss', 'manual']);
+const SOURCE_KINDS = new Set<SourceKind>(['cfp', 'xcancel', 'rss', 'manual', 'search']);
 const BODY_STATUSES = new Set<BodyStatus>([
   'ok',
   'unavailable',
@@ -105,6 +107,47 @@ function parseBodyStatus(
   return 'pending';
 }
 
+function parseTopicIds(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+  const ids = value
+    .filter((item): item is string => typeof item === 'string')
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0);
+  return [...new Set(ids)];
+}
+
+function parseSearchProviders(value: unknown): SearchProvider[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+  const providers = value.filter((item): item is SearchProvider =>
+    SEARCH_PROVIDERS.includes(item as SearchProvider),
+  );
+  return [...new Set(providers)];
+}
+
+/** Topic search provenance: keep only keys present and valid on the stored record. */
+function parseTopicSearchFields(
+  raw: Record<string, unknown>,
+): Pick<Article, 'topicIds' | 'searchProviders' | 'googleNewsUrl'> {
+  const fields: Pick<Article, 'topicIds' | 'searchProviders' | 'googleNewsUrl'> = {};
+  const topicIds = parseTopicIds(raw.topicIds);
+  if (topicIds) {
+    fields.topicIds = topicIds;
+  }
+  const searchProviders = parseSearchProviders(raw.searchProviders);
+  if (searchProviders) {
+    fields.searchProviders = searchProviders;
+  }
+  const googleNewsUrl = raw.googleNewsUrl;
+  if (googleNewsUrl === null || typeof googleNewsUrl === 'string') {
+    fields.googleNewsUrl = googleNewsUrl;
+  }
+  return fields;
+}
+
 /**
  * Normalize a stored article to the source-agnostic shape.
  * Legacy records used `cfpUrl` as identity and had no sourceKind / citations / handle.
@@ -164,6 +207,7 @@ export function migrateArticle(raw: unknown): Article {
     classification: parseClassification(raw.classification),
     classifiedAt: asNullableString(raw.classifiedAt),
     classifyError: asNullableString(raw.classifyError),
+    ...parseTopicSearchFields(raw),
   };
 }
 

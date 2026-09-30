@@ -349,3 +349,66 @@ test('xcancel not_applicable body counts as newly usable', () => {
   assert.equal(merged.bodyStatus, 'not_applicable');
   assert.equal(merged.classification, null);
 });
+
+test('CFP re-upsert keeps topic search provenance from the existing row', () => {
+  const existing = article({
+    topicIds: ['iran'],
+    searchProviders: ['google_news'],
+    googleNewsUrl: 'https://news.google.com/rss/articles/CBMiXyz',
+  });
+  const incoming = article({ fetchedAt: '2026-08-16T13:00:00.000Z' });
+  const merged = mergeArticleOnUpsert(existing, incoming, existing.id);
+  assert.deepEqual(merged.topicIds, ['iran']);
+  assert.deepEqual(merged.searchProviders, ['google_news']);
+  assert.equal(merged.googleNewsUrl, 'https://news.google.com/rss/articles/CBMiXyz');
+});
+
+test('topic search upsert unions and dedupes topicIds and searchProviders', () => {
+  const existing = article({
+    topicIds: ['iran', 'nuclear'],
+    searchProviders: ['google_news'],
+  });
+  const incoming = article({
+    topicIds: ['nuclear', 'sanctions'],
+    searchProviders: ['searxng', 'google_news'],
+  });
+  const merged = mergeArticleOnUpsert(existing, incoming, existing.id);
+  assert.deepEqual(merged.topicIds, ['iran', 'nuclear', 'sanctions']);
+  assert.deepEqual(merged.searchProviders, ['google_news', 'searxng']);
+});
+
+test('incoming string googleNewsUrl wins; incoming null keeps existing', () => {
+  const existing = article({ googleNewsUrl: 'https://news.google.com/rss/articles/Old' });
+  const fromGoogle = mergeArticleOnUpsert(
+    existing,
+    article({ googleNewsUrl: 'https://news.google.com/rss/articles/New' }),
+    existing.id,
+  );
+  assert.equal(fromGoogle.googleNewsUrl, 'https://news.google.com/rss/articles/New');
+  const fromSearx = mergeArticleOnUpsert(
+    existing,
+    article({ googleNewsUrl: null }),
+    existing.id,
+  );
+  assert.equal(fromSearx.googleNewsUrl, 'https://news.google.com/rss/articles/Old');
+});
+
+test('merge without provenance on either side adds no topic search keys', () => {
+  const merged = mergeArticleOnUpsert(article(), article(), 'abc123');
+  assert.equal('topicIds' in merged, false);
+  assert.equal('searchProviders' in merged, false);
+  assert.equal('googleNewsUrl' in merged, false);
+});
+
+test('no existing row keeps incoming topic search fields as-is', () => {
+  const incoming = article({
+    sourceKind: 'search',
+    topicIds: ['iran'],
+    searchProviders: ['searxng'],
+    googleNewsUrl: null,
+  });
+  const merged = mergeArticleOnUpsert(undefined, incoming, incoming.id);
+  assert.deepEqual(merged.topicIds, ['iran']);
+  assert.deepEqual(merged.searchProviders, ['searxng']);
+  assert.equal(merged.googleNewsUrl, null);
+});
