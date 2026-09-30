@@ -58,6 +58,33 @@ function shouldKeepExistingImage(
   return contentUnchanged(existing, incoming);
 }
 
+function unionOrUndefined<T>(
+  existing: readonly T[] | undefined,
+  incoming: readonly T[] | undefined,
+): T[] | undefined {
+  if (!existing && !incoming) {
+    return undefined;
+  }
+  return [...new Set([...(existing ?? []), ...(incoming ?? [])])];
+}
+
+/** Topic search provenance survives upserts from any source (CFP, RSS, search). */
+function withTopicSearchProvenance(existing: Article, merged: Article): Article {
+  const next: Article = { ...merged };
+  const topicIds = unionOrUndefined(existing.topicIds, merged.topicIds);
+  if (topicIds) {
+    next.topicIds = topicIds;
+  }
+  const searchProviders = unionOrUndefined(existing.searchProviders, merged.searchProviders);
+  if (searchProviders) {
+    next.searchProviders = searchProviders;
+  }
+  if (typeof merged.googleNewsUrl !== 'string' && existing.googleNewsUrl !== undefined) {
+    next.googleNewsUrl = existing.googleNewsUrl;
+  }
+  return next;
+}
+
 function hasUsableBody(status: BodyStatus, bodyText: string | null): boolean {
   return (
     (status === 'ok' || status === 'not_applicable') && Boolean(bodyText?.trim())
@@ -91,6 +118,9 @@ function bodyNewlyUsable(existing: Article, merged: Article): boolean {
  * intentional ok/blocked (and xcancel tweet text) apply from incoming.
  *
  * clusterId: fetch paths send null; keep existing until the cluster pass rewrites.
+ *
+ * Topic search provenance: topicIds / searchProviders union (existing first);
+ * googleNewsUrl from incoming when a string, else existing.
  */
 export function mergeArticleOnUpsert(
   existing: Article | undefined,
@@ -125,13 +155,17 @@ export function mergeArticleOnUpsert(
       ? { ...withImage, clusterId: existing.clusterId }
       : withImage;
 
+  const merged: Article = existing
+    ? withTopicSearchProvenance(existing, withCluster)
+    : withCluster;
+
   if (incomingWritesClassification(incoming) || !existing) {
-    return withCluster;
+    return merged;
   }
 
-  if (bodyNewlyUsable(existing, withCluster)) {
+  if (bodyNewlyUsable(existing, merged)) {
     return {
-      ...withCluster,
+      ...merged,
       classification: null,
       classifiedAt: null,
       classifyError: null,
@@ -140,7 +174,7 @@ export function mergeArticleOnUpsert(
 
   if (contentUnchanged(existing, incoming)) {
     return {
-      ...withCluster,
+      ...merged,
       classification: existing.classification,
       classifiedAt: existing.classifiedAt,
       classifyError: existing.classifyError,
@@ -148,7 +182,7 @@ export function mergeArticleOnUpsert(
   }
 
   return {
-    ...withCluster,
+    ...merged,
     classification: null,
     classifiedAt: null,
     classifyError: null,

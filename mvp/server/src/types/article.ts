@@ -3,6 +3,7 @@
  * UI should label results: "AI-assisted framing analysis — not ground truth."
  */
 import type { SourceTier } from './claim.js';
+import type { SearchProvider, TopicSearchMeta } from './topicSearch.js';
 
 export type FramingGenre = 'news_blurb' | 'opinion' | 'analysis' | 'unclear';
 
@@ -31,7 +32,7 @@ export type FramingAnalysis = {
   confidence: number;
 };
 
-export type SourceKind = 'cfp' | 'xcancel' | 'rss' | 'manual';
+export type SourceKind = 'cfp' | 'xcancel' | 'rss' | 'manual' | 'search';
 
 /** Publisher body scrape / tweet-as-body status. */
 export type BodyStatus =
@@ -90,6 +91,12 @@ export type Article = {
   classifiedAt: string | null;
   /** Human-readable error; may include raw model text after a delimiter for debugging */
   classifyError: string | null;
+  /** Desired topics whose search found this article; absent when never found by topic search */
+  topicIds?: string[];
+  /** Search providers that returned this article; absent when never found by topic search */
+  searchProviders?: SearchProvider[];
+  /** Google News article link (query stripped) when Google returned it; null/absent otherwise */
+  googleNewsUrl?: string | null;
 };
 
 export function truncateBodyText(
@@ -106,4 +113,6 @@ export function truncateBodyText(
 export type StoreMeta = {
   lastFetchAt: string | null;
   lastError: string | null;
+  /** Per-provider topic search status from the last refresh */
+  topicSearch?: TopicSearchMeta | null;
 };

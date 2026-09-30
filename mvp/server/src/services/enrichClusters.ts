@@ -82,6 +82,7 @@ function membersToInput(articles: Article[]): EnrichMemberInput[] {
 /**
  * Enrich clusters that do not yet have a successful enrichment record.
  * Groups articles by adapter key: clusterId or `solo:{articleId}`.
+ * Untriaged search rows are skipped until NEWS-87.
  */
 export async function enrichUnenrichedClusters(
   options: EnrichBatchOptions = {},
@@ -98,6 +99,7 @@ export async function enrichUnenrichedClusters(
   const articles = await readArticlesFn();
   const byKey = new Map<string, Article[]>();
   for (const a of articles) {
+    if (a.sourceKind === 'search') continue;
     const key = groupKey(a);
     const list = byKey.get(key) ?? [];
     list.push(a);

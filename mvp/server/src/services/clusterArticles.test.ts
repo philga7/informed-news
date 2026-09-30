@@ -119,6 +119,92 @@ test('unrelated items stay ungrouped', () => {
   assert.equal(out[1].clusterId, null);
 });
 
+function searchRow(overrides: Partial<Article> & Pick<Article, 'id' | 'title'>): Article {
+  return article({
+    sourceKind: 'search',
+    sourceTier: 'sensor',
+    canonicalUrl: `https://news.google.com/rss/articles/${overrides.id}`,
+    citations: [{ label: 'Google News', url: `https://news.google.com/rss/articles/${overrides.id}` }],
+    ...overrides,
+  });
+}
+
+test('search row related to a CFP row leaves both unclustered', () => {
+  const cfp = article({
+    id: 'b-cfp',
+    title: 'Senate passes major infrastructure spending bill',
+    publisherUrl: 'https://news.example.com/senate-bill',
+    publisherDomain: 'news.example.com',
+  });
+  const search = searchRow({
+    id: 'a-search',
+    title: 'Senate passes major infrastructure spending bill',
+    publisherUrl: 'https://news.example.com/senate-bill',
+    publisherDomain: 'news.example.com',
+  });
+
+  assert.equal(articlesAreRelated(cfp, search), true);
+  const out = assignClusterIdsInMemory([cfp, search]);
+  assert.equal(out[0].clusterId, null);
+  assert.equal(out[1].clusterId, null);
+});
+
+test('search row does not bridge two otherwise-unrelated CFP rows', () => {
+  const cfpA = article({
+    id: 'cfp-a',
+    title: 'Senate passes major infrastructure spending bill',
+    publisherUrl: 'https://news.example.com/senate-bill',
+    publisherDomain: 'news.example.com',
+  });
+  const cfpB = article({
+    id: 'cfp-b',
+    title: 'Governor signs drought emergency order',
+    publisherUrl: 'https://other.example.org/drought',
+    publisherDomain: 'other.example.org',
+  });
+  const bridge = searchRow({
+    id: 'a-bridge',
+    title: 'Roundup https://news.example.com/senate-bill',
+    snippet: 'See also https://other.example.org/drought',
+  });
+
+  assert.equal(articlesAreRelated(cfpA, cfpB), false);
+  assert.equal(articlesAreRelated(bridge, cfpA), true);
+  assert.equal(articlesAreRelated(bridge, cfpB), true);
+
+  const out = assignClusterIdsInMemory([cfpA, cfpB, bridge]);
+  assert.deepEqual(
+    out.map((a) => a.clusterId),
+    [null, null, null],
+  );
+});
+
+test('search rows do not change cluster ids among non-search rows', () => {
+  const cfp = article({
+    id: 'b-cfp',
+    title: 'Senate passes major infrastructure spending bill',
+    publisherUrl: 'https://news.example.com/a',
+    publisherDomain: 'news.example.com',
+  });
+  const cfp2 = article({
+    id: 'c-cfp',
+    title: 'Senate passes infrastructure spending measure',
+    publisherUrl: 'https://news.example.com/b',
+    publisherDomain: 'news.example.com',
+  });
+  const search = searchRow({
+    id: 'a-search',
+    title: 'Senate passes major infrastructure spending bill',
+    publisherUrl: 'https://news.example.com/a',
+    publisherDomain: 'news.example.com',
+  });
+
+  const out = assignClusterIdsInMemory([cfp, cfp2, search]);
+  assert.equal(out[0].clusterId, 'b-cfp');
+  assert.equal(out[1].clusterId, 'b-cfp');
+  assert.equal(out[2].clusterId, null);
+});
+
 test('same domain but dissimilar titles do not cluster', () => {
   const a = article({
     id: 'a1',

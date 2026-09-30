@@ -55,6 +55,10 @@ See `mvp/.env.example` for the API:
 - Optional file: `mvp/data/x-profiles.json` (gitignored; see `x-profiles.example.json`)  
 - `PORT` — API port (default `3001`)
 
+### Topic search (optional SearXNG)
+
+Each refresh searches desired topics on Google News RSS and a local SearXNG container (`TOPIC_SEARCH_ENABLED`, `SEARXNG_URL`). SearXNG is optional — `npm run dev` works without it. Setup, env, and failure behavior: [docs/TOPIC_SEARCH.md](docs/TOPIC_SEARCH.md).
+
 Kite UI env: `apps/kite/.env.example`. Owned brief: [docs/OWNED_BRIEF.md](docs/OWNED_BRIEF.md). API compat: [docs/MVP_API_COMPAT.md](docs/MVP_API_COMPAT.md). Route map: [docs/ROUTE_MAP.md](docs/ROUTE_MAP.md). Kagi service cleanup: [docs/KAGI_SERVICE_CLEANUP.md](docs/KAGI_SERVICE_CLEANUP.md). Sync / license: [docs/UPSTREAM_KITE.md](docs/UPSTREAM_KITE.md), [THIRD_PARTY.md](THIRD_PARTY.md).
 
 ## Scripts

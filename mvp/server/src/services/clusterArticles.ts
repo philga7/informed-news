@@ -191,23 +191,26 @@ class UnionFind {
 /**
  * Assign clusterId from connected components of related articles.
  * Singleton components stay null. Cluster id = min member article id.
+ * Search rows (`sourceKind: 'search'`) stay unclustered until triaged (NEWS-87):
+ * they are never unioned and always get `clusterId: null`.
  */
 export function assignClusterIdsInMemory(articles: Article[]): Article[] {
+  const clusterable = articles.filter((a) => a.sourceKind !== 'search');
   const uf = new UnionFind();
-  for (const a of articles) {
+  for (const a of clusterable) {
     uf.add(a.id);
   }
 
-  for (let i = 0; i < articles.length; i++) {
-    for (let j = i + 1; j < articles.length; j++) {
-      if (articlesAreRelated(articles[i], articles[j])) {
-        uf.union(articles[i].id, articles[j].id);
+  for (let i = 0; i < clusterable.length; i++) {
+    for (let j = i + 1; j < clusterable.length; j++) {
+      if (articlesAreRelated(clusterable[i], clusterable[j])) {
+        uf.union(clusterable[i].id, clusterable[j].id);
       }
     }
   }
 
   const membersByRoot = new Map<string, string[]>();
-  for (const a of articles) {
+  for (const a of clusterable) {
     const root = uf.find(a.id);
     const list = membersByRoot.get(root) ?? [];
     list.push(a.id);

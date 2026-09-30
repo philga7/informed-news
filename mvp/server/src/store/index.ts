@@ -38,6 +38,15 @@ export {
   updateTopic,
 } from './topicsStore.js';
 export type { TopicsStorePaths } from './topicsStore.js';
+export {
+  getCachedGoogleNewsUrl,
+  putCachedGoogleNewsUrl,
+  readGoogleNewsUrlCache,
+} from './googleNewsUrlCacheStore.js';
+export type {
+  GoogleNewsUrlCache,
+  GoogleNewsUrlCacheEntry,
+} from './googleNewsUrlCacheStore.js';
 export { acceptClaim, readClaimMembership, unacceptClaim } from './claimMembershipStore.js';
 export type { ClaimMembership } from './claimMembershipStore.js';
 export {
@@ -72,6 +81,7 @@ export {
   CLUSTER_ENRICHMENTS_PATH,
   DATA_DIR,
   EVIDENCE_LINKS_PATH,
+  GOOGLE_NEWS_URL_CACHE_PATH,
   MUTE_RULES_PATH,
   META_PATH,
   TOPICS_PATH,

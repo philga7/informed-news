@@ -35,6 +35,40 @@ export {
 } from './rss.js';
 export type { RssItem } from './rss.js';
 export {
+  buildGoogleNewsSearchUrl,
+  googleArticleIdFromUrl,
+  parseGoogleNewsRss,
+  searchGoogleNews,
+} from './googleNewsRss.js';
+export type { SearchGoogleNewsDeps, SearchGoogleNewsOptions } from './googleNewsRss.js';
+export {
+  buildSearxngSearchUrl,
+  parseSearxngPublishedDate,
+  parseSearxngResults,
+  resolveSearxngBaseUrl,
+  searchSearxng,
+} from './searxngSearch.js';
+export type { SearchSearxngDeps, SearchSearxngOptions } from './searxngSearch.js';
+export {
+  buildSeenKeys,
+  isTopicSearchEnabled,
+  mergeCandidates,
+  runTopicSearch,
+  selectNewForTopic,
+  toArticleInput,
+} from './topicSearchIngest.js';
+export type {
+  MergedCandidate,
+  TopicSearchDeps,
+  TopicSearchResult,
+  TopicSearchTopicCounts,
+} from './topicSearchIngest.js';
+export { resolveGoogleNewsUrl } from './googleNewsResolve.js';
+export type {
+  ResolveGoogleNewsUrlDeps,
+  ResolveGoogleNewsUrlOptions,
+} from './googleNewsResolve.js';
+export {
   fetchCuratedRss,
 } from './curatedRssFetch.js';
 export type {

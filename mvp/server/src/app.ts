@@ -251,11 +251,11 @@ export function createApp(deps: CreateAppDeps = {}): Express {
   app.use('/api', createAuthRouter());
 
   /**
-   * Unified refresh: CFP → curated RSS → xcancel (when configured).
+   * Unified refresh: CFP → curated RSS → xcancel (when configured) → topic search.
    * Optional body/query: { limit?: number, feedUrl?: string }
    * Empty/missing radar-sources.json skips curated without failing CFP.
    * Empty XCANCEL_PROFILES / x-profiles.json skips xcancel without failing CFP.
-   * Curated/xcancel errors are returned in the payload; CFP still succeeds.
+   * Curated/xcancel/topic search errors are returned in the payload; CFP still succeeds.
    */
   app.post('/api/fetch', async (req, res) => {
     try {
@@ -300,6 +300,14 @@ export function createApp(deps: CreateAppDeps = {}): Express {
           fetched: result.xcancel.fetched,
           errors: result.xcancel.errors,
           articles: result.xcancel.upserted,
+        },
+        topicSearch: {
+          skipped: result.topicSearch.skipped,
+          providers: result.topicSearch.providers,
+          fetched: result.topicSearch.fetched,
+          perTopic: result.topicSearch.perTopic,
+          errors: result.topicSearch.errors,
+          articles: result.topicSearch.upserted.length,
         },
         articles: result.articles,
       });

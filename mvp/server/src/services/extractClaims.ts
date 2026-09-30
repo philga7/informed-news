@@ -212,7 +212,10 @@ async function selectArticles(
   }
 
   // NEWS-79: batch mode (no articleIds) prefers primaries first, then sensors.
-  const sorted = sortNewestFirst(articles).filter((a) => a.sourceKind !== 'manual');
+  // Untriaged search rows stay out of batch mode until NEWS-87.
+  const sorted = sortNewestFirst(articles).filter(
+    (a) => a.sourceKind !== 'manual' && a.sourceKind !== 'search',
+  );
   const sensors: Article[] = [];
   const primaries: Article[] = [];
   for (const article of sorted) {

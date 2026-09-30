@@ -19,6 +19,7 @@ apps/kite (SvelteKit Brief UI)
 mvp/server (Express)
     → mvp/data/*.json
     → CFP RSS + publisher scrape (+ optional xcancel)
+    → topic search: Google News RSS + local SearXNG (docs/TOPIC_SEARCH.md)
     → Ollama Cloud (framing)
 ```
 

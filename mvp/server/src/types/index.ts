@@ -33,3 +33,12 @@ export type {
   TopicsStore,
 } from './topic.js';
 export { TOPIC_KINDS, TOPIC_LEVELS, TOPIC_SECTIONS } from './topic.js';
+
+export type {
+  ProviderRunState,
+  ProviderRunStatus,
+  SearchCandidate,
+  SearchProvider,
+  TopicSearchMeta,
+} from './topicSearch.js';
+export { SEARCH_PROVIDERS } from './topicSearch.js';

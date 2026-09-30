@@ -9,6 +9,8 @@ import type {
   CuratedRssFetchOptions,
   CuratedRssFetchResult,
 } from './curatedRssFetch.js';
+import { runTopicSearch } from './topicSearchIngest.js';
+import type { TopicSearchResult } from './topicSearchIngest.js';
 
 export type FetchAllOptions = CfpFetchOptions &
   XcancelFetchOptions &
@@ -28,6 +30,7 @@ export type FetchAllResult = {
   cfp: CfpFetchResult;
   curated: CuratedRssFetchResult;
   xcancel: XcancelFetchResult;
+  topicSearch: TopicSearchResult;
   articles: Article[];
   tiers: FetchTiers;
   fetched: number;
@@ -81,8 +84,27 @@ function emptyCuratedFailure(
   };
 }
 
+function emptyTopicSearchFailure(message: string): TopicSearchResult {
+  const down = () => ({
+    state: 'down' as const,
+    topicsAttempted: 0,
+    topicsFailed: 0,
+    items: 0,
+    errors: [message],
+  });
+  return {
+    skipped: false,
+    providers: { google_news: down(), searxng: down() },
+    fetched: 0,
+    perTopic: {},
+    upserted: [],
+    errors: [message],
+  };
+}
+
 /**
- * Run enabled sources in sequence: CFP, then curated RSS, then xcancel.
+ * Run enabled sources in sequence: CFP, then curated RSS, then xcancel, then
+ * topic search (Google News RSS + SearXNG).
  * CFP failure fails the whole refresh. Other source failures are isolated —
  * CFP results are still returned and errors surface on the result.
  */
@@ -119,7 +141,15 @@ export async function fetchAllSources(
     xcancel = emptyXcancelFailure(message, options);
   }
 
-  // Crude same-event ids across the full store (CFP + curated + xcancel + prior rows).
+  let topicSearch: TopicSearchResult;
+  try {
+    topicSearch = await runTopicSearch();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    topicSearch = emptyTopicSearchFailure(message);
+  }
+
+  // Crude same-event ids across the full store (CFP + curated + xcancel + topic search + prior rows).
   const clustered = await assignClusterIds();
   const byId = new Map(clustered.articles.map((a) => [a.id, a]));
   const withCluster = (rows: Article[]): Article[] =>
@@ -137,10 +167,15 @@ export async function fetchAllSources(
     ...xcancel,
     upserted: withCluster(xcancel.upserted),
   };
+  const topicSearchWithCluster: TopicSearchResult = {
+    ...topicSearch,
+    upserted: withCluster(topicSearch.upserted),
+  };
   const articles = [
     ...cfpWithCluster.upserted,
     ...curatedWithCluster.upserted,
     ...xcancelWithCluster.upserted,
+    ...topicSearchWithCluster.upserted,
   ];
   const tiers = countFetchTiers(articles);
 
@@ -148,9 +183,10 @@ export async function fetchAllSources(
     cfp: cfpWithCluster,
     curated: curatedWithCluster,
     xcancel: xcancelWithCluster,
+    topicSearch: topicSearchWithCluster,
     articles,
     tiers,
-    fetched: cfp.fetched + curated.fetched + xcancel.fetched,
+    fetched: cfp.fetched + curated.fetched + xcancel.fetched + topicSearch.fetched,
     clustered: clustered.clustered,
     clusters: clustered.clusters,
   };
