@@ -35,6 +35,13 @@ export {
 } from './rss.js';
 export type { RssItem } from './rss.js';
 export {
+  buildGoogleNewsSearchUrl,
+  googleArticleIdFromUrl,
+  parseGoogleNewsRss,
+  searchGoogleNews,
+} from './googleNewsRss.js';
+export type { SearchGoogleNewsDeps, SearchGoogleNewsOptions } from './googleNewsRss.js';
+export {
   fetchCuratedRss,
 } from './curatedRssFetch.js';
 export type {
