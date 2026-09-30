@@ -49,6 +49,20 @@ export {
   searchSearxng,
 } from './searxngSearch.js';
 export type { SearchSearxngDeps, SearchSearxngOptions } from './searxngSearch.js';
+export {
+  buildSeenKeys,
+  isTopicSearchEnabled,
+  mergeCandidates,
+  runTopicSearch,
+  selectNewForTopic,
+  toArticleInput,
+} from './topicSearchIngest.js';
+export type {
+  MergedCandidate,
+  TopicSearchDeps,
+  TopicSearchResult,
+  TopicSearchTopicCounts,
+} from './topicSearchIngest.js';
 export { resolveGoogleNewsUrl } from './googleNewsResolve.js';
 export type {
   ResolveGoogleNewsUrlDeps,

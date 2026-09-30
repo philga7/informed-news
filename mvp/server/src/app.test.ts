@@ -304,6 +304,17 @@ test('POST /api/fetch calls syncTrackedAfterFetch with briefClusterKey counts', 
         cfp: { feedUrl: 'x', limit: 3, fetched: 3, upserted: [] },
         curated: { skipped: true, sources: [], fetched: 0, errors: [], upserted: [] },
         xcancel: { skipped: true, handles: [], fetched: 0, errors: [], upserted: [] },
+        topicSearch: {
+          skipped: false,
+          providers: {
+            google_news: { state: 'ok', topicsAttempted: 1, topicsFailed: 0, items: 2, errors: [] },
+            searxng: { state: 'disabled', topicsAttempted: 0, topicsFailed: 0, items: 0, errors: [] },
+          },
+          fetched: 2,
+          perTopic: { t1: { found: 2, merged: 2, skippedSeen: 1, new: 1 } },
+          upserted: [{ id: 'a2', clusterId: 'c1' } as Article],
+          errors: [],
+        },
         // NOTE: syncTrackedAfterFetch must be based on the full rewritten store, not only
         // the upserted article set returned from the fetch result.
         articles: [{ id: 'a2', clusterId: 'c1' } as Article],
@@ -324,8 +335,19 @@ test('POST /api/fetch calls syncTrackedAfterFetch with briefClusterKey counts', 
       body: JSON.stringify({ limit: 3 }),
     });
     assert.equal(resp.status, 200);
-    const json = (await resp.json()) as { ok: boolean };
+    const json = (await resp.json()) as { ok: boolean; topicSearch: unknown };
     assert.equal(json.ok, true);
+    assert.deepEqual(json.topicSearch, {
+      skipped: false,
+      providers: {
+        google_news: { state: 'ok', topicsAttempted: 1, topicsFailed: 0, items: 2, errors: [] },
+        searxng: { state: 'disabled', topicsAttempted: 0, topicsFailed: 0, items: 0, errors: [] },
+      },
+      fetched: 2,
+      perTopic: { t1: { found: 2, merged: 2, skippedSeen: 1, new: 1 } },
+      errors: [],
+      articles: 1,
+    });
     assert.deepEqual(seenMap, { c1: 3, 'solo:solo-1': 1 });
   } finally {
     await close();
@@ -347,6 +369,17 @@ test('POST /api/fetch succeeds even when syncTrackedAfterFetch throws', async ()
         cfp: { feedUrl: 'x', limit: 1, fetched: 0, upserted: [] },
         curated: { skipped: true, sources: [], fetched: 0, errors: [], upserted: [] },
         xcancel: { skipped: true, handles: [], fetched: 0, errors: [], upserted: [] },
+        topicSearch: {
+          skipped: true,
+          providers: {
+            google_news: { state: 'disabled', topicsAttempted: 0, topicsFailed: 0, items: 0, errors: [] },
+            searxng: { state: 'disabled', topicsAttempted: 0, topicsFailed: 0, items: 0, errors: [] },
+          },
+          fetched: 0,
+          perTopic: {},
+          upserted: [],
+          errors: [],
+        },
         articles: [],
       }) as any,
     syncTrackedAfterFetch: async () => {
