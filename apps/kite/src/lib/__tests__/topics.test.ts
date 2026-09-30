@@ -123,15 +123,17 @@ describe('formToPayload', () => {
 		});
 	});
 
-	it('forces level null and no sections for undesired topics', () => {
+	it('forces level null, no sections, and empty search query for undesired topics', () => {
 		const payload = formToPayload({
 			...emptyTopicForm('undesired'),
 			name: 'Celebrity gossip',
 			level: 'core',
+			searchQuery: 'celebrity news',
 			sections: ['business', 'technical'],
 		});
 		expect(payload.kind).toBe('undesired');
 		expect(payload.level).toBeNull();
+		expect(payload.searchQuery).toBe('');
 		expect(payload.sections).toEqual([]);
 	});
 });

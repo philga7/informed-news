@@ -87,7 +87,7 @@ const linkButtonClass =
 			</ul>
 		{/if}
 
-		{#if topic.searchQuery}
+		{#if desired && topic.searchQuery}
 			<p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
 				<span class="font-medium">{TOPICS_FIELD_QUERY}:</span>
 				<code class="ml-1 font-mono text-gray-800 dark:text-gray-200">{topic.searchQuery}</code>

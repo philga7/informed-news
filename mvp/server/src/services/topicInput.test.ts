@@ -52,15 +52,17 @@ test('parseTopicCreate trims name and applies defaults for minimal desired topic
   });
 });
 
-test('parseTopicCreate forces level null and sections [] for undesired topics', () => {
+test('parseTopicCreate forces level null, sections [], and empty searchQuery for undesired topics', () => {
   const topic = parseTopicCreate({
     name: 'Sports',
     kind: 'undesired',
     level: 'core',
+    searchQuery: 'football scores',
     sections: ['map'],
   });
   assert.equal(topic.level, null);
   assert.deepEqual(topic.sections, []);
+  assert.equal(topic.searchQuery, '');
 });
 
 test('parseTopicCreate requires level for desired topics', () => {
@@ -181,11 +183,12 @@ test('parseTopicPatch ignores unknown keys and server-owned fields', () => {
   );
 });
 
-test('finalizeTopicFields clears level and sections when switching to undesired', () => {
+test('finalizeTopicFields clears level, sections, and searchQuery when switching to undesired', () => {
   const topic = finalizeTopicFields(existingDesired, { kind: 'undesired' });
   assert.equal(topic.kind, 'undesired');
   assert.equal(topic.level, null);
   assert.deepEqual(topic.sections, []);
+  assert.equal(topic.searchQuery, '');
   assert.equal(topic.name, 'Iran');
 });
 

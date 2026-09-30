@@ -156,7 +156,7 @@ export function finalizeTopicFields(
     level,
     description: merged.description ?? '',
     keywords: merged.keywords ?? [],
-    searchQuery: merged.searchQuery ?? '',
+    searchQuery: undesired ? '' : (merged.searchQuery ?? ''),
     sections: undesired ? [] : (merged.sections ?? []),
     notes: merged.notes ?? '',
   };

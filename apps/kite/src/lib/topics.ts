@@ -35,13 +35,13 @@ export const TOPIC_SECTIONS: ReadonlyArray<{ id: TopicSection; label: string }> 
 
 export const TOPICS_PAGE_TITLE = `Topics — ${PRODUCT_NAME}`;
 
-export const TOPICS_PAGE_DESCRIPTION = `Your ${PRODUCT_NAME} topic list drives what the Brief searches for and what it filters out.`;
+export const TOPICS_PAGE_DESCRIPTION = `Your ${PRODUCT_NAME} topic list: what the Brief will search for and what it will filter out.`;
 
 export const TOPICS_LOGIN_INTRO =
 	'Topics are currently limited to the MVP operator session. Enter the same password used for the local API to manage topics.';
 
 export const TOPICS_INTRO_HELP =
-	'Desired topics drive what the Brief looks for. Core topics get top stories every refresh; Watch topics surface only significant developments. Undesired topics and mute rules filter stories out — mutes always win.';
+	'Desired topics tell the Brief what to look for: Core topics get top stories every refresh; Watch topics surface only significant developments. Undesired topics describe what to filter out. Topics are saved now and take effect once topic search and triage ship. Mute rules already apply and always win.';
 
 export const TOPICS_CORE_TITLE = 'Core';
 
@@ -212,7 +212,7 @@ export function formToPayload(form: TopicFormState): TopicPayload {
 		level: undesired ? null : form.level,
 		description: form.description.trim(),
 		keywords: parseKeywordsInput(form.keywordsText),
-		searchQuery: form.searchQuery.trim(),
+		searchQuery: undesired ? '' : form.searchQuery.trim(),
 		sections: undesired
 			? []
 			: TOPIC_SECTIONS.map((s) => s.id).filter((id) => form.sections.includes(id)),

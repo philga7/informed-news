@@ -23,7 +23,7 @@ The operator's topic list becomes a persisted, editable object: a flat JSON stor
     level: TopicLevel | null;   // required for desired; always null for undesired
     description: string;
     keywords: string[];
-    searchQuery: string;
+    searchQuery: string;         // always '' for undesired
     sections: TopicSection[];   // always [] for undesired; canonical order, deduped
     notes: string;              // traps / exclusions guidance for triage
     createdAt: string;          // ISO
@@ -477,9 +477,9 @@ Defaults: `topicsPath = TOPICS_PATH`, `seedPath = DEFAULT_TOPICS_SEED_PATH`.
 - `TOPIC_SECTIONS: ReadonlyArray<{ id: TopicSection; label: string }>` in canonical order with labels: business → `Business angle`, technical → `Technical details`, action → `What you can do`, map → `Map`, history → `History`.
 - Copy constants (same style as `$lib/radar.ts`; import `PRODUCT_NAME` from `./brand`):
   - `TOPICS_PAGE_TITLE = \`Topics — ${PRODUCT_NAME}\``
-  - `TOPICS_PAGE_DESCRIPTION` — one sentence: the operator's topic list drives what the Brief searches for and filters out.
+  - `TOPICS_PAGE_DESCRIPTION = \`Your ${PRODUCT_NAME} topic list: what the Brief will search for and what it will filter out.\``
   - `TOPICS_LOGIN_INTRO` — topics are limited to the MVP operator session; enter the local API password.
-  - `TOPICS_INTRO_HELP = 'Desired topics drive what the Brief looks for. Core topics get top stories every refresh; Watch topics surface only significant developments. Undesired topics and mute rules filter stories out — mutes always win.'`
+  - `TOPICS_INTRO_HELP = 'Desired topics tell the Brief what to look for: Core topics get top stories every refresh; Watch topics surface only significant developments. Undesired topics describe what to filter out. Topics are saved now and take effect once topic search and triage ship. Mute rules already apply and always win.'`
   - Section titles: `TOPICS_CORE_TITLE = 'Core'`, `TOPICS_WATCH_TITLE = 'Watch'`, `TOPICS_UNDESIRED_TITLE = 'Undesired'`, `TOPICS_MUTES_TITLE = 'Keyword & outlet mutes'`
   - `TOPICS_MUTES_HELP = 'Stories matching a keyword (optionally only from one outlet) are always filtered out, even when they match a desired topic.'`
   - Empty copy: `TOPICS_EMPTY_DESIRED = 'No topics at this level yet.'`, `TOPICS_EMPTY_UNDESIRED = 'No undesired topics yet.'`
