@@ -16,7 +16,7 @@ const parser: Parser<Record<string, never>, GoogleNewsItem> = new Parser({
   },
 });
 
-const USER_AGENT = 'Mozilla/5.0 (compatible; InformedNews/1.0)';
+export const USER_AGENT = 'Mozilla/5.0 (compatible; InformedNews/1.0)';
 
 export type SearchGoogleNewsOptions = {
   now?: Date;

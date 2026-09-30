@@ -41,6 +41,11 @@ export {
   searchGoogleNews,
 } from './googleNewsRss.js';
 export type { SearchGoogleNewsDeps, SearchGoogleNewsOptions } from './googleNewsRss.js';
+export { resolveGoogleNewsUrl } from './googleNewsResolve.js';
+export type {
+  ResolveGoogleNewsUrlDeps,
+  ResolveGoogleNewsUrlOptions,
+} from './googleNewsResolve.js';
 export {
   fetchCuratedRss,
 } from './curatedRssFetch.js';
