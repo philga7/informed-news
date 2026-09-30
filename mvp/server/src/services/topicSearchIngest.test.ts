@@ -272,6 +272,55 @@ test('the same story found by two topics is one upsert input with both topicIds'
   assert.deepEqual(h.upserts[0]![0]!.topicIds, ['t1', 't2']);
 });
 
+for (const googleOnlyFirst of [false, true]) {
+  test(`a story found via both providers and via Google only is one article (Google-only topic ${googleOnlyFirst ? 'first' : 'second'})`, async () => {
+    const google = googleCandidate('Port strike expands', { id: 'CBMiS', domain: 'port.com' });
+    const searx = searxCandidate('Port strike expands', 'https://port.com/strike');
+    const bothTopic = googleOnlyFirst ? 't2' : 't1';
+    const h = harness({
+      topics: [makeTopic('t1', 'First'), makeTopic('t2', 'Second')],
+      google: async () => [google],
+      searx: async (query) => (query === (bothTopic === 't1' ? 'First' : 'Second') ? [searx] : []),
+    });
+
+    await runTopicSearch({ now: NOW, env: ENV }, h.deps);
+
+    assert.equal(h.upserts[0]!.length, 1);
+    const article = h.upserts[0]![0]!;
+    assert.deepEqual(article.topicIds, ['t1', 't2']);
+    assert.equal(article.canonicalUrl, 'https://port.com/strike');
+    assert.equal(article.publisherUrl, 'https://port.com/strike');
+    assert.equal(article.googleNewsUrl, 'https://news.google.com/rss/articles/CBMiS');
+    assert.deepEqual(article.searchProviders, ['google_news', 'searxng']);
+    assert.equal(article.title, 'Port strike expands');
+  });
+}
+
+test('mergeCandidates takes the first non-null Google link among Google members', () => {
+  const [merged] = mergeCandidates([
+    { ...googleCandidate('Same story', { domain: 'd.com' }), googleNewsUrl: null },
+    googleCandidate('Same story', { id: 'CBMiLater', domain: 'd.com' }),
+  ]);
+  assert.equal(merged!.googleNewsUrl, 'https://news.google.com/rss/articles/CBMiLater');
+  assert.equal(merged!.canonicalUrl, 'https://news.google.com/rss/articles/CBMiLater');
+});
+
+test('selectNewForTopic sorts an unparsable publishedAt like undated (last)', () => {
+  const { selected } = selectNewForTopic(
+    [
+      mergedCandidate({ canonicalUrl: 'https://x.com/bad', publishedAt: 'not a date' }),
+      mergedCandidate({ canonicalUrl: 'https://x.com/old', publishedAt: hoursAgo(5) }),
+      mergedCandidate({ canonicalUrl: 'https://x.com/new', publishedAt: hoursAgo(1) }),
+    ],
+    new Set(),
+    20,
+  );
+  assert.deepEqual(
+    selected.map((m) => m.canonicalUrl),
+    ['https://x.com/new', 'https://x.com/old', 'https://x.com/bad'],
+  );
+});
+
 test('already-seen canonical, publisher, and Google URLs are skipped and counted', async () => {
   const stored = [
     { canonicalUrl: 'https://seen.com/canonical', publisherUrl: null } as Article,

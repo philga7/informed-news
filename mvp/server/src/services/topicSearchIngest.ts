@@ -103,7 +103,8 @@ function mergeGroup(members: SearchCandidate[]): MergedCandidate | null {
     members.find((m) => m.provider === 'searxng' && m.publisherUrl)?.publisherUrl ??
     members.find((m) => m.publisherUrl)?.publisherUrl ??
     null;
-  const googleNewsUrl = google?.googleNewsUrl ?? null;
+  const googleNewsUrl =
+    members.find((m) => m.provider === 'google_news' && m.googleNewsUrl)?.googleNewsUrl ?? null;
   const canonicalUrl = publisherUrl ?? googleNewsUrl;
   if (!canonicalUrl) return null;
 
@@ -164,11 +165,14 @@ export function selectNewForTopic(
   const fresh = merged.filter(
     (m) => !isSeen(m.canonicalUrl) && !isSeen(m.publisherUrl) && !isSeen(m.googleNewsUrl),
   );
+  const publishedMs = (m: MergedCandidate): number =>
+    m.publishedAt === null ? Number.NaN : Date.parse(m.publishedAt);
   const byNewest = (a: MergedCandidate, b: MergedCandidate): number => {
-    if (a.publishedAt === b.publishedAt) return 0;
-    if (a.publishedAt === null) return 1;
-    if (b.publishedAt === null) return -1;
-    return Date.parse(b.publishedAt) - Date.parse(a.publishedAt);
+    const aMs = publishedMs(a);
+    const bMs = publishedMs(b);
+    if (Number.isNaN(aMs)) return Number.isNaN(bMs) ? 0 : 1;
+    if (Number.isNaN(bMs)) return -1;
+    return bMs - aMs;
   };
   return {
     selected: [...fresh].sort(byNewest).slice(0, max),
@@ -217,6 +221,64 @@ export function toArticleInput(
     searchProviders: merged.providers,
     googleNewsUrl: merged.googleNewsUrl,
   };
+}
+
+type CombinedStory = { merged: MergedCandidate; topicIds: string[]; keys: Set<string> };
+
+function storyKeys(story: MergedCandidate): string[] {
+  return [story.canonicalUrl, story.publisherUrl, story.googleNewsUrl].filter(
+    (url): url is string => url !== null,
+  );
+}
+
+/** Two copies of one story; the copy with a direct publisher URL supplies the identity. */
+function combineStories(a: MergedCandidate, b: MergedCandidate): MergedCandidate {
+  const [primary, other] = !a.publisherUrl && b.publisherUrl ? [b, a] : [a, b];
+  return {
+    ...primary,
+    googleNewsUrl: primary.googleNewsUrl ?? other.googleNewsUrl,
+    publisherName: primary.publisherName ?? other.publisherName,
+    publisherDomain: primary.publisherDomain ?? other.publisherDomain,
+    publishedAt: primary.publishedAt ?? other.publishedAt,
+    snippet: primary.snippet || other.snippet,
+    providers: SEARCH_PROVIDERS.filter(
+      (p) => primary.providers.includes(p) || other.providers.includes(p),
+    ),
+  };
+}
+
+/**
+ * One entry per story across topics: stories sharing any canonical, publisher,
+ * or Google URL join (transitively). `topicIds` follow `topicOrder`.
+ */
+function combineAcrossTopics(
+  selectedByTopic: Array<{ topicId: string; selected: MergedCandidate[] }>,
+  topicOrder: string[],
+): CombinedStory[] {
+  let entries: CombinedStory[] = [];
+
+  for (const { topicId, selected } of selectedByTopic) {
+    for (const story of selected) {
+      const keys = storyKeys(story);
+      const matches = entries.filter((e) => keys.some((key) => e.keys.has(key)));
+      const target = matches[0];
+      if (!target) {
+        entries.push({ merged: story, topicIds: [topicId], keys: new Set(keys) });
+        continue;
+      }
+      for (const absorbed of matches.slice(1)) {
+        target.merged = combineStories(target.merged, absorbed.merged);
+        target.topicIds.push(...absorbed.topicIds);
+        absorbed.keys.forEach((key) => target.keys.add(key));
+      }
+      entries = entries.filter((e) => !matches.includes(e) || e === target);
+      target.merged = combineStories(target.merged, story);
+      keys.forEach((key) => target.keys.add(key));
+      const topicIds = new Set([...target.topicIds, topicId]);
+      target.topicIds = topicOrder.filter((id) => topicIds.has(id));
+    }
+  }
+  return entries;
 }
 
 type ProviderRun = (query: string) => Promise<SearchCandidate[]>;
@@ -383,9 +445,7 @@ export async function runTopicSearch(
 
   try {
     const seen = buildSeenKeys(await (deps.readArticles ?? readArticles)());
-    const combined = new Map<string, { merged: MergedCandidate; topicIds: string[] }>();
-
-    mergedByTopic.forEach((merged, i) => {
+    const selectedByTopic = mergedByTopic.map((merged, i) => {
       const topic = topics[i]!;
       const { selected, skippedSeen } = selectNewForTopic(
         merged,
@@ -398,26 +458,15 @@ export async function runTopicSearch(
         skippedSeen,
         new: selected.length,
       };
-
-      for (const story of selected) {
-        const existing = combined.get(story.canonicalUrl);
-        if (!existing) {
-          combined.set(story.canonicalUrl, { merged: story, topicIds: [topic.id] });
-          continue;
-        }
-        if (!existing.topicIds.includes(topic.id)) existing.topicIds.push(topic.id);
-        existing.merged = {
-          ...existing.merged,
-          googleNewsUrl: existing.merged.googleNewsUrl ?? story.googleNewsUrl,
-          providers: SEARCH_PROVIDERS.filter(
-            (p) => existing.merged.providers.includes(p) || story.providers.includes(p),
-          ),
-        };
-      }
+      return { topicId: topic.id, selected };
     });
+    const combined = combineAcrossTopics(
+      selectedByTopic,
+      topics.map((t) => t.id),
+    );
 
     const fetchedAt = now.toISOString();
-    const inputs = [...combined.values()].map(({ merged, topicIds }) =>
+    const inputs = combined.map(({ merged, topicIds }) =>
       toArticleInput(merged, topicIds, fetchedAt),
     );
     if (inputs.length > 0) {
