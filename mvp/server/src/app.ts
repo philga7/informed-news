@@ -1,6 +1,6 @@
 import cors from 'cors';
 import express from 'express';
-import type { Express } from 'express';
+import type { Express, Response } from 'express';
 import {
   createAuthRouter,
   createSessionMiddleware,
@@ -17,7 +17,10 @@ import {
   fetchAllSources,
   ManualSeedValidationError,
   parseManualSeedBody,
+  parseTopicCreate,
+  parseTopicPatch,
   sortNewestFirst,
+  TopicValidationError,
   buildRadarFeed,
   briefClusterKey,
   clusterMatchesMute,
@@ -30,6 +33,7 @@ import {
   addMuteRule,
   dismissClaimReview,
   ackTrackedUpdate,
+  createTopic,
   getArticleById,
   getClaimById,
   readArticles,
@@ -37,16 +41,20 @@ import {
   readClaimMembership,
   readMuteRules,
   readMeta,
+  readTopics,
   readTrackedClaims,
   readTrackedStories,
   removeMuteRule,
+  removeTopic,
   syncTrackedAfterFetch,
+  TopicConflictError,
   trackClaim,
   trackCluster,
   unacceptCluster,
   unacceptClaim,
   untrackClaim,
   untrackCluster,
+  updateTopic,
 } from './store/index.js';
 import type { TrackedEntry } from './store/index.js';
 import type { TrackedClaimEntry } from './store/index.js';
@@ -75,6 +83,10 @@ export type CreateAppDeps = {
   readMuteRules?: typeof readMuteRules;
   addMuteRule?: typeof addMuteRule;
   removeMuteRule?: typeof removeMuteRule;
+  readTopics?: typeof readTopics;
+  createTopic?: typeof createTopic;
+  updateTopic?: typeof updateTopic;
+  removeTopic?: typeof removeTopic;
   loadClaimsRadar?: typeof loadClaimsRadar;
   readClaimMembership?: typeof readClaimMembership;
   acceptClaim?: typeof acceptClaim;
@@ -137,6 +149,20 @@ function parseBooleanLike(raw: unknown): boolean | undefined {
           : undefined;
 }
 
+function sendTopicWriteError(res: Response, verb: string, err: unknown): void {
+  if (err instanceof TopicValidationError) {
+    res.status(400).json({ ok: false, error: err.message });
+    return;
+  }
+  if (err instanceof TopicConflictError) {
+    res.status(409).json({ ok: false, error: err.message });
+    return;
+  }
+  const message = err instanceof Error ? err.message : String(err);
+  console.error(`Topic ${verb} failed:`, message);
+  res.status(500).json({ ok: false, error: message });
+}
+
 function countMembersForClusterId(
   articles: ReadonlyArray<Pick<Article, 'id' | 'clusterId'>>,
   clusterId: string,
@@ -178,6 +204,10 @@ export function createApp(deps: CreateAppDeps = {}): Express {
   const readMutes = deps.readMuteRules ?? readMuteRules;
   const addMute = deps.addMuteRule ?? addMuteRule;
   const removeMute = deps.removeMuteRule ?? removeMuteRule;
+  const readTopicList = deps.readTopics ?? readTopics;
+  const createOneTopic = deps.createTopic ?? createTopic;
+  const updateOneTopic = deps.updateTopic ?? updateTopic;
+  const removeOneTopic = deps.removeTopic ?? removeTopic;
   const getById = deps.getArticleById ?? getArticleById;
   const classifyBatch = deps.classifyUnclassifiedArticles ?? classifyUnclassifiedArticles;
   const classifyOne = deps.classifyArticleById ?? classifyArticleById;
@@ -352,6 +382,56 @@ export function createApp(deps: CreateAppDeps = {}): Express {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.error('Mute rule delete failed:', message);
+      res.status(500).json({ ok: false, error: message });
+    }
+  });
+
+  /**
+   * Operator topic list (NEWS-85).
+   * Mute rules still apply and always win over desired topics.
+   */
+  app.get('/api/topics', async (_req, res) => {
+    try {
+      const store = await readTopicList();
+      res.json({ ok: true, topics: store.topics, updatedAt: store.updatedAt });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('Topics read failed:', message);
+      res.status(500).json({ ok: false, error: message });
+    }
+  });
+
+  app.post('/api/topics', async (req, res) => {
+    try {
+      const fields = parseTopicCreate(req.body);
+      const result = await createOneTopic(fields);
+      res.status(201).json({ ok: true, topic: result.topic, topics: result.topics });
+    } catch (err) {
+      sendTopicWriteError(res, 'create', err);
+    }
+  });
+
+  app.patch('/api/topics/:id', async (req, res) => {
+    try {
+      const patch = parseTopicPatch(req.body);
+      const result = await updateOneTopic(req.params.id, patch);
+      if (!result) {
+        res.status(404).json({ ok: false, error: 'topic not found' });
+        return;
+      }
+      res.json({ ok: true, topic: result.topic, topics: result.topics });
+    } catch (err) {
+      sendTopicWriteError(res, 'update', err);
+    }
+  });
+
+  app.delete('/api/topics/:id', async (req, res) => {
+    try {
+      const result = await removeOneTopic(req.params.id);
+      res.json({ ok: true, removed: result.removed, topics: result.topics });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('Topic delete failed:', message);
       res.status(500).json({ ok: false, error: message });
     }
   });

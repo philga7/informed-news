@@ -30,6 +30,14 @@ export {
 export type { TrackedEntry, TrackedStories } from './trackedStoriesStore.js';
 export { addMuteRule, readMuteRules, removeMuteRule } from './muteRulesStore.js';
 export type { MuteRule, MuteRulesStore } from './muteRulesStore.js';
+export {
+  TopicConflictError,
+  createTopic,
+  readTopics,
+  removeTopic,
+  updateTopic,
+} from './topicsStore.js';
+export type { TopicsStorePaths } from './topicsStore.js';
 export { acceptClaim, readClaimMembership, unacceptClaim } from './claimMembershipStore.js';
 export type { ClaimMembership } from './claimMembershipStore.js';
 export {
@@ -66,6 +74,7 @@ export {
   EVIDENCE_LINKS_PATH,
   MUTE_RULES_PATH,
   META_PATH,
+  TOPICS_PATH,
   TRACKED_CLAIMS_PATH,
   TRACKED_STORIES_PATH,
 } from './paths.js';

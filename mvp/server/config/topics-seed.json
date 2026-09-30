@@ -1,0 +1,257 @@
+{
+  "topics": [
+    {
+      "id": "iran",
+      "name": "Iran",
+      "kind": "desired",
+      "level": "core",
+      "description": "Iranian state affairs: nuclear program, sanctions, IRGC, conflict with US/Israel, domestic politics",
+      "keywords": ["Iran", "Tehran", "IRGC", "Iranian government"],
+      "searchQuery": "Iran OR Tehran OR IRGC OR \"Iranian government\"",
+      "sections": ["map", "history"],
+      "notes": "Proxies only when Iran named/central; exclude national football team"
+    },
+    {
+      "id": "israel",
+      "name": "Israel",
+      "kind": "desired",
+      "level": "core",
+      "description": "Israeli government and security: Gaza/Lebanon fighting, Netanyahu, US–Israel relations",
+      "keywords": ["Israel", "Netanyahu", "IDF", "Gaza"],
+      "searchQuery": "Israel OR Netanyahu OR IDF OR Gaza",
+      "sections": ["map"],
+      "notes": "Exclude US campus protest/antisemitism stories; people named Israel"
+    },
+    {
+      "id": "ice-enforcement",
+      "name": "ICE Enforcement",
+      "kind": "desired",
+      "level": "core",
+      "description": "US immigration enforcement: ICE and CBP/Border Patrol arrests, raids, detention, deportations, DHS policy",
+      "keywords": ["Immigration and Customs Enforcement", "ICE raid", "ICE detention", "deportation", "Border Patrol", "CBP"],
+      "searchQuery": "\"Immigration and Customs Enforcement\" OR (ICE (immigration OR deportation OR raid OR detention OR arrests))",
+      "sections": [],
+      "notes": "Traps: hockey, ice storms, Intercontinental Exchange, ICE vehicles"
+    },
+    {
+      "id": "venezuela",
+      "name": "Venezuela",
+      "kind": "desired",
+      "level": "core",
+      "description": "Venezuelan government (Maduro), US–Venezuela military/sanctions tensions, oil, migration",
+      "keywords": ["Venezuela", "Maduro", "Caracas", "Tren de Aragua"],
+      "searchQuery": "Venezuela OR Maduro OR Caracas OR \"Tren de Aragua\"",
+      "sections": ["map"],
+      "notes": "Exclude MLB players, pageants"
+    },
+    {
+      "id": "government-shutdown",
+      "name": "Government Shutdown",
+      "kind": "desired",
+      "level": "core",
+      "description": "US federal funding lapses: appropriations, continuing resolutions, furloughs",
+      "keywords": ["government shutdown", "continuing resolution", "appropriations", "furlough"],
+      "searchQuery": "\"government shutdown\" OR \"continuing resolution\" OR (appropriations Congress) OR furlough",
+      "sections": ["action"],
+      "notes": "Federal only"
+    },
+    {
+      "id": "tariffs",
+      "name": "Tariffs",
+      "kind": "desired",
+      "level": "core",
+      "description": "US tariff/trade policy: Section 232/301/IEEPA, deals, retaliation, court rulings, price impacts",
+      "keywords": ["tariff", "tariffs", "trade war", "Section 232", "Section 301", "IEEPA"],
+      "searchQuery": "tariffs OR tariff OR \"trade war\" OR \"Section 232\" OR IEEPA",
+      "sections": ["business"],
+      "notes": "Trap: utility \"tariffs\""
+    },
+    {
+      "id": "epstein-files",
+      "name": "Epstein Files",
+      "kind": "desired",
+      "level": "core",
+      "description": "Release and fallout of government Jeffrey Epstein records: DOJ, FBI, Congress, Maxwell, named associates",
+      "keywords": ["Epstein files", "Jeffrey Epstein", "Ghislaine Maxwell"],
+      "searchQuery": "\"Epstein files\" OR \"Jeffrey Epstein\" OR \"Ghislaine Maxwell\"",
+      "sections": ["history"],
+      "notes": "Traps: other Epsteins, Epstein-Barr"
+    },
+    {
+      "id": "doge-audits",
+      "name": "DOGE Audits",
+      "kind": "desired",
+      "level": "core",
+      "description": "Department of Government Efficiency cuts, contract cancellations, data access, GAO/IG audits",
+      "keywords": ["Department of Government Efficiency", "DOGE"],
+      "searchQuery": "\"Department of Government Efficiency\" OR (DOGE (audit OR cuts OR contracts OR federal))",
+      "sections": [],
+      "notes": "Federal only; trap: Dogecoin"
+    },
+    {
+      "id": "election-integrity",
+      "name": "Election Integrity",
+      "kind": "desired",
+      "level": "core",
+      "description": "Voting security/administration: voter rolls, voter ID, SAVE Act, machines, fraud claims, litigation; includes \"voting rights\" framing",
+      "keywords": ["election integrity", "voter rolls", "voter ID", "SAVE Act", "election security", "voting machines", "voting rights"],
+      "searchQuery": "\"election integrity\" OR \"voter rolls\" OR \"voter ID\" OR \"SAVE Act\" OR \"election security\" OR \"voting machines\"",
+      "sections": ["history"],
+      "notes": "US only"
+    },
+    {
+      "id": "georgia-elections",
+      "name": "Georgia elections",
+      "kind": "desired",
+      "level": "core",
+      "description": "Elections in the US state of Georgia: State Election Board, Secretary of State, Fulton County, races, voting law, governor race",
+      "keywords": ["Georgia election", "State Election Board", "Raffensperger", "Fulton County"],
+      "searchQuery": "Georgia (election OR \"State Election Board\" OR Raffensperger OR \"Fulton County\" OR runoff OR primary) -Tbilisi -\"Georgian Dream\"",
+      "sections": ["history"],
+      "notes": "Trap: country of Georgia"
+    },
+    {
+      "id": "federal-elections",
+      "name": "federal elections",
+      "kind": "desired",
+      "level": "core",
+      "description": "US federal races: midterms, House/Senate races, FEC, redistricting",
+      "keywords": ["midterms", "midterm elections", "Senate race", "House race", "redistricting", "FEC"],
+      "searchQuery": "midterms OR \"midterm elections\" OR \"Senate race\" OR \"House race\" OR redistricting OR FEC",
+      "sections": ["history"],
+      "notes": "Exclude other countries; governors only via Georgia elections"
+    },
+    {
+      "id": "supreme-court",
+      "name": "Supreme Court",
+      "kind": "desired",
+      "level": "core",
+      "description": "US Supreme Court rulings, docket, emergency orders, justices; plus Georgia Supreme Court",
+      "keywords": ["Supreme Court", "SCOTUS", "justices", "Georgia Supreme Court"],
+      "searchQuery": "\"Supreme Court\" OR SCOTUS OR justices",
+      "sections": [],
+      "notes": "Exclude other state and foreign courts"
+    },
+    {
+      "id": "pandemic-outbreaks",
+      "name": "Pandemic & outbreaks",
+      "kind": "desired",
+      "level": "watch",
+      "description": "COVID-19, H5N1, measles and other outbreaks; vaccine policy (CDC, ACIP, FDA); preparedness",
+      "keywords": ["COVID-19", "COVID", "pandemic", "bird flu", "H5N1", "measles", "CDC", "ACIP"],
+      "searchQuery": "COVID OR \"COVID-19\" OR pandemic OR \"bird flu\" OR H5N1 OR measles outbreak",
+      "sections": [],
+      "notes": "Exclude passing \"since the pandemic\" mentions"
+    },
+    {
+      "id": "federal-contracting",
+      "name": "Federal Contracting",
+      "kind": "desired",
+      "level": "watch",
+      "description": "US government procurement: awards, protests, GSA consolidation, FAR overhaul, GWACs, 8(a)/small-business rules",
+      "keywords": ["federal contract", "federal contractors", "federal contracting", "GSA contract", "FAR overhaul", "8(a)", "GWAC"],
+      "searchQuery": "\"federal contract\" OR \"federal contractors\" OR \"federal contracting\" OR \"GSA contract\" OR \"FAR overhaul\" OR \"8(a)\"",
+      "sections": ["business"],
+      "notes": "Routine award PRs only when significant"
+    },
+    {
+      "id": "valley-it",
+      "name": "Valley IT",
+      "kind": "desired",
+      "level": "watch",
+      "description": "Valley IT Solutions LLC (Fargo, ND): 8(a)-graduate DoD C6ISR/IT contractor, STARS III holder",
+      "keywords": ["Valley IT Solutions", "Valley IT"],
+      "searchQuery": "\"Valley IT Solutions\" OR (\"Valley IT\" Fargo)",
+      "sections": [],
+      "notes": "Near-zero news volume; USAspending later"
+    },
+    {
+      "id": "bison-computing",
+      "name": "Bison Computing",
+      "kind": "desired",
+      "level": "watch",
+      "description": "Bison Computing LLC: Valley IT's rugged GPU / edge server line for DoD",
+      "keywords": ["Bison Computing"],
+      "searchQuery": "\"Bison Computing\"",
+      "sections": ["technical"],
+      "notes": "Traps: bison, NDSU Bison, Bison Transport"
+    },
+    {
+      "id": "palantir",
+      "name": "Palantir",
+      "kind": "desired",
+      "level": "watch",
+      "description": "Palantir Technologies: government/defense contracts, AI platforms, civil-liberties debate, earnings",
+      "keywords": ["Palantir", "PLTR"],
+      "searchQuery": "Palantir OR PLTR",
+      "sections": ["business"],
+      "notes": "Stock-tip/market commentary = trash"
+    },
+    {
+      "id": "dod-it-modernization",
+      "name": "DoD IT Modernization",
+      "kind": "desired",
+      "level": "watch",
+      "description": "Pentagon enterprise IT: cloud (JWCC), zero trust, CMMC, CIO policy, software acquisition, AI adoption",
+      "keywords": ["IT modernization", "JWCC", "zero trust", "CMMC", "DoD CIO", "software acquisition"],
+      "searchQuery": "(Pentagon OR DoD OR \"Defense Department\" OR \"War Department\") (\"IT modernization\" OR JWCC OR \"zero trust\" OR CMMC OR \"DoD CIO\" OR \"software acquisition\")",
+      "sections": ["technical"],
+      "notes": "DoD only; exclude weapons \"modernization\""
+    },
+    {
+      "id": "gas-prices",
+      "name": "gas prices",
+      "kind": "desired",
+      "level": "watch",
+      "description": "US retail gasoline prices, national and Georgia averages, AAA/GasBuddy, crude drivers",
+      "keywords": ["gas prices", "gasoline prices", "GasBuddy", "price at the pump"],
+      "searchQuery": "\"gas prices\" OR \"gasoline prices\" OR GasBuddy OR \"price at the pump\"",
+      "sections": ["business", "action"],
+      "notes": "Traps: natural gas, crypto gas fees"
+    },
+    {
+      "id": "diesel-prices",
+      "name": "diesel prices",
+      "kind": "desired",
+      "level": "watch",
+      "description": "US on-highway diesel prices (EIA weekly), trucking/freight cost impact",
+      "keywords": ["diesel prices", "diesel price", "diesel fuel", "diesel costs"],
+      "searchQuery": "\"diesel prices\" OR \"diesel price\" OR \"diesel fuel\" OR \"diesel costs\"",
+      "sections": ["business", "action"],
+      "notes": "Traps: Diesel brand, Vin Diesel"
+    },
+    {
+      "id": "brinkley-rv",
+      "name": "Brinkley RV",
+      "kind": "desired",
+      "level": "watch",
+      "description": "Goshen, IN towable RV maker (Models Z, Z AIR, G, I, R)",
+      "keywords": ["Brinkley RV", "Brinkley Model Z", "Brinkley Model G", "Brinkley Model R"],
+      "searchQuery": "\"Brinkley RV\" OR \"Brinkley Model Z\" OR \"Brinkley Model G\" OR \"Brinkley Model R\"",
+      "sections": ["action"],
+      "notes": "Not wider RV industry"
+    },
+    {
+      "id": "ford-super-duty",
+      "name": "Ford Super Duty",
+      "kind": "desired",
+      "level": "watch",
+      "description": "Ford F-250/350/450 Super Duty pickups: recalls, model years, pricing, towing",
+      "keywords": ["Super Duty", "F-250", "F-350", "F-450"],
+      "searchQuery": "\"Super Duty\" OR \"F-250\" OR \"F-350\" OR \"F-450\"",
+      "sections": ["technical", "action"],
+      "notes": "Not F-150"
+    },
+    {
+      "id": "honda-cars",
+      "name": "Honda cars",
+      "kind": "desired",
+      "level": "watch",
+      "description": "Honda and Acura automobiles: models, recalls, pricing, tariffs",
+      "keywords": ["Honda", "Acura", "Civic", "Accord", "CR-V", "HR-V"],
+      "searchQuery": "(Honda (Civic OR Accord OR \"CR-V\" OR \"HR-V\" OR Pilot OR Prologue OR recall) OR Acura) -motorcycle",
+      "sections": ["action"],
+      "notes": "Exclude motorcycles, F1/IndyCar, HondaJet, Honda Center"
+    }
+  ]
+}

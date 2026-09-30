@@ -36,6 +36,12 @@ import {
   readMuteRules,
   removeMuteRule,
 } from './store/muteRulesStore.js';
+import {
+  createTopic,
+  readTopics,
+  removeTopic,
+  updateTopic,
+} from './store/topicsStore.js';
 import { loadBriefClaims } from './services/briefClaims.js';
 import { enrichAcceptedClaims } from './services/enrichClaims.js';
 import { createKiteBriefRouter } from './services/kiteBriefRoutes.js';
@@ -54,6 +60,11 @@ function tempTrackedPath(): string {
 function tempMuteRulesPath(): string {
   const dir = mkdtempSync(path.join(tmpdir(), 'mute-rules-'));
   return path.join(dir, 'mute-rules.json');
+}
+
+function tempTopicsPath(): string {
+  const dir = mkdtempSync(path.join(tmpdir(), 'topics-'));
+  return path.join(dir, 'topics.json');
 }
 
 function tempClaimMembershipPath(): string {
@@ -547,6 +558,250 @@ test('POST /api/brief/mutes persists rule; DELETE /api/brief/mutes/:id removes i
     };
     assert.equal(after.ok, true);
     assert.deepEqual(after.rules, []);
+  } finally {
+    await close();
+  }
+});
+
+type TopicBody = {
+  id: string;
+  name: string;
+  kind: string;
+  level: string | null;
+  sections: string[];
+};
+
+async function startTopicsServer(): Promise<{
+  baseUrl: string;
+  close: () => Promise<void>;
+}> {
+  process.env.SESSION_SECRET = 'test-secret';
+  process.env.MVP_PASSWORD = 'pw';
+  delete process.env.MVP_PASSWORD_HASH;
+
+  const topicsPath = tempTopicsPath();
+
+  const { createApp } = await import('./app.js');
+  const app = createApp({
+    readTopics: async () => await readTopics({ topicsPath }),
+    createTopic: async (fields) => await createTopic(fields, { topicsPath }),
+    updateTopic: async (id, patch) => await updateTopic(id, patch, { topicsPath }),
+    removeTopic: async (id) => await removeTopic(id, { topicsPath }),
+  });
+  return await startServer(app);
+}
+
+async function postTopic(baseUrl: string, cookie: string, body: unknown): Promise<Response> {
+  return await fetch(`${baseUrl}/api/topics`, {
+    method: 'POST',
+    headers: { cookie, 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
+async function patchTopic(
+  baseUrl: string,
+  cookie: string,
+  id: string,
+  body: unknown,
+): Promise<Response> {
+  return await fetch(`${baseUrl}/api/topics/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: { cookie, 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
+async function listTopics(baseUrl: string, cookie: string): Promise<TopicBody[]> {
+  const resp = await fetch(`${baseUrl}/api/topics`, { headers: { cookie } });
+  assert.equal(resp.status, 200);
+  const body = (await resp.json()) as { ok: true; topics: TopicBody[] };
+  assert.equal(body.ok, true);
+  return body.topics;
+}
+
+test('GET /api/topics requires session', async () => {
+  const { baseUrl, close } = await startTopicsServer();
+  try {
+    const resp = await fetch(`${baseUrl}/api/topics`);
+    assert.equal(resp.status, 401);
+    const body = (await resp.json()) as { ok: false; error: string };
+    assert.equal(body.ok, false);
+    assert.equal(body.error, 'Unauthorized');
+  } finally {
+    await close();
+  }
+});
+
+test('GET /api/topics seeds 23 topics on an empty store', async () => {
+  const { baseUrl, close } = await startTopicsServer();
+  try {
+    const cookie = await login(baseUrl);
+    const resp = await fetch(`${baseUrl}/api/topics`, { headers: { cookie } });
+    assert.equal(resp.status, 200);
+    const body = (await resp.json()) as {
+      ok: true;
+      topics: TopicBody[];
+      updatedAt: string | null;
+    };
+    assert.equal(body.ok, true);
+    assert.equal(body.topics.length, 23);
+    assert.equal(typeof body.updatedAt, 'string');
+  } finally {
+    await close();
+  }
+});
+
+test('POST /api/topics creates desired and undesired topics', async () => {
+  const { baseUrl, close } = await startTopicsServer();
+  try {
+    const cookie = await login(baseUrl);
+
+    const desiredResp = await postTopic(baseUrl, cookie, {
+      name: 'Arctic shipping',
+      kind: 'desired',
+      level: 'watch',
+      sections: ['map', 'business'],
+    });
+    assert.equal(desiredResp.status, 201);
+    const desired = (await desiredResp.json()) as {
+      ok: true;
+      topic: TopicBody;
+      topics: TopicBody[];
+    };
+    assert.equal(desired.ok, true);
+    assert.equal(desired.topic.name, 'Arctic shipping');
+    assert.equal(desired.topic.level, 'watch');
+    assert.deepEqual(desired.topic.sections, ['business', 'map']);
+    assert.ok(desired.topics.some((t) => t.id === desired.topic.id));
+    assert.ok((await listTopics(baseUrl, cookie)).some((t) => t.id === desired.topic.id));
+
+    const undesiredResp = await postTopic(baseUrl, cookie, {
+      name: 'Celebrity gossip',
+      kind: 'undesired',
+      level: 'core',
+      sections: ['business'],
+    });
+    assert.equal(undesiredResp.status, 201);
+    const undesired = (await undesiredResp.json()) as { ok: true; topic: TopicBody };
+    assert.equal(undesired.topic.kind, 'undesired');
+    assert.equal(undesired.topic.level, null);
+    assert.deepEqual(undesired.topic.sections, []);
+  } finally {
+    await close();
+  }
+});
+
+test('POST /api/topics returns 400 on invalid bodies', async () => {
+  const { baseUrl, close } = await startTopicsServer();
+  try {
+    const cookie = await login(baseUrl);
+
+    const missingName = await postTopic(baseUrl, cookie, { kind: 'desired', level: 'core' });
+    assert.equal(missingName.status, 400);
+    const missingNameBody = (await missingName.json()) as { ok: false; error: string };
+    assert.equal(missingNameBody.ok, false);
+    assert.equal(missingNameBody.error, 'name is required');
+
+    const noLevel = await postTopic(baseUrl, cookie, { name: 'No level', kind: 'desired' });
+    assert.equal(noLevel.status, 400);
+    const noLevelBody = (await noLevel.json()) as { ok: false; error: string };
+    assert.equal(noLevelBody.error, 'level is required for desired topics');
+
+    const badSection = await postTopic(baseUrl, cookie, {
+      name: 'Bad section',
+      kind: 'desired',
+      level: 'core',
+      sections: ['sports'],
+    });
+    assert.equal(badSection.status, 400);
+    const badSectionBody = (await badSection.json()) as { ok: false; error: string };
+    assert.match(badSectionBody.error, /sections/);
+  } finally {
+    await close();
+  }
+});
+
+test('POST /api/topics returns 409 on duplicate name', async () => {
+  const { baseUrl, close } = await startTopicsServer();
+  try {
+    const cookie = await login(baseUrl);
+    const first = await postTopic(baseUrl, cookie, {
+      name: 'Arctic shipping',
+      kind: 'desired',
+      level: 'core',
+    });
+    assert.equal(first.status, 201);
+
+    const dup = await postTopic(baseUrl, cookie, {
+      name: '  arctic SHIPPING ',
+      kind: 'undesired',
+    });
+    assert.equal(dup.status, 409);
+    const body = (await dup.json()) as { ok: false; error: string };
+    assert.equal(body.ok, false);
+    assert.match(body.error, /already exists/);
+  } finally {
+    await close();
+  }
+});
+
+test('PATCH /api/topics/:id updates, 404s unknown ids, 400s invalid bodies', async () => {
+  const { baseUrl, close } = await startTopicsServer();
+  try {
+    const cookie = await login(baseUrl);
+
+    const resp = await patchTopic(baseUrl, cookie, 'iran', { level: 'watch' });
+    assert.equal(resp.status, 200);
+    const body = (await resp.json()) as { ok: true; topic: TopicBody; topics: TopicBody[] };
+    assert.equal(body.ok, true);
+    assert.equal(body.topic.id, 'iran');
+    assert.equal(body.topic.level, 'watch');
+    assert.equal(body.topics.length, 23);
+    const iran = (await listTopics(baseUrl, cookie)).find((t) => t.id === 'iran');
+    assert.equal(iran?.level, 'watch');
+
+    const missing = await patchTopic(baseUrl, cookie, 'no-such-topic', { level: 'watch' });
+    assert.equal(missing.status, 404);
+    assert.deepEqual(await missing.json(), { ok: false, error: 'topic not found' });
+
+    const invalid = await patchTopic(baseUrl, cookie, 'iran', { kind: 'bogus' });
+    assert.equal(invalid.status, 400);
+    const invalidBody = (await invalid.json()) as { ok: false; error: string };
+    assert.equal(invalidBody.ok, false);
+    assert.match(invalidBody.error, /kind/);
+  } finally {
+    await close();
+  }
+});
+
+test('DELETE /api/topics/:id removes a topic idempotently', async () => {
+  const { baseUrl, close } = await startTopicsServer();
+  try {
+    const cookie = await login(baseUrl);
+
+    const first = await fetch(`${baseUrl}/api/topics/iran`, {
+      method: 'DELETE',
+      headers: { cookie },
+    });
+    assert.equal(first.status, 200);
+    const firstBody = (await first.json()) as {
+      ok: true;
+      removed: boolean;
+      topics: TopicBody[];
+    };
+    assert.equal(firstBody.ok, true);
+    assert.equal(firstBody.removed, true);
+    assert.equal(firstBody.topics.length, 22);
+    assert.ok(!(await listTopics(baseUrl, cookie)).some((t) => t.id === 'iran'));
+
+    const repeat = await fetch(`${baseUrl}/api/topics/iran`, {
+      method: 'DELETE',
+      headers: { cookie },
+    });
+    assert.equal(repeat.status, 200);
+    const repeatBody = (await repeat.json()) as { ok: true; removed: boolean };
+    assert.equal(repeatBody.removed, false);
   } finally {
     await close();
   }

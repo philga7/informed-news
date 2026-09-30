@@ -15,6 +15,7 @@ export const CLUSTER_ENRICHMENTS_PATH = path.join(
 export const BRIEF_MEMBERSHIP_PATH = path.join(DATA_DIR, 'brief-membership.json');
 export const TRACKED_STORIES_PATH = path.join(DATA_DIR, 'tracked-stories.json');
 export const MUTE_RULES_PATH = path.join(DATA_DIR, 'mute-rules.json');
+export const TOPICS_PATH = path.join(DATA_DIR, 'topics.json');
 
 export const CLAIMS_PATH = path.join(DATA_DIR, 'claims.json');
 export const EVIDENCE_LINKS_PATH = path.join(DATA_DIR, 'evidence-links.json');

@@ -21,3 +21,15 @@ export type {
   TrackedClaimEntry,
   TrackedClaims,
 } from './claim.js';
+
+export type {
+  Topic,
+  TopicFields,
+  TopicKind,
+  TopicLevel,
+  TopicPatch,
+  TopicSection,
+  TopicSeedEntry,
+  TopicsStore,
+} from './topic.js';
+export { TOPIC_KINDS, TOPIC_LEVELS, TOPIC_SECTIONS } from './topic.js';
