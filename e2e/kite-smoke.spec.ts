@@ -272,6 +272,14 @@ test.describe('Nav shell (NEWS-42)', () => {
 			timeout: 60_000,
 		});
 	});
+
+	test('/topics loads session shell with Topics title', async ({ page }) => {
+		await page.goto('/topics');
+		await expect(page).toHaveTitle(/Topics/i, { timeout: 60_000 });
+		await expect(page.getByRole('heading', { name: 'Topics', exact: true })).toBeVisible({
+			timeout: 60_000,
+		});
+	});
 });
 
 test.describe('Transparency page (NEWS-32)', () => {

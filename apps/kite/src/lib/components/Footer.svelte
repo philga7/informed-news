@@ -194,6 +194,34 @@ onMount(() => {
     </a>
 
     <a
+      href="/topics"
+      class="flex items-center space-x-2 text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
+      title={s("footer.topics") || "Topics"}
+    >
+      <svg
+        class="h-5 w-5 text-gray-600 dark:text-gray-400"
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.5"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M9 6h11" />
+        <path d="M9 12h11" />
+        <path d="M9 18h11" />
+        <circle cx="4.5" cy="6" r="1" />
+        <circle cx="4.5" cy="12" r="1" />
+        <circle cx="4.5" cy="18" r="1" />
+      </svg>
+      <span class="text-xs sm:text-sm">
+        {s("footer.topics") || "Topics"}
+      </span>
+    </a>
+
+    <a
       href="/radar"
       class="flex items-center space-x-2 text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
       title={s("footer.radar") || "Radar"}

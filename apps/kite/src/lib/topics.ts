@@ -107,6 +107,28 @@ export const TOPICS_REMOVE_ERROR = 'Could not remove topic. Try again.';
 export const TOPICS_NETWORK_ERROR =
 	'Network error while talking to the topics API. Check that the server is running on :3001.';
 
+export const TOPICS_NAME_REQUIRED = 'Name is required.';
+
+export const TOPICS_LOADING_LABEL = 'Loading topics…';
+
+export const TOPICS_LOGIN_TITLE = 'Session required';
+
+export const TOPICS_LOGIN_PASSWORD_LABEL = 'MVP password';
+
+export const TOPICS_LOGIN_SUBMIT_LABEL = 'Sign in';
+
+export const TOPICS_LOGIN_PENDING_LABEL = 'Signing in…';
+
+export const TOPICS_LOGIN_ERROR = 'Login failed. Check the password and try again.';
+
+export const TOPICS_LOGOUT_LABEL = 'Log out';
+
+export const TOPICS_FOOTER_NOTE = 'Changes save immediately — no restart needed.';
+
+export const TOPICS_BACK_TO_BRIEF = '← Back to Brief';
+
+export const TOPICS_MUTES_KEYWORD_REQUIRED = 'Keyword is required.';
+
 export type TopicFormState = {
 	name: string;
 	kind: TopicKind;

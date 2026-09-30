@@ -22,6 +22,19 @@ describe('NEWS-42 nav shell route map', () => {
 		assert.match(map, /Reserved/);
 		const shippedSection = map.split('## Shipped (live)')[1]?.split('## Planned')[0];
 		assert.ok(shippedSection?.includes('`/radar`'), 'expected /radar in Shipped section');
+		assert.ok(shippedSection?.includes('`/topics`'), 'expected /topics in Shipped section');
+	});
+
+	it('ships /topics page with footer link (NEWS-85)', () => {
+		assert.equal(
+			existsSync(join(root, 'apps/kite/src/routes/topics/+page.svelte')),
+			true,
+		);
+		const footer = readFileSync(
+			join(root, 'apps/kite/src/lib/components/Footer.svelte'),
+			'utf8',
+		);
+		assert.match(footer, /href="\/topics"/);
 	});
 
 	it('ships /transparency and /radar pages with footer links', () => {
