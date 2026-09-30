@@ -41,6 +41,14 @@ export {
   searchGoogleNews,
 } from './googleNewsRss.js';
 export type { SearchGoogleNewsDeps, SearchGoogleNewsOptions } from './googleNewsRss.js';
+export {
+  buildSearxngSearchUrl,
+  parseSearxngPublishedDate,
+  parseSearxngResults,
+  resolveSearxngBaseUrl,
+  searchSearxng,
+} from './searxngSearch.js';
+export type { SearchSearxngDeps, SearchSearxngOptions } from './searxngSearch.js';
 export { resolveGoogleNewsUrl } from './googleNewsResolve.js';
 export type {
   ResolveGoogleNewsUrlDeps,
