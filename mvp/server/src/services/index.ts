@@ -167,4 +167,15 @@ export type {
   CreateManualSeedResult,
   ManualSeedInput,
 } from './manualBriefSeed.js';
+export {
+  TOPIC_KEYWORD_MAX,
+  TOPIC_KEYWORDS_MAX,
+  TOPIC_NAME_MAX,
+  TOPIC_TEXT_MAX,
+  TopicValidationError,
+  finalizeTopicFields,
+  parseTopicCreate,
+  parseTopicPatch,
+} from './topicInput.js';
+export { DEFAULT_TOPICS_SEED_PATH, loadTopicSeed } from './topicSeed.js';
 
