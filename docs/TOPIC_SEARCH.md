@@ -23,6 +23,16 @@ New stories are upserted as articles with `sourceKind: 'search'`, `sourceTier: '
 | `searchProviders` | `('google_news' \| 'searxng')[]` that returned it |
 | `googleNewsUrl` | Google News article link (`?oc=…` stripped) or `null` |
 
+## Interim behavior (until NEWS-87 / NEWS-88)
+
+Search rows are **untriaged** candidates. Until triage ([NEWS-87](https://informedcrew.atlassian.net/browse/NEWS-87)) and topic-driven Brief ([NEWS-88](https://informedcrew.atlassian.net/browse/NEWS-88)) land:
+
+- **Topics do not select Brief stories yet** (NEWS-88).
+- **Stored and listed, not on Radar:** search rows are in the shared article store and returned by `GET /api/articles` and `POST /api/fetch` (top-level `articles`), but hidden from Radar (Radar shows `cfp` / `rss` only).
+- **Not clustered:** search rows always get `clusterId: null` and are never grouped with other articles, so they cannot re-key an existing Brief or tracked story or bridge two Radar clusters.
+- **Skipped by Ollama batches:** the batch endpoints `POST /api/classify`, `POST /api/enrich`, and `POST /api/claims/extract` (without `articleIds`) skip search rows. Explicit per-id calls (`POST /api/classify/:id`, `POST /api/claims/extract` with `articleIds`) are unchanged.
+- **No body scrape and no live Google link resolution at ingest** — both are NEWS-87 work on triage survivors.
+
 ## Google News RSS
 
 Per topic: `https://news.google.com/rss/search?q=<encodeURIComponent(query + ' when:2d')>&hl=en-US&gl=US&ceid=US:en`.
@@ -79,8 +89,11 @@ In `mvp/.env` (see `mvp/.env.example`):
 ## Failure behavior
 
 - Either provider down (container not running, timeout, non-2xx, bad JSON) → the error is recorded for that topic and the refresh continues. Topic search never fails `POST /api/fetch`; CFP failure still does, as before.
+- A SearXNG that hangs (rather than refusing the connection) is cut off by the 20s timeout per topic, so it can add up to 20s × ceil(desired topics / 3) to `POST /api/fetch`.
 - Per-provider status is stored in `mvp/data/meta.json` under `topicSearch` (`{ at, providers }`) and returned in the `POST /api/fetch` response `topicSearch` block ([MVP_API_COMPAT.md](MVP_API_COMPAT.md)). Each provider reports `{ state, topicsAttempted, topicsFailed, items, errors }` with `state` one of `ok` \| `partial` (some topics failed) \| `down` (all attempted topics failed) \| `disabled`; `errors` holds at most 5 `"<topicId>: <message>"` entries.
-- `npm run dev` does **not** need SearXNG running — without it, SearXNG reports `down` and Google News results still land.
+- `topicSearch.skipped` is `true` when no search ran: topic search disabled, no desired topics, or the topics file unreadable. With no desired topics, providers report `ok` with `topicsAttempted: 0`; with an unreadable topics file, enabled providers report `down`.
+- `topicSearch.errors` (top level) holds run-level errors that are not tied to one provider/topic: topics file unreadable, article store read or upsert failure, or an unexpected topic-search exception. Provider/topic failures go in each provider's `errors` instead.
+- `npm run dev` does **not** need SearXNG running — without it, SearXNG reports `down` (when desired topics exist; otherwise the run is skipped) and Google News results still land.
 - Showing provider status in the Kite Brief is NEWS-88.
 
 ## Trade-offs
