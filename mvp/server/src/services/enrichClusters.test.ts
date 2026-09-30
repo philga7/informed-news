@@ -119,6 +119,63 @@ test('enrichUnenrichedClusters treats all-empty enrichment as failure (not store
   assert.equal(upserted[0]!.enrichment, null);
 });
 
+test('enrichUnenrichedClusters skips untriaged search rows', async () => {
+  const articles: Article[] = [
+    article({
+      id: 's1',
+      title: 'Search-only singleton',
+      sourceKind: 'search',
+      sourceTier: 'sensor',
+      bodyStatus: 'pending',
+      publishedAt: '2026-09-13T12:00:00.000Z',
+    }),
+    article({
+      id: 's2',
+      title: 'Search rows with a stale cluster id',
+      sourceKind: 'search',
+      sourceTier: 'sensor',
+      bodyStatus: 'pending',
+      clusterId: 'stale',
+    }),
+    article({
+      id: 's3',
+      title: 'Search rows with a stale cluster id (2)',
+      sourceKind: 'search',
+      sourceTier: 'sensor',
+      bodyStatus: 'pending',
+      clusterId: 'stale',
+    }),
+    article({ id: 'a1', title: 'CFP solo' }),
+  ];
+
+  const enrichedTitles: string[][] = [];
+
+  const result = await enrichUnenrichedClusters({
+    limit: 10,
+    readArticlesFn: async () => articles,
+    getClusterEnrichmentFn: async () => null,
+    enrichFn: async (members) => {
+      enrichedTitles.push(members.map((m) => m.title));
+      return {
+        ok: true,
+        enrichment: {
+          talking_points: ['tp'],
+          timeline: [],
+          suggested_qna: [],
+        },
+        model: 'glm-5.3-flash',
+        rawText: '{"talking_points":["tp"],"timeline":[],"suggested_qna":[]}',
+      };
+    },
+    upsertClusterEnrichmentFn: async (record) => record,
+    nowIsoFn: () => '2026-09-12T20:00:00.000Z',
+  });
+
+  assert.deepEqual(result.keys, ['solo:a1']);
+  assert.equal(result.attempted, 1);
+  assert.deepEqual(enrichedTitles, [['CFP solo']]);
+});
+
 test('enrichUnenrichedClusters force re-enriches existing key', async () => {
   const articles: Article[] = [
     article({ id: 'a1', title: 'Existing cluster member', clusterId: 'c1' }),

@@ -633,6 +633,47 @@ test('extractClaims: explicit articleIds skip muted articles', async () => {
   assert.equal(result.skippedMuted, 1);
 });
 
+test('extractClaims: batch skips untriaged search rows without consuming limit or marking processed', async () => {
+  const paths = tempStorePaths();
+  const calls: string[] = [];
+  const marked: string[] = [];
+
+  const search = sampleArticle({
+    id: 'art-search',
+    sourceKind: 'search',
+    sourceTier: 'sensor',
+    title: 'search: newest',
+    clusterId: null,
+    bodyStatus: 'pending',
+    snippet: '',
+    publishedAt: '2026-09-12T12:00:00.000Z',
+  });
+  const cfp = sampleArticle({
+    id: 'art-cfp',
+    title: 'cfp: older',
+    publishedAt: '2026-09-10T12:00:00.000Z',
+  });
+
+  const result = await extractClaimsFromArticles({
+    limit: 1,
+    readArticlesFn: async () => [search, cfp],
+    readClaimsFn: async () => [],
+    readMuteRulesFn: async () => ({ rules: [], updatedAt: null }),
+    isArticleExtractProcessedFn: async () => false,
+    markArticlesExtractProcessedFn: async (ids: string[]) => {
+      marked.push(...ids);
+      return { articleIds: ids };
+    },
+    proposeFn: recordingProposeFn(calls),
+    judgeFn: async () => mockJudgeResult(highConfidenceAnswers()),
+    ...paths,
+  });
+
+  assert.deepEqual(calls, ['cfp: older']);
+  assert.equal(result.attempted, 1);
+  assert.ok(!marked.includes(search.id));
+});
+
 test('extractClaims: force does not bypass mute', async () => {
   const paths = tempStorePaths();
   const calls: string[] = [];

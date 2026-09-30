@@ -22,7 +22,7 @@ export type ClassifyBatchResult = {
   attempted: number;
   succeeded: number;
   failed: number;
-  /** How many attempted items came from each source (manual seeds are skipped). */
+  /** How many attempted items came from each source (manual seeds and search rows are skipped). */
   bySourceKind: { cfp: number; xcancel: number; rss: number; manual: number; search: number };
   articles: Article[];
 };
@@ -66,6 +66,19 @@ export function framingBodyText(article: Article): string | null {
 }
 
 /**
+ * Batch candidates: unclassified, newest-first, up to `limit`.
+ * Manual seeds and untriaged search rows (until NEWS-87) are skipped.
+ */
+export function selectClassifyBatchCandidates(articles: Article[], limit: number): Article[] {
+  return sortNewestFirst(articles)
+    .filter(
+      (a) =>
+        a.classification === null && a.sourceKind !== 'manual' && a.sourceKind !== 'search',
+    )
+    .slice(0, limit);
+}
+
+/**
  * Classify articles with null classification, newest-first, up to `limit`.
  * Source-agnostic: CFP and xcancel items share FramingAnalysis.
  * Uses body text when present; otherwise title + snippet.
@@ -78,9 +91,7 @@ export async function classifyUnclassifiedArticles(
   const articles = await readArticles();
   const byId = new Map(articles.map((a) => [a.id, a]));
 
-  const candidates = sortNewestFirst(articles)
-    .filter((a) => a.classification === null && a.sourceKind !== 'manual')
-    .slice(0, limit);
+  const candidates = selectClassifyBatchCandidates(articles, limit);
 
   let succeeded = 0;
   let failed = 0;
