@@ -29,6 +29,10 @@ describe('NEWS-43 MVP API compat surface', () => {
 		assert.match(src, /app\.get\('\/api\/brief\/mutes'/);
 		assert.match(src, /app\.post\('\/api\/brief\/mutes'/);
 		assert.match(src, /app\.delete\('\/api\/brief\/mutes\/:id'/);
+		assert.match(src, /app\.get\('\/api\/topics'/);
+		assert.match(src, /app\.post\('\/api\/topics'/);
+		assert.match(src, /app\.patch\('\/api\/topics\/:id'/);
+		assert.match(src, /app\.delete\('\/api\/topics\/:id'/);
 		assert.match(src, /hiddenMutedCount/);
 		assert.match(src, /requireApiSession/);
 		assert.match(src, /createKiteBriefRouter/);
@@ -59,6 +63,10 @@ describe('NEWS-43 MVP API compat surface', () => {
 		assert.match(doc, /GET \| `\/api\/brief\/mutes`/);
 		assert.match(doc, /POST \| `\/api\/brief\/mutes`/);
 		assert.match(doc, /DELETE \| `\/api\/brief\/mutes\/:id`/);
+		assert.match(doc, /GET \| `\/api\/topics`/);
+		assert.match(doc, /POST \| `\/api\/topics`/);
+		assert.match(doc, /PATCH \| `\/api\/topics\/:id`/);
+		assert.match(doc, /DELETE \| `\/api\/topics\/:id`/);
 		assert.match(doc, /hiddenMutedCount/);
 		assert.match(doc, /muted/);
 		assert.match(doc, /pendingUpdate/);
