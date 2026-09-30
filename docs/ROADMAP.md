@@ -13,8 +13,8 @@ Claims spine plan: [`.cursor/plans/claims_evidence_spine_8f4cde15.plan.md`](../.
 
 | Order | Key | Summary |
 |-------|-----|---------|
-| **1** | [NEWS-85](https://informedcrew.atlassian.net/browse/NEWS-85) | Topics store, API, and Topics page (seeded with 23 topics) *(next)* |
-| 2 | [NEWS-86](https://informedcrew.atlassian.net/browse/NEWS-86) | Topic search ingest: Google News RSS + self-hosted SearXNG, merged |
+| 1 | [NEWS-85](https://informedcrew.atlassian.net/browse/NEWS-85) | Topics store, API, and Topics page (seeded with 23 topics) — **Done** |
+| **2** | [NEWS-86](https://informedcrew.atlassian.net/browse/NEWS-86) | Topic search ingest: Google News RSS + self-hosted SearXNG, merged *(next)* |
 | 3 | [NEWS-87](https://informedcrew.atlassian.net/browse/NEWS-87) | Triage pipeline: dedupe, keyword + Jev headline gates, survivor-only scrape, budget caps, drop reasons |
 | 4 | [NEWS-88](https://informedcrew.atlassian.net/browse/NEWS-88) | Brief by topic: top 3 per topic, summaries for shown stories only, scheduled + manual refresh |
 | 5 | [NEWS-89](https://informedcrew.atlassian.net/browse/NEWS-89) | Full stories: tap-to-expand *(milestone 1)*; automatic worth-it bar, topic sections, living updates *(follow-up)* |
