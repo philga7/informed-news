@@ -27,5 +27,15 @@ export default defineConfig({
 		url: baseURL,
 		reuseExistingServer: !process.env.CI,
 		timeout: 180_000,
+		// A startup catch-up refresh would spend real CFP / search / Jev / Ollama budget.
+		// mvp/.env still wins if it sets REFRESH_INTERVAL_HOURS (dotenv override: true).
+		env: {
+			...Object.fromEntries(
+				Object.entries(process.env).filter(
+					(entry): entry is [string, string] => entry[1] !== undefined,
+				),
+			),
+			REFRESH_INTERVAL_HOURS: 'off',
+		},
 	},
 });

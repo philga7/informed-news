@@ -26,7 +26,7 @@ mvp/server (Express)
     → Ollama Cloud (framing)
 ```
 
-The server starts an auto-refresh scheduler (`startRefreshScheduler` in `mvp/server/src/index.ts`) that spends real API budget (CFP, search, Jev, Ollama). Set `REFRESH_INTERVAL_HOURS=off` when you need the server up without refreshing (e.g. `REFRESH_INTERVAL_HOURS=off npm run test:e2e:kite`). `createApp` never starts timers.
+The server starts an auto-refresh scheduler (`startRefreshScheduler` in `mvp/server/src/index.ts`) that spends real API budget (CFP, search, Jev, Ollama). Set `REFRESH_INTERVAL_HOURS=off` when you need the server up without refreshing. The e2e config (`playwright.config.ts`) already does this for `npm run test:e2e:kite`; `mvp/.env` wins if it sets the key. `createApp` never starts timers.
 
 ### Layout
 

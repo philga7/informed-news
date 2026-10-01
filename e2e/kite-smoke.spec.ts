@@ -5,7 +5,6 @@ import { expect, test } from '@playwright/test';
 type BriefOverview = {
 	ok: boolean;
 	fixture: boolean;
-	refresh: { running: boolean };
 	notices: string[];
 	sections: Array<{ topicId: string; name: string; storyIds: string[]; moreIds: string[] }>;
 	quiet: Array<{ id: string; name: string }>;

@@ -37,7 +37,7 @@ The first 3,000 characters are used, with the source article's headline. With no
 
 **On demand:** opening (expanding) a story whose summary is missing asks the server for one — this covers More stories, stories past the budget, and expand-all. The card shows "Summary loads when you open this story" until then, and "Loading summary…" while it runs. On-demand calls don't use the refresh budget but are capped at 30 per hour per server process ("Summary limit reached for this hour. Try again later."). Only stories currently visible in the Brief qualify. You must be logged in; otherwise the card links "Log in on Topics to load summaries".
 
-Without `OLLAMA_API_KEY` no summaries are generated and the refresh bar shows "Summaries unavailable (Ollama not configured)".
+Without `OLLAMA_API_KEY` no summaries are generated; once a refresh has recorded that, the refresh bar shows "Summaries unavailable (Ollama not configured)".
 
 ## Seen stories
 
@@ -59,7 +59,7 @@ A refresh runs the whole pipeline: CFP → curated RSS → xcancel → topic sea
 
 - "Updated 5 min ago" from the last successful refresh, or "Not refreshed yet".
 - "Next refresh 3:40 PM" when the timer is on and a refresh has succeeded ("Next refresh due now" once it is overdue).
-- **Refresh** button → runs a refresh and reloads the Brief. It shows "Refreshing…" and is disabled while a refresh is running. It needs a login: otherwise it shows "Log in on Topics to refresh" linking to `/topics`. A refresh can take minutes; while one runs (including a timer run, or after the request times out in the browser) the bar checks every 10 seconds and reloads the Brief when it finishes.
+- **Refresh** button → runs a refresh and reloads the Brief. It shows "Refreshing…" and is disabled while a refresh is running. It needs a login: otherwise it shows "Log in on Topics to refresh" linking to `/topics`. A refresh can take minutes. The bar checks every 10 seconds and reloads the Brief when the refresh finishes in two cases: a refresh was already running when the page loaded, or your Refresh request timed out or failed in a way that may hide a still-running refresh (network error or server error). A timer refresh that starts after the page loaded shows up the next time you reload.
 - Notices, in plain language:
 
 | Notice | When |
@@ -68,7 +68,7 @@ A refresh runs the whole pipeline: CFP → curated RSS → xcancel → topic sea
 | SearXNG / Google News partly failed | That provider failed for some topics |
 | Story scoring unavailable (TypeSafe not configured) | No `TYPESAFE_API_KEY`; triage can't score stories |
 | N stories not scored (budget) | Triage's Jev budget ran out; retried next refresh |
-| Summaries unavailable (Ollama not configured) | No `OLLAMA_API_KEY` |
+| Summaries unavailable (Ollama not configured) | The last refresh found no `OLLAMA_API_KEY` |
 | Last refresh failed: … | The last refresh failed (e.g. CFP down) |
 
 ## Env
@@ -83,7 +83,7 @@ In `mvp/.env` (see `mvp/.env.example`):
 
 Other limits are constants in `mvp/server/src/services/briefConfig.ts` (top 3, 8 links, update thresholds, 7-day seen retention, summary lengths, concurrency, 30/hour on demand, refresh check and retry minutes).
 
-Running `npm run test:e2e:kite` starts `npm run dev`, whose startup catch-up would run a real refresh. Run it as `REFRESH_INTERVAL_HOURS=off npm run test:e2e:kite` (and keep the key out of `mvp/.env`, which overrides the shell).
+`npm run test:e2e:kite` starts `npm run dev` with `REFRESH_INTERVAL_HOURS=off` (set in `playwright.config.ts`), so tests never trigger a real refresh. `mvp/.env` wins if it sets the key, and an already-running dev server is reused as-is.
 
 ## What's stored where
 
