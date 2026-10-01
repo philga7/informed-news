@@ -25,8 +25,15 @@ import {
   buildRadarFeed,
   briefClusterKey,
   clusterMatchesMute,
+  createRefreshRunner,
+  createTrackedStoriesSync,
+  generateRefreshSummaries,
+  getRefreshRunner,
   loadClaimsRadar,
+  markBriefSeen,
+  summarizeBriefStory,
 } from './services/index.js';
+import type { RefreshRunner } from './services/index.js';
 import {
   acceptCluster,
   acceptClaim,
@@ -39,6 +46,8 @@ import {
   getClaimById,
   readArticles,
   readBriefMembership,
+  readBriefSeen,
+  readBriefSummaries,
   readClaimMembership,
   readMuteRules,
   readMeta,
@@ -56,15 +65,26 @@ import {
   unacceptClaim,
   untrackClaim,
   untrackCluster,
+  updateMeta,
   updateTopic,
+  writeBriefSeen,
 } from './store/index.js';
 import type { TrackedEntry } from './store/index.js';
 import type { TrackedClaimEntry } from './store/index.js';
 import type { Article } from './types/article.js';
 
 export type CreateAppDeps = {
+  /** Default: the process runner, or one built from the deps below when `fetchAllSources` is injected */
+  refreshRunner?: RefreshRunner;
+  /**
+   * Injecting this builds a fresh runner from the deps below. Inject
+   * `generateRefreshSummaries` and `updateMeta` too (or pass a `refreshRunner`
+   * instead): any left out fall back to the real stores (mvp/data) and Ollama.
+   */
   fetchAllSources?: typeof fetchAllSources;
   syncTrackedAfterFetch?: typeof syncTrackedAfterFetch;
+  generateRefreshSummaries?: typeof generateRefreshSummaries;
+  updateMeta?: typeof updateMeta;
   readArticles?: typeof readArticles;
   readMeta?: typeof readMeta;
   acceptCluster?: typeof acceptCluster;
@@ -100,7 +120,37 @@ export type CreateAppDeps = {
   untrackClaim?: typeof untrackClaim;
   ackTrackedClaimUpdate?: typeof ackTrackedClaimUpdate;
   getClaimById?: typeof getClaimById;
+  readBriefSeen?: typeof readBriefSeen;
+  writeBriefSeen?: typeof writeBriefSeen;
+  readBriefSummaries?: typeof readBriefSummaries;
+  summarizeBriefStory?: typeof summarizeBriefStory;
+  now?: () => Date;
 };
+
+const SEEN_IDS_MAX = 100;
+
+/** `articleIds`: array of 1–SEEN_IDS_MAX non-empty strings; else null. */
+function parseSeenArticleIds(body: unknown): string[] | null {
+  const raw = (body as { articleIds?: unknown } | null)?.articleIds;
+  if (!Array.isArray(raw) || raw.length === 0 || raw.length > SEEN_IDS_MAX) return null;
+  const ids: string[] = [];
+  for (const value of raw) {
+    if (typeof value !== 'string' || value.trim() === '') return null;
+    ids.push(value.trim());
+  }
+  return ids;
+}
+
+/** In-process queue for brief-seen.json read-modify-write so concurrent marks aren't lost. */
+let seenWriteChain: Promise<unknown> = Promise.resolve();
+
+function serializeSeenWrite<T>(task: () => Promise<T>): Promise<T> {
+  const run = seenWriteChain.then(task, task);
+  seenWriteChain = run.catch(() => undefined);
+  return run;
+}
+
+const SUMMARY_ERROR_STATUS = { not_in_brief: 404, rate_limited: 429, error: 502 } as const;
 
 function parseClusterId(body: unknown): string | null {
   const raw = (body as { clusterId?: unknown } | null)?.clusterId;
@@ -179,22 +229,23 @@ function countMembersForClusterId(
   return count;
 }
 
-function countByClusterIdFromArticles(
-  articles: ReadonlyArray<Pick<Article, 'id' | 'clusterId'>>,
-): Record<string, number> {
-  const counts: Record<string, number> = {};
-  for (const article of articles) {
-    const key = briefClusterKey(article);
-    counts[key] = (counts[key] ?? 0) + 1;
-  }
-  return counts;
-}
-
 export function createApp(deps: CreateAppDeps = {}): Express {
-  const fetchAll = deps.fetchAllSources ?? fetchAllSources;
-  const syncTracked = deps.syncTrackedAfterFetch ?? syncTrackedAfterFetch;
   const readAllArticles = deps.readArticles ?? readArticles;
   const readServerMeta = deps.readMeta ?? readMeta;
+  const refreshRunner =
+    deps.refreshRunner ??
+    (deps.fetchAllSources
+      ? createRefreshRunner({
+          fetchAll: deps.fetchAllSources,
+          syncTracked: createTrackedStoriesSync({
+            readArticles: readAllArticles,
+            syncTrackedAfterFetch: deps.syncTrackedAfterFetch ?? syncTrackedAfterFetch,
+          }),
+          generateSummaries: deps.generateRefreshSummaries ?? generateRefreshSummaries,
+          readMeta: readServerMeta,
+          updateMeta: deps.updateMeta ?? updateMeta,
+        })
+      : getRefreshRunner());
   const accept = deps.acceptCluster ?? acceptCluster;
   const unaccept = deps.unacceptCluster ?? unacceptCluster;
   const readMembership = deps.readBriefMembership ?? readBriefMembership;
@@ -228,6 +279,11 @@ export function createApp(deps: CreateAppDeps = {}): Express {
   const untrackOneClaim = deps.untrackClaim ?? untrackClaim;
   const ackTrackedClaim = deps.ackTrackedClaimUpdate ?? ackTrackedClaimUpdate;
   const getClaim = deps.getClaimById ?? getClaimById;
+  const readSeen = deps.readBriefSeen ?? readBriefSeen;
+  const writeSeen = deps.writeBriefSeen ?? writeBriefSeen;
+  const readSummaries = deps.readBriefSummaries ?? readBriefSummaries;
+  const summarizeStory = deps.summarizeBriefStory ?? summarizeBriefStory;
+  const now = deps.now ?? (() => new Date());
 
   const app = express();
 
@@ -249,14 +305,29 @@ export function createApp(deps: CreateAppDeps = {}): Express {
   });
 
   // Public Kite brief adapter (NEWS-44) — must stay before requireApiSession.
-  app.use('/api', createKiteBriefRouter());
+  app.use(
+    '/api',
+    createKiteBriefRouter({
+      readArticles: readAllArticles,
+      readTriage: readTriageStore,
+      readTopics: readTopicList,
+      readMuteRules: readMutes,
+      readBriefSeen: readSeen,
+      readBriefSummaries: readSummaries,
+      readMeta: readServerMeta,
+      readBriefMembership: readMembership,
+      now,
+      isRefreshRunning: () => refreshRunner.isRunning(),
+    }),
+  );
 
   app.use('/api', requireApiSession);
   app.use('/api', createAuthRouter());
 
   /**
-   * Unified refresh: CFP → curated RSS → xcancel (when configured) → topic search → triage.
-   * Optional body/query: { limit?: number, feedUrl?: string }
+   * Unified refresh: CFP → curated RSS → xcancel (when configured) → topic search → triage
+   * → tracked-stories sync → Brief summaries (shared single-flight runner with the timer).
+   * Optional body/query: { limit?: number, feedUrl?: string } — ignored when joining a running refresh.
    * Empty/missing radar-sources.json skips curated without failing CFP.
    * Empty XCANCEL_PROFILES / x-profiles.json skips xcancel without failing CFP.
    * Curated/xcancel/topic search errors are returned in the payload; CFP still succeeds.
@@ -269,18 +340,8 @@ export function createApp(deps: CreateAppDeps = {}): Express {
         limitRaw !== undefined && limitRaw !== '' ? Number(limitRaw) : undefined;
       const feedUrl = typeof feedUrlRaw === 'string' ? feedUrlRaw : undefined;
 
-      const result = await fetchAll({ limit, feedUrl });
-
-      try {
-        // Important: build counts from the full rewritten store (same denominator as Accept),
-        // not just the upserted rows from this fetch result.
-        const allArticles = await readAllArticles();
-        const countByClusterId = countByClusterIdFromArticles(allArticles);
-        await syncTracked(countByClusterId);
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        console.error('Tracked stories sync after fetch failed:', message);
-      }
+      const refresh = await refreshRunner.run('manual', { limit, feedUrl });
+      const result = refresh.fetch;
 
       res.json({
         ok: true,
@@ -324,6 +385,13 @@ export function createApp(deps: CreateAppDeps = {}): Express {
           errors: result.triage.errors,
         },
         articles: result.articles,
+        refresh: {
+          trigger: refresh.trigger,
+          joined: refresh.joined,
+          startedAt: refresh.startedAt,
+          completedAt: refresh.completedAt,
+        },
+        brief: { summaries: refresh.brief.summaries },
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -359,6 +427,71 @@ export function createApp(deps: CreateAppDeps = {}): Express {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.error('Brief membership read failed:', message);
+      res.status(500).json({ ok: false, error: message });
+    }
+  });
+
+  /**
+   * Topic Brief read marks (NEWS-88): body { articleIds: string[] } (1–100).
+   * Snapshots each kept record so the story stays hidden after the next
+   * refresh unless significantly updated; unknown ids are ignored.
+   */
+  app.post('/api/brief/seen', async (req, res) => {
+    const articleIds = parseSeenArticleIds(req.body);
+    if (!articleIds) {
+      res.status(400).json({
+        ok: false,
+        error: `articleIds must be an array of 1–${SEEN_IDS_MAX} non-empty strings`,
+      });
+      return;
+    }
+    try {
+      const recorded = await serializeSeenWrite(async () => {
+        const [seen, triage] = await Promise.all([readSeen(), readTriageStore()]);
+        const result = markBriefSeen({ seen, triage, articleIds, now: now() });
+        await writeSeen(result.store);
+        return result.recorded;
+      });
+      res.json({ ok: true, recorded });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('Brief seen write failed:', message);
+      res.status(500).json({ ok: false, error: message });
+    }
+  });
+
+  /**
+   * On-demand AI summary for a story visible in the topic Brief (NEWS-88).
+   * 404 not_in_brief · 429 rate_limited · 502 error (Ollama / store).
+   */
+  app.post('/api/brief/stories/:articleId/summary', async (req, res) => {
+    try {
+      const result = await summarizeStory(
+        req.params.articleId,
+        { now: now() },
+        {
+          readTopics: readTopicList,
+          readMuteRules: readMutes,
+          readArticles: readAllArticles,
+          readTriage: readTriageStore,
+          readBriefSeen: readSeen,
+          readBriefSummaries: readSummaries,
+          readMeta: readServerMeta,
+        },
+      );
+      if (!result.ok) {
+        res
+          .status(SUMMARY_ERROR_STATUS[result.code])
+          .json({ ok: false, error: result.code, message: result.error });
+        return;
+      }
+      res.json({
+        ok: true,
+        summary: { status: result.summary.status, text: result.summary.text },
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('Brief summary failed:', message);
       res.status(500).json({ ok: false, error: message });
     }
   });

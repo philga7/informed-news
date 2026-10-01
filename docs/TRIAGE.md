@@ -2,11 +2,11 @@
 
 Part of Epic **L** ([NEWS-84](https://informedcrew.atlassian.net/browse/NEWS-84)) — topics → search → triage → Brief. Ticket: [NEWS-87](https://informedcrew.atlassian.net/browse/NEWS-87). Inputs: topics ([NEWS-85](https://informedcrew.atlassian.net/browse/NEWS-85), `GET /api/topics`) and topic search rows ([NEWS-86](https://informedcrew.atlassian.net/browse/NEWS-86), [TOPIC_SEARCH.md](TOPIC_SEARCH.md)).
 
-Triage decides which new stories are worth a reader's attention. It does **not** put anything in the Brief yet — kept stories are only recorded. Showing them in the Brief by topic is [NEWS-88](https://informedcrew.atlassian.net/browse/NEWS-88).
+Triage decides which new stories are worth a reader's attention. Kept stories are what the Brief shows, grouped by topic ([NEWS-88](https://informedcrew.atlassian.net/browse/NEWS-88), [BRIEF.md](BRIEF.md)).
 
 ## When it runs
 
-At the end of every refresh (`POST /api/fetch`): CFP → curated RSS → xcancel → topic search → clustering → **triage**. It runs inline (4 story groups in flight at once); there is no separate timer yet (NEWS-88).
+In every refresh — the auto-refresh timer, the startup catch-up, the Kite **Refresh** button, or `POST /api/fetch` ([BRIEF.md](BRIEF.md#refresh)): CFP → curated RSS → xcancel → topic search → clustering → **triage** → tracked-stories sync → Brief summaries. It runs inline (4 story groups in flight at once).
 
 **Candidates** are articles that:
 
@@ -28,7 +28,7 @@ Cheapest step first. A story only moves on if it passes the step before, so off-
 2. **Duplicate grouping (free).** Stories are grouped when they share a URL (or one links to the other), carry the same normalized headline on any outlet (syndication; headlines of 3+ words only, so "Live updates" doesn't merge), or have very similar headlines within a shared topic. If a group matches a story already kept earlier in the window, every new member becomes a `duplicate` of it with no Jev call. Otherwise the group picks a representative: primary-tier source first, then one with a direct publisher link, then one with a scraped body, then the longer snippet, then the earliest date.
 3. **Headline check (one Jev call).** The representative's headline, publisher, snippet (first 300 characters), and date go to Jev. See [Jev questions](#jev-questions).
 4. **Survivor prep.** Only stories that pass the headline check, and only rows still waiting for a scrape (`bodyStatus: 'pending'`, e.g. topic search rows) touch the network: a Google-only link is resolved to the publisher URL, the publisher page is scraped for the body, and an undated story gets its date from page metadata. A topic search story that is still undated → `undated`; a page date older than 48 hours → `stale`. Other sources fall back to `fetchedAt` and are never `undated`.
-5. **Body check (one more Jev call).** Only when the story has its body (`bodyStatus: 'ok'`, from this scrape or from ingest) and budget remains. Same questions, with the first 3,000 characters of the body added; a drop verdict here replaces the headline verdict. If the body is blocked or unavailable, the call fails, or the budget is spent, the story is **kept on the headline verdict** with `bodyChecked: false` (NEWS-88 will show "full text unavailable").
+5. **Body check (one more Jev call).** Only when the story has its body (`bodyStatus: 'ok'`, from this scrape or from ingest) and budget remains. Same questions, with the first 3,000 characters of the body added; a drop verdict here replaces the headline verdict. If the body is blocked or unavailable, the call fails, or the budget is spent, the story is **kept on the headline verdict** with `bodyChecked: false`. Its Brief summary is written from the kept story's body when it has one, else from a duplicate member's body, else — for a post with no page to scrape — from the post text when it is at least 120 characters; with none of these, the card shows "Full text unavailable" ([BRIEF.md](BRIEF.md#summaries)).
 
 When a story is kept, the untried members of its group become `duplicate` of it. If the representative is dropped as `clickbait`, `opinion`, `rewrite`, `sponsored`, `undated`, or `stale`, up to **2** alternates from the group are tried in turn. When an alternate is kept, members already tried and dropped keep their own reason; only untried members become `duplicate`. The kept record's `memberIds` lists the whole group (including dropped alternates), so read each member's own record for its status. `off_topic`, `muted:*`, and `not_significant` stop the group (same event, same answer). If nothing in the group is kept, the untried members become `duplicate` of the representative.
 
@@ -86,7 +86,7 @@ In `mvp/.env` (see `mvp/.env.example`):
 |----------|----------|
 | `TRIAGE_ENABLED` | Default on. `false` / `0` / `off` / `no` (trimmed, case-insensitive) disables triage; the run is reported `skipped: true`. |
 | `TRIAGE_JEV_BUDGET` | Jev calls per refresh. Non-negative integer; unset or invalid → `300`. `0` means every story that reaches Jev is `not_scored_budget`. |
-| `TRIAGE_SUMMARY_BUDGET` | Summaries per refresh. Non-negative integer; unset or invalid → `60`. Read and reported here, but **enforced by NEWS-88** (summaries are generated there). |
+| `TRIAGE_SUMMARY_BUDGET` | Ollama Brief summary calls per refresh. Non-negative integer; unset or invalid → `60`. Reported here as `summaryBudget` and **enforced by the Brief's refresh-time summaries** ([BRIEF.md](BRIEF.md#summaries)); failed calls count. |
 | `TYPESAFE_API_KEY` / `TYPESAFE_MODEL` | Existing TypeSafe settings. Without a key, no Jev calls are made: stories that would reach Jev get `not_scored_error` and the run error `TypeSafe not configured`. |
 
 Other limits are constants in `mvp/server/src/services/triageConfig.ts` (48h window, concurrency 4, 6 candidate / 10 undesired topics per call, 2 promotions, Jev thresholds, snippet and body lengths, similar-headline thresholds).
@@ -120,8 +120,7 @@ curl -s -b /tmp/mvp-cookies http://127.0.0.1:3001/api/triage
 
 ## Interim limits
 
-- **Kept stories are not shown in the Brief yet** — that is NEWS-88. Until then they are visible only through `GET /api/triage`.
+- **Kept stories are shown in the Brief** by topic ([BRIEF.md](BRIEF.md)); `GET /api/triage` still lists every record.
 - **Filtered-out view** (browse dropped stories with their reasons) is [NEWS-90](https://informedcrew.atlassian.net/browse/NEWS-90).
-- **Topic edits don't re-triage final records** while they are in the window. A new or changed topic only affects stories triaged after the edit.
-- **Summary budget** is defined and reported but not enforced until NEWS-88.
+- **Topic edits don't re-triage final records** while they are in the window. A new or changed topic only affects stories triaged after the edit. The Brief does re-check mute rules and undesired topics when it is read, and drops a kept story whose topics are all deleted or undesired.
 - The NEWS-86 guards on topic search rows stay in place (not clustered, not on Radar, skipped by Ollama batch endpoints) — see [TOPIC_SEARCH.md](TOPIC_SEARCH.md).

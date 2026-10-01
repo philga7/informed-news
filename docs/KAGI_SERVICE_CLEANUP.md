@@ -13,6 +13,7 @@ Flags live in [`apps/kite/src/lib/features.ts`](../apps/kite/src/lib/features.ts
 | Header App Navigation (“Kagi Apps”) | **Hide** | Links to kagi.com products |
 | Story Ask Assistant | **Hide** | Deep-link to kagi.com/assistant |
 | About → Mobile Apps | **Hide** | Kagi News App Store / Play listings |
+| New-batch push (`/api/sse/batches`) | **Off** (`kagiBatchPush`) | Kagi batch pipeline stream; no owned endpoint, so the client retried and logged errors. The topic Brief polls its refresh instead |
 | Contribute / onboarding “Kagi News” / staff copy | **Relabel** | Via `brand.ts` overrides |
 | Time Travel subscriber copy | **Relabel** | Via `brand.ts` |
 | MIT LICENSE / NOTICE / THIRD_PARTY | **Keep** | Upstream attribution unchanged |

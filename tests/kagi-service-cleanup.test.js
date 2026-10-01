@@ -18,6 +18,7 @@ describe('NEWS-47 Kagi service cleanup', () => {
 		assert.match(features, /kagiAppNavigation: false/);
 		assert.match(features, /kagiAssistant: false/);
 		assert.match(features, /kagiMobileApps: false/);
+		assert.match(features, /kagiBatchPush: false/);
 	});
 
 	it('hides Account tab and Upgrade-to-Kagi reading-level paywall in default path', () => {

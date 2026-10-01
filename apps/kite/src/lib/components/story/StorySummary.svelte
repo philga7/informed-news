@@ -200,6 +200,8 @@ onDestroy(() => {
         text={storyLocalizer("article.location") || `View on ${mapServiceName}`}
         position="top"
       >
+        <!-- Tooltip stops click propagation, so the text re-binds the click; the parent button owns keyboard access. -->
+        <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
         <span dir="auto" onclick={handleLocationClick}>
           <CitationText
             text={displayLocation}

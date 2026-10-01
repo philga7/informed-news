@@ -4,7 +4,7 @@ Part of Epic **L** ([NEWS-84](https://informedcrew.atlassian.net/browse/NEWS-84)
 
 ## What it does
 
-On every refresh (`POST /api/fetch`), after CFP, curated RSS, and xcancel, `mvp/server` searches each **desired** topic (`kind: 'desired'`; undesired topics are never searched):
+On every refresh (timer, startup catch-up, Kite **Refresh** button, or `POST /api/fetch` — [BRIEF.md](BRIEF.md#refresh)), after CFP, curated RSS, and xcancel, `mvp/server` searches each **desired** topic (`kind: 'desired'`; undesired topics are never searched):
 
 - **Query:** `topic.searchQuery.trim() || topic.name`.
 - **Both providers every refresh:** Google News RSS and a local SearXNG instance run side by side per topic (3 topics in flight at once).
@@ -23,16 +23,18 @@ New stories are upserted as articles with `sourceKind: 'search'`, `sourceTier: '
 | `searchProviders` | `('google_news' \| 'searxng')[]` that returned it |
 | `googleNewsUrl` | Google News article link (`?oc=…` stripped) or `null` |
 
-## Interim behavior (until NEWS-88)
+## Interim behavior
 
-Search rows are **triaged** at the end of every refresh ([NEWS-87](https://informedcrew.atlassian.net/browse/NEWS-87), [TRIAGE.md](TRIAGE.md)): each gets a kept or dropped record in `mvp/data/triage.json`. Until topic-driven Brief ([NEWS-88](https://informedcrew.atlassian.net/browse/NEWS-88)) lands:
+Search rows are **triaged** at the end of every refresh ([NEWS-87](https://informedcrew.atlassian.net/browse/NEWS-87), [TRIAGE.md](TRIAGE.md)): each gets a kept or dropped record in `mvp/data/triage.json`.
 
-- **Topics do not select Brief stories yet** (NEWS-88). Kept stories are visible only through `GET /api/triage`.
+- **Kept search rows are shown in the Brief** under their topic ([NEWS-88](https://informedcrew.atlassian.net/browse/NEWS-88), [BRIEF.md](BRIEF.md)) and get their Brief summary through that path only.
 - **Survivors only get resolved and scraped:** a search row that passes the triage headline check has its Google link resolved to the publisher URL, its body scraped, and (if undated) its date read from page metadata — still undated → dropped `undated`. Rows that fail triage stay `bodyStatus: 'pending'` with no live resolution.
 - **Stored and listed, not on Radar:** search rows are in the shared article store and returned by `GET /api/articles` and `POST /api/fetch` (top-level `articles`), but hidden from Radar (Radar shows `cfp` / `rss` only).
 - **Not clustered:** search rows always get `clusterId: null` and are never grouped with other articles, so they cannot re-key an existing Brief or tracked story or bridge two Radar clusters. (Triage does its own duplicate grouping; it does not set `clusterId`.)
 - **Skipped by Ollama batches:** the batch endpoints `POST /api/classify`, `POST /api/enrich`, and `POST /api/claims/extract` (without `articleIds`) skip search rows. Explicit per-id calls (`POST /api/classify/:id`, `POST /api/claims/extract` with `articleIds`) are unchanged.
 - **No body scrape and no live Google link resolution at ingest** — both happen in triage, for survivors only.
+
+These guards stay in place after NEWS-88.
 
 ## Google News RSS
 
@@ -95,7 +97,7 @@ In `mvp/.env` (see `mvp/.env.example`):
 - `topicSearch.skipped` is `true` when no search ran: topic search disabled, no desired topics, or the topics file unreadable. With no desired topics, providers report `ok` with `topicsAttempted: 0`; with an unreadable topics file, enabled providers report `down`.
 - `topicSearch.errors` (top level) holds run-level errors that are not tied to one provider/topic: topics file unreadable, article store read or upsert failure, or an unexpected topic-search exception. Provider/topic failures go in each provider's `errors` instead.
 - `npm run dev` does **not** need SearXNG running — without it, SearXNG reports `down` (when desired topics exist; otherwise the run is skipped) and Google News results still land.
-- Showing provider status in the Kite Brief is NEWS-88.
+- The Brief refresh bar shows "SearXNG unavailable" / "Google News unavailable" when a provider is `down`, and "… partly failed" when it is `partial` ([BRIEF.md](BRIEF.md#refresh)).
 
 ## Trade-offs
 

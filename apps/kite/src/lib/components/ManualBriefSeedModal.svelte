@@ -9,6 +9,7 @@ import {
 	BRIEF_SEED_PENDING_LABEL,
 	BRIEF_SEED_SUBMIT_LABEL,
 	BRIEF_SEED_TITLE_LABEL,
+	BRIEF_SEED_TOPIC_BRIEF_NOTE,
 	BRIEF_SEED_URLS_LABEL,
 	parseUrlsFromTextarea,
 	postBriefSeed,
@@ -129,6 +130,8 @@ async function handleSubmit(event: Event): Promise<void> {
 				placeholder="https://example.com/story"
 			></textarea>
 		</label>
+
+		<p class="text-xs text-gray-500 dark:text-gray-400">{BRIEF_SEED_TOPIC_BRIEF_NOTE}</p>
 
 		{#if error}
 			<p class="text-xs text-red-600 dark:text-red-400" role="alert">

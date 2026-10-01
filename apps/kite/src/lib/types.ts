@@ -107,6 +107,14 @@ export interface Story {
 	articles: Article[];
 	domains?: Domain[];
 	expanded?: boolean;
+	/** Informed News topic Brief glue (NEWS-88); see `$lib/topicBrief`. */
+	informed_article_id?: string;
+	informed_topic_id?: string;
+	informed_topic_name?: string;
+	informed_more?: boolean;
+	informed_outlet_count?: number;
+	informed_labels?: 'official'[];
+	informed_summary_status?: 'ok' | 'missing' | 'unavailable';
 }
 
 export interface Category {

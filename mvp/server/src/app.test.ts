@@ -6,8 +6,21 @@ import { test } from 'node:test';
 import type { Server } from 'node:http';
 import express from 'express';
 
-import type { Article } from './types/article.js';
-import type { TriageRecord, TriageRunMeta } from './types/triage.js';
+import type { CreateAppDeps } from './app.js';
+import type { Article, StoreMeta } from './types/article.js';
+import type { BriefRunMeta, BriefSeenStore } from './types/brief.js';
+import type { Topic } from './types/topic.js';
+import type { TriageRecord, TriageRunMeta, TriageStore } from './types/triage.js';
+import type { RefreshResult, RefreshRunner } from './services/refreshRunner.js';
+import type { SummarizeBriefStoryResult } from './services/briefSummaries.js';
+import {
+  OWNED_FIXTURE_TITLE,
+  buildOwnedStoriesResponse,
+  ownedBriefFixtureEnrichments,
+  resolveOwnedBriefArticles,
+  type KiteBatchCategoriesResponse,
+  type KiteBatchStoriesResponse,
+} from './services/kiteBriefAdapter.js';
 import { acceptCluster, readBriefMembership } from './store/briefMembershipStore.js';
 import {
   ackTrackedUpdate,
@@ -45,7 +58,7 @@ import {
 } from './store/topicsStore.js';
 import { loadBriefClaims } from './services/briefClaims.js';
 import { enrichAcceptedClaims } from './services/enrichClaims.js';
-import { createKiteBriefRouter } from './services/kiteBriefRoutes.js';
+import { createKiteBriefRouter, type CreateKiteBriefRouterDeps } from './services/kiteBriefRoutes.js';
 import { createManualSeed } from './services/manualBriefSeed.js';
 
 function tempMembershipPath(): string {
@@ -82,6 +95,17 @@ function tempClaimReviewQueuePath(): string {
   const dir = mkdtempSync(path.join(tmpdir(), 'claim-review-queue-'));
   return path.join(dir, 'claim-review-queue.json');
 }
+
+const BRIEF_RUN: BriefRunMeta = {
+  at: '2026-09-30T12:00:05.000Z',
+  summaries: { budget: 60, used: 2, generated: 1, reused: 1, unavailable: 0, errors: ['Ollama: x'] },
+};
+
+/** Keeps refresh-time summaries and meta.refresh writes out of mvp/data. */
+const noRefreshSideEffects = {
+  generateRefreshSummaries: async () => BRIEF_RUN,
+  updateMeta: async () => ({ lastFetchAt: null, lastError: null }),
+};
 
 async function startServer(app: { listen: (...args: any[]) => Server }): Promise<{
   baseUrl: string;
@@ -337,6 +361,7 @@ test('POST /api/fetch calls syncTrackedAfterFetch with briefClusterKey counts', 
       seenMap = countByClusterId;
       return { entries: [] };
     },
+    ...noRefreshSideEffects,
   });
 
   const { baseUrl, close } = await startServer(app);
@@ -372,6 +397,7 @@ test('POST /api/fetch calls syncTrackedAfterFetch with briefClusterKey counts', 
       articles: 1,
     });
     assert.deepEqual(seenMap, { c1: 3, 'solo:solo-1': 1 });
+    assert.deepEqual((json as { brief?: unknown }).brief, { summaries: BRIEF_RUN.summaries });
   } finally {
     await close();
   }
@@ -420,6 +446,7 @@ test('POST /api/fetch succeeds even when syncTrackedAfterFetch throws', async ()
     syncTrackedAfterFetch: async () => {
       throw new Error('boom');
     },
+    ...noRefreshSideEffects,
   });
 
   const { baseUrl, close } = await startServer(app);
@@ -433,6 +460,174 @@ test('POST /api/fetch succeeds even when syncTrackedAfterFetch throws', async ()
     assert.equal(resp.status, 200);
     const json = (await resp.json()) as { ok: boolean };
     assert.equal(json.ok, true);
+  } finally {
+    await close();
+  }
+});
+
+function stubFetchResult(): RefreshResult['fetch'] {
+  return {
+    fetched: 1,
+    clustered: 0,
+    clusters: 0,
+    tiers: { sensor: { fetched: 1, upserted: 1 }, primary: { fetched: 0, upserted: 0 } },
+    cfp: { feedUrl: 'x', limit: 5, fetched: 1, upserted: [] },
+    curated: { skipped: true, sources: [], fetched: 0, errors: [], upserted: [] },
+    xcancel: { skipped: true, handles: [], fetched: 0, errors: [], upserted: [] },
+    topicSearch: {
+      skipped: true,
+      providers: {
+        google_news: { state: 'disabled', topicsAttempted: 0, topicsFailed: 0, items: 0, errors: [] },
+        searxng: { state: 'disabled', topicsAttempted: 0, topicsFailed: 0, items: 0, errors: [] },
+      },
+      fetched: 0,
+      perTopic: {},
+      upserted: [],
+      errors: [],
+    },
+    triage: {
+      at: '2026-09-30T12:00:00.000Z',
+      skipped: true,
+      candidates: 0,
+      kept: 0,
+      dropped: 0,
+      byReason: {},
+      jev: { budget: 300, used: 0, errors: 0 },
+      summaryBudget: 60,
+      errors: [],
+      keptIds: [],
+    },
+    articles: [],
+  } as unknown as RefreshResult['fetch'];
+}
+
+test('POST /api/fetch runs the refresh runner (manual) and returns refresh + brief', async () => {
+  process.env.SESSION_SECRET = 'test-secret';
+  process.env.MVP_PASSWORD = 'pw';
+  delete process.env.MVP_PASSWORD_HASH;
+
+  const calls: Array<{ trigger: string; options: unknown }> = [];
+  const refreshRunner: RefreshRunner = {
+    isRunning: () => false,
+    run: async (trigger, options) => {
+      calls.push({ trigger, options });
+      return {
+        trigger: 'timer',
+        joined: true,
+        startedAt: '2026-09-30T12:00:00.000Z',
+        completedAt: '2026-09-30T12:00:06.000Z',
+        fetch: stubFetchResult(),
+        brief: BRIEF_RUN,
+      };
+    },
+  };
+
+  const { createApp } = await import('./app.js');
+  const app = createApp({ refreshRunner });
+
+  const { baseUrl, close } = await startServer(app);
+  try {
+    const cookie = await login(baseUrl);
+    const resp = await fetch(`${baseUrl}/api/fetch`, {
+      method: 'POST',
+      headers: { cookie, 'content-type': 'application/json' },
+      body: JSON.stringify({ limit: 5, feedUrl: 'https://feed.example/rss' }),
+    });
+    assert.equal(resp.status, 200);
+    const json = (await resp.json()) as {
+      ok: boolean;
+      feedUrl: string;
+      limit: number;
+      fetched: number;
+      refresh: unknown;
+      brief: unknown;
+    };
+    assert.deepEqual(calls, [
+      { trigger: 'manual', options: { limit: 5, feedUrl: 'https://feed.example/rss' } },
+    ]);
+    assert.equal(json.ok, true);
+    assert.equal(json.feedUrl, 'x');
+    assert.equal(json.limit, 5);
+    assert.equal(json.fetched, 1);
+    assert.deepEqual(json.refresh, {
+      trigger: 'timer',
+      joined: true,
+      startedAt: '2026-09-30T12:00:00.000Z',
+      completedAt: '2026-09-30T12:00:06.000Z',
+    });
+    assert.deepEqual(json.brief, { summaries: BRIEF_RUN.summaries });
+  } finally {
+    await close();
+  }
+});
+
+test('POST /api/fetch returns 500 when the refresh fails (CFP)', async () => {
+  process.env.SESSION_SECRET = 'test-secret';
+  process.env.MVP_PASSWORD = 'pw';
+  delete process.env.MVP_PASSWORD_HASH;
+
+  const refreshRunner: RefreshRunner = {
+    isRunning: () => false,
+    run: async () => {
+      throw new Error('CFP feed unreachable');
+    },
+  };
+
+  const { createApp } = await import('./app.js');
+  const app = createApp({ refreshRunner });
+
+  const { baseUrl, close } = await startServer(app);
+  try {
+    const cookie = await login(baseUrl);
+    const resp = await fetch(`${baseUrl}/api/fetch`, {
+      method: 'POST',
+      headers: { cookie, 'content-type': 'application/json' },
+      body: '{}',
+    });
+    assert.equal(resp.status, 500);
+    assert.deepEqual(await resp.json(), { ok: false, error: 'CFP feed unreachable' });
+  } finally {
+    await close();
+  }
+});
+
+test('POST /api/fetch with injected fetchAllSources records a failed refresh and 500s', async () => {
+  process.env.SESSION_SECRET = 'test-secret';
+  process.env.MVP_PASSWORD = 'pw';
+  delete process.env.MVP_PASSWORD_HASH;
+
+  const patches: unknown[] = [];
+  const { createApp } = await import('./app.js');
+  const app = createApp({
+    fetchAllSources: async () => {
+      throw new Error('CFP down');
+    },
+    readMeta: async () => ({ lastFetchAt: null, lastError: null }),
+    updateMeta: async (patch) => {
+      patches.push(patch);
+      return { lastFetchAt: null, lastError: null };
+    },
+    generateRefreshSummaries: async () => {
+      throw new Error('summaries must not run after a failed fetch');
+    },
+  });
+
+  const { baseUrl, close } = await startServer(app);
+  try {
+    const cookie = await login(baseUrl);
+    const resp = await fetch(`${baseUrl}/api/fetch`, {
+      method: 'POST',
+      headers: { cookie, 'content-type': 'application/json' },
+      body: '{}',
+    });
+    assert.equal(resp.status, 500);
+    assert.deepEqual(await resp.json(), { ok: false, error: 'CFP down' });
+    assert.equal(patches.length, 1);
+    const refresh = (patches[0] as { refresh: { last: { ok: boolean; trigger: string; error: string }; lastSuccess: unknown } }).refresh;
+    assert.equal(refresh.last.ok, false);
+    assert.equal(refresh.last.trigger, 'manual');
+    assert.equal(refresh.last.error, 'CFP down');
+    assert.equal(refresh.lastSuccess, null);
   } finally {
     await close();
   }
@@ -1974,6 +2169,583 @@ test('GET /api/triage returns run null when no triage has run', async () => {
     const resp = await fetch(`${baseUrl}/api/triage`, { headers: { cookie } });
     assert.equal(resp.status, 200);
     assert.deepEqual(await resp.json(), { ok: true, run: null, records: [] });
+  } finally {
+    await close();
+  }
+});
+
+// --- Topic Brief (NEWS-88) -------------------------------------------------
+
+const BRIEF_NOW = new Date('2026-09-30T12:00:00.000Z');
+const BRIEF_RECENT = '2026-09-30T10:00:00.000Z';
+
+function briefArticle(id: string, overrides: Partial<Article> = {}): Article {
+  return {
+    id,
+    title: `Headline ${id}`,
+    sourceKind: 'rss',
+    canonicalUrl: `https://cfp.example/${id}`,
+    citations: [],
+    publisherUrl: `https://${id}.example.com/story`,
+    publisherDomain: `${id}.example.com`,
+    handle: null,
+    publishedAt: BRIEF_RECENT,
+    snippet: '',
+    bodyText: null,
+    bodyStatus: 'unavailable',
+    publisherTitle: null,
+    imageUrl: null,
+    imageCaption: null,
+    imageCredit: null,
+    clusterId: null,
+    fetchedAt: BRIEF_RECENT,
+    classification: null,
+    classifiedAt: null,
+    classifyError: null,
+    ...overrides,
+  };
+}
+
+function briefTopic(id: string, overrides: Partial<Topic> = {}): Topic {
+  return {
+    id,
+    name: id.toUpperCase(),
+    kind: 'desired',
+    level: 'core',
+    description: '',
+    keywords: [],
+    searchQuery: id,
+    sections: [],
+    notes: '',
+    createdAt: '2026-09-01T00:00:00.000Z',
+    updatedAt: '2026-09-01T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
+function keptRecord(
+  id: string,
+  topicIds: string[],
+  overrides: Partial<TriageRecord> = {},
+): TriageRecord {
+  return {
+    ...triageRecordFixture(id, BRIEF_RECENT),
+    status: 'kept',
+    reason: null,
+    stage: 'headline',
+    topicIds,
+    outletCount: 1,
+    significance: 1,
+    ...overrides,
+  };
+}
+
+function triageStoreOf(records: TriageRecord[]): TriageStore {
+  return { records: Object.fromEntries(records.map((r) => [r.articleId, r])), updatedAt: null };
+}
+
+type BriefFixture = {
+  articles: Article[];
+  records?: TriageRecord[];
+  topics?: Topic[];
+  meta?: StoreMeta;
+  seen?: BriefSeenStore;
+  acceptedClusterIds?: string[];
+};
+
+/** Store reads shared by the Kite brief router and createApp (same dep names). */
+function briefReads(f: BriefFixture) {
+  return {
+    readArticles: async () => f.articles,
+    readTriage: async () => triageStoreOf(f.records ?? []),
+    readTopics: async () => ({ topics: f.topics ?? [briefTopic('t1')], updatedAt: null }),
+    readMuteRules: async () => ({ rules: [], updatedAt: null }),
+    readBriefSeen: async () => f.seen ?? { seen: {}, updatedAt: null },
+    readBriefSummaries: async () => ({ summaries: {}, updatedAt: null }),
+    readMeta: async (): Promise<StoreMeta> => f.meta ?? { lastFetchAt: null, lastError: null },
+    readBriefMembership: async () => ({
+      acceptedClusterIds: f.acceptedClusterIds ?? [],
+      updatedAt: null,
+    }),
+    now: () => BRIEF_NOW,
+  };
+}
+
+async function startBriefRouter(
+  f: BriefFixture,
+  extra: CreateKiteBriefRouterDeps = {},
+): Promise<{ baseUrl: string; close: () => Promise<void> }> {
+  const app = express();
+  app.use(
+    '/api',
+    createKiteBriefRouter({
+      ...briefReads(f),
+      readClusterEnrichments: async () => [],
+      isRefreshRunning: () => false,
+      env: {},
+      ...extra,
+    }),
+  );
+  return await startServer(app);
+}
+
+async function getJson<T>(url: string): Promise<T> {
+  const resp = await fetch(url);
+  assert.equal(resp.status, 200, url);
+  return (await resp.json()) as T;
+}
+
+test('GET /api/categories/metadata and /api/chaos/history: owned Brief category, no chaos history (public)', async () => {
+  const { baseUrl, close } = await startBriefRouter({ articles: [] });
+  try {
+    const metadata = await getJson<unknown>(`${baseUrl}/api/categories/metadata`);
+    assert.deepEqual(metadata, {
+      categories: [
+        { categoryId: 'world', categoryType: 'core', isCore: true, displayName: 'Brief' },
+      ],
+    });
+    assert.deepEqual(await getJson<unknown>(`${baseUrl}/api/chaos/history?days=7`), []);
+  } finally {
+    await close();
+  }
+});
+
+test('Kite brief: empty article store keeps the fixture path unchanged', async () => {
+  const { baseUrl, close } = await startBriefRouter({ articles: [] });
+  try {
+    const categories = await getJson<KiteBatchCategoriesResponse>(
+      `${baseUrl}/api/batches/latest/categories`,
+    );
+    assert.equal(categories.categories[0]!.categoryId, 'world');
+    assert.equal(categories.categories[0]!.categoryName, 'Brief');
+
+    const body = await getJson<KiteBatchStoriesResponse>(
+      `${baseUrl}/api/batches/latest/categories/world/stories?limit=12`,
+    );
+    const expected = buildOwnedStoriesResponse(
+      resolveOwnedBriefArticles([], [], BRIEF_NOW).articles,
+      'world',
+      { limit: 12, enrichments: ownedBriefFixtureEnrichments() },
+    )!;
+    assert.deepEqual(body.stories, expected.stories);
+    assert.equal(body.stories[0]!.title, OWNED_FIXTURE_TITLE);
+    assert.ok(body.stories[0]!.talking_points);
+    assert.equal(body.stories[0]!.informed_article_id, undefined);
+
+    const overview = await getJson<{ fixture: boolean; sections: unknown[]; quiet: unknown[] }>(
+      `${baseUrl}/api/brief/overview`,
+    );
+    assert.equal(overview.fixture, true);
+    assert.deepEqual(overview.sections, []);
+    assert.deepEqual(overview.quiet, []);
+  } finally {
+    await close();
+  }
+});
+
+test('Kite brief: non-empty store with no kept records → zero stories, category still world / Brief', async () => {
+  const { baseUrl, close } = await startBriefRouter({
+    articles: [briefArticle('a1')],
+    records: [triageRecordFixture('a1', BRIEF_RECENT)],
+  });
+  try {
+    const categories = await getJson<KiteBatchCategoriesResponse>(
+      `${baseUrl}/api/batches/owned-latest/categories`,
+    );
+    assert.equal(categories.categories.length, 1);
+    assert.equal(categories.categories[0]!.categoryId, 'world');
+    assert.equal(categories.categories[0]!.categoryName, 'Brief');
+    assert.equal(categories.categories[0]!.clusterCount, 0);
+
+    const body = await getJson<KiteBatchStoriesResponse>(
+      `${baseUrl}/api/batches/owned-latest/categories/world/stories`,
+    );
+    assert.deepEqual(body.stories, []);
+
+    const missing = await fetch(`${baseUrl}/api/batches/latest/categories/sports/stories`);
+    assert.equal(missing.status, 404);
+  } finally {
+    await close();
+  }
+});
+
+test('Kite brief via createApp: kept stories only (accepted-but-not-kept gone), limit ignored, timestamp = last success', async () => {
+  process.env.SESSION_SECRET = 'test-secret';
+  process.env.MVP_PASSWORD = 'pw';
+  delete process.env.MVP_PASSWORD_HASH;
+
+  const lastSuccess = {
+    trigger: 'timer' as const,
+    startedAt: '2026-09-30T11:00:00.000Z',
+    completedAt: '2026-09-30T11:02:00.000Z',
+    ok: true,
+    error: null,
+  };
+  const { createApp } = await import('./app.js');
+  const app = createApp(
+    briefReads({
+      articles: [briefArticle('accepted'), briefArticle('k1'), briefArticle('k2')],
+      records: [
+        triageRecordFixture('accepted', BRIEF_RECENT),
+        keptRecord('k1', ['t1'], { significance: 2 }),
+        keptRecord('k2', ['t1']),
+      ],
+      acceptedClusterIds: ['solo:accepted'],
+      meta: { lastFetchAt: null, lastError: null, refresh: { last: lastSuccess, lastSuccess } },
+    }),
+  );
+  const { baseUrl, close } = await startServer(app);
+  try {
+    const body = await getJson<KiteBatchStoriesResponse>(
+      `${baseUrl}/api/batches/latest/categories/world/stories?limit=1`,
+    );
+    assert.deepEqual(
+      body.stories.map((s) => s.id),
+      ['k1', 'k2'],
+    );
+    assert.equal(body.stories[0]!.category, 'world');
+    assert.equal(body.stories[0]!.informed_topic_id, 't1');
+    assert.equal(body.timestamp, Date.parse(lastSuccess.completedAt) / 1000);
+
+    const categories = await getJson<KiteBatchCategoriesResponse>(
+      `${baseUrl}/api/batches/latest/categories`,
+    );
+    assert.equal(categories.categories[0]!.clusterCount, 2);
+
+    const batch = await getJson<{ id: string; totalReadCount: number }>(
+      `${baseUrl}/api/batches/latest`,
+    );
+    assert.equal(batch.id, 'owned-latest');
+    assert.equal(batch.totalReadCount, 2);
+  } finally {
+    await close();
+  }
+});
+
+test('GET /api/brief/overview: sections with More split, quiet, notices, nextAt, running (public)', async () => {
+  const lastSuccess = {
+    trigger: 'manual' as const,
+    startedAt: '2026-09-30T09:00:00.000Z',
+    completedAt: '2026-09-30T09:30:00.000Z',
+    ok: true,
+    error: null,
+  };
+  const meta: StoreMeta = {
+    lastFetchAt: null,
+    lastError: null,
+    refresh: { last: lastSuccess, lastSuccess },
+    topicSearch: {
+      at: BRIEF_RECENT,
+      providers: {
+        searxng: { state: 'ok' },
+        google_news: { state: 'partial' },
+      },
+    } as unknown as StoreMeta['topicSearch'],
+  };
+  const { baseUrl, close } = await startBriefRouter(
+    {
+      articles: ['c1', 'c2', 'c3', 'c4', 'w1'].map((id) => briefArticle(id)),
+      records: [
+        keptRecord('c1', ['core'], { significance: 2 }),
+        keptRecord('c2', ['core'], { significance: 1.5 }),
+        keptRecord('c3', ['core', 'watch'], { significance: 1.2 }),
+        keptRecord('c4', ['core'], { significance: 1 }),
+        keptRecord('w1', ['watch']),
+      ],
+      topics: [
+        briefTopic('watch', { name: 'Gas prices', level: 'watch' }),
+        briefTopic('core', { name: 'Iran' }),
+        briefTopic('quiet', { name: 'Palantir' }),
+      ],
+      meta,
+    },
+    { env: { REFRESH_INTERVAL_HOURS: '2' }, isRefreshRunning: () => true },
+  );
+  try {
+    const overview = await getJson<unknown>(`${baseUrl}/api/brief/overview`);
+    assert.deepEqual(overview, {
+      ok: true,
+      fixture: false,
+      refresh: {
+        last: lastSuccess,
+        lastSuccess,
+        nextAt: '2026-09-30T11:30:00.000Z',
+        intervalHours: 2,
+        running: true,
+      },
+      notices: ['Google News partly failed'],
+      sections: [
+        { topicId: 'core', name: 'Iran', level: 'core', storyIds: ['c1', 'c2', 'c3'], moreIds: ['c4'] },
+        { topicId: 'watch', name: 'Gas prices', level: 'watch', storyIds: ['w1'], moreIds: [] },
+      ],
+      quiet: [{ id: 'quiet', name: 'Palantir', level: 'core' }],
+    });
+  } finally {
+    await close();
+  }
+});
+
+for (const [store, dep, notice] of [
+  ['seen', 'readBriefSeen', 'Read history unavailable (brief-seen.json unreadable)'],
+  ['summaries', 'readBriefSummaries', 'Saved summaries unavailable (brief-summaries.json unreadable)'],
+] as const) {
+  test(`Kite brief: unreadable ${store} store degrades to empty with an overview notice`, async () => {
+    const { baseUrl, close } = await startBriefRouter(
+      {
+        articles: ['k1', 'k2'].map((id) => briefArticle(id)),
+        records: [keptRecord('k1', ['t1']), keptRecord('k2', ['t1'])],
+      },
+      {
+        [dep]: async () => {
+          throw new Error(`corrupt ${store}`);
+        },
+      },
+    );
+    try {
+      const body = await getJson<KiteBatchStoriesResponse>(
+        `${baseUrl}/api/batches/latest/categories/world/stories`,
+      );
+      assert.deepEqual(
+        body.stories.map((s) => s.id).sort(),
+        ['k1', 'k2'],
+      );
+      const overview = await getJson<{ notices: string[] }>(`${baseUrl}/api/brief/overview`);
+      assert.deepEqual(overview.notices, [notice]);
+    } finally {
+      await close();
+    }
+  });
+}
+
+test('Kite brief: unreadable triage store still fails with 500', async () => {
+  const { baseUrl, close } = await startBriefRouter(
+    { articles: [briefArticle('k1')] },
+    {
+      readTriage: async () => {
+        throw new Error('corrupt triage');
+      },
+    },
+  );
+  try {
+    const resp = await fetch(`${baseUrl}/api/brief/overview`);
+    assert.equal(resp.status, 500);
+  } finally {
+    await close();
+  }
+});
+
+async function startSeenServer(f: BriefFixture & {
+  writeBriefSeen?: (store: BriefSeenStore) => Promise<void>;
+  summarizeBriefStory?: CreateAppDeps['summarizeBriefStory'];
+}): Promise<{ baseUrl: string; close: () => Promise<void> }> {
+  process.env.SESSION_SECRET = 'test-secret';
+  process.env.MVP_PASSWORD = 'pw';
+  delete process.env.MVP_PASSWORD_HASH;
+
+  const { createApp } = await import('./app.js');
+  const app = createApp({
+    ...briefReads(f),
+    writeBriefSeen: f.writeBriefSeen ?? (async () => {}),
+    ...(f.summarizeBriefStory ? { summarizeBriefStory: f.summarizeBriefStory } : {}),
+  });
+  return await startServer(app);
+}
+
+function postJson(baseUrl: string, route: string, body: unknown, cookie?: string) {
+  return fetch(`${baseUrl}${route}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...(cookie ? { cookie } : {}) },
+    body: JSON.stringify(body),
+  });
+}
+
+test('POST /api/brief/seen requires session', async () => {
+  let writes = 0;
+  const { baseUrl, close } = await startSeenServer({
+    articles: [],
+    writeBriefSeen: async () => {
+      writes += 1;
+    },
+  });
+  try {
+    const resp = await postJson(baseUrl, '/api/brief/seen', { articleIds: ['k1'] });
+    assert.equal(resp.status, 401);
+    assert.equal(writes, 0);
+  } finally {
+    await close();
+  }
+});
+
+test('POST /api/brief/seen returns 400 on bad bodies', async () => {
+  let writes = 0;
+  const { baseUrl, close } = await startSeenServer({
+    articles: [],
+    writeBriefSeen: async () => {
+      writes += 1;
+    },
+  });
+  try {
+    const cookie = await login(baseUrl);
+    const bad: unknown[] = [
+      {},
+      { articleIds: 'k1' },
+      { articleIds: [] },
+      { articleIds: ['k1', 7] },
+      { articleIds: ['k1', '  '] },
+      { articleIds: Array.from({ length: 101 }, (_, i) => `id${i}`) },
+    ];
+    for (const body of bad) {
+      const resp = await postJson(baseUrl, '/api/brief/seen', body, cookie);
+      assert.equal(resp.status, 400, JSON.stringify(body).slice(0, 40));
+      const json = (await resp.json()) as { ok: boolean };
+      assert.equal(json.ok, false);
+    }
+    assert.equal(writes, 0);
+
+    const max = await postJson(
+      baseUrl,
+      '/api/brief/seen',
+      { articleIds: Array.from({ length: 100 }, (_, i) => `id${i}`) },
+      cookie,
+    );
+    assert.equal(max.status, 200);
+  } finally {
+    await close();
+  }
+});
+
+test('POST /api/brief/seen records kept-record snapshots, ignores unknown ids, prunes', async () => {
+  const written: BriefSeenStore[] = [];
+  const { baseUrl, close } = await startSeenServer({
+    articles: [],
+    records: [
+      keptRecord('k1', ['t1'], { outletCount: 3, significance: 1.4 }),
+      keptRecord('k-recent', ['t1']),
+      keptRecord('k-old', ['t1']),
+      triageRecordFixture('dropped', BRIEF_RECENT),
+    ],
+    seen: {
+      seen: {
+        'k-recent': { seenAt: '2026-09-25T00:00:00.000Z', outletCount: 1, significance: 1 },
+        'k-old': { seenAt: '2026-09-20T00:00:00.000Z', outletCount: 1, significance: 1 },
+        gone: { seenAt: '2026-09-29T00:00:00.000Z', outletCount: 1, significance: 1 },
+      },
+      updatedAt: null,
+    },
+    writeBriefSeen: async (store) => {
+      written.push(store);
+    },
+  });
+  try {
+    const cookie = await login(baseUrl);
+    const resp = await postJson(
+      baseUrl,
+      '/api/brief/seen',
+      { articleIds: ['k1', 'unknown', 'dropped'] },
+      cookie,
+    );
+    assert.equal(resp.status, 200);
+    assert.deepEqual(await resp.json(), { ok: true, recorded: 1 });
+    assert.equal(written.length, 1);
+    assert.deepEqual(written[0], {
+      seen: {
+        'k-recent': { seenAt: '2026-09-25T00:00:00.000Z', outletCount: 1, significance: 1 },
+        k1: { seenAt: BRIEF_NOW.toISOString(), outletCount: 3, significance: 1.4 },
+      },
+      updatedAt: BRIEF_NOW.toISOString(),
+    });
+  } finally {
+    await close();
+  }
+});
+
+test('POST /api/brief/seen serializes concurrent marks so none are lost', async () => {
+  let disk: BriefSeenStore = { seen: {}, updatedAt: null };
+  process.env.SESSION_SECRET = 'test-secret';
+  process.env.MVP_PASSWORD = 'pw';
+  delete process.env.MVP_PASSWORD_HASH;
+  const { createApp } = await import('./app.js');
+  const app = createApp({
+    ...briefReads({
+      articles: [],
+      records: ['k1', 'k2', 'k3'].map((id) => keptRecord(id, ['t1'])),
+    }),
+    readBriefSeen: async () => {
+      const snapshot = structuredClone(disk);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      return snapshot;
+    },
+    writeBriefSeen: async (store) => {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      disk = store;
+    },
+  });
+  const { baseUrl, close } = await startServer(app);
+  try {
+    const cookie = await login(baseUrl);
+    const responses = await Promise.all(
+      ['k1', 'k2', 'k3'].map((id) => postJson(baseUrl, '/api/brief/seen', { articleIds: [id] }, cookie)),
+    );
+    for (const resp of responses) assert.equal(resp.status, 200);
+    assert.deepEqual(Object.keys(disk.seen).sort(), ['k1', 'k2', 'k3']);
+  } finally {
+    await close();
+  }
+});
+
+test('POST /api/brief/stories/:articleId/summary maps results to 200 / 404 / 429 / 502 and requires session', async () => {
+  const calls: string[] = [];
+  const results: Record<string, SummarizeBriefStoryResult> = {
+    ok: {
+      ok: true,
+      summary: {
+        articleId: 'ok',
+        status: 'ok',
+        text: 'Officials said talks resumed on Tuesday.',
+        sourceArticleId: 'ok',
+        sourceHash: 'abc',
+        model: 'm',
+        error: null,
+        generatedAt: BRIEF_RECENT,
+        trigger: 'on_demand',
+      },
+    },
+    none: { ok: false, code: 'not_in_brief', error: 'Story is not in the current Brief' },
+    busy: { ok: false, code: 'rate_limited', error: 'limit' },
+    broken: { ok: false, code: 'error', error: 'Ollama not configured' },
+  };
+  const { baseUrl, close } = await startSeenServer({
+    articles: [],
+    summarizeBriefStory: async (articleId) => {
+      calls.push(articleId);
+      return results[articleId]!;
+    },
+  });
+  try {
+    const anonymous = await postJson(baseUrl, '/api/brief/stories/ok/summary', {});
+    assert.equal(anonymous.status, 401);
+
+    const cookie = await login(baseUrl);
+    const ok = await postJson(baseUrl, '/api/brief/stories/ok/summary', {}, cookie);
+    assert.equal(ok.status, 200);
+    assert.deepEqual(await ok.json(), {
+      ok: true,
+      summary: { status: 'ok', text: 'Officials said talks resumed on Tuesday.' },
+    });
+
+    const expected: Array<[string, number, string]> = [
+      ['none', 404, 'not_in_brief'],
+      ['busy', 429, 'rate_limited'],
+      ['broken', 502, 'error'],
+    ];
+    for (const [id, status, code] of expected) {
+      const resp = await postJson(baseUrl, `/api/brief/stories/${id}/summary`, {}, cookie);
+      assert.equal(resp.status, status, id);
+      const body = (await resp.json()) as { ok: boolean; error: string };
+      assert.equal(body.ok, false);
+      assert.equal(body.error, code);
+    }
+    assert.deepEqual(calls, ['ok', 'none', 'busy', 'broken']);
   } finally {
     await close();
   }

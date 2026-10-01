@@ -224,7 +224,7 @@ async function loadInitialData() {
 			// Keep all enabled categories (even if not in current batch - they'll show "no stories" message)
 			// But clean up disabled categories that no longer exist
 			validEnabledCategories = categorySettings.enabled;
-			console.log('📊 Keeping all enabled categories:', validEnabledCategories);
+			console.log('📊 Keeping all enabled categories:', $state.snapshot(validEnabledCategories));
 
 			// Clean up disabled categories that don't exist in current batch
 			const validDisabledCategories = categorySettings.disabled.filter((catId) =>

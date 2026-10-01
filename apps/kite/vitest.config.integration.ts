@@ -8,6 +8,7 @@ export default defineConfig({
     include: ['src/**/*.integration.test.{js,ts}'],
     environment: 'node',
     globals: true,
+    globalSetup: ['./src/tests/integration-stack.ts'],
     setupFiles: ['./src/tests/setup.integration.ts'],
     testTimeout: 10000, // Longer timeout for API calls
     pool: 'forks', // Use separate processes to avoid state pollution
@@ -15,7 +16,7 @@ export default defineConfig({
   resolve: {
     alias: {
       $lib: path.resolve('./src/lib'),
-      '$app/environment': path.resolve('./src/app.ts'),
+      '$app/environment': path.resolve('./src/tests/app-environment.ts'),
     },
   },
 });

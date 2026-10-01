@@ -15,14 +15,18 @@ Informed News is pivoting to an OSINT-oriented product shell:
 
 ```
 apps/kite (SvelteKit Brief UI)
-    ← owned brief adapter on mvp/server
+    ← owned brief adapter on mvp/server (topic Brief: sections per topic, docs/BRIEF.md)
 mvp/server (Express)
     → mvp/data/*.json
+    refresh (timer every REFRESH_INTERVAL_HOURS + startup catch-up + POST /api/fetch, single-flight):
     → CFP RSS + publisher scrape (+ optional xcancel)
     → topic search: Google News RSS + local SearXNG (docs/TOPIC_SEARCH.md)
     → triage: keyword/mute → dedupe → Jev headline → scrape survivors → Jev body (docs/TRIAGE.md)
+    → Brief summaries: Ollama, shown stories only (top 3 per topic at refresh, rest on demand)
     → Ollama Cloud (framing)
 ```
+
+The server starts an auto-refresh scheduler (`startRefreshScheduler` in `mvp/server/src/index.ts`) that spends real API budget (CFP, search, Jev, Ollama). Set `REFRESH_INTERVAL_HOURS=off` when you need the server up without refreshing. `npm run test:e2e:kite` and the Kite integration suite use their own hermetic stack (`e2e/stack/`: own ports, seeded temp data dir, generated env file with refresh off and no AI keys) — never the dev server, `mvp/data` or `mvp/.env`. `createApp` never starts timers.
 
 ### Layout
 
@@ -49,7 +53,8 @@ _legacy/
 - `npm run dev` — **mvp/server + Kite** (UI http://localhost:5173, API :3001)
 - `npm run typecheck` — `mvp/server`
 - `npm run test:kite` — provenance + default-entrypoint + retire-mvp-web checks
-- `npm run test:e2e:kite` — Playwright Brief smoke
+- `npm run test:e2e:kite` — Playwright Brief smoke (own seeded stack, Kite :5174)
+- `cd apps/kite && bun run check` — svelte-check (expect 0 errors, 0 warnings); `bun run test:unit` / `bun run test:integration` — Kite vitest
 
 Do **not** treat `_legacy/` (including `_legacy/mvp-web`) as the primary product UI.
 
@@ -107,7 +112,7 @@ Do **not** treat `_legacy/` (including `_legacy/mvp-web`) as the primary product
 
 Informed News work uses the **NEWS** project on Atlassian (`informedcrew.atlassian.net`). Prefer JQL `project = NEWS`.
 
-**Item ordering:** [docs/ROADMAP.md](docs/ROADMAP.md) — **Current next:** Epic **L** [NEWS-84](https://informedcrew.atlassian.net/browse/NEWS-84) topic-driven brief (topics → search → triage → Brief, no review queue): [NEWS-85](https://informedcrew.atlassian.net/browse/NEWS-85) topics, [NEWS-86](https://informedcrew.atlassian.net/browse/NEWS-86) topic search ingest, and [NEWS-87](https://informedcrew.atlassian.net/browse/NEWS-87) triage pipeline Done; next [NEWS-88](https://informedcrew.atlassian.net/browse/NEWS-88) Brief by topic. Epic **K** [NEWS-83](https://informedcrew.atlassian.net/browse/NEWS-83) stays open as bug intake. Epic **J** Done (claims desk parked by L); [NEWS-78](https://informedcrew.atlassian.net/browse/NEWS-78) Mark reviewed and [NEWS-79](https://informedcrew.atlassian.net/browse/NEWS-79) extract gating Done. Desk v1 (**NEWS-57**) Done-demo complete; Later children parked. Discernment: [docs/CLAIMS_DISCERNMENT.md](docs/CLAIMS_DISCERNMENT.md). Ask before parked Later or Epic **B**. Do not pick parked B–G epics unless the user reorders.
+**Item ordering:** [docs/ROADMAP.md](docs/ROADMAP.md) — **Current next:** Epic **L** [NEWS-84](https://informedcrew.atlassian.net/browse/NEWS-84) topic-driven brief (topics → search → triage → Brief, no review queue): [NEWS-85](https://informedcrew.atlassian.net/browse/NEWS-85) topics, [NEWS-86](https://informedcrew.atlassian.net/browse/NEWS-86) topic search ingest, [NEWS-87](https://informedcrew.atlassian.net/browse/NEWS-87) triage pipeline, and [NEWS-88](https://informedcrew.atlassian.net/browse/NEWS-88) Brief by topic Done; next [NEWS-89](https://informedcrew.atlassian.net/browse/NEWS-89) full stories (tap-to-expand). Epic **K** [NEWS-83](https://informedcrew.atlassian.net/browse/NEWS-83) stays open as bug intake. Epic **J** Done (claims desk parked by L); [NEWS-78](https://informedcrew.atlassian.net/browse/NEWS-78) Mark reviewed and [NEWS-79](https://informedcrew.atlassian.net/browse/NEWS-79) extract gating Done. Desk v1 (**NEWS-57**) Done-demo complete; Later children parked. Discernment: [docs/CLAIMS_DISCERNMENT.md](docs/CLAIMS_DISCERNMENT.md). Ask before parked Later or Epic **B**. Do not pick parked B–G epics unless the user reorders.
 
 **AI split (Epic J):** TypeSafe / Jev = structured judgments (Choice / Score / Noul + confidence). Ollama = claim-candidate proposal + Brief verbiage only — not classifier-of-record for claims. No Verified badges or claim verdicts.
 

@@ -1,4 +1,5 @@
 <script lang="ts">
+import type { Snippet } from 'svelte';
 import { browser } from '$app/environment';
 import { s } from '$lib/client/localization.svelte';
 import { createStoryLocalizer } from '$lib/client/storyLocalization.svelte';
@@ -37,6 +38,7 @@ interface Props {
 	isSharedView?: boolean;
 	isLinkedStory?: boolean; // Story opened from URL/link
 	isKeyboardSelected?: boolean; // Story selected via keyboard navigation
+	belowHeader?: Snippet; // Informed News glue (topic Brief badges / summary line)
 }
 
 let {
@@ -63,6 +65,7 @@ let {
 	isSharedView = false,
 	isLinkedStory = false,
 	isKeyboardSelected = false,
+	belowHeader,
 }: Props = $props();
 
 // Story element reference
@@ -254,6 +257,8 @@ $effect(() => {
       {unacceptPending}
     />
 
+    {@render belowHeader?.()}
+
     <!-- Expanded Content -->
     {#if isExpanded}
       <div
@@ -265,7 +270,7 @@ $effect(() => {
         {#if simplification.isLoading && simplification.isAutoSimplified}
           <StoryContentSkeleton readingLevel={simplification.defaultLevel} />
         {:else}
-          {#if (displayStory.talking_points?.length ?? 0) > 0 || (displayStory.timeline?.length ?? 0) > 0 || (displayStory.suggested_qna?.length ?? 0) > 0}
+          {#if (story.talking_points?.length ?? 0) > 0 || (story.timeline?.length ?? 0) > 0 || (story.suggested_qna?.length ?? 0) > 0}
             <div class="px-4 text-xs text-gray-500 dark:text-gray-400">AI-assisted — not ground truth.</div>
           {/if}
           <!-- Dynamic Sections based on user settings -->

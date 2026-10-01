@@ -13,13 +13,13 @@ export default defineConfig({
     setupFiles: ['./src/tests/setup.ts'],
     alias: {
       $lib: path.resolve('./src/lib'),
-      '$app/environment': path.resolve('./src/app.ts'),
+      '$app/environment': path.resolve('./src/tests/app-environment.ts'),
     },
   },
   resolve: {
     alias: {
       $lib: path.resolve('./src/lib'),
-      '$app/environment': path.resolve('./src/app.ts'),
+      '$app/environment': path.resolve('./src/tests/app-environment.ts'),
     },
     conditions: ['browser'],
   },

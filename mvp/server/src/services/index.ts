@@ -65,6 +65,58 @@ export type {
 } from './topicSearchIngest.js';
 export { listTriageRecords, runTriage, TRIAGE_LIST_MAX } from './triagePipeline.js';
 export type { TriageDeps, TriageListing, TriageResult } from './triagePipeline.js';
+export {
+  buildRefreshNotices,
+  composeTopicBrief,
+  isSignificantlyUpdated,
+  markBriefSeen,
+  summarySourceFor,
+} from './topicBrief.js';
+export type {
+  BriefLink,
+  BriefSection,
+  BriefStory,
+  BriefSummaryStatus,
+  BriefTopicRef,
+  ComposeTopicBriefInput,
+  SummarySource,
+  TopicBrief,
+} from './topicBrief.js';
+export {
+  OLLAMA_NOT_CONFIGURED,
+  buildSummaryPrompt,
+  parseSummaryOutput,
+  summarizeSource,
+} from './briefSummary.js';
+export type {
+  ParseSummaryResult,
+  SummarizeChat,
+  SummarizeDeps,
+  SummarizeResult,
+} from './briefSummary.js';
+export {
+  createOnDemandLimiter,
+  generateRefreshSummaries,
+  summarizeBriefStory,
+} from './briefSummaries.js';
+export type {
+  BriefSummaryDeps,
+  OnDemandLimiter,
+  SummarizeBriefStoryResult,
+} from './briefSummaries.js';
+export {
+  countByClusterIdFromArticles,
+  createRefreshRunner,
+  createTrackedStoriesSync,
+  getRefreshRunner,
+} from './refreshRunner.js';
+export type { RefreshResult, RefreshRunner, RefreshRunnerDeps } from './refreshRunner.js';
+export { isRefreshDue, startRefreshScheduler } from './refreshScheduler.js';
+export type {
+  IntervalHandle,
+  RefreshScheduler,
+  RefreshSchedulerDeps,
+} from './refreshScheduler.js';
 export { resolveGoogleNewsUrl } from './googleNewsResolve.js';
 export type {
   ResolveGoogleNewsUrlDeps,
@@ -139,8 +191,19 @@ export {
   ownedBriefFixtureArticles,
   filterArticlesForBrief,
   resolveOwnedBriefArticles,
+  buildBriefOverview,
+  buildTopicBriefBatchInfo,
+  buildTopicBriefCategoriesResponse,
+  buildTopicBriefStoriesResponse,
+  topicBriefToKiteStories,
+} from './kiteBriefAdapter.js';
+export type {
+  BriefDegradedStore,
+  BriefOverview,
+  TopicBriefResponseOptions,
 } from './kiteBriefAdapter.js';
 export { createKiteBriefRouter } from './kiteBriefRoutes.js';
+export type { CreateKiteBriefRouterDeps } from './kiteBriefRoutes.js';
 export { buildBriefClaimsFeed, loadBriefClaims } from './briefClaims.js';
 export type { BuildBriefClaimsFeedInput, LoadBriefClaimsDeps } from './briefClaims.js';
 

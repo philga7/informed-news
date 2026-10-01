@@ -71,7 +71,7 @@ describe('BatchService Integration Tests', () => {
 			expect(batchService.getCurrentBatchId()).toBe(null);
 
 			const testBatchId = 'test-batch-123';
-			batchService.setTimeTravelBatch(testBatchId);
+			batchService.setTimeTravelBatch(testBatchId, null, null, true);
 
 			expect(batchService.isTimeTravelMode()).toBe(true);
 			expect(batchService.getCurrentBatchId()).toBe(testBatchId);

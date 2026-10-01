@@ -1,6 +1,11 @@
 import { env } from '$env/dynamic/private';
 import type { RequestHandler } from '@sveltejs/kit';
 
+// Captured at server start (imported by hooks.server.ts): in dev, SvelteKit swaps
+// globalThis.fetch during every async SSR render, so a proxy call overlapping a render
+// would otherwise trip its "Avoid calling fetch eagerly" warning.
+const upstreamFetch: typeof fetch = globalThis.fetch;
+
 /**
  * Upstream brief API. Default: local mvp/server owned brief (NEWS-44).
  * Opt-in CC BY-NC Kagi data: KITE_API_BASE=https://kite.kagi.com/api
@@ -45,7 +50,7 @@ export function createProxy(endpoint: string): RequestHandler {
       proxyRequest.headers.delete('host');
       
       // Make the request to the configured brief API
-      const response = await fetch(proxyRequest);
+      const response = await upstreamFetch(proxyRequest);
       
       // Create a new headers object and remove problematic encoding headers
       const headers = new Headers(response.headers);

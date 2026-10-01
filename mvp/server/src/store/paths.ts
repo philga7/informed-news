@@ -3,8 +3,13 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-/** Absolute path to mvp/data (sibling of mvp/server) */
-export const DATA_DIR = path.resolve(__dirname, '../../../data');
+/**
+ * Absolute path to mvp/data (sibling of mvp/server). `MVP_DATA_DIR` overrides it
+ * (e2e stack); read at import, so it must be set in the process env, not mvp/.env.
+ */
+export const DATA_DIR = process.env.MVP_DATA_DIR?.trim()
+  ? path.resolve(process.env.MVP_DATA_DIR.trim())
+  : path.resolve(__dirname, '../../../data');
 
 export const ARTICLES_PATH = path.join(DATA_DIR, 'articles.json');
 export const META_PATH = path.join(DATA_DIR, 'meta.json');
@@ -18,6 +23,8 @@ export const MUTE_RULES_PATH = path.join(DATA_DIR, 'mute-rules.json');
 export const TOPICS_PATH = path.join(DATA_DIR, 'topics.json');
 export const GOOGLE_NEWS_URL_CACHE_PATH = path.join(DATA_DIR, 'google-news-url-cache.json');
 export const TRIAGE_PATH = path.join(DATA_DIR, 'triage.json');
+export const BRIEF_SUMMARIES_PATH = path.join(DATA_DIR, 'brief-summaries.json');
+export const BRIEF_SEEN_PATH = path.join(DATA_DIR, 'brief-seen.json');
 
 export const CLAIMS_PATH = path.join(DATA_DIR, 'claims.json');
 export const EVIDENCE_LINKS_PATH = path.join(DATA_DIR, 'evidence-links.json');

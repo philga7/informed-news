@@ -24,6 +24,7 @@ export default defineConfig({
           name: 'integration',
           include: ['src/**/*.integration.test.{js,ts}'],
           environment: 'node',
+          globalSetup: ['./src/tests/integration-stack.ts'],
           setupFiles: ['./src/tests/setup.integration.ts'],
           pool: 'forks',
           testTimeout: 10000,
@@ -34,7 +35,7 @@ export default defineConfig({
   resolve: {
     alias: {
       $lib: path.resolve('./src/lib'),
-      '$app/environment': path.resolve('./src/app.ts'),
+      '$app/environment': path.resolve('./src/tests/app-environment.ts'),
     },
   },
 });
