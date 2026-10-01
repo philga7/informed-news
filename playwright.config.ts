@@ -1,8 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
+import { E2E_API_PORT, E2E_DATA_DIR, E2E_KITE_PORT } from './e2e/stack/config.mjs';
 
-const kitePort = Number(process.env.KITE_PORT ?? 5173);
 // Use localhost (not 127.0.0.1): Vite may bind IPv6-only on macOS.
-const baseURL = `http://localhost:${kitePort}`;
+const baseURL = `http://localhost:${E2E_KITE_PORT}`;
 
 export default defineConfig({
 	testDir: './e2e',
@@ -22,20 +22,21 @@ export default defineConfig({
 		},
 	],
 	webServer: {
-		// Owned brief requires mvp/server + Kite (NEWS-44).
-		command: `npm run dev`,
+		// Hermetic stack (e2e/stack): own ports + seeded data dir + generated env file,
+		// never the dev server, mvp/data or mvp/.env — so no live budget and no data-dependent skips.
+		command: 'node e2e/stack/start.mjs',
 		url: baseURL,
-		reuseExistingServer: !process.env.CI,
+		reuseExistingServer: false,
 		timeout: 180_000,
-		// A startup catch-up refresh would spend real CFP / search / Jev / Ollama budget.
-		// mvp/.env still wins if it sets REFRESH_INTERVAL_HOURS (dotenv override: true).
 		env: {
 			...Object.fromEntries(
 				Object.entries(process.env).filter(
 					(entry): entry is [string, string] => entry[1] !== undefined,
 				),
 			),
-			REFRESH_INTERVAL_HOURS: 'off',
+			E2E_API_PORT: String(E2E_API_PORT),
+			E2E_KITE_PORT: String(E2E_KITE_PORT),
+			E2E_DATA_DIR,
 		},
 	},
 });

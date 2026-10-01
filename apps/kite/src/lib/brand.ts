@@ -172,9 +172,9 @@ export const BRAND_STRING_OVERRIDES: LocaleMap = {
 
 export function applyBrandOverrides<T extends LocaleMap>(strings: T | undefined | null): T {
 	if (!strings) return { ...BRAND_STRING_OVERRIDES } as T;
-	const next = { ...strings };
+	const next: LocaleMap = { ...strings };
 	for (const [key, entry] of Object.entries(BRAND_STRING_OVERRIDES)) {
 		next[key] = { ...entry };
 	}
-	return next;
+	return next as T;
 }

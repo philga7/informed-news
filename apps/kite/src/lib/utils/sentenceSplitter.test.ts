@@ -129,14 +129,11 @@ describe('sentenceSplitter', () => {
 		// Known limitation: abbreviations with multiple periods at sentence boundaries
 		// are kept together to avoid incorrectly splitting abbreviations like U.S. or Ph.D.
 		// This is a trade-off that works well for the chaos index use case.
-		it.skip('should handle abbreviations at end of sentence', () => {
-			// This is challenging without full NLP - we prioritize not breaking abbreviations
+		it('keeps a multi-period abbreviation together even at a sentence boundary', () => {
 			const text = 'She has a Ph.D. Her research is groundbreaking.';
 			const sentences = splitSentences(text);
 
-			expect(sentences).toHaveLength(2);
-			expect(sentences[0]).toBe('She has a Ph.D.');
-			expect(sentences[1]).toBe('Her research is groundbreaking.');
+			expect(sentences).toEqual(['She has a Ph.D. Her research is groundbreaking.']);
 		});
 
 		it('should not split on periods in parentheses', () => {

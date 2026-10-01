@@ -4,6 +4,7 @@
  */
 
 import { browser } from '$app/environment';
+import { FEATURES } from '$lib/features';
 
 export type BatchNotification = {
 	type: 'new_batch';
@@ -24,7 +25,7 @@ class BatchNotificationService {
 	 * Connect to SSE endpoint and start listening for batch notifications
 	 */
 	connect(): void {
-		if (!browser) return;
+		if (!browser || !FEATURES.kagiBatchPush) return;
 
 		// Don't reconnect if already connected or connecting
 		if (this.eventSource?.readyState === EventSource.OPEN || this.isConnecting) {

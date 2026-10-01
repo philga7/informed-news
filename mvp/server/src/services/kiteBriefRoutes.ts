@@ -22,6 +22,7 @@ import {
   type BriefDegradedStore,
   buildBriefOverview,
   buildOwnedBatchInfo,
+  buildOwnedCategoryMetadata,
   buildOwnedCategoriesResponse,
   buildOwnedStoriesResponse,
   buildTopicBriefBatchInfo,
@@ -244,6 +245,14 @@ export function createKiteBriefRouter(
       const message = err instanceof Error ? err.message : String(err);
       res.status(500).json({ error: message });
     }
+  });
+
+  router.get('/categories/metadata', (_req, res) => {
+    res.json(buildOwnedCategoryMetadata());
+  });
+
+  router.get('/chaos/history', (_req, res) => {
+    res.json([]);
   });
 
   router.get('/batches/:batchId/chaos', (_req, res) => {

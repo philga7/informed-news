@@ -39,9 +39,12 @@ Read the source of truth: [`apps/kite/UPSTREAM.md`](../apps/kite/UPSTREAM.md).
    npm run kite
    # open http://localhost:5173
    npm run test:kite
+   (cd apps/kite && bun run check && bun run test:unit && bun run test:integration)
    npx playwright install chromium   # once per machine
    npm run test:e2e:kite
    ```
+
+   A bump must keep `bun run check` at 0 errors / 0 warnings. Upstream ships `src/app.ts` (a test mock) next to `src/app.d.ts`, which makes TypeScript silently drop every global in `app.d.ts`; the mock lives at `src/tests/app-environment.ts` — re-move it if a bump restores `src/app.ts`.
 
 6. Open a PR that only bumps the pin (+ any required glue). Avoid drive-by rewrites of upstream files.
 

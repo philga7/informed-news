@@ -26,7 +26,7 @@ mvp/server (Express)
     → Ollama Cloud (framing)
 ```
 
-The server starts an auto-refresh scheduler (`startRefreshScheduler` in `mvp/server/src/index.ts`) that spends real API budget (CFP, search, Jev, Ollama). Set `REFRESH_INTERVAL_HOURS=off` when you need the server up without refreshing. The e2e config (`playwright.config.ts`) already does this for `npm run test:e2e:kite`; `mvp/.env` wins if it sets the key. `createApp` never starts timers.
+The server starts an auto-refresh scheduler (`startRefreshScheduler` in `mvp/server/src/index.ts`) that spends real API budget (CFP, search, Jev, Ollama). Set `REFRESH_INTERVAL_HOURS=off` when you need the server up without refreshing. `npm run test:e2e:kite` and the Kite integration suite use their own hermetic stack (`e2e/stack/`: own ports, seeded temp data dir, generated env file with refresh off and no AI keys) — never the dev server, `mvp/data` or `mvp/.env`. `createApp` never starts timers.
 
 ### Layout
 
@@ -53,7 +53,8 @@ _legacy/
 - `npm run dev` — **mvp/server + Kite** (UI http://localhost:5173, API :3001)
 - `npm run typecheck` — `mvp/server`
 - `npm run test:kite` — provenance + default-entrypoint + retire-mvp-web checks
-- `npm run test:e2e:kite` — Playwright Brief smoke
+- `npm run test:e2e:kite` — Playwright Brief smoke (own seeded stack, Kite :5174)
+- `cd apps/kite && bun run check` — svelte-check (expect 0 errors, 0 warnings); `bun run test:unit` / `bun run test:integration` — Kite vitest
 
 Do **not** treat `_legacy/` (including `_legacy/mvp-web`) as the primary product UI.
 

@@ -47,8 +47,11 @@ global.localStorage = localStorageMock as any;
 
 // Mock OverlayScrollbars
 vi.mock('overlayscrollbars', () => ({
-  OverlayScrollbars: vi.fn(() => ({
-    options: vi.fn(),
-    destroy: vi.fn()
-  }))
+  OverlayScrollbars: Object.assign(
+    vi.fn(() => ({
+      options: vi.fn(),
+      destroy: vi.fn()
+    })),
+    { valid: vi.fn(() => false) }
+  )
 }));

@@ -581,6 +581,29 @@ export function buildOwnedStoriesResponse(
   };
 }
 
+export type KiteCategoryMetadataResponse = {
+  categories: Array<{
+    categoryId: string;
+    categoryType: 'core' | 'community';
+    isCore: boolean;
+    displayName: string;
+  }>;
+};
+
+/** Kite `/api/categories/metadata`: the single owned Brief category. */
+export function buildOwnedCategoryMetadata(): KiteCategoryMetadataResponse {
+  return {
+    categories: [
+      {
+        categoryId: OWNED_CATEGORY_SLUG,
+        categoryType: 'core',
+        isCore: true,
+        displayName: OWNED_CATEGORY_NAME,
+      },
+    ],
+  };
+}
+
 /**
  * Keep articles whose Brief cluster key is in the accepted membership set.
  */

@@ -30,6 +30,7 @@ const CORE_FEEDS_URL =
 let { data } = $props();
 
 // State: onboarding (SSR-safe via cookie)
+// svelte-ignore state_referenced_locally - initial cookie value only; the page owns it afterwards
 let showOnboarding = $state(!data.hasSeenOnboarding);
 
 // State: data loading

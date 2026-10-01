@@ -1,6 +1,11 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
+import {
+	E2E_API_PORT,
+	E2E_DATA_DIR,
+	E2E_KITE_PORT,
+	E2E_MVP_PASSWORD,
+} from './stack/config.mjs';
+import { TOPIC_SCENARIO, writeScenario } from './stack/scenarios.mjs';
 
 type BriefOverview = {
 	ok: boolean;
@@ -9,6 +14,59 @@ type BriefOverview = {
 	sections: Array<{ topicId: string; name: string; storyIds: string[]; moreIds: string[] }>;
 	quiet: Array<{ id: string; name: string }>;
 };
+
+type KiteStory = {
+	id?: string;
+	title?: string;
+	cluster_number?: number;
+	primary_image?: { url?: string; caption?: string };
+	articles?: Array<{ image?: string }>;
+	domains?: Array<{ name: string }>;
+	perspectives?: unknown[];
+	talking_points?: unknown[];
+	timeline?: unknown[];
+	suggested_qna?: unknown[];
+	informed_article_id?: string;
+	informed_summary_status?: string;
+};
+
+function useScenario(name: 'topics' | 'empty'): void {
+	writeScenario(E2E_DATA_DIR, name, { imageBaseUrl: `http://localhost:${E2E_KITE_PORT}` });
+}
+
+/** Kite proxy → owned batch → first category → its stories. */
+async function loadOwnedStories(page: Page): Promise<KiteStory[]> {
+	const latest = await page.request.get('/api/batches/latest');
+	expect(latest.ok()).toBeTruthy();
+	const batch = (await latest.json()) as { id?: string };
+	expect(batch.id).toBe('owned-latest');
+
+	const categories = await page.request.get(`/api/batches/${batch.id}/categories`);
+	expect(categories.ok()).toBeTruthy();
+	const catBody = (await categories.json()) as {
+		categories?: Array<{ id: string; categoryId?: string; categoryName?: string }>;
+	};
+	expect(catBody.categories?.[0]?.categoryId).toBe('world');
+	expect(catBody.categories?.[0]?.categoryName).toBe('Brief');
+	const categoryUuid = catBody.categories?.[0]?.id;
+	expect(categoryUuid, 'expected first owned category id').toBeTruthy();
+
+	const storiesRes = await page.request.get(
+		`/api/batches/${batch.id}/categories/${categoryUuid}/stories?limit=12`,
+	);
+	expect(storiesRes.ok()).toBeTruthy();
+	const body = (await storiesRes.json()) as { stories?: KiteStory[] };
+	expect(Array.isArray(body.stories)).toBeTruthy();
+	return body.stories ?? [];
+}
+
+function watchKagiRequests(page: Page): string[] {
+	const kagiHosts: string[] = [];
+	page.on('request', (req) => {
+		if (req.url().includes('kite.kagi.com')) kagiHosts.push(req.url());
+	});
+	return kagiHosts;
+}
 
 test.describe('Informed News shell branding (NEWS-45)', () => {
 	test('Brief chrome uses Informed News title, not Kagi News', async ({ page }) => {
@@ -20,248 +78,123 @@ test.describe('Informed News shell branding (NEWS-45)', () => {
 	});
 });
 
-test.describe('Owned brief (NEWS-44)', () => {
-	test('Owned brief stories expose primary_image or article image (NEWS-52)', async ({
-		page,
-	}) => {
-		// Ensure Kite UI is up (webServer from playwright config) so relative
-		// page.request calls resolve against the same origin.
+test.describe('Topic Brief (NEWS-88)', () => {
+	test.beforeEach(() => useScenario('topics'));
+
+	test('topic Brief stories expose primary_image (NEWS-52)', async ({ page }) => {
 		await page.goto('/');
 		await expect(page).toHaveTitle(/Informed News/i, { timeout: 60_000 });
 
-		const latest = await page.request.get('/api/batches/latest');
-		expect(latest.ok()).toBeTruthy();
-		const batch = (await latest.json()) as { id?: string };
-		expect(batch.id).toBe('owned-latest');
-
-		const categories = await page.request.get(`/api/batches/${batch.id}/categories`);
-		expect(categories.ok()).toBeTruthy();
-		const catBody = (await categories.json()) as {
-			categories?: Array<{ id: string; categoryId?: string; categoryName?: string }>;
-		};
-		expect(catBody.categories?.[0]?.categoryId).toBe('world');
-		expect(catBody.categories?.[0]?.categoryName).toBe('Brief');
-		const categoryUuid = catBody.categories?.[0]?.id as string | undefined;
-		expect(categoryUuid, 'expected first owned category id').toBeTruthy();
-
-		const storiesRes = await page.request.get(
-			`/api/batches/${batch.id}/categories/${categoryUuid}/stories?limit=12`,
-		);
-		expect(storiesRes.ok()).toBeTruthy();
-		const storiesBody = (await storiesRes.json()) as { stories?: Array<any> };
-		const stories = storiesBody.stories ?? [];
-		expect(Array.isArray(stories)).toBeTruthy();
-		if (stories.length === 0) {
-			test.skip(true, 'topic Brief has no visible stories; image smoke needs kept stories or the fixture');
-			return;
-		}
-
-		const hasPrimaryImageUrl = stories.some((s: any) => {
-			const url = s?.primary_image?.url;
-			return typeof url === 'string' && url.trim().length > 0;
-		});
-		const hasArticleImage = stories.some((s: any) => {
-			const articles = s?.articles;
-			return (
-				Array.isArray(articles) &&
-				articles.some((a: any) => {
-					const img = a?.image;
-					return typeof img === 'string' && img.trim().length > 0;
-				})
-			);
-		});
-
-		if (!hasPrimaryImageUrl && !hasArticleImage) {
-			test.skip(
-				true,
-				'owned brief has no primary_image.url or articles[].image; primary-image smoke requires fixture or live scrape images',
-			);
-			return;
-		}
-
-		expect(
-			hasPrimaryImageUrl || hasArticleImage,
-			'expected at least one story with primary_image.url or at least one member with articles[].image',
-		).toBeTruthy();
-
-		// If primary_image exists, assert it is well-formed without depending on CDN image loads.
-		const storyWithPrimary = stories.find(
-			(s: any) =>
-				typeof s?.primary_image?.url === 'string' &&
-				s.primary_image.url.trim().length > 0,
-		);
-		if (storyWithPrimary) {
-			expect(typeof storyWithPrimary.primary_image.caption).toBe('string');
-			expect(storyWithPrimary.primary_image.caption.trim().length).toBeGreaterThan(
-				0,
-			);
+		const stories = await loadOwnedStories(page);
+		expect(stories.length).toBe(5);
+		for (const story of stories) {
+			expect(story.primary_image?.url, `${story.title} primary_image.url`).toBeTruthy();
+			expect(story.primary_image?.caption?.trim().length ?? 0).toBeGreaterThan(0);
 		}
 	});
 
-	test('Brief cold path does not require kite.kagi.com', async ({ page }) => {
-		const kagiHosts: string[] = [];
-		page.on('request', (req) => {
-			const url = req.url();
-			if (url.includes('kite.kagi.com')) {
-				kagiHosts.push(url);
-			}
-		});
-
+	test('sections, More, quiet topics, summaries and refresh bar render without kite.kagi.com', async ({
+		page,
+	}) => {
+		const kagiHosts = watchKagiRequests(page);
 		await page.goto('/');
 		await expect(page).toHaveTitle(/Informed News/i, { timeout: 60_000 });
 
-		// Local proxy → mvp/server owned batch
-		const latest = await page.request.get('/api/batches/latest');
-		expect(latest.ok()).toBeTruthy();
-		const batch = await latest.json();
-		expect(batch.id).toBe('owned-latest');
-
-		const categories = await page.request.get(
-			`/api/batches/${batch.id}/categories`,
-		);
-		expect(categories.ok()).toBeTruthy();
-		const catBody = await categories.json();
-		expect(catBody.categories?.[0]?.categoryId).toBe('world');
-		expect(catBody.categories?.[0]?.categoryName).toBe('Brief');
-		const categoryUuid = catBody.categories[0].id as string;
-
-		const stories = await page.request.get(
-			`/api/batches/${batch.id}/categories/${categoryUuid}/stories?limit=12`,
-		);
-		expect(stories.ok()).toBeTruthy();
-		const storiesBody = await stories.json();
-		expect(Array.isArray(storiesBody.stories)).toBeTruthy();
-
-		// Topic Brief layout (NEWS-88)
+		const stories = await loadOwnedStories(page);
 		const overviewRes = await page.request.get('/api/brief/overview');
 		expect(overviewRes.ok()).toBeTruthy();
 		const overview = (await overviewRes.json()) as BriefOverview;
 		expect(overview.ok).toBe(true);
-		expect(Array.isArray(overview.sections)).toBeTruthy();
-		expect(Array.isArray(overview.quiet)).toBeTruthy();
-		expect(Array.isArray(overview.notices)).toBeTruthy();
+		expect(overview.fixture).toBe(false);
+		expect(overview.sections.map((s) => s.name)).toEqual(
+			TOPIC_SCENARIO.sections.map((s) => s.name),
+		);
+		expect(overview.sections[0]!.storyIds).toHaveLength(3);
+		expect(overview.sections[0]!.moreIds).toHaveLength(TOPIC_SCENARIO.gridMoreCount);
+		expect(overview.quiet.map((q) => q.name)).toEqual(TOPIC_SCENARIO.quiet.map((q) => q.name));
 
-		if (overview.fixture) {
-			// Empty article store: the fixture story renders in the plain list.
-			expect(storiesBody.stories.length).toBeGreaterThan(0);
-			expect(storiesBody.stories[0].title).toBeTruthy();
-		} else {
-			const storyIds = new Set(
-				storiesBody.stories.map((s: { id?: string }) => s.id),
-			);
-			for (const section of overview.sections) {
-				for (const id of [...section.storyIds, ...section.moreIds]) {
-					expect(storyIds.has(id), `overview story ${id} missing from stories`).toBeTruthy();
-				}
-			}
-			for (const story of storiesBody.stories) {
-				expect(story.informed_article_id).toBe(story.id);
-				expect(['ok', 'missing', 'unavailable']).toContain(story.informed_summary_status);
-			}
-
-			await expect(page.getByTestId('brief-refresh-bar')).toBeVisible({ timeout: 60_000 });
-			await expect(
-				page.getByTestId('brief-refresh-bar').getByRole('button', { name: /^Refresh/ }),
-			).toBeVisible();
-
-			if (overview.sections.length > 0) {
-				await expect(
-					page
-						.getByTestId('topic-brief-section')
-						.first()
-						.getByRole('heading', { name: overview.sections[0]!.name, exact: true }),
-				).toBeVisible();
-			} else if (overview.quiet.length > 0) {
-				await expect(page.getByTestId('topic-brief-quiet')).toContainText('Nothing new:');
-			} else {
-				await expect(page.getByText('No topics yet.')).toBeVisible();
+		const storyIds = new Set(stories.map((s) => s.id));
+		for (const section of overview.sections) {
+			for (const id of [...section.storyIds, ...section.moreIds]) {
+				expect(storyIds.has(id), `overview story ${id} missing from stories`).toBeTruthy();
 			}
 		}
-
-		expect(
-			kagiHosts,
-			`unexpected kite.kagi.com requests: ${kagiHosts.join(', ')}`,
-		).toEqual([]);
-
-		const hasTalkingPoints = storiesBody.stories.some(
-			(s: { talking_points?: unknown }) =>
-				Array.isArray(s.talking_points) && s.talking_points.length > 0,
-		);
-		const hasTimeline = storiesBody.stories.some(
-			(s: { timeline?: unknown }) => Array.isArray(s.timeline) && s.timeline.length > 0,
-		);
-		const hasSuggestedQna = storiesBody.stories.some(
-			(s: { suggested_qna?: unknown }) =>
-				Array.isArray(s.suggested_qna) && s.suggested_qna.length > 0,
-		);
-
-		if (!hasTalkingPoints) {
-			test.skip(
-				true,
-				'owned brief has no enriched stories (talking_points/timeline/suggested_qna); enrich smoke requires fixture or enriched live data',
-			);
-			return;
+		for (const story of stories) {
+			expect(story.informed_article_id).toBe(story.id);
 		}
-		expect(hasTimeline, 'expected at least one story with timeline[]').toBeTruthy();
-		expect(hasSuggestedQna, 'expected at least one story with suggested_qna[]').toBeTruthy();
+		expect(stories.map((s) => s.informed_summary_status).sort()).toEqual([
+			'missing',
+			'missing',
+			'missing',
+			'ok',
+			'unavailable',
+		]);
 
-		const storyToOpen = storiesBody.stories.find(
-			(s: {
-				cluster_number?: number;
-				talking_points?: unknown;
-				timeline?: unknown;
-				suggested_qna?: unknown;
-			}) =>
-				(Array.isArray(s.talking_points) && s.talking_points.length > 0) ||
-				(Array.isArray(s.timeline) && s.timeline.length > 0) ||
-				(Array.isArray(s.suggested_qna) && s.suggested_qna.length > 0),
-		);
-		expect(storyToOpen?.cluster_number, 'expected an enriched story to open').toBeTruthy();
+		const bar = page.getByTestId('brief-refresh-bar');
+		await expect(bar).toBeVisible({ timeout: 60_000 });
+		await expect(bar.getByRole('button', { name: /^Refresh/ })).toBeVisible();
 
-		// Owned brief stories payload should expose at least one domains entry
-		// (either from live ingest or the fixture cluster).
-		const storiesWithDomains = storiesBody.stories.filter(
-			(s: { domains?: Array<{ name: string }> }) =>
-				Array.isArray(s.domains) && s.domains.length >= 1,
-		);
-		expect(
-			storiesWithDomains.length,
-			'expected at least one story with domains[] from owned adapter',
-		).toBeGreaterThan(0);
+		const sections = page.getByTestId('topic-brief-section');
+		await expect(sections).toHaveCount(2);
+		const grid = sections.first();
+		await expect(
+			grid.getByRole('heading', { name: TOPIC_SCENARIO.sections[0]!.name, exact: true }),
+		).toBeVisible();
+		await expect(grid.getByText(TOPIC_SCENARIO.summaryText)).toBeVisible();
+		await expect(grid.getByText('AI summary — not ground truth')).toBeVisible();
 
-		// Owned brief stories payload should expose at least one perspectives entry
-		// (either from live ingest or the fixture multi-member cluster).
-		// Skip the smoke check entirely when there are no multi-member clusters yet.
-		const hasClusteredStory = storiesBody.stories.some(
-			(s: { articles?: Array<unknown> }) =>
-				Array.isArray(s.articles) && s.articles.length > 1,
-		);
-		if (!hasClusteredStory) {
-			test.skip(
-				true,
-				'owned brief has no multi-member clusters; perspectives smoke requires a cluster',
-			);
-		}
+		const more = grid.getByRole('button', { name: `More (${TOPIC_SCENARIO.gridMoreCount})` });
+		await expect(more).toHaveAttribute('aria-expanded', 'false');
+		await expect(grid.getByText('Regulator opens review of overnight tariffs')).toHaveCount(0);
+		await more.click();
+		await expect(grid.getByText('Regulator opens review of overnight tariffs')).toBeVisible();
 
-		const storiesWithPerspectives = storiesBody.stories.filter(
-			(s: { perspectives?: Array<unknown> }) =>
-				Array.isArray(s.perspectives) && s.perspectives.length >= 1,
+		await expect(sections.nth(1).getByText(TOPIC_SCENARIO.duplicateOutletBadge)).toBeVisible();
+		await expect(page.getByTestId('topic-brief-quiet')).toContainText(
+			`Nothing new: ${TOPIC_SCENARIO.quiet[0]!.name}`,
 		);
-		expect(
-			storiesWithPerspectives.length,
-			'expected at least one story with perspectives[] from owned adapter',
-		).toBeGreaterThan(0);
 
-		// Expand an enriched story and verify the concise honesty copy appears.
-		const storyCard = page.locator(
-			`article#story-${(storyToOpen as { cluster_number: number }).cluster_number}`,
-		);
+		expect(kagiHosts, `unexpected kite.kagi.com requests: ${kagiHosts.join(', ')}`).toEqual([]);
+	});
+});
+
+test.describe('Owned brief fixture (NEWS-44, NEWS-51)', () => {
+	test.beforeEach(() => useScenario('empty'));
+
+	test('empty store serves the enriched fixture cluster without kite.kagi.com', async ({
+		page,
+	}) => {
+		const kagiHosts = watchKagiRequests(page);
+		await page.goto('/');
+		await expect(page).toHaveTitle(/Informed News/i, { timeout: 60_000 });
+
+		const overviewRes = await page.request.get('/api/brief/overview');
+		expect(overviewRes.ok()).toBeTruthy();
+		expect(((await overviewRes.json()) as BriefOverview).fixture).toBe(true);
+
+		const stories = await loadOwnedStories(page);
+		expect(stories.length).toBeGreaterThan(0);
+		const story = stories[0]!;
+		expect(story.title).toBeTruthy();
+		expect(story.primary_image?.url).toBeTruthy();
+		expect(story.primary_image?.caption?.trim().length ?? 0).toBeGreaterThan(0);
+		expect(story.talking_points?.length ?? 0).toBeGreaterThan(0);
+		expect(story.timeline?.length ?? 0).toBeGreaterThan(0);
+		expect(story.suggested_qna?.length ?? 0).toBeGreaterThan(0);
+		expect(story.domains?.length ?? 0).toBeGreaterThan(0);
+		expect(story.articles?.length ?? 0).toBeGreaterThan(1);
+		expect(story.perspectives?.length ?? 0).toBeGreaterThan(0);
+		expect(story.cluster_number, 'expected an enriched story to open').toBeTruthy();
+
+		const storyCard = page.locator(`article#story-${story.cluster_number}`);
 		await expect(storyCard).toBeVisible({ timeout: 60_000 });
 		await storyCard.scrollIntoViewIfNeeded();
 		await storyCard.locator('button[aria-label="Expand story"]').click();
 		await expect(page.getByText('AI-assisted — not ground truth.')).toBeVisible({
 			timeout: 60_000,
 		});
+
+		expect(kagiHosts, `unexpected kite.kagi.com requests: ${kagiHosts.join(', ')}`).toEqual([]);
 	});
 });
 
@@ -337,6 +270,13 @@ test.describe('Nav shell (NEWS-42)', () => {
 			timeout: 60_000,
 		});
 	});
+
+	test('dated batch/category deep links and /contribute render', async ({ page }) => {
+		for (const path of ['/2026-09-30/world', '/contribute']) {
+			const res = await page.goto(path);
+			expect(res?.status(), path).toBe(200);
+		}
+	});
 });
 
 test.describe('Transparency page (NEWS-32)', () => {
@@ -360,24 +300,14 @@ test.describe('Transparency page (NEWS-32)', () => {
 });
 
 test.describe('MVP API compat (NEWS-43)', () => {
-	const apiBase = `http://127.0.0.1:${process.env.PORT ?? 3001}`;
+	const apiBase = `http://127.0.0.1:${E2E_API_PORT}`;
 
-	function readMvpPassword(): string | undefined {
-		if (process.env.MVP_PASSWORD) return process.env.MVP_PASSWORD;
-		try {
-			const env = readFileSync(join(process.cwd(), 'mvp/.env'), 'utf8');
-			const match = env.match(/^MVP_PASSWORD=(.*)$/m);
-			return match?.[1]?.trim().replace(/^["']|["']$/g, '');
-		} catch {
-			return undefined;
-		}
-	}
+	test.beforeEach(() => useScenario('topics'));
 
 	test('health is public; articles JSON reachable with session while Kite runs', async ({
 		page,
 		request,
 	}) => {
-		// Kite UI is up (webServer from playwright.config).
 		await page.goto('/');
 		await expect(page).toHaveTitle(/Informed News|News Briefs|World/i, { timeout: 60_000 });
 
@@ -387,25 +317,20 @@ test.describe('MVP API compat (NEWS-43)', () => {
 		expect(healthBody.status).toBe('ok');
 		expect(healthBody.app).toBe('mvp-server');
 
-		const password = readMvpPassword();
-		test.skip(!password, 'mvp/.env MVP_PASSWORD required for articles check');
-
 		const login = await request.post(`${apiBase}/api/login`, {
-			data: { password },
+			data: { password: E2E_MVP_PASSWORD },
 		});
 		expect(login.ok()).toBeTruthy();
 
 		const articlesRes = await request.get(`${apiBase}/api/articles`);
 		expect(articlesRes.ok()).toBeTruthy();
-		const articlesBody = await articlesRes.json();
-		expect(Array.isArray(articlesBody.articles)).toBeTruthy();
+		const articlesBody = (await articlesRes.json()) as { articles: Array<{ id: string }> };
+		expect(articlesBody.articles.length).toBeGreaterThan(0);
 
-		if (articlesBody.articles.length > 0) {
-			const id = articlesBody.articles[0].id as string;
-			const one = await request.get(`${apiBase}/api/articles/${id}`);
-			expect(one.ok()).toBeTruthy();
-			const oneBody = await one.json();
-			expect(oneBody.article?.id).toBe(id);
-		}
+		const id = articlesBody.articles[0]!.id;
+		const one = await request.get(`${apiBase}/api/articles/${id}`);
+		expect(one.ok()).toBeTruthy();
+		const oneBody = await one.json();
+		expect(oneBody.article?.id).toBe(id);
 	});
 });

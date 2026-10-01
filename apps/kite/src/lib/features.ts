@@ -16,4 +16,6 @@ export const FEATURES = {
 	kagiAssistant: false,
 	/** Settings → About mobile badges for Kagi News store listings */
 	kagiMobileApps: false,
+	/** New-batch push via `/api/sse/batches` (Kagi batch pipeline; the topic Brief polls its refresh instead) */
+	kagiBatchPush: false,
 } as const;

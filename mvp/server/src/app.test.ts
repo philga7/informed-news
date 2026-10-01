@@ -2295,6 +2295,21 @@ async function getJson<T>(url: string): Promise<T> {
   return (await resp.json()) as T;
 }
 
+test('GET /api/categories/metadata and /api/chaos/history: owned Brief category, no chaos history (public)', async () => {
+  const { baseUrl, close } = await startBriefRouter({ articles: [] });
+  try {
+    const metadata = await getJson<unknown>(`${baseUrl}/api/categories/metadata`);
+    assert.deepEqual(metadata, {
+      categories: [
+        { categoryId: 'world', categoryType: 'core', isCore: true, displayName: 'Brief' },
+      ],
+    });
+    assert.deepEqual(await getJson<unknown>(`${baseUrl}/api/chaos/history?days=7`), []);
+  } finally {
+    await close();
+  }
+});
+
 test('Kite brief: empty article store keeps the fixture path unchanged', async () => {
   const { baseUrl, close } = await startBriefRouter({ articles: [] });
   try {

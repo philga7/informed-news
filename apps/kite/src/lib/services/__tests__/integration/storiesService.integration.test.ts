@@ -55,7 +55,7 @@ describe('StoriesService Integration Tests', () => {
 			}
 		});
 
-		it('should respect the limit parameter', async () => {
+		it('returns every topic Brief story whatever the limit (docs/BRIEF.md)', async () => {
 			const batchData = await batchService.loadInitialData('en');
 			const firstCategoryId = Object.keys(batchData.categoryMap)[0];
 
@@ -71,9 +71,8 @@ describe('StoriesService Integration Tests', () => {
 					'en',
 				);
 
-				expect(result3.stories.length).toBeLessThanOrEqual(3);
-				expect(result10.stories.length).toBeLessThanOrEqual(10);
-				expect(result10.stories.length).toBeGreaterThanOrEqual(result3.stories.length);
+				expect(result3.stories.length).toBeGreaterThan(3);
+				expect(result3.stories.map((s) => s.id)).toEqual(result10.stories.map((s) => s.id));
 			}
 		});
 

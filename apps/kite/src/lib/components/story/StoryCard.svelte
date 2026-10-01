@@ -270,7 +270,7 @@ $effect(() => {
         {#if simplification.isLoading && simplification.isAutoSimplified}
           <StoryContentSkeleton readingLevel={simplification.defaultLevel} />
         {:else}
-          {#if (displayStory.talking_points?.length ?? 0) > 0 || (displayStory.timeline?.length ?? 0) > 0 || (displayStory.suggested_qna?.length ?? 0) > 0}
+          {#if (story.talking_points?.length ?? 0) > 0 || (story.timeline?.length ?? 0) > 0 || (story.suggested_qna?.length ?? 0) > 0}
             <div class="px-4 text-xs text-gray-500 dark:text-gray-400">AI-assisted — not ground truth.</div>
           {/if}
           <!-- Dynamic Sections based on user settings -->

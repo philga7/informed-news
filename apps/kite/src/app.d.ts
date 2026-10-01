@@ -12,7 +12,7 @@ declare global {
 		interface PageData {
 			session: Session | null;
 			locale?: string;
-			strings?: Record<string, string>;
+			strings?: Record<string, { text: string; translationContext: string }>;
 		}
 		interface PageState {}
 		interface Platform {}

@@ -6,7 +6,8 @@ import { REFRESH_CHECK_MINUTES } from './services/briefConfig.js';
 import { startRefreshScheduler } from './services/index.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-dotenv.config({ path: path.resolve(__dirname, '../../.env'), override: true });
+const envFile = process.env.MVP_ENV_FILE?.trim() || path.resolve(__dirname, '../../.env');
+dotenv.config({ path: envFile, override: true });
 
 const port = Number(process.env.PORT) || 3001;
 

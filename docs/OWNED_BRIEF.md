@@ -28,6 +28,8 @@ Product next is the **claims / evidence** desk ([NEWS-69](https://informedcrew.a
 | GET | `/api/batches/:batchId/categories` | The single **Brief** category |
 | GET | `/api/batches/:batchId/categories/:categoryId/stories` | Topic Brief stories (all visible, Brief order) |
 | GET | `/api/brief/overview` | Topic sections, More split, quiet topics, refresh status ([NEWS-88](https://informedcrew.atlassian.net/browse/NEWS-88)) |
+| GET | `/api/categories/metadata` | Kite category metadata: the single core **Brief** category |
+| GET | `/api/chaos/history` | Always `[]` (no chaos index on the owned brief; `/api/batches/:batchId/chaos` stays 404 = "not available") |
 | GET | `/api/batches/latest/claims` | Accepted claims for Brief hybrid ([NEWS-76](https://informedcrew.atlassian.net/browse/NEWS-76)) |
 | GET | `/api/batches/:batchId/claims` | Same; `:batchId` must be `owned-latest` or `latest` |
 

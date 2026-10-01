@@ -38,7 +38,8 @@ CFP / xcancel / framing stay on the MVP API while Kite is the shell — frozen s
 
 ## Smoke test
 
-- **Product UI:** open http://localhost:5173 after `npm run dev` (or `npm run test:e2e:kite`).
+- **Product UI:** open http://localhost:5173 after `npm run dev`.
+- **Automated:** `npm run test:e2e:kite` (Playwright) and `cd apps/kite && bun run test:integration` each start their own throwaway server + Kite on separate ports with seeded data (`e2e/stack/`) — never your dev server, `mvp/data` or `mvp/.env`, so they spend no API budget and don't depend on your local stories.
 - **API compat:** `GET /health` + session `GET /api/articles` (see [docs/MVP_API_COMPAT.md](docs/MVP_API_COMPAT.md)).
 - **API checklist:** [mvp/SMOKE.md](mvp/SMOKE.md) covers classify + citations against `mvp/server`.
 
@@ -68,7 +69,7 @@ After the sources, each refresh triages new stories against your topics (mute/ke
 
 The Brief (`/`) shows triage's kept stories grouped by your topics: top 3 per topic with **More**, a "Nothing new: …" line for quiet topics, and short Ollama summaries (labelled AI) written only for stories shown. Stories you open or mark read are hidden after the next refresh unless significantly updated.
 
-The server refreshes on its own: a check at startup (catch-up) and every 5 minutes, refreshing when the last success is older than `REFRESH_INTERVAL_HOURS` (default 3; `off` disables the timer). The Brief's **Refresh** button (log in on `/topics` first) refreshes now. `TRIAGE_SUMMARY_BUDGET` caps summaries per refresh. A refresh spends API budget, so the e2e config (`playwright.config.ts`) starts the dev server with auto-refresh off — unless `mvp/.env` sets `REFRESH_INTERVAL_HOURS`, which wins. Details: [docs/BRIEF.md](docs/BRIEF.md).
+The server refreshes on its own: a check at startup (catch-up) and every 5 minutes, refreshing when the last success is older than `REFRESH_INTERVAL_HOURS` (default 3; `off` disables the timer). The Brief's **Refresh** button (log in on `/topics` first) refreshes now. `TRIAGE_SUMMARY_BUDGET` caps summaries per refresh. A refresh spends API budget; the e2e and integration stacks run with auto-refresh off and no Ollama / TypeSafe keys. Details: [docs/BRIEF.md](docs/BRIEF.md).
 
 Kite UI env: `apps/kite/.env.example`. Brief guide: [docs/BRIEF.md](docs/BRIEF.md). Owned brief: [docs/OWNED_BRIEF.md](docs/OWNED_BRIEF.md). API compat: [docs/MVP_API_COMPAT.md](docs/MVP_API_COMPAT.md). Route map: [docs/ROUTE_MAP.md](docs/ROUTE_MAP.md). Kagi service cleanup: [docs/KAGI_SERVICE_CLEANUP.md](docs/KAGI_SERVICE_CLEANUP.md). Sync / license: [docs/UPSTREAM_KITE.md](docs/UPSTREAM_KITE.md), [THIRD_PARTY.md](THIRD_PARTY.md).
 
@@ -84,7 +85,7 @@ Kite UI env: `apps/kite/.env.example`. Brief guide: [docs/BRIEF.md](docs/BRIEF.m
 | `npm run typecheck` | Typecheck `mvp/server` |
 | `npm test` | MVP server unit tests |
 | `npm run test:kite` | Kite provenance + default-entrypoint checks |
-| `npm run test:e2e:kite` | Playwright: Brief loads on :5173 |
+| `npm run test:e2e:kite` | Playwright smoke on its own seeded stack (Kite :5174, API :3101) |
 | `npm run build` | Build archived `_legacy/mvp-web` (current Vercel artifact) |
 
 ## Versioning & CI

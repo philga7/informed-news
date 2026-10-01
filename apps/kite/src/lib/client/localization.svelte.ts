@@ -12,11 +12,8 @@ export function s(
 export function s(key: string, view?: Record<string, string>, strict = false): string | undefined {
 	// Use server-side strings on server, client-side strings on client
 	const strings = browser ? language.currentStrings : page.data.strings;
-	let value = strings?.[key];
-
-	if (typeof value === 'object') {
-		value = value?.text;
-	}
+	const entry = strings?.[key];
+	const value = typeof entry === 'string' ? entry : entry?.text;
 
 	if (!value) return strict ? undefined : key;
 
