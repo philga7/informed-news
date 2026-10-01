@@ -15,6 +15,7 @@ import {
   enrichUnenrichedClusters,
   extractClaimsFromArticles,
   fetchAllSources,
+  listTriageRecords,
   ManualSeedValidationError,
   parseManualSeedBody,
   parseTopicCreate,
@@ -44,6 +45,7 @@ import {
   readTopics,
   readTrackedClaims,
   readTrackedStories,
+  readTriage,
   removeMuteRule,
   removeTopic,
   syncTrackedAfterFetch,
@@ -87,6 +89,7 @@ export type CreateAppDeps = {
   createTopic?: typeof createTopic;
   updateTopic?: typeof updateTopic;
   removeTopic?: typeof removeTopic;
+  readTriage?: typeof readTriage;
   loadClaimsRadar?: typeof loadClaimsRadar;
   readClaimMembership?: typeof readClaimMembership;
   acceptClaim?: typeof acceptClaim;
@@ -208,6 +211,7 @@ export function createApp(deps: CreateAppDeps = {}): Express {
   const createOneTopic = deps.createTopic ?? createTopic;
   const updateOneTopic = deps.updateTopic ?? updateTopic;
   const removeOneTopic = deps.removeTopic ?? removeTopic;
+  const readTriageStore = deps.readTriage ?? readTriage;
   const getById = deps.getArticleById ?? getArticleById;
   const classifyBatch = deps.classifyUnclassifiedArticles ?? classifyUnclassifiedArticles;
   const classifyOne = deps.classifyArticleById ?? classifyArticleById;
@@ -251,7 +255,7 @@ export function createApp(deps: CreateAppDeps = {}): Express {
   app.use('/api', createAuthRouter());
 
   /**
-   * Unified refresh: CFP → curated RSS → xcancel (when configured) → topic search.
+   * Unified refresh: CFP → curated RSS → xcancel (when configured) → topic search → triage.
    * Optional body/query: { limit?: number, feedUrl?: string }
    * Empty/missing radar-sources.json skips curated without failing CFP.
    * Empty XCANCEL_PROFILES / x-profiles.json skips xcancel without failing CFP.
@@ -308,6 +312,16 @@ export function createApp(deps: CreateAppDeps = {}): Express {
           perTopic: result.topicSearch.perTopic,
           errors: result.topicSearch.errors,
           articles: result.topicSearch.upserted.length,
+        },
+        triage: {
+          skipped: result.triage.skipped,
+          candidates: result.triage.candidates,
+          kept: result.triage.kept,
+          dropped: result.triage.dropped,
+          byReason: result.triage.byReason,
+          jev: result.triage.jev,
+          summaryBudget: result.triage.summaryBudget,
+          errors: result.triage.errors,
         },
         articles: result.articles,
       });
@@ -440,6 +454,29 @@ export function createApp(deps: CreateAppDeps = {}): Express {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.error('Topic delete failed:', message);
+      res.status(500).json({ ok: false, error: message });
+    }
+  });
+
+  /**
+   * Triage records (NEWS-87): newest first, capped, joined with article fields,
+   * plus the last run summary from meta.
+   */
+  app.get('/api/triage', async (_req, res) => {
+    try {
+      const [store, articles, meta] = await Promise.all([
+        readTriageStore(),
+        readAllArticles(),
+        readServerMeta(),
+      ]);
+      res.json({
+        ok: true,
+        run: meta.triage ?? null,
+        records: listTriageRecords(store, articles),
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('Triage read failed:', message);
       res.status(500).json({ ok: false, error: message });
     }
   });

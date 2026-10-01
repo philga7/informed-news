@@ -7,6 +7,7 @@ import type { Server } from 'node:http';
 import express from 'express';
 
 import type { Article } from './types/article.js';
+import type { TriageRecord, TriageRunMeta } from './types/triage.js';
 import { acceptCluster, readBriefMembership } from './store/briefMembershipStore.js';
 import {
   ackTrackedUpdate,
@@ -315,6 +316,18 @@ test('POST /api/fetch calls syncTrackedAfterFetch with briefClusterKey counts', 
           upserted: [{ id: 'a2', clusterId: 'c1' } as Article],
           errors: [],
         },
+        triage: {
+          at: '2026-09-30T12:00:00.000Z',
+          skipped: false,
+          candidates: 3,
+          kept: 1,
+          dropped: 2,
+          byReason: { off_topic: 1, duplicate: 1 },
+          jev: { budget: 300, used: 1, errors: 0 },
+          summaryBudget: 60,
+          errors: [],
+          keptIds: ['a2'],
+        },
         // NOTE: syncTrackedAfterFetch must be based on the full rewritten store, not only
         // the upserted article set returned from the fetch result.
         articles: [{ id: 'a2', clusterId: 'c1' } as Article],
@@ -335,8 +348,18 @@ test('POST /api/fetch calls syncTrackedAfterFetch with briefClusterKey counts', 
       body: JSON.stringify({ limit: 3 }),
     });
     assert.equal(resp.status, 200);
-    const json = (await resp.json()) as { ok: boolean; topicSearch: unknown };
+    const json = (await resp.json()) as { ok: boolean; topicSearch: unknown; triage: unknown };
     assert.equal(json.ok, true);
+    assert.deepEqual(json.triage, {
+      skipped: false,
+      candidates: 3,
+      kept: 1,
+      dropped: 2,
+      byReason: { off_topic: 1, duplicate: 1 },
+      jev: { budget: 300, used: 1, errors: 0 },
+      summaryBudget: 60,
+      errors: [],
+    });
     assert.deepEqual(json.topicSearch, {
       skipped: false,
       providers: {
@@ -379,6 +402,18 @@ test('POST /api/fetch succeeds even when syncTrackedAfterFetch throws', async ()
           perTopic: {},
           upserted: [],
           errors: [],
+        },
+        triage: {
+          at: '2026-09-30T12:00:00.000Z',
+          skipped: true,
+          candidates: 0,
+          kept: 0,
+          dropped: 0,
+          byReason: {},
+          jev: { budget: 300, used: 0, errors: 0 },
+          summaryBudget: 60,
+          errors: [],
+          keptIds: [],
         },
         articles: [],
       }) as any,
@@ -1813,3 +1848,133 @@ test('GET /api/radar hides muted clusters + counts them; tracked muted still ret
   }
 });
 
+
+function triageRecordFixture(articleId: string, triagedAt: string): TriageRecord {
+  return {
+    articleId,
+    status: 'dropped',
+    reason: 'off_topic',
+    stage: 'keyword',
+    final: true,
+    topicIds: [],
+    labels: [],
+    duplicateOf: null,
+    memberIds: [],
+    outletCount: null,
+    significance: null,
+    bodyChecked: false,
+    jevCalls: 0,
+    triagedAt,
+  };
+}
+
+async function startTriageServer(opts: {
+  records: Record<string, TriageRecord>;
+  articles: Article[];
+  run: TriageRunMeta | null;
+}): Promise<{ baseUrl: string; close: () => Promise<void> }> {
+  process.env.SESSION_SECRET = 'test-secret';
+  process.env.MVP_PASSWORD = 'pw';
+  delete process.env.MVP_PASSWORD_HASH;
+
+  const { createApp } = await import('./app.js');
+  const app = createApp({
+    readTriage: async () => ({ records: opts.records, updatedAt: null }),
+    readArticles: async () => opts.articles,
+    readMeta: async () => ({ lastFetchAt: null, lastError: null, triage: opts.run }),
+  });
+  return await startServer(app);
+}
+
+test('GET /api/triage requires session', async () => {
+  const { baseUrl, close } = await startTriageServer({ records: {}, articles: [], run: null });
+  try {
+    const resp = await fetch(`${baseUrl}/api/triage`);
+    assert.equal(resp.status, 401);
+  } finally {
+    await close();
+  }
+});
+
+test('GET /api/triage returns run meta and records newest first, joined with articles, capped at 500', async () => {
+  const base = Date.parse('2026-09-30T00:00:00.000Z');
+  const records: Record<string, TriageRecord> = {};
+  for (let i = 0; i < 502; i++) {
+    const id = `r${i}`;
+    records[id] = triageRecordFixture(id, new Date(base + i * 1000).toISOString());
+  }
+  const article = {
+    id: 'r501',
+    title: 'Tariff ruling hits steel imports',
+    canonicalUrl: 'https://news.example.com/a',
+    publisherUrl: 'https://news.example.com/a',
+    publisherDomain: 'news.example.com',
+    publishedAt: '2026-09-30T08:00:00.000Z',
+    sourceKind: 'search',
+  } as Article;
+  const run: TriageRunMeta = {
+    at: '2026-09-30T12:00:00.000Z',
+    skipped: false,
+    candidates: 502,
+    kept: 0,
+    dropped: 502,
+    byReason: { off_topic: 502 },
+    jev: { budget: 300, used: 0, errors: 0 },
+    summaryBudget: 60,
+    errors: [],
+  };
+
+  const { baseUrl, close } = await startTriageServer({ records, articles: [article], run });
+  try {
+    const cookie = await login(baseUrl);
+    const resp = await fetch(`${baseUrl}/api/triage`, { headers: { cookie } });
+    assert.equal(resp.status, 200);
+    const body = (await resp.json()) as {
+      ok: true;
+      run: TriageRunMeta | null;
+      records: Array<TriageRecord & Record<string, unknown>>;
+    };
+    assert.equal(body.ok, true);
+    assert.deepEqual(body.run, run);
+    assert.equal(body.records.length, 500);
+    assert.equal(body.records[0]!.articleId, 'r501');
+    assert.equal(body.records[1]!.articleId, 'r500');
+    assert.equal(body.records.at(-1)!.articleId, 'r2');
+    assert.deepEqual(
+      {
+        title: body.records[0]!.title,
+        canonicalUrl: body.records[0]!.canonicalUrl,
+        publisherUrl: body.records[0]!.publisherUrl,
+        publisherDomain: body.records[0]!.publisherDomain,
+        publishedAt: body.records[0]!.publishedAt,
+        sourceKind: body.records[0]!.sourceKind,
+        reason: body.records[0]!.reason,
+      },
+      {
+        title: 'Tariff ruling hits steel imports',
+        canonicalUrl: 'https://news.example.com/a',
+        publisherUrl: 'https://news.example.com/a',
+        publisherDomain: 'news.example.com',
+        publishedAt: '2026-09-30T08:00:00.000Z',
+        sourceKind: 'search',
+        reason: 'off_topic',
+      },
+    );
+    assert.equal(body.records[1]!.title, null);
+    assert.equal(body.records[1]!.sourceKind, null);
+  } finally {
+    await close();
+  }
+});
+
+test('GET /api/triage returns run null when no triage has run', async () => {
+  const { baseUrl, close } = await startTriageServer({ records: {}, articles: [], run: null });
+  try {
+    const cookie = await login(baseUrl);
+    const resp = await fetch(`${baseUrl}/api/triage`, { headers: { cookie } });
+    assert.equal(resp.status, 200);
+    assert.deepEqual(await resp.json(), { ok: true, run: null, records: [] });
+  } finally {
+    await close();
+  }
+});
