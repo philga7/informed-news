@@ -58,8 +58,15 @@ function rule(id: string, keyword: string, source: string | null = null): MuteRu
   return { id, keyword, source, createdAt: '2026-09-01T00:00:00.000Z' };
 }
 
-const IMMIGRATION = makeTopic('immigration', 'Immigration enforcement', {
-  keywords: ['Immigration and Customs Enforcement', 'ICE raid', 'ICE', 'deportation'],
+const IMMIGRATION = makeTopic('ice-enforcement', 'ICE enforcement', {
+  keywords: [
+    'Immigration and Customs Enforcement',
+    'ICE raid',
+    'ICE detention',
+    'deportation',
+    'Border Patrol',
+    'CBP',
+  ],
 });
 const TARIFFS = makeTopic('tariffs', 'Tariffs and trade', {
   keywords: ['tariff', 'tariffs', 'trade war'],
@@ -81,7 +88,29 @@ test('keywordMatches: all-caps keyword is case-sensitive (ICE vs ice cream)', ()
   assert.equal(keywordMatches('Ice storm hits Midwest', 'ICE'), false);
   assert.equal(keywordMatches('ICE raids in Chicago', 'ICE'), true);
   assert.equal(keywordMatches('ICE raid in Chicago', 'ICE raid'), true);
-  assert.equal(keywordMatches('ICE raids in Chicago', 'ICE raid'), false);
+  assert.equal(keywordMatches('ICE raids in Chicago', 'ICE raid'), true);
+});
+
+test('keywordMatches: keyword ending in a letter allows an inflection suffix', () => {
+  assert.equal(keywordMatches('Deportations surge', 'deportation'), true);
+  assert.equal(keywordMatches('Israeli military', 'Israel'), true);
+  assert.equal(keywordMatches('Iranian missiles', 'Iran'), true);
+  assert.equal(keywordMatches('Venezuelan opposition', 'Venezuela'), true);
+  assert.equal(keywordMatches('furloughs mount', 'furlough'), true);
+  assert.equal(keywordMatches('New federal contracts awarded', 'federal contract'), true);
+  assert.equal(keywordMatches('Tariffs rise', 'tariff'), true);
+  assert.equal(keywordMatches('Iranians protest', 'Iran'), false);
+  assert.equal(keywordMatches('Irate voters', 'Iran'), false);
+});
+
+test('keywordMatches: suffix does not loosen all-caps or non-letter-ending keywords', () => {
+  assert.equal(keywordMatches('Local shop sells ice cream', 'ICE'), false);
+  assert.equal(keywordMatches('Dogecoin rallies', 'DOGE'), false);
+  assert.equal(keywordMatches('DOGECOIN rallies', 'DOGE'), false);
+  assert.equal(keywordMatches('DOGEs cuts', 'DOGE'), true);
+  assert.equal(keywordMatches('Ford recalls F-2500 pickups', 'F-250'), false);
+  assert.equal(keywordMatches('Ford recalls F-250s', 'F-250'), false);
+  assert.equal(keywordMatches('SBA changes 8(a)s rules', '8(a)'), false);
 });
 
 test('keywordMatches: keyword with lowercase letters is case-insensitive', () => {
@@ -95,7 +124,7 @@ test('keywordMatches: word boundaries are alphanumeric', () => {
   assert.equal(keywordMatches('Ford recalls F-2500 pickups', 'F-250'), false);
   assert.equal(keywordMatches('XF-250 prototype', 'F-250'), false);
   assert.equal(keywordMatches('(F-250) recall', 'F-250'), true);
-  assert.equal(keywordMatches('Tariffs rise', 'tariff'), false);
+  assert.equal(keywordMatches('Tariffing rises', 'tariff'), false);
   assert.equal(keywordMatches('DOGE cuts', 'DOGE'), true);
   assert.equal(keywordMatches('Dogecoin rallies', 'DOGE'), false);
   assert.equal(keywordMatches('DOGECOIN rallies', 'DOGE'), false);
@@ -169,7 +198,32 @@ test('candidateTopicIds: non-search row uses hits only; no hit → []', () => {
   assert.deepEqual(candidateTopicIds(ignoredTopicIds, DESIRED), []);
 
   const hit = makeArticle({ sourceKind: 'rss', title: 'ICE raid in Denver' });
-  assert.deepEqual(candidateTopicIds(hit, DESIRED), ['immigration']);
+  assert.deepEqual(candidateTopicIds(hit, DESIRED), ['ice-enforcement']);
+});
+
+test('desiredTopicHits: inflected headlines hit seed keywords', () => {
+  const seedLike: Topic[] = [
+    makeTopic('iran', 'Iran', { keywords: ['Iran', 'Tehran', 'IRGC', 'Iranian government'] }),
+    makeTopic('israel', 'Israel', { keywords: ['Israel', 'Netanyahu', 'IDF', 'Gaza'] }),
+    IMMIGRATION,
+    makeTopic('venezuela', 'Venezuela', { keywords: ['Venezuela', 'Maduro', 'Caracas'] }),
+    makeTopic('government-shutdown', 'Government shutdown', {
+      keywords: ['government shutdown', 'continuing resolution', 'appropriations', 'furlough'],
+    }),
+    makeTopic('federal-contracting', 'Federal contracting', {
+      keywords: ['federal contract', 'federal contractors', 'GSA contract', '8(a)', 'GWAC'],
+    }),
+  ];
+  const hits = (title: string) => desiredTopicHits(makeArticle({ title }), seedLike);
+
+  assert.deepEqual(hits('ICE raids sweep Chicago suburbs'), ['ice-enforcement']);
+  assert.deepEqual(hits('Deportations surge at the border'), ['ice-enforcement']);
+  assert.deepEqual(hits('Israeli military expands operation'), ['israel']);
+  assert.deepEqual(hits('Iranian missiles intercepted'), ['iran']);
+  assert.deepEqual(hits('Venezuelan opposition calls strike'), ['venezuela']);
+  assert.deepEqual(hits('Shutdown furloughs mount'), ['government-shutdown']);
+  assert.deepEqual(hits('Agency cancels federal contracts'), ['federal-contracting']);
+  assert.deepEqual(hits('Ice cream sales rise in heat wave'), []);
 });
 
 test('muteReason: mute rule wins over undesired topic', () => {
@@ -229,6 +283,25 @@ test('muteReason: dotted keyword is an outlet block on publisherDomain (equal or
     null,
   );
   assert.equal(muteReason(makeArticle({ title, publisherDomain: null }), [], undesired), null);
+});
+
+test('muteReason: outlet block keyword with leading www. matches www-stripped domain', () => {
+  const undesired = [
+    makeTopic('tabloids', 'Tabloids', { kind: 'undesired', level: null, keywords: ['www.dailymail.co.uk'] }),
+  ];
+  const title = 'Senate passes budget';
+  assert.equal(
+    muteReason(makeArticle({ title, publisherDomain: 'dailymail.co.uk' }), [], undesired),
+    'muted:tabloids',
+  );
+  assert.equal(
+    muteReason(makeArticle({ title, publisherDomain: 'us.dailymail.co.uk' }), [], undesired),
+    'muted:tabloids',
+  );
+  assert.equal(
+    muteReason(makeArticle({ title, publisherDomain: 'notdailymail.co.uk' }), [], undesired),
+    null,
+  );
 });
 
 test('muteReason: keyword with spaces is not an outlet block', () => {

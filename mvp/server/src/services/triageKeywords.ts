@@ -10,12 +10,17 @@ function escapeRegExp(raw: string): string {
 /**
  * Word-boundary keyword match. A keyword with no lowercase letters (e.g. `ICE`, `F-250`)
  * is case-sensitive so `ICE` doesn't hit "ice cream"; otherwise case-insensitive.
+ * A keyword ending in a letter also matches common inflections ("ICE raids", "Israeli").
  */
 export function keywordMatches(text: string, keyword: string): boolean {
   const needle = keyword.trim();
   if (!needle) return false;
   const flags = /\p{Ll}/u.test(needle) ? 'i' : '';
-  const pattern = new RegExp(`(?<![A-Za-z0-9])${escapeRegExp(needle)}(?![A-Za-z0-9])`, flags);
+  const suffix = /[A-Za-z]$/.test(needle) ? '(?:s|es|n|an|ian|i)?' : '';
+  const pattern = new RegExp(
+    `(?<![A-Za-z0-9])${escapeRegExp(needle)}${suffix}(?![A-Za-z0-9])`,
+    flags,
+  );
   return pattern.test(text);
 }
 
@@ -37,7 +42,7 @@ function topicBlocksOutlet(topic: Topic, publisherDomain: string | null): boolea
   const domain = publisherDomain?.trim().toLowerCase();
   if (!domain) return false;
   return topic.keywords.some((raw) => {
-    const keyword = raw.trim().toLowerCase();
+    const keyword = raw.trim().toLowerCase().replace(/^www\./, '');
     if (!isOutletKeyword(keyword)) return false;
     return domain === keyword || domain.endsWith(`.${keyword}`);
   });
