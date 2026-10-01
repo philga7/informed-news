@@ -81,6 +81,28 @@ export type {
   SummarySource,
   TopicBrief,
 } from './topicBrief.js';
+export {
+  OLLAMA_NOT_CONFIGURED,
+  buildSummaryPrompt,
+  parseSummaryOutput,
+  summarizeSource,
+} from './briefSummary.js';
+export type {
+  ParseSummaryResult,
+  SummarizeChat,
+  SummarizeDeps,
+  SummarizeResult,
+} from './briefSummary.js';
+export {
+  createOnDemandLimiter,
+  generateRefreshSummaries,
+  summarizeBriefStory,
+} from './briefSummaries.js';
+export type {
+  BriefSummaryDeps,
+  OnDemandLimiter,
+  SummarizeBriefStoryResult,
+} from './briefSummaries.js';
 export { resolveGoogleNewsUrl } from './googleNewsResolve.js';
 export type {
   ResolveGoogleNewsUrlDeps,
