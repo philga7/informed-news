@@ -64,7 +64,21 @@ export type PublisherBodyResult = {
   imageUrl: string | null;
   imageCaption: string | null;
   imageCredit: string | null;
+  /** ISO publish time from page metadata; null when absent, invalid, or nothing was parsed. */
+  publishedAt: string | null;
 };
+
+function emptyResult(bodyStatus: 'unavailable' | 'blocked'): PublisherBodyResult {
+  return {
+    bodyText: null,
+    bodyStatus,
+    publisherTitle: null,
+    imageUrl: null,
+    imageCaption: null,
+    imageCredit: null,
+    publishedAt: null,
+  };
+}
 
 function isRetryableNetworkError(err: unknown): boolean {
   if (!(err instanceof Error)) return false;
@@ -173,6 +187,59 @@ function extractTitle($: cheerio.CheerioAPI): string | null {
   return null;
 }
 
+const DATE_META_SELECTORS = [
+  'meta[property="article:published_time"]',
+  'meta[property="og:article:published_time"]',
+  'meta[itemprop="datePublished"]',
+  'meta[name="pubdate" i], meta[name="publishdate" i], meta[name="date" i], meta[name="dc.date" i]',
+];
+
+function normalizeDate(raw: unknown): string | null {
+  if (typeof raw !== 'string' || !raw.trim()) return null;
+  const date = new Date(raw.trim());
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+function jsonLdDatePublished(value: unknown): string | null {
+  const nodes = Array.isArray(value) ? value : [value];
+  for (const node of nodes) {
+    if (!node || typeof node !== 'object') continue;
+    const record = node as Record<string, unknown>;
+    const own = normalizeDate(record.datePublished);
+    if (own) return own;
+    if (Array.isArray(record['@graph'])) {
+      const fromGraph = jsonLdDatePublished(record['@graph']);
+      if (fromGraph) return fromGraph;
+    }
+  }
+  return null;
+}
+
+/** Must run before `extractMainText`, which strips scripts/headers from the document. */
+function extractPublishedAt($: cheerio.CheerioAPI): string | null {
+  for (const selector of DATE_META_SELECTORS) {
+    let found: string | null = null;
+    $(selector).each((_i, el) => {
+      found = normalizeDate($(el).attr('content'));
+      return found === null;
+    });
+    if (found) return found;
+  }
+
+  let fromJsonLd: string | null = null;
+  $('script[type="application/ld+json"]').each((_i, el) => {
+    try {
+      fromJsonLd = jsonLdDatePublished(JSON.parse($(el).text()));
+    } catch {
+      fromJsonLd = null;
+    }
+    return fromJsonLd === null;
+  });
+  if (fromJsonLd) return fromJsonLd;
+
+  return normalizeDate($('time[datetime]').first().attr('datetime'));
+}
+
 function extractMainText($: cheerio.CheerioAPI): string {
   const root = $.root();
   root.find(STRIP_SELECTORS.join(', ')).remove();
@@ -207,21 +274,23 @@ export function extractPublisherBodyFromHtml(
   const $ = cheerio.load(html);
   const publisherTitle = extractTitle($);
   const image = extractImageMeta($, baseUrl);
+  const publishedAt = extractPublishedAt($);
   const rawText = extractMainText($);
   const bodyText = rawText ? truncateBodyText(rawText) : null;
+  const meta = { publisherTitle, ...image, publishedAt };
 
   if (looksPaywalled(html, rawText) && (!bodyText || bodyText.length < MIN_BODY_CHARS * 2)) {
-    return { bodyText: null, bodyStatus: 'blocked', publisherTitle, ...image };
+    return { bodyText: null, bodyStatus: 'blocked', ...meta };
   }
 
   if (!bodyText || bodyText.length < MIN_BODY_CHARS) {
     if (looksPaywalled(html, rawText)) {
-      return { bodyText: null, bodyStatus: 'blocked', publisherTitle, ...image };
+      return { bodyText: null, bodyStatus: 'blocked', ...meta };
     }
-    return { bodyText: null, bodyStatus: 'unavailable', publisherTitle, ...image };
+    return { bodyText: null, bodyStatus: 'unavailable', ...meta };
   }
 
-  return { bodyText, bodyStatus: 'ok', publisherTitle, ...image };
+  return { bodyText, bodyStatus: 'ok', ...meta };
 }
 
 async function fetchHtml(url: string, retryCount: number): Promise<Response> {
@@ -253,26 +322,8 @@ async function fetchHtml(url: string, retryCount: number): Promise<Response> {
 export async function scrapePublisherBody(
   publisherUrl: string | null | undefined,
 ): Promise<PublisherBodyResult> {
-  if (!publisherUrl) {
-    return {
-      bodyText: null,
-      bodyStatus: 'unavailable',
-      publisherTitle: null,
-      imageUrl: null,
-      imageCaption: null,
-      imageCredit: null,
-    };
-  }
-
-  if (isBlockedPublisherHost(publisherUrl)) {
-    return {
-      bodyText: null,
-      bodyStatus: 'unavailable',
-      publisherTitle: null,
-      imageUrl: null,
-      imageCaption: null,
-      imageCredit: null,
-    };
+  if (!publisherUrl || isBlockedPublisherHost(publisherUrl)) {
+    return emptyResult('unavailable');
   }
 
   try {
@@ -282,36 +333,15 @@ export async function scrapePublisherBody(
       try {
         const html = await response.text();
         const extracted = extractPublisherBodyFromHtml(html, publisherUrl);
-        return {
-          bodyText: null,
-          bodyStatus: 'blocked',
-          publisherTitle: extracted.publisherTitle,
-          imageUrl: extracted.imageUrl,
-          imageCaption: extracted.imageCaption,
-          imageCredit: extracted.imageCredit,
-        };
+        return { ...extracted, bodyText: null, bodyStatus: 'blocked' };
       } catch {
-        return {
-          bodyText: null,
-          bodyStatus: 'blocked',
-          publisherTitle: null,
-          imageUrl: null,
-          imageCaption: null,
-          imageCredit: null,
-        };
+        return emptyResult('blocked');
       }
     }
 
     if (!response.ok) {
       console.warn(`Publisher body HTTP ${response.status} for ${publisherUrl}`);
-      return {
-        bodyText: null,
-        bodyStatus: 'unavailable',
-        publisherTitle: null,
-        imageUrl: null,
-        imageCaption: null,
-        imageCredit: null,
-      };
+      return emptyResult('unavailable');
     }
 
     const html = await response.text();
@@ -321,13 +351,6 @@ export async function scrapePublisherBody(
       `Publisher body scrape failed for ${publisherUrl}:`,
       err instanceof Error ? err.message : err,
     );
-    return {
-      bodyText: null,
-      bodyStatus: 'unavailable',
-      publisherTitle: null,
-      imageUrl: null,
-      imageCaption: null,
-      imageCredit: null,
-    };
+    return emptyResult('unavailable');
   }
 }

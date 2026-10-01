@@ -63,6 +63,8 @@ export type {
   TopicSearchResult,
   TopicSearchTopicCounts,
 } from './topicSearchIngest.js';
+export { listTriageRecords, runTriage, TRIAGE_LIST_MAX } from './triagePipeline.js';
+export type { TriageDeps, TriageListing, TriageResult } from './triagePipeline.js';
 export { resolveGoogleNewsUrl } from './googleNewsResolve.js';
 export type {
   ResolveGoogleNewsUrlDeps,

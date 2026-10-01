@@ -74,7 +74,7 @@ export function titleTokens(title: string): Set<string> {
   return new Set(tokens);
 }
 
-function jaccard(a: Set<string>, b: Set<string>): number {
+export function jaccard(a: Set<string>, b: Set<string>): number {
   if (a.size === 0 || b.size === 0) return 0;
   let shared = 0;
   for (const t of a) {
@@ -83,7 +83,7 @@ function jaccard(a: Set<string>, b: Set<string>): number {
   return shared / (a.size + b.size - shared);
 }
 
-function sharedTokenCount(a: Set<string>, b: Set<string>): number {
+export function sharedTokenCount(a: Set<string>, b: Set<string>): number {
   let shared = 0;
   for (const t of a) {
     if (b.has(t)) shared += 1;
@@ -127,6 +127,35 @@ function setsIntersect(a: Set<string>, b: Set<string>): boolean {
   return false;
 }
 
+/** URLs mentioned in this article's snippet, body, or title. */
+export function articleMentionedUrls(article: Article): Set<string> {
+  return urlsInText(article.snippet, article.bodyText, article.title);
+}
+
+/** Shared URL identity, or one side mentions the other's URL (precomputed sets). */
+export function urlSetsLink(
+  ownedA: Set<string>,
+  mentionedA: Set<string>,
+  ownedB: Set<string>,
+  mentionedB: Set<string>,
+): boolean {
+  return (
+    setsIntersect(ownedA, ownedB) ||
+    setsIntersect(ownedA, mentionedB) ||
+    setsIntersect(ownedB, mentionedA)
+  );
+}
+
+/** Shared URL identity, or one side mentions the other's URL. */
+export function articlesShareUrl(a: Article, b: Article): boolean {
+  return urlSetsLink(
+    articleOwnedUrls(a),
+    articleMentionedUrls(a),
+    articleOwnedUrls(b),
+    articleMentionedUrls(b),
+  );
+}
+
 /**
  * Crude relatedness: overlapping owned/mentioned URLs, or same publisher
  * domain with similar title tokens. Wrong groups are acceptable if obvious.
@@ -134,15 +163,7 @@ function setsIntersect(a: Set<string>, b: Set<string>): boolean {
 export function articlesAreRelated(a: Article, b: Article): boolean {
   if (a.id === b.id) return false;
 
-  const ownedA = articleOwnedUrls(a);
-  const ownedB = articleOwnedUrls(b);
-  const mentionedA = urlsInText(a.snippet, a.bodyText, a.title);
-  const mentionedB = urlsInText(b.snippet, b.bodyText, b.title);
-
-  // Shared URL identity, or one side mentions the other's URL.
-  if (setsIntersect(ownedA, ownedB)) return true;
-  if (setsIntersect(ownedA, mentionedB)) return true;
-  if (setsIntersect(ownedB, mentionedA)) return true;
+  if (articlesShareUrl(a, b)) return true;
 
   const domainA = a.publisherDomain?.toLowerCase() ?? null;
   const domainB = b.publisherDomain?.toLowerCase() ?? null;

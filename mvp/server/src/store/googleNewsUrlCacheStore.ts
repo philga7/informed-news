@@ -1,4 +1,5 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
+import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { GOOGLE_NEWS_URL_CACHE_PATH } from './paths.js';
 
@@ -65,13 +66,35 @@ export async function getCachedGoogleNewsUrl(
   return cache.entries[articleId]?.url ?? null;
 }
 
+/** Per-file write chains: parallel resolves must not interleave read-modify-write cycles. */
+const writeChains = new Map<string, Promise<void>>();
+
+async function writeEntry(articleId: string, url: string, cachePath: string): Promise<void> {
+  const cache = await readGoogleNewsUrlCache(cachePath);
+  cache.entries[articleId] = { url, resolvedAt: new Date().toISOString() };
+  await mkdir(path.dirname(cachePath), { recursive: true });
+  const tempPath = `${cachePath}.${process.pid}.${randomUUID()}.tmp`;
+  try {
+    await writeFile(tempPath, `${JSON.stringify(cache, null, 2)}\n`, 'utf8');
+    await rename(tempPath, cachePath);
+  } catch (err) {
+    await rm(tempPath, { force: true });
+    throw err;
+  }
+}
+
 export async function putCachedGoogleNewsUrl(
   articleId: string,
   url: string,
   cachePath: string = GOOGLE_NEWS_URL_CACHE_PATH,
 ): Promise<void> {
-  const cache = await readGoogleNewsUrlCache(cachePath);
-  cache.entries[articleId] = { url, resolvedAt: new Date().toISOString() };
-  await mkdir(path.dirname(cachePath), { recursive: true });
-  await writeFile(cachePath, `${JSON.stringify(cache, null, 2)}\n`, 'utf8');
+  const key = path.resolve(cachePath);
+  const previous = writeChains.get(key) ?? Promise.resolve();
+  const next = previous.then(() => writeEntry(articleId, url, cachePath));
+  const settled = next.catch(() => undefined);
+  writeChains.set(key, settled);
+  void settled.then(() => {
+    if (writeChains.get(key) === settled) writeChains.delete(key);
+  });
+  return next;
 }

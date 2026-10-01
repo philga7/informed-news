@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { mkdtempSync } from 'node:fs';
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile, readdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
@@ -41,6 +41,36 @@ test('putCachedGoogleNewsUrl persists pretty JSON and getCachedGoogleNewsUrl rea
   };
   assert.equal(parsed.entries.CBMiAbc?.url, 'https://www.reuters.com/world/story');
   assert.ok(!Number.isNaN(Date.parse(parsed.entries.CBMiAbc?.resolvedAt ?? '')));
+});
+
+test('concurrent putCachedGoogleNewsUrl calls never lose entries', async () => {
+  const cachePath = tempCachePath();
+  const ids = Array.from({ length: 10 }, (_, i) => `CBMiConcurrent${i}`);
+
+  await Promise.all(
+    ids.map((id) => putCachedGoogleNewsUrl(id, `https://example.com/${id}`, cachePath)),
+  );
+
+  const cache = await readGoogleNewsUrlCache(cachePath);
+  assert.equal(Object.keys(cache.entries).length, 10);
+  for (const id of ids) {
+    assert.equal(cache.entries[id]?.url, `https://example.com/${id}`);
+  }
+  const leftovers = (await readdir(path.dirname(cachePath))).filter(
+    (name) => name !== path.basename(cachePath),
+  );
+  assert.deepEqual(leftovers, []);
+});
+
+test('a failed write does not block later writes to the same cache', async () => {
+  const cachePath = tempCachePath();
+  await putCachedGoogleNewsUrl('CBMiSeed', 'https://seed.example.com', cachePath);
+  await writeFile(cachePath, JSON.stringify(['not', 'an', 'object']), 'utf8');
+  await assert.rejects(putCachedGoogleNewsUrl('CBMiBad', 'https://bad.example.com', cachePath));
+
+  await writeFile(cachePath, JSON.stringify({ entries: {} }), 'utf8');
+  await putCachedGoogleNewsUrl('CBMiAfter', 'https://after.example.com', cachePath);
+  assert.equal(await getCachedGoogleNewsUrl('CBMiAfter', cachePath), 'https://after.example.com');
 });
 
 test('putCachedGoogleNewsUrl overwrites an existing entry', async () => {

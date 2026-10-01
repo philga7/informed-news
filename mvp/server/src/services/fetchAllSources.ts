@@ -1,3 +1,4 @@
+import { updateMeta } from '../store/index.js';
 import type { Article } from '../types/article.js';
 import { assignClusterIds } from './clusterArticles.js';
 import { fetchCfpArticles } from './cfpFetch.js';
@@ -11,6 +12,9 @@ import type {
 } from './curatedRssFetch.js';
 import { runTopicSearch } from './topicSearchIngest.js';
 import type { TopicSearchResult } from './topicSearchIngest.js';
+import { resolveTriageBudgets } from './triageConfig.js';
+import { runTriage } from './triagePipeline.js';
+import type { TriageResult } from './triagePipeline.js';
 
 export type FetchAllOptions = CfpFetchOptions &
   XcancelFetchOptions &
@@ -31,6 +35,7 @@ export type FetchAllResult = {
   curated: CuratedRssFetchResult;
   xcancel: XcancelFetchResult;
   topicSearch: TopicSearchResult;
+  triage: TriageResult;
   articles: Article[];
   tiers: FetchTiers;
   fetched: number;
@@ -102,11 +107,27 @@ function emptyTopicSearchFailure(message: string): TopicSearchResult {
   };
 }
 
+function emptyTriageFailure(message: string): TriageResult {
+  const budgets = resolveTriageBudgets();
+  return {
+    at: new Date().toISOString(),
+    skipped: true,
+    candidates: 0,
+    kept: 0,
+    dropped: 0,
+    byReason: {},
+    jev: { budget: budgets.jevCalls, used: 0, errors: 0 },
+    summaryBudget: budgets.summaries,
+    errors: [message],
+    keptIds: [],
+  };
+}
+
 /**
  * Run enabled sources in sequence: CFP, then curated RSS, then xcancel, then
- * topic search (Google News RSS + SearXNG).
- * CFP failure fails the whole refresh. Other source failures are isolated —
- * CFP results are still returned and errors surface on the result.
+ * topic search (Google News RSS + SearXNG), then cluster and triage.
+ * CFP failure fails the whole refresh. Other source and triage failures are
+ * isolated — CFP results are still returned and errors surface on the result.
  */
 export async function fetchAllSources(
   options: FetchAllOptions = {},
@@ -151,6 +172,20 @@ export async function fetchAllSources(
 
   // Crude same-event ids across the full store (CFP + curated + xcancel + topic search + prior rows).
   const clustered = await assignClusterIds();
+
+  let triage: TriageResult;
+  try {
+    triage = await runTriage();
+  } catch (err) {
+    triage = emptyTriageFailure(err instanceof Error ? err.message : String(err));
+    const { keptIds: _keptIds, ...runMeta } = triage;
+    try {
+      await updateMeta({ triage: runMeta });
+    } catch {
+      // The failure is still returned on the refresh result.
+    }
+  }
+
   const byId = new Map(clustered.articles.map((a) => [a.id, a]));
   const withCluster = (rows: Article[]): Article[] =>
     rows.map((a) => byId.get(a.id) ?? a);
@@ -184,6 +219,7 @@ export async function fetchAllSources(
     curated: curatedWithCluster,
     xcancel: xcancelWithCluster,
     topicSearch: topicSearchWithCluster,
+    triage,
     articles,
     tiers,
     fetched: cfp.fetched + curated.fetched + xcancel.fetched + topicSearch.fetched,

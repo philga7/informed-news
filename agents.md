@@ -20,6 +20,7 @@ mvp/server (Express)
     → mvp/data/*.json
     → CFP RSS + publisher scrape (+ optional xcancel)
     → topic search: Google News RSS + local SearXNG (docs/TOPIC_SEARCH.md)
+    → triage: keyword/mute → dedupe → Jev headline → scrape survivors → Jev body (docs/TRIAGE.md)
     → Ollama Cloud (framing)
 ```
 
