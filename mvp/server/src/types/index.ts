@@ -42,3 +42,15 @@ export type {
   TopicSearchMeta,
 } from './topicSearch.js';
 export { SEARCH_PROVIDERS } from './topicSearch.js';
+
+export type {
+  TriageLabel,
+  TriageReason,
+  TriageRecord,
+  TriageRunMeta,
+  TriageStage,
+  TriageStaticReason,
+  TriageStatus,
+  TriageStore,
+} from './triage.js';
+export { NON_FINAL_REASONS, TRIAGE_STATIC_REASONS } from './triage.js';

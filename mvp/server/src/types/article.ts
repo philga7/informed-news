@@ -4,6 +4,7 @@
  */
 import type { SourceTier } from './claim.js';
 import type { SearchProvider, TopicSearchMeta } from './topicSearch.js';
+import type { TriageRunMeta } from './triage.js';
 
 export type FramingGenre = 'news_blurb' | 'opinion' | 'analysis' | 'unclear';
 
@@ -115,4 +116,6 @@ export type StoreMeta = {
   lastError: string | null;
   /** Per-provider topic search status from the last refresh */
   topicSearch?: TopicSearchMeta | null;
+  /** Triage run summary from the last refresh */
+  triage?: TriageRunMeta | null;
 };

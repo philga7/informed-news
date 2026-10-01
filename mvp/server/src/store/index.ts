@@ -47,6 +47,7 @@ export type {
   GoogleNewsUrlCache,
   GoogleNewsUrlCacheEntry,
 } from './googleNewsUrlCacheStore.js';
+export { readTriage, writeTriage } from './triageStore.js';
 export { acceptClaim, readClaimMembership, unacceptClaim } from './claimMembershipStore.js';
 export type { ClaimMembership } from './claimMembershipStore.js';
 export {
@@ -87,6 +88,7 @@ export {
   TOPICS_PATH,
   TRACKED_CLAIMS_PATH,
   TRACKED_STORIES_PATH,
+  TRIAGE_PATH,
 } from './paths.js';
 export {
   getClaimEnrichment,
