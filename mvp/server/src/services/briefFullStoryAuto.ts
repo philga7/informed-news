@@ -52,9 +52,6 @@ function isAutomaticCandidate(
   if (story.outletCount < options.minOutlets && !story.labels.includes('official')) return false;
   if (existing?.status !== 'ok') return true;
   if (options.sourceHashChanged?.(story, existing)) return true;
-  // Records written before automatic snapshots get one refresh to establish a
-  // baseline; otherwise their freshness cannot be determined safely.
-  if (!existing.autoSnapshot) return true;
   return hasSignificantUpdate(story, existing);
 }
 

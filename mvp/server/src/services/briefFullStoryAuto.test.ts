@@ -104,6 +104,9 @@ test('automatic selector skips a fresh record and reselects a significant update
   const current = story('known', { outletCount: 3, significance: 1 });
   const input = brief([{ id: 'topic', level: 'core', stories: [current] }]);
   assert.deepEqual(selectAutoFullStoryTargets(input, { known: record('known') }), []);
+  assert.deepEqual(selectAutoFullStoryTargets(input, {
+    known: { ...record('known'), autoSnapshot: undefined },
+  }), []);
 
   const changed = brief([{
     id: 'topic',
@@ -111,4 +114,12 @@ test('automatic selector skips a fresh record and reselects a significant update
     stories: [story('known', { outletCount: 5, significance: 1 })],
   }]);
   assert.deepEqual(selectAutoFullStoryTargets(changed, { known: record('known') }), ['known']);
+});
+
+test('automatic selector selects missing and non-ok records', () => {
+  const input = brief([{ id: 'topic', level: 'core', stories: [story('candidate')] }]);
+  assert.deepEqual(selectAutoFullStoryTargets(input, {}), ['candidate']);
+  assert.deepEqual(selectAutoFullStoryTargets(input, {
+    candidate: { ...record('candidate'), status: 'error', error: 'previous failure' },
+  }), ['candidate']);
 });
