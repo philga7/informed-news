@@ -35,6 +35,8 @@ import Toast from '$lib/components/Toast.svelte';
 import WikipediaPopup from '$lib/components/WikipediaPopup.svelte';
 import Weather from '$lib/components/weather/Weather.svelte';
 import { BRIEF_STORIES_SECTION_TITLE } from '$lib/briefClaims';
+import TopicBrief from '$lib/components/brief/TopicBrief.svelte';
+import { TOPIC_BRIEF_CATEGORY_ID } from '$lib/topicBrief';
 import {
 	displaySettings,
 	languageSettings,
@@ -774,7 +776,7 @@ if (browser && typeof window !== 'undefined') {
         {:else if derived.isSinglePageMode}
           {#if !state.isSharedArticleView}
             <BriefClaimsLead batchId={state.currentBatchId} isLatestBatch={state.isLatestBatch} />
-            <section class="mt-8 mb-4 space-y-1" aria-label="Accepted stories">
+            <section class="mt-8 mb-4 space-y-1" aria-label={BRIEF_STORIES_SECTION_TITLE}>
               <h2 class="text-sm font-semibold tracking-tight text-gray-900 dark:text-gray-100">
                 {BRIEF_STORIES_SECTION_TITLE}
               </h2>
@@ -813,7 +815,7 @@ if (browser && typeof window !== 'undefined') {
         {:else}
           {#if !state.isSharedArticleView && isBriefStoryViewCategory(state.currentCategory)}
             <BriefClaimsLead batchId={state.currentBatchId} isLatestBatch={state.isLatestBatch} />
-            <section class="mt-8 mb-4 space-y-1" aria-label="Accepted stories">
+            <section class="mt-8 mb-4 space-y-1" aria-label={BRIEF_STORIES_SECTION_TITLE}>
               <h2 class="text-sm font-semibold tracking-tight text-gray-900 dark:text-gray-100">
                 {BRIEF_STORIES_SECTION_TITLE}
               </h2>
@@ -848,6 +850,7 @@ if (browser && typeof window !== 'undefined') {
             <Weather location="austin" />
           {/if} -->
 
+          {#snippet categoryStoryList()}
           <StoryList
             bind:this={state.storyList}
             stories={state.stories}
@@ -870,6 +873,29 @@ if (browser && typeof window !== 'undefined') {
             sharedClusterId={state.sharedClusterId}
             initiallyExpandedIndex={state.initiallyExpandedStoryIndex}
           />
+          {/snippet}
+          {#if !state.isSharedArticleView && state.currentCategory === TOPIC_BRIEF_CATEGORY_ID}
+            <!-- Informed News topic Brief (NEWS-88); falls back to the plain list for the fixture -->
+            <TopicBrief
+              bind:this={state.storyList}
+              stories={state.stories}
+              categoryId={state.currentCategory}
+              categoryUuid={state.categoryMap[state.currentCategory]}
+              batchId={state.currentBatchId}
+              batchDateSlug={state.currentDateSlug}
+              bind:expandedStories={state.expandedStories}
+              onStoryToggle={storyToggle.handleToggle}
+              bind:readStories={state.readStories}
+              bind:showSourceOverlay={state.showSourceOverlay}
+              bind:currentSource={state.currentSource}
+              bind:sourceArticles={state.sourceArticles}
+              bind:currentMediaInfo={state.currentMediaInfo}
+              bind:isLoadingMediaInfo={state.isLoadingMediaInfo}
+              fallback={categoryStoryList}
+            />
+          {:else}
+            {@render categoryStoryList()}
+          {/if}
         {/if}
       </div>
 

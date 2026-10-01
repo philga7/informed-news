@@ -1,4 +1,5 @@
 <script lang="ts">
+import type { Snippet } from 'svelte';
 import { browser } from '$app/environment';
 import { s } from '$lib/client/localization.svelte';
 import { createStoryLocalizer } from '$lib/client/storyLocalization.svelte';
@@ -37,6 +38,7 @@ interface Props {
 	isSharedView?: boolean;
 	isLinkedStory?: boolean; // Story opened from URL/link
 	isKeyboardSelected?: boolean; // Story selected via keyboard navigation
+	belowHeader?: Snippet; // Informed News glue (topic Brief badges / summary line)
 }
 
 let {
@@ -63,6 +65,7 @@ let {
 	isSharedView = false,
 	isLinkedStory = false,
 	isKeyboardSelected = false,
+	belowHeader,
 }: Props = $props();
 
 // Story element reference
@@ -253,6 +256,8 @@ $effect(() => {
       onUnacceptClick={onUnaccept}
       {unacceptPending}
     />
+
+    {@render belowHeader?.()}
 
     <!-- Expanded Content -->
     {#if isExpanded}

@@ -45,7 +45,7 @@ export type BriefClaimsResponse =
 	  };
 
 export const BRIEF_CLAIMS_SECTION_TITLE = 'Accepted claims';
-export const BRIEF_STORIES_SECTION_TITLE = 'Accepted stories';
+export const BRIEF_STORIES_SECTION_TITLE = 'Your topics';
 export const BRIEF_CLAIMS_EMPTY_COPY = 'No accepted claims yet. Accept on Radar.';
 export const BRIEF_CLAIMS_LOAD_ERROR = 'Could not load accepted claims. Try again.';
 export const BRIEF_CLAIMS_UNACCEPT_LABEL = 'Unaccept';
