@@ -65,6 +65,22 @@ export type {
 } from './topicSearchIngest.js';
 export { listTriageRecords, runTriage, TRIAGE_LIST_MAX } from './triagePipeline.js';
 export type { TriageDeps, TriageListing, TriageResult } from './triagePipeline.js';
+export {
+  buildRefreshNotices,
+  composeTopicBrief,
+  isSignificantlyUpdated,
+  summarySourceFor,
+} from './topicBrief.js';
+export type {
+  BriefLink,
+  BriefSection,
+  BriefStory,
+  BriefSummaryStatus,
+  BriefTopicRef,
+  ComposeTopicBriefInput,
+  SummarySource,
+  TopicBrief,
+} from './topicBrief.js';
 export { resolveGoogleNewsUrl } from './googleNewsResolve.js';
 export type {
   ResolveGoogleNewsUrlDeps,
