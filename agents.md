@@ -15,14 +15,18 @@ Informed News is pivoting to an OSINT-oriented product shell:
 
 ```
 apps/kite (SvelteKit Brief UI)
-    ← owned brief adapter on mvp/server
+    ← owned brief adapter on mvp/server (topic Brief: sections per topic, docs/BRIEF.md)
 mvp/server (Express)
     → mvp/data/*.json
+    refresh (timer every REFRESH_INTERVAL_HOURS + startup catch-up + POST /api/fetch, single-flight):
     → CFP RSS + publisher scrape (+ optional xcancel)
     → topic search: Google News RSS + local SearXNG (docs/TOPIC_SEARCH.md)
     → triage: keyword/mute → dedupe → Jev headline → scrape survivors → Jev body (docs/TRIAGE.md)
+    → Brief summaries: Ollama, shown stories only (top 3 per topic at refresh, rest on demand)
     → Ollama Cloud (framing)
 ```
+
+The server starts an auto-refresh scheduler (`startRefreshScheduler` in `mvp/server/src/index.ts`) that spends real API budget (CFP, search, Jev, Ollama). Set `REFRESH_INTERVAL_HOURS=off` when you need the server up without refreshing (e.g. `REFRESH_INTERVAL_HOURS=off npm run test:e2e:kite`). `createApp` never starts timers.
 
 ### Layout
 

@@ -48,7 +48,8 @@ See `mvp/.env.example` for the API:
 
 - `MVP_PASSWORD` / `MVP_PASSWORD_HASH` — single-password session auth  
 - `SESSION_SECRET` — cookie signing  
-- `OLLAMA_API_KEY` / `OLLAMA_MODEL` — framing classify  
+- `OLLAMA_API_KEY` / `OLLAMA_MODEL` — framing classify and Brief summaries  
+- `REFRESH_INTERVAL_HOURS` — Brief auto-refresh interval (default 3; `0` / `off` / `false` / `no` disables)  
 - `CFP_FEED_URL` / `FETCH_LIMIT` — CFP RSS fetch defaults  
 - `XCANCEL_PROFILES` — optional comma-separated handles (empty = CFP-only)  
 - `XCANCEL_PER_PROFILE_LIMIT` / `XCANCEL_FETCH_DELAY_MS` — xcancel polite fetch knobs  
@@ -61,9 +62,15 @@ Each refresh searches desired topics on Google News RSS and a local SearXNG cont
 
 ### Triage
 
-After the sources, each refresh triages new stories against your topics (mute/keyword pass, duplicate grouping, TypeSafe Jev headline and body checks, survivor-only scrape) and records kept/dropped with a reason in `mvp/data/triage.json` (`TRIAGE_ENABLED`, `TRIAGE_JEV_BUDGET`, `TRIAGE_SUMMARY_BUDGET`; Jev needs `TYPESAFE_API_KEY`). Kept stories are not shown in the Brief yet (NEWS-88); inspect them via `GET /api/triage`. Details: [docs/TRIAGE.md](docs/TRIAGE.md).
+After the sources, each refresh triages new stories against your topics (mute/keyword pass, duplicate grouping, TypeSafe Jev headline and body checks, survivor-only scrape) and records kept/dropped with a reason in `mvp/data/triage.json` (`TRIAGE_ENABLED`, `TRIAGE_JEV_BUDGET`; Jev needs `TYPESAFE_API_KEY`). Kept stories feed the Brief; all records are listed by `GET /api/triage`. Details: [docs/TRIAGE.md](docs/TRIAGE.md).
 
-Kite UI env: `apps/kite/.env.example`. Owned brief: [docs/OWNED_BRIEF.md](docs/OWNED_BRIEF.md). API compat: [docs/MVP_API_COMPAT.md](docs/MVP_API_COMPAT.md). Route map: [docs/ROUTE_MAP.md](docs/ROUTE_MAP.md). Kagi service cleanup: [docs/KAGI_SERVICE_CLEANUP.md](docs/KAGI_SERVICE_CLEANUP.md). Sync / license: [docs/UPSTREAM_KITE.md](docs/UPSTREAM_KITE.md), [THIRD_PARTY.md](THIRD_PARTY.md).
+### Brief and refresh
+
+The Brief (`/`) shows triage's kept stories grouped by your topics: top 3 per topic with **More**, a "Nothing new: …" line for quiet topics, and short Ollama summaries (labelled AI) written only for stories shown. Stories you open or mark read are hidden after the next refresh unless significantly updated.
+
+The server refreshes on its own: a check at startup (catch-up) and every 5 minutes, refreshing when the last success is older than `REFRESH_INTERVAL_HOURS` (default 3; `off` disables the timer). The Brief's **Refresh** button (log in on `/topics` first) refreshes now. `TRIAGE_SUMMARY_BUDGET` caps summaries per refresh. Because a refresh spends API budget, run e2e as `REFRESH_INTERVAL_HOURS=off npm run test:e2e:kite`. Details: [docs/BRIEF.md](docs/BRIEF.md).
+
+Kite UI env: `apps/kite/.env.example`. Brief guide: [docs/BRIEF.md](docs/BRIEF.md). Owned brief: [docs/OWNED_BRIEF.md](docs/OWNED_BRIEF.md). API compat: [docs/MVP_API_COMPAT.md](docs/MVP_API_COMPAT.md). Route map: [docs/ROUTE_MAP.md](docs/ROUTE_MAP.md). Kagi service cleanup: [docs/KAGI_SERVICE_CLEANUP.md](docs/KAGI_SERVICE_CLEANUP.md). Sync / license: [docs/UPSTREAM_KITE.md](docs/UPSTREAM_KITE.md), [THIRD_PARTY.md](THIRD_PARTY.md).
 
 ## Scripts
 

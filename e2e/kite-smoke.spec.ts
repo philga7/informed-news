@@ -2,6 +2,15 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, test } from '@playwright/test';
 
+type BriefOverview = {
+	ok: boolean;
+	fixture: boolean;
+	refresh: { running: boolean };
+	notices: string[];
+	sections: Array<{ topicId: string; name: string; storyIds: string[]; moreIds: string[] }>;
+	quiet: Array<{ id: string; name: string }>;
+};
+
 test.describe('Informed News shell branding (NEWS-45)', () => {
 	test('Brief chrome uses Informed News title, not Kagi News', async ({ page }) => {
 		await page.goto('/');
@@ -29,9 +38,10 @@ test.describe('Owned brief (NEWS-44)', () => {
 		const categories = await page.request.get(`/api/batches/${batch.id}/categories`);
 		expect(categories.ok()).toBeTruthy();
 		const catBody = (await categories.json()) as {
-			categories?: Array<{ id: string; categoryId?: string }>;
+			categories?: Array<{ id: string; categoryId?: string; categoryName?: string }>;
 		};
 		expect(catBody.categories?.[0]?.categoryId).toBe('world');
+		expect(catBody.categories?.[0]?.categoryName).toBe('Brief');
 		const categoryUuid = catBody.categories?.[0]?.id as string | undefined;
 		expect(categoryUuid, 'expected first owned category id').toBeTruthy();
 
@@ -42,7 +52,10 @@ test.describe('Owned brief (NEWS-44)', () => {
 		const storiesBody = (await storiesRes.json()) as { stories?: Array<any> };
 		const stories = storiesBody.stories ?? [];
 		expect(Array.isArray(stories)).toBeTruthy();
-		expect(stories.length).toBeGreaterThan(0);
+		if (stories.length === 0) {
+			test.skip(true, 'topic Brief has no visible stories; image smoke needs kept stories or the fixture');
+			return;
+		}
 
 		const hasPrimaryImageUrl = stories.some((s: any) => {
 			const url = s?.primary_image?.url;
@@ -110,6 +123,7 @@ test.describe('Owned brief (NEWS-44)', () => {
 		expect(categories.ok()).toBeTruthy();
 		const catBody = await categories.json();
 		expect(catBody.categories?.[0]?.categoryId).toBe('world');
+		expect(catBody.categories?.[0]?.categoryName).toBe('Brief');
 		const categoryUuid = catBody.categories[0].id as string;
 
 		const stories = await page.request.get(
@@ -118,8 +132,57 @@ test.describe('Owned brief (NEWS-44)', () => {
 		expect(stories.ok()).toBeTruthy();
 		const storiesBody = await stories.json();
 		expect(Array.isArray(storiesBody.stories)).toBeTruthy();
-		expect(storiesBody.stories.length).toBeGreaterThan(0);
-		expect(storiesBody.stories[0].title).toBeTruthy();
+
+		// Topic Brief layout (NEWS-88)
+		const overviewRes = await page.request.get('/api/brief/overview');
+		expect(overviewRes.ok()).toBeTruthy();
+		const overview = (await overviewRes.json()) as BriefOverview;
+		expect(overview.ok).toBe(true);
+		expect(Array.isArray(overview.sections)).toBeTruthy();
+		expect(Array.isArray(overview.quiet)).toBeTruthy();
+		expect(Array.isArray(overview.notices)).toBeTruthy();
+
+		if (overview.fixture) {
+			// Empty article store: the fixture story renders in the plain list.
+			expect(storiesBody.stories.length).toBeGreaterThan(0);
+			expect(storiesBody.stories[0].title).toBeTruthy();
+		} else {
+			const storyIds = new Set(
+				storiesBody.stories.map((s: { id?: string }) => s.id),
+			);
+			for (const section of overview.sections) {
+				for (const id of [...section.storyIds, ...section.moreIds]) {
+					expect(storyIds.has(id), `overview story ${id} missing from stories`).toBeTruthy();
+				}
+			}
+			for (const story of storiesBody.stories) {
+				expect(story.informed_article_id).toBe(story.id);
+				expect(['ok', 'missing', 'unavailable']).toContain(story.informed_summary_status);
+			}
+
+			await expect(page.getByTestId('brief-refresh-bar')).toBeVisible({ timeout: 60_000 });
+			await expect(
+				page.getByTestId('brief-refresh-bar').getByRole('button', { name: /^Refresh/ }),
+			).toBeVisible();
+
+			if (overview.sections.length > 0) {
+				await expect(
+					page
+						.getByTestId('topic-brief-section')
+						.first()
+						.getByRole('heading', { name: overview.sections[0]!.name, exact: true }),
+				).toBeVisible();
+			} else if (overview.quiet.length > 0) {
+				await expect(page.getByTestId('topic-brief-quiet')).toContainText('Nothing new:');
+			} else {
+				await expect(page.getByText('No topics yet.')).toBeVisible();
+			}
+		}
+
+		expect(
+			kagiHosts,
+			`unexpected kite.kagi.com requests: ${kagiHosts.join(', ')}`,
+		).toEqual([]);
 
 		const hasTalkingPoints = storiesBody.stories.some(
 			(s: { talking_points?: unknown }) =>
@@ -200,11 +263,6 @@ test.describe('Owned brief (NEWS-44)', () => {
 		await expect(page.getByText('AI-assisted — not ground truth.')).toBeVisible({
 			timeout: 60_000,
 		});
-
-		expect(
-			kagiHosts,
-			`unexpected kite.kagi.com requests: ${kagiHosts.join(', ')}`,
-		).toEqual([]);
 	});
 });
 
