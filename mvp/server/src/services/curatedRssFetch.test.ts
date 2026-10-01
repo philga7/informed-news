@@ -60,6 +60,7 @@ test('fetchCuratedRss ingests RSS items as rss articles and strips fragments', a
         imageUrl: null,
         imageCaption: null,
         imageCredit: null,
+        publishedAt: null,
       }),
       upsertArticles: async (incoming) => {
         upsertBatches.push(incoming);
@@ -125,6 +126,7 @@ test('fetchCuratedRss stamps sourceTier from RadarSource', async () => {
         imageUrl: null,
         imageCaption: null,
         imageCredit: null,
+        publishedAt: null,
       }),
       upsertArticles: async (incoming) => {
         upsertBatches.push(incoming);
@@ -203,6 +205,7 @@ test('one failing source does not block another', async () => {
         imageUrl: null,
         imageCaption: null,
         imageCredit: null,
+        publishedAt: null,
       }),
       upsertArticles: async (incoming) =>
         incoming.map((article, index) => ({
