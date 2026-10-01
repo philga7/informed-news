@@ -18,6 +18,8 @@ export const MUTE_RULES_PATH = path.join(DATA_DIR, 'mute-rules.json');
 export const TOPICS_PATH = path.join(DATA_DIR, 'topics.json');
 export const GOOGLE_NEWS_URL_CACHE_PATH = path.join(DATA_DIR, 'google-news-url-cache.json');
 export const TRIAGE_PATH = path.join(DATA_DIR, 'triage.json');
+export const BRIEF_SUMMARIES_PATH = path.join(DATA_DIR, 'brief-summaries.json');
+export const BRIEF_SEEN_PATH = path.join(DATA_DIR, 'brief-seen.json');
 
 export const CLAIMS_PATH = path.join(DATA_DIR, 'claims.json');
 export const EVIDENCE_LINKS_PATH = path.join(DATA_DIR, 'evidence-links.json');

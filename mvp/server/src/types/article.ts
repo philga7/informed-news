@@ -2,6 +2,7 @@
  * Structured framing / bias analysis from Ollama Cloud.
  * UI should label results: "AI-assisted framing analysis — not ground truth."
  */
+import type { BriefRunMeta, RefreshMeta } from './brief.js';
 import type { SourceTier } from './claim.js';
 import type { SearchProvider, TopicSearchMeta } from './topicSearch.js';
 import type { TriageRunMeta } from './triage.js';
@@ -118,4 +119,8 @@ export type StoreMeta = {
   topicSearch?: TopicSearchMeta | null;
   /** Triage run summary from the last refresh */
   triage?: TriageRunMeta | null;
+  /** Last refresh attempt and last successful refresh (manual, timer or startup) */
+  refresh?: RefreshMeta | null;
+  /** Brief summary run from the last refresh */
+  brief?: BriefRunMeta | null;
 };
