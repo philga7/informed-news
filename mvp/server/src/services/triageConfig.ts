@@ -28,6 +28,8 @@ export const BODY_EXCERPT_MAX_CHARS = 3000;
 
 export const SIMILAR_TITLE_MIN_SHARED_TOKENS = 4;
 export const SIMILAR_TITLE_JACCARD_MIN = 0.6;
+/** Identical headlines shorter than this (e.g. "Live updates") are not syndication */
+export const SYNDICATION_MIN_TITLE_TOKENS = 3;
 
 const DISABLED_VALUES = new Set(['false', '0', 'off', 'no']);
 

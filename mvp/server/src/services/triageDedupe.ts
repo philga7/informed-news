@@ -1,8 +1,19 @@
 /** Duplicate grouping and outlet breadth for triage (NEWS-87). Pure — no I/O. */
 import type { Article } from '../types/article.js';
-import { articlesAreRelated, jaccard, sharedTokenCount, titleTokens } from './clusterArticles.js';
+import {
+  articleMentionedUrls,
+  articleOwnedUrls,
+  jaccard,
+  sharedTokenCount,
+  titleTokens,
+  urlSetsLink,
+} from './clusterArticles.js';
 import { normalizeTitleForMatch } from './searchUrl.js';
-import { SIMILAR_TITLE_JACCARD_MIN, SIMILAR_TITLE_MIN_SHARED_TOKENS } from './triageConfig.js';
+import {
+  SIMILAR_TITLE_JACCARD_MIN,
+  SIMILAR_TITLE_MIN_SHARED_TOKENS,
+  SYNDICATION_MIN_TITLE_TOKENS,
+} from './triageConfig.js';
 
 export type DedupeCandidate = { article: Article; topicIds: string[] };
 
@@ -15,33 +26,47 @@ export type DedupeGroup = {
   topicIds: string[];
 };
 
-function sharesTopic(a: DedupeCandidate, b: DedupeCandidate): boolean {
-  return a.topicIds.some((id) => b.topicIds.includes(id));
+type DedupeFeatures = {
+  topicIds: string[];
+  normalizedTitle: string;
+  tokens: Set<string>;
+  ownedUrls: Set<string>;
+  mentionedUrls: Set<string>;
+};
+
+function dedupeFeatures(c: DedupeCandidate): DedupeFeatures {
+  return {
+    topicIds: c.topicIds,
+    normalizedTitle: normalizeTitleForMatch(c.article.title),
+    tokens: titleTokens(c.article.title),
+    ownedUrls: articleOwnedUrls(c.article),
+    mentionedUrls: articleMentionedUrls(c.article),
+  };
 }
 
-function isSyndicated(a: Article, b: Article): boolean {
-  const title = normalizeTitleForMatch(a.title);
-  return title !== '' && title === normalizeTitleForMatch(b.title);
-}
-
-function hasSimilarTitle(a: Article, b: Article): boolean {
-  const tokensA = titleTokens(a.title);
-  const tokensB = titleTokens(b.title);
+function featuresAreDuplicates(a: DedupeFeatures, b: DedupeFeatures): boolean {
+  if (urlSetsLink(a.ownedUrls, a.mentionedUrls, b.ownedUrls, b.mentionedUrls)) return true;
+  if (
+    a.normalizedTitle !== '' &&
+    a.normalizedTitle === b.normalizedTitle &&
+    a.tokens.size >= SYNDICATION_MIN_TITLE_TOKENS
+  ) {
+    return true;
+  }
   return (
-    sharedTokenCount(tokensA, tokensB) >= SIMILAR_TITLE_MIN_SHARED_TOKENS &&
-    jaccard(tokensA, tokensB) >= SIMILAR_TITLE_JACCARD_MIN
+    a.topicIds.some((id) => b.topicIds.includes(id)) &&
+    sharedTokenCount(a.tokens, b.tokens) >= SIMILAR_TITLE_MIN_SHARED_TOKENS &&
+    jaccard(a.tokens, b.tokens) >= SIMILAR_TITLE_JACCARD_MIN
   );
 }
 
 /**
- * Same story: existing relatedness (shared URL / same-domain similar title),
- * syndication (identical normalized headline on any outlet), or similar
- * headlines across outlets within a shared topic.
+ * Same story: shared/mentioned URL, syndication (identical normalized
+ * headline of ≥ SYNDICATION_MIN_TITLE_TOKENS tokens on any outlet), or similar
+ * headlines within a shared topic (same outlet or not).
  */
 export function storiesAreDuplicates(a: DedupeCandidate, b: DedupeCandidate): boolean {
-  if (articlesAreRelated(a.article, b.article)) return true;
-  if (isSyndicated(a.article, b.article)) return true;
-  return sharesTopic(a, b) && hasSimilarTitle(a.article, b.article);
+  return featuresAreDuplicates(dedupeFeatures(a), dedupeFeatures(b));
 }
 
 /**
@@ -97,11 +122,12 @@ export function groupCandidates(
   const candidateIds = new Set(candidates.map((c) => c.article.id));
   const kept = recentKept.filter((k) => !candidateIds.has(k.article.id));
   const nodes = [...candidates, ...kept];
+  const features = nodes.map(dedupeFeatures);
   const uf = makeUnionFind(nodes.length);
 
   for (let i = 0; i < nodes.length; i++) {
     for (let j = i + 1; j < nodes.length; j++) {
-      if (storiesAreDuplicates(nodes[i]!, nodes[j]!)) uf.union(i, j);
+      if (featuresAreDuplicates(features[i]!, features[j]!)) uf.union(i, j);
     }
   }
 

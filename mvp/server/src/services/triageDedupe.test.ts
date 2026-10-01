@@ -71,7 +71,45 @@ test('storiesAreDuplicates: empty normalized titles are not syndication', () => 
   assert.equal(storiesAreDuplicates(a, b), false);
 });
 
-test('storiesAreDuplicates: shared URL via articlesAreRelated', () => {
+test('storiesAreDuplicates: short identical headlines are not syndication', () => {
+  const cnn = cand('c', 'cnn.com', 'Live updates', ['t-a']);
+  const nbc = cand('n', 'nbcnews.com', 'Live Updates!', ['t-a']);
+  assert.equal(storiesAreDuplicates(cnn, nbc), false);
+  assert.equal(groupCandidates([cnn, nbc], []).length, 2);
+});
+
+test('storiesAreDuplicates: same-outlet near-identical headlines sharing a topic', () => {
+  const a = cand('a', 'reuters.com', 'Iran sanctions expanded by Treasury over drone program');
+  const b = cand('b', 'reuters.com', 'Treasury expands Iran sanctions over drone program');
+  assert.equal(storiesAreDuplicates(a, b), true);
+});
+
+test('storiesAreDuplicates: xcancel row mentioning the publisher URL groups', () => {
+  const article = cand('a', 'reuters.com', 'Fed holds rates steady as inflation cools', ['t-fed']);
+  const tweet = cand('x', 'xcancel.com', 'Breaking from our newsroom', ['t-other'], {
+    sourceKind: 'xcancel',
+    publisherUrl: null,
+    publisherDomain: null,
+    snippet: 'Read more: https://www.reuters.com/a',
+  });
+  assert.equal(storiesAreDuplicates(article, tweet), true);
+  assert.equal(groupCandidates([article, tweet], []).length, 1);
+});
+
+test('groupCandidates: same-outlet stories on different topics do not chain (review probe)', () => {
+  const canada = cand('r1', 'reuters.com', 'Trump administration tariffs Canada retaliation announced', ['t1']);
+  const court = cand('r2', 'reuters.com', 'Trump administration tariffs struck down by appeals court', ['t2']);
+  const msnCopy = cand('m1', 'msn.com', 'Trump administration tariffs struck down by appeals court', ['t3']);
+
+  assert.equal(storiesAreDuplicates(canada, court), false);
+  const groups = groupCandidates([canada, court, msnCopy], []);
+  assert.deepEqual(
+    groups.map((g) => g.ordered.map((c) => c.article.id).sort()),
+    [['m1', 'r2'], ['r1']],
+  );
+});
+
+test('storiesAreDuplicates: shared URL link', () => {
   const a = cand('a', 'one.com', 'Totally different words here', ['t-a']);
   const b = cand('b', 'two.com', 'Nothing alike whatsoever now', ['t-b'], {
     publisherUrl: 'https://one.com/a',
