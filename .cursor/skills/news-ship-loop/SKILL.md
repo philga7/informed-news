@@ -2,10 +2,11 @@
 name: news-ship-loop
 description: >-
   Informed News ship ritual for NEWS Jira items: transition In Progress, run
-  SDD (or focused build), push/open PR, squash-merge to main when asked, mark
-  Done, delete the SDD plan. Use when starting or finishing a NEWS-* ticket,
-  opening/merging a feature PR, closing an epic after children are Done, or
-  when the user says ship / merge the PR / close the ticket.
+  SDD (or focused build), confirm follow-up Jira items with the user, push/open
+  PR, squash-merge to main when asked, mark Done, delete the SDD plan. Use when
+  starting or finishing a NEWS-* ticket, opening/merging a feature PR, closing
+  an epic after children are Done, or when the user says ship / merge the PR /
+  close the ticket.
 ---
 
 # NEWS ship loop
@@ -32,6 +33,8 @@ Codifies how Informed News work moves through **Jira ↔ git ↔ GitHub**. Does 
 
 Same spirit as SDD: do **not** push to a shared branch, open a PR, or merge to `main` unless the user asked (or an explicit standing instruction in the same turn). Marking Jira **Done** after a successful merge the user requested is part of this skill.
 
+**Also ask first:** creating new NEWS issues from review leftovers — propose, wait for confirm, then file (see § Follow-up Jira gate).
+
 ## Atlassian defaults
 
 - MCP: `user-Atlassian-MCP-Server` (or project Atlassian MCP)
@@ -46,6 +49,7 @@ Same spirit as SDD: do **not** push to a shared branch, open a PR, or merge to `
 gate ticket ready
   → In Progress
   → plan + feat branch + /subagent-driven-development
+  → follow-up Jira gate (propose → user confirms → file or none)
   → (user) push + PR
   → (user) squash-merge + delete branch
   → Done
@@ -62,27 +66,44 @@ gate ticket ready
 4. Write/commit the SDD plan under `.cursor/plans/` if using SDD; run `scripts/sdd-workspace` + ledger.
 5. Execute `/subagent-driven-development` until final review is clean. Obey **no-subagent-timers**.
 
-### 2. Ship to GitHub (only when asked)
+### 2. Follow-up Jira gate (before ship)
+
+After SDD final review is clean (or a focused build is ready to ship), **before** push/PR/merge — and again when presenting finish options if anything new appeared:
+
+1. Triage leftovers that must not die with the branch:
+   - Final-review Critical/Important items parked or deferred as out-of-scope for this PR
+   - Deferred minors that need product tracking
+   - Mid-epic discoveries that should become additional NEWS items (per `AGENTS.md` / roadmap rules)
+   - Infra / process gaps found while shipping (e.g. CI not gating merges)
+2. Present a short list: proposed issue type (Bug / Task / Story), parent epic (prefer Epic **K** [NEWS-83](https://informedcrew.atlassian.net/browse/NEWS-83) for bugs/intake; Epic **L** [NEWS-84](https://informedcrew.atlassian.net/browse/NEWS-84) or the active epic for in-epic follow-ups), one-line summary, and why — or explicitly **None**.
+3. **Do not create issues until the user confirms** which items (all / some / none).
+4. After confirmation: create in **NEWS** only, link **Relates** to the shipped key, update [docs/ROADMAP.md](../../docs/ROADMAP.md) (and `AGENTS.md` / `.cursor/rules/news-roadmap.mdc` when Current next changes). Prefer committing those docs on the feat branch before PR; if discovered after merge, include them in the plan-delete cleanup commit on `main`.
+
+Skipping the *ask* is the defect. “None” after an honest triage is success.
+
+### 3. Ship to GitHub (only when asked)
 
 1. Ensure working tree is clean of secrets (never commit `mvp/.env`, `mvp/data/*.json`).
 2. `git push -u origin HEAD`.
 3. `gh pr create` with:
    - Title referencing NEWS-N
    - Body: Summary + Test plan + `Closes NEWS-N` when the PR fully completes the story
-4. When the user asks to **merge**: `gh pr merge <n> --squash --delete-branch`
+4. When the user asks to **merge**: prefer green CI (`gh pr checks`) before `gh pr merge <n> --squash --delete-branch` (see NEWS-103 for making this a hard refuse-on-red rule).
 5. `git checkout main && git pull --ff-only origin main`
 
-### 3. Close the Jira item
+### 4. Close the Jira item
 
 1. Transition the story to **Done** (`id=41` or looked-up).
 2. Delete the SDD plan file from `main` (`.cursor/plans/news-….plan.md`), commit + push that cleanup (same pattern as NEWS-51/52).
 3. If the user asks to close a **parent epic**: verify children are Done (JQL), then Done the epic.
 
-### 4. Controllers must not skip
+### 5. Controllers must not skip
 
 | Step | Skip? |
 |------|--------|
 | In Progress at start of build | No |
+| Follow-up Jira gate ask (propose or None) | No |
+| Create follow-ups without user confirm | Yes — stop and ask |
 | Done after user-requested merge | No |
 | Push/PR/merge without user ask | Yes — stop and ask |
 | Plan delete after merge | No (unless user says keep it) |
@@ -90,10 +111,12 @@ gate ticket ready
 ## Examples
 
 **User:** “Do NEWS-54 via /subagent-driven-development”  
-→ In Progress → plan/branch → SDD → stop at finish options (do not merge until asked).
+→ In Progress → plan/branch → SDD → follow-up Jira gate → stop at finish options (do not merge until asked).
 
 **User:** “Merge the PR to main”  
-→ squash-merge → pull main → Done on the NEWS key → remove SDD plan → push cleanup.
+→ (if gate not done yet, run it first) → squash-merge → pull main → Done on the NEWS key → remove SDD plan → push cleanup.
 
 **User:** “Close NEWS-48”  
 → confirm children Done → Done on epic.
+
+**After NEWS-89 final review:** propose prune-store / UX bug / tech-debt tickets → user confirms → file NEWS-100–102 (+ ROADMAP) → then ship when asked.
