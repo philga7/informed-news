@@ -74,7 +74,7 @@ export function titleTokens(title: string): Set<string> {
   return new Set(tokens);
 }
 
-function jaccard(a: Set<string>, b: Set<string>): number {
+export function jaccard(a: Set<string>, b: Set<string>): number {
   if (a.size === 0 || b.size === 0) return 0;
   let shared = 0;
   for (const t of a) {
@@ -83,7 +83,7 @@ function jaccard(a: Set<string>, b: Set<string>): number {
   return shared / (a.size + b.size - shared);
 }
 
-function sharedTokenCount(a: Set<string>, b: Set<string>): number {
+export function sharedTokenCount(a: Set<string>, b: Set<string>): number {
   let shared = 0;
   for (const t of a) {
     if (b.has(t)) shared += 1;
