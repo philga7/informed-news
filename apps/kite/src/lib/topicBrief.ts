@@ -261,6 +261,18 @@ export function refreshPollOutcome(
 	return { kind: 'done', reload, error };
 }
 
+/** Consecutive failed overview polls tolerated while a refresh runs; one more stops polling. */
+export const BRIEF_REFRESH_POLL_FAILURES_TOLERATED = 2;
+
+/** After a failed (null) overview poll: the new consecutive-failure count and whether to stop. */
+export function overviewPollFailure(consecutiveFailures: number): {
+	failures: number;
+	stop: boolean;
+} {
+	const failures = consecutiveFailures + 1;
+	return { failures, stop: failures > BRIEF_REFRESH_POLL_FAILURES_TOLERATED };
+}
+
 /** "just now" / "5 min ago" / "3 h ago" / "2 d ago"; null for an unparsable time. */
 export function formatTimeAgoShort(iso: string, now: Date): string | null {
 	const at = Date.parse(iso);

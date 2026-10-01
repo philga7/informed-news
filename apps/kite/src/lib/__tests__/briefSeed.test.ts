@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { parseUrlsFromTextarea } from '$lib/briefSeed';
+import { BRIEF_SEED_TOPIC_BRIEF_NOTE, parseUrlsFromTextarea } from '$lib/briefSeed';
+
+describe('BRIEF_SEED_TOPIC_BRIEF_NOTE', () => {
+	it('says the story is saved but not shown in the topic Brief yet', () => {
+		expect(BRIEF_SEED_TOPIC_BRIEF_NOTE).toMatch(/saved/);
+		expect(BRIEF_SEED_TOPIC_BRIEF_NOTE).toMatch(/won't appear in the topic Brief yet/);
+	});
+});
 
 describe('parseUrlsFromTextarea', () => {
 	it('splits lines and drops blanks', () => {

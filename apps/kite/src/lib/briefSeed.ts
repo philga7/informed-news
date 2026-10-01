@@ -14,6 +14,10 @@ export const BRIEF_SEED_SUBMIT_LABEL = 'Add to Brief';
 
 export const BRIEF_SEED_PENDING_LABEL = 'Saving…';
 
+/** Manual seeds are not triaged, so the topic Brief (NEWS-88) doesn't show them. */
+export const BRIEF_SEED_TOPIC_BRIEF_NOTE =
+	"The story is saved, but it won't appear in the topic Brief yet.";
+
 export const BRIEF_SEED_ERROR_GENERIC =
 	'Could not create the story. Check the title and URLs, then try again.';
 

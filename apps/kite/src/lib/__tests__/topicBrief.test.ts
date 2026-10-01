@@ -4,6 +4,7 @@ import {
 	BRIEF_AI_SUMMARY_NOTE,
 	BRIEF_NOT_REFRESHED,
 	BRIEF_REFRESH_ERROR,
+	BRIEF_REFRESH_POLL_FAILURES_TOLERATED,
 	BRIEF_OTHER_SECTION_NAME,
 	BRIEF_SEEN_MAX_IDS,
 	BRIEF_SUMMARY_ERROR,
@@ -23,6 +24,7 @@ import {
 	newlyReadIds,
 	nextRefreshLabel,
 	outletBadge,
+	overviewPollFailure,
 	postBriefRefresh,
 	postBriefSeen,
 	postStorySummary,
@@ -325,6 +327,13 @@ describe('refresh polling decisions', () => {
 		expect(
 			refreshPollOutcome(before, makeRefresh({ last: run(before, false, null) })),
 		).toMatchObject({ error: BRIEF_REFRESH_ERROR });
+	});
+
+	it('overviewPollFailure: tolerates 2 consecutive failed polls, the 3rd stops', () => {
+		expect(BRIEF_REFRESH_POLL_FAILURES_TOLERATED).toBe(2);
+		expect(overviewPollFailure(0)).toEqual({ failures: 1, stop: false });
+		expect(overviewPollFailure(1)).toEqual({ failures: 2, stop: false });
+		expect(overviewPollFailure(2)).toEqual({ failures: 3, stop: true });
 	});
 });
 

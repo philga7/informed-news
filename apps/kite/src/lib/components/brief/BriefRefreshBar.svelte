@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, untrack } from 'svelte';
 	import { dataReloadService } from '$lib/services/dataService';
 	import {
 		BRIEF_REFRESHING_LABEL,
@@ -11,6 +11,7 @@
 		isRecoverableRefreshFailure,
 		lastSuccessAt,
 		nextRefreshLabel,
+		overviewPollFailure,
 		postBriefRefresh,
 		refreshPollOutcome,
 		updatedLabel,
@@ -33,6 +34,7 @@
 
 	let pollTimer: ReturnType<typeof setTimeout> | null = null;
 	let pollBaseline: string | null = null;
+	let pollFailures = 0;
 	let destroyed = false;
 
 	const currentRefresh = $derived(polled?.refresh ?? refresh);
@@ -48,6 +50,14 @@
 		return () => clearInterval(timer);
 	});
 
+	// A new overview from the parent (e.g. after a reload) replaces data from an earlier poll.
+	$effect(() => {
+		void refresh;
+		untrack(() => {
+			if (!polling) polled = null;
+		});
+	});
+
 	onMount(() => {
 		if (refresh.running) startPolling(lastSuccessAt(refresh), false);
 		return () => {
@@ -61,6 +71,7 @@
 		if (polling || destroyed) return;
 		polling = true;
 		pollBaseline = baseline;
+		pollFailures = 0;
 		if (immediately) void pollOnce();
 		else schedulePoll();
 	}
@@ -76,10 +87,17 @@
 		const overview = await fetchBriefOverview();
 		if (destroyed) return;
 		if (!overview) {
+			const failure = overviewPollFailure(pollFailures);
+			pollFailures = failure.failures;
+			if (!failure.stop) {
+				schedulePoll();
+				return;
+			}
 			polling = false;
 			errorMessage = BRIEF_REFRESH_ERROR;
 			return;
 		}
+		pollFailures = 0;
 		polled = { refresh: overview.refresh, notices: overview.notices };
 		const outcome = refreshPollOutcome(pollBaseline, overview.refresh);
 		if (outcome.kind === 'running') {
@@ -94,6 +112,7 @@
 	async function handleRefresh(): Promise<void> {
 		if (busy) return;
 		const baseline = lastSuccessAt(currentRefresh);
+		polled = null;
 		refreshing = true;
 		errorMessage = null;
 		loginHint = false;
