@@ -61,6 +61,24 @@ test('isRefreshDue: failed attempt within the retry window → not due; after �
   assert.equal(isRefreshDue(meta({ refresh: { last: oldFail, lastSuccess: null } }), 3, NOW), true);
 });
 
+test('isRefreshDue: future or invalid last-success timestamps count as missing → due', () => {
+  const future = run({ completedAt: MINUTES_AGO(-60) });
+  assert.equal(isRefreshDue(meta({ refresh: { last: future, lastSuccess: future } }), 3, NOW), true);
+  const invalid = run({ completedAt: 'not-a-date' });
+  assert.equal(isRefreshDue(meta({ refresh: { last: invalid, lastSuccess: invalid } }), 3, NOW), true);
+  assert.equal(isRefreshDue(meta({ lastFetchAt: MINUTES_AGO(-60) }), 3, NOW), true);
+  assert.equal(isRefreshDue(meta({ lastFetchAt: 'garbage' }), 3, NOW), true);
+});
+
+test('isRefreshDue: future or invalid failed-attempt startedAt skips the retry gate', () => {
+  const stale = run({ completedAt: HOURS_AGO(5) });
+  const futureFail = run({ ok: false, error: 'CFP down', startedAt: MINUTES_AGO(-10) });
+  const invalidFail = run({ ok: false, error: 'CFP down', startedAt: 'nope' });
+  assert.equal(isRefreshDue(meta({ refresh: { last: futureFail, lastSuccess: stale } }), 3, NOW), true);
+  assert.equal(isRefreshDue(meta({ refresh: { last: invalidFail, lastSuccess: stale } }), 3, NOW), true);
+  assert.equal(isRefreshDue(meta({ refresh: { last: futureFail, lastSuccess: null } }), 3, NOW), true);
+});
+
 function okResult(trigger: RefreshTrigger): RefreshResult {
   return {
     trigger,

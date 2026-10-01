@@ -797,6 +797,20 @@ test('buildBriefOverview: sections with More split, quiet, notices, nextAt, runn
   assert.equal(never.refresh.last, null);
   assert.equal(never.refresh.lastSuccess, null);
   assert.deepEqual(never.notices, []);
+
+  const degraded = buildBriefOverview({
+    brief: topicBrief(),
+    meta,
+    intervalHours: 3,
+    running: false,
+    degraded: ['seen', 'summaries'],
+  });
+  assert.deepEqual(degraded.notices, [
+    'SearXNG unavailable',
+    'Last refresh failed: CFP down',
+    'Read history unavailable (brief-seen.json unreadable)',
+    'Saved summaries unavailable (brief-summaries.json unreadable)',
+  ]);
 });
 
 test('buildBriefOverview: fixture (brief null) → no sections or quiet line', () => {

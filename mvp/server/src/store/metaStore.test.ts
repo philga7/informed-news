@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
@@ -42,4 +42,16 @@ test('readMeta keeps refresh and brief, and updateMeta merges without dropping t
   const next = await updateMeta({ lastError: 'CFP down' }, metaPath);
   assert.deepEqual(next, { ...meta, lastError: 'CFP down' });
   assert.deepEqual(await readMeta(metaPath), { ...meta, lastError: 'CFP down' });
+});
+
+test('writeMeta is atomic: concurrent writes leave valid JSON and no .tmp files', async () => {
+  const metaPath = tempMetaPath();
+  await Promise.all(
+    Array.from({ length: 10 }, (_, i) =>
+      writeMeta({ lastFetchAt: null, lastError: `e${i}` }, metaPath),
+    ),
+  );
+  const meta = await readMeta(metaPath);
+  assert.match(meta.lastError ?? '', /^e\d$/);
+  assert.deepEqual(readdirSync(path.dirname(metaPath)), ['meta.json']);
 });

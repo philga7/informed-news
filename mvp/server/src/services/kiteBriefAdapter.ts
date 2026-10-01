@@ -798,15 +798,28 @@ function nextRefreshAt(
   return new Date(completed + intervalHours * 60 * 60 * 1000).toISOString();
 }
 
+/** Brief stores that may be unreadable without failing the Brief (read as empty). */
+export type BriefDegradedStore = 'seen' | 'summaries';
+
+const DEGRADED_NOTICES: Record<BriefDegradedStore, string> = {
+  seen: 'Read history unavailable (brief-seen.json unreadable)',
+  summaries: 'Saved summaries unavailable (brief-summaries.json unreadable)',
+};
+
 /** `brief: null` = fixture (empty article store): no sections or quiet line. */
 export function buildBriefOverview(input: {
   brief: TopicBrief | null;
   meta: StoreMeta;
   intervalHours: number | null;
   running: boolean;
+  degraded?: readonly BriefDegradedStore[];
 }): BriefOverview {
   const last = input.meta.refresh?.last ?? null;
   const lastSuccess = input.meta.refresh?.lastSuccess ?? null;
+  const notices = [
+    ...buildRefreshNotices(input.meta),
+    ...(input.degraded ?? []).map((store) => DEGRADED_NOTICES[store]),
+  ];
   return {
     ok: true,
     fixture: input.brief === null,
@@ -817,7 +830,7 @@ export function buildBriefOverview(input: {
       intervalHours: input.intervalHours,
       running: input.running,
     },
-    notices: buildRefreshNotices(input.meta),
+    notices,
     sections: (input.brief?.sections ?? []).map((section) => ({
       topicId: section.topic.id,
       name: section.topic.name,

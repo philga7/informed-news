@@ -110,7 +110,7 @@ With a non-empty article store, `GET /api/batches/:batchId/categories` returns o
   quiet: [{ id, name, level }] }
 ```
 
-`last` / `lastSuccess` are `meta.json` → `refresh` runs (or `null`); `nextAt` = `lastSuccess.completedAt` + interval (`null` when auto-refresh is off or nothing has succeeded); `intervalHours` is `null` when off; `running` is true while a refresh runs in this process. `notices` are plain-language status lines (provider down/partial, TypeSafe or Ollama not configured, stories not scored for budget, last refresh failed). `fixture: true` (empty store) → empty `sections` / `quiet`. Kite proxy: `apps/kite/src/routes/api/brief/overview/+server.ts`. Guide: [BRIEF.md](BRIEF.md).
+`last` / `lastSuccess` are `meta.json` → `refresh` runs (or `null`); `nextAt` = `lastSuccess.completedAt` + interval (`null` when auto-refresh is off or nothing has succeeded); `intervalHours` is `null` when off; `running` is true while a refresh runs in this process. `notices` are plain-language status lines (provider down/partial, TypeSafe or Ollama not configured, stories not scored for budget, last refresh failed, `brief-seen.json` / `brief-summaries.json` unreadable). An unreadable seen or summaries file is read as empty (stories and overview still return 200); other store read failures → 500. `fixture: true` (empty store) → empty `sections` / `quiet`. Kite proxy: `apps/kite/src/routes/api/brief/overview/+server.ts`. Guide: [BRIEF.md](BRIEF.md).
 
 Claims response: `{ ok: true, claims: BriefClaimItem[] }`. Source: `ClaimMembership.acceptedClaimIds` only — not the full radar inbox. Muted accepted claims are **omitted** (membership retained). Sorted `createdAt` desc. Empty → `{ ok: true, claims: [] }` (no fixture claims).
 

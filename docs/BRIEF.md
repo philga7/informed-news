@@ -43,7 +43,7 @@ Without `OLLAMA_API_KEY` no summaries are generated; once a refresh has recorded
 
 A story counts as **seen** when you open it or mark it read in the Brief (including **Mark all as read**). Kite sends seen marks to the server in batches about a second later, and right away when you leave the tab. Seen marks need a login; without one they are silently skipped.
 
-- A seen story stays on the page (read styling) until the next successful refresh. After that refresh it is hidden.
+- A seen story stays on the page (read styling) until the next successful refresh. After that refresh it is hidden. A story read while a refresh is running hides after the following refresh.
 - It comes back if it is **significantly updated** since you saw it: at least **2 more outlets**, or significance up by at least **0.5**. Seeing it again takes a fresh snapshot.
 - Before the first successful refresh nothing is hidden.
 - Refresh-time summaries skip stories you saw before that refresh started.
@@ -53,13 +53,13 @@ A story counts as **seen** when you open it or mark it read in the Brief (includ
 
 A refresh runs the whole pipeline: CFP → curated RSS → xcancel → topic search → clustering → triage → tracked-stories sync → Brief summaries. The timer, the startup catch-up, and the Refresh button share one runner: a refresh requested while one is running joins it instead of starting another.
 
-**Timer.** The server checks once at startup and then every 5 minutes. A refresh starts when the last successful one finished at least `REFRESH_INTERVAL_HOURS` ago (default 3), or there has never been one (a store from before NEWS-88 uses its last fetch time instead). After a failed refresh it waits 30 minutes before trying again. A laptop that slept catches up on the first check after it wakes; an always-on host behaves the same. The server log says at startup whether auto-refresh is on and at what interval.
+**Timer.** The server checks once at startup and then every 5 minutes. A refresh starts when the last successful one finished at least `REFRESH_INTERVAL_HOURS` ago (default 3), or there has never been one (a store from before NEWS-88 uses its last fetch time instead). After a failed refresh it waits 30 minutes before trying again. A stored time that is unreadable or in the future (e.g. after a clock change) counts as missing, so a refresh runs and the 30-minute wait is skipped. A laptop that slept catches up on the first check after it wakes; an always-on host behaves the same. The server log says at startup whether auto-refresh is on and at what interval.
 
 **Refresh bar** (above the sections):
 
 - "Updated 5 min ago" from the last successful refresh, or "Not refreshed yet".
 - "Next refresh 3:40 PM" when the timer is on and a refresh has succeeded ("Next refresh due now" once it is overdue).
-- **Refresh** button → runs a refresh and reloads the Brief. It shows "Refreshing…" and is disabled while a refresh is running. It needs a login: otherwise it shows "Log in on Topics to refresh" linking to `/topics`. A refresh can take minutes. The bar checks every 10 seconds and reloads the Brief when the refresh finishes in two cases: a refresh was already running when the page loaded, or your Refresh request timed out or failed in a way that may hide a still-running refresh (network error or server error). A timer refresh that starts after the page loaded shows up the next time you reload.
+- **Refresh** button → runs a refresh and reloads the Brief. It shows "Refreshing…" and is disabled while a refresh is running. It needs a login: otherwise it shows "Log in on Topics to refresh" linking to `/topics`. A refresh can take minutes. The bar checks every 10 seconds and reloads the Brief when the refresh finishes in two cases: a refresh was already running when the page loaded, or your Refresh request timed out or failed in a way that may hide a still-running refresh (network error or server error). If 3 checks in a row fail, it stops and shows "Refresh failed. Try again." A timer refresh that starts after the page loaded shows up the next time you reload.
 - Notices, in plain language:
 
 | Notice | When |
@@ -70,6 +70,8 @@ A refresh runs the whole pipeline: CFP → curated RSS → xcancel → topic sea
 | N stories not scored (budget) | Triage's Jev budget ran out; retried next refresh |
 | Summaries unavailable (Ollama not configured) | The last refresh found no `OLLAMA_API_KEY` |
 | Last refresh failed: … | The last refresh failed (e.g. CFP down) |
+| Read history unavailable (brief-seen.json unreadable) | The seen file can't be read; nothing is hidden as seen |
+| Saved summaries unavailable (brief-summaries.json unreadable) | The summaries file can't be read; cards show no saved summary |
 
 ## Env
 
@@ -111,10 +113,11 @@ Shapes and status codes: [MVP_API_COMPAT.md](MVP_API_COMPAT.md). Kite proxies th
 - Summary problems never fail a refresh; they are recorded in `meta.json` → `brief`.
 - A CFP failure still fails the refresh (`POST /api/fetch` → 500); it is recorded as the last refresh and shown as a notice.
 - Auto-refresh errors are logged and never stop the server; it starts and serves even if the startup catch-up fails.
+- An unreadable `brief-seen.json` or `brief-summaries.json` doesn't break the Brief: it is read as empty and the refresh bar shows "Read history unavailable (brief-seen.json unreadable)" or "Saved summaries unavailable (brief-summaries.json unreadable)". Any other unreadable store (articles, triage, topics, mutes, meta) still fails the Brief request (500).
 
 ## Still interim
 
-- **Accept / claims lead.** The accepted-claims lead still renders above the topic sections, and Accept / Unaccept endpoints still exist, but Accept no longer decides what is in the Brief. Manual seeds (Add story) are not triaged, so they don't appear in the topic Brief. Retiring the review flow is [NEWS-91](https://informedcrew.atlassian.net/browse/NEWS-91).
+- **Accept / claims lead.** The accepted-claims lead still renders above the topic sections, and Accept / Unaccept endpoints still exist, but Accept no longer decides what is in the Brief. Manual seeds (Add story) are not triaged, so they don't appear in the topic Brief; the Add story form says so. Retiring the review flow is [NEWS-91](https://informedcrew.atlassian.net/browse/NEWS-91).
 - **Full stories** (talking points, timeline, sections) are not on topic Brief cards — [NEWS-89](https://informedcrew.atlassian.net/browse/NEWS-89).
 - **Filtered out view** (dropped stories and why) — [NEWS-90](https://informedcrew.atlassian.net/browse/NEWS-90).
 - The NEWS-86 guards on topic search rows stay ([TOPIC_SEARCH.md](TOPIC_SEARCH.md)); kept search rows get Brief summaries only through this path.

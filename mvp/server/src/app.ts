@@ -76,6 +76,11 @@ import type { Article } from './types/article.js';
 export type CreateAppDeps = {
   /** Default: the process runner, or one built from the deps below when `fetchAllSources` is injected */
   refreshRunner?: RefreshRunner;
+  /**
+   * Injecting this builds a fresh runner from the deps below. Inject
+   * `generateRefreshSummaries` and `updateMeta` too (or pass a `refreshRunner`
+   * instead): any left out fall back to the real stores (mvp/data) and Ollama.
+   */
   fetchAllSources?: typeof fetchAllSources;
   syncTrackedAfterFetch?: typeof syncTrackedAfterFetch;
   generateRefreshSummaries?: typeof generateRefreshSummaries;

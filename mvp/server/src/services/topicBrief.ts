@@ -112,7 +112,8 @@ function hostnameOf(url: string): string | null {
 }
 
 function articleDomain(article: Article): string | null {
-  return article.publisherDomain || hostnameOf(articleLink(article));
+  const publisherDomain = article.publisherDomain?.replace(/^www\./, '');
+  return publisherDomain || hostnameOf(articleLink(article));
 }
 
 function isDuplicateMember(triage: TriageStore, id: string): boolean {

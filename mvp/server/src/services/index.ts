@@ -197,7 +197,11 @@ export {
   buildTopicBriefStoriesResponse,
   topicBriefToKiteStories,
 } from './kiteBriefAdapter.js';
-export type { BriefOverview, TopicBriefResponseOptions } from './kiteBriefAdapter.js';
+export type {
+  BriefDegradedStore,
+  BriefOverview,
+  TopicBriefResponseOptions,
+} from './kiteBriefAdapter.js';
 export { createKiteBriefRouter } from './kiteBriefRoutes.js';
 export type { CreateKiteBriefRouterDeps } from './kiteBriefRoutes.js';
 export { buildBriefClaimsFeed, loadBriefClaims } from './briefClaims.js';

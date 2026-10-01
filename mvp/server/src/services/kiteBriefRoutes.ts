@@ -16,8 +16,10 @@ import {
   readTriage,
 } from '../store/index.js';
 import type { Article, StoreMeta } from '../types/article.js';
+import type { BriefSeenStore, BriefSummariesStore } from '../types/brief.js';
 import {
   OWNED_BATCH_ID,
+  type BriefDegradedStore,
   buildBriefOverview,
   buildOwnedBatchInfo,
   buildOwnedCategoriesResponse,
@@ -52,10 +54,13 @@ export type CreateKiteBriefRouterDeps = {
   env?: NodeJS.ProcessEnv;
 };
 
-/** Empty article store → the fixture stories; otherwise the topic Brief from triage kept records. */
+/**
+ * Empty article store → the fixture stories; otherwise the topic Brief from triage kept records.
+ * `degraded` lists the seen/summaries stores that could not be read (treated as empty).
+ */
 type OwnedBrief =
   | { fixture: true; articles: Article[] }
-  | { fixture: false; brief: TopicBrief; meta: StoreMeta };
+  | { fixture: false; brief: TopicBrief; meta: StoreMeta; degraded: BriefDegradedStore[] };
 
 function isOwnedBatchId(batchId: string): boolean {
   return batchId === OWNED_BATCH_ID || batchId === 'latest';
@@ -99,14 +104,22 @@ export function createKiteBriefRouter(
       return { fixture: true, articles };
     }
 
+    const degraded: BriefDegradedStore[] = [];
     const [triage, topics, mutes, seen, summaries, meta] = await Promise.all([
       readTriageStore(),
       readTopicList(),
       readMutes(),
-      readSeen(),
-      readSummaries(),
+      readSeen().catch((): BriefSeenStore => {
+        degraded.push('seen');
+        return { seen: {}, updatedAt: null };
+      }),
+      readSummaries().catch((): BriefSummariesStore => {
+        degraded.push('summaries');
+        return { summaries: {}, updatedAt: null };
+      }),
       readServerMeta(),
     ]);
+    degraded.sort();
     const brief = composeTopicBrief({
       topics: topics.topics,
       muteRules: mutes.rules,
@@ -117,7 +130,7 @@ export function createKiteBriefRouter(
       refresh: meta.refresh ?? null,
       now: at,
     });
-    return { fixture: false, brief, meta };
+    return { fixture: false, brief, meta, degraded };
   }
 
   async function loadEnrichments() {
@@ -263,6 +276,7 @@ export function createKiteBriefRouter(
           meta,
           intervalHours: resolveRefreshIntervalHours(deps.env ?? process.env),
           running: isRefreshRunning(),
+          degraded: owned.fixture ? [] : owned.degraded,
         }),
       );
     } catch (err) {

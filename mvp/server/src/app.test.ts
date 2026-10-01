@@ -2470,6 +2470,55 @@ test('GET /api/brief/overview: sections with More split, quiet, notices, nextAt,
   }
 });
 
+for (const [store, dep, notice] of [
+  ['seen', 'readBriefSeen', 'Read history unavailable (brief-seen.json unreadable)'],
+  ['summaries', 'readBriefSummaries', 'Saved summaries unavailable (brief-summaries.json unreadable)'],
+] as const) {
+  test(`Kite brief: unreadable ${store} store degrades to empty with an overview notice`, async () => {
+    const { baseUrl, close } = await startBriefRouter(
+      {
+        articles: ['k1', 'k2'].map((id) => briefArticle(id)),
+        records: [keptRecord('k1', ['t1']), keptRecord('k2', ['t1'])],
+      },
+      {
+        [dep]: async () => {
+          throw new Error(`corrupt ${store}`);
+        },
+      },
+    );
+    try {
+      const body = await getJson<KiteBatchStoriesResponse>(
+        `${baseUrl}/api/batches/latest/categories/world/stories`,
+      );
+      assert.deepEqual(
+        body.stories.map((s) => s.id).sort(),
+        ['k1', 'k2'],
+      );
+      const overview = await getJson<{ notices: string[] }>(`${baseUrl}/api/brief/overview`);
+      assert.deepEqual(overview.notices, [notice]);
+    } finally {
+      await close();
+    }
+  });
+}
+
+test('Kite brief: unreadable triage store still fails with 500', async () => {
+  const { baseUrl, close } = await startBriefRouter(
+    { articles: [briefArticle('k1')] },
+    {
+      readTriage: async () => {
+        throw new Error('corrupt triage');
+      },
+    },
+  );
+  try {
+    const resp = await fetch(`${baseUrl}/api/brief/overview`);
+    assert.equal(resp.status, 500);
+  } finally {
+    await close();
+  }
+});
+
 async function startSeenServer(f: BriefFixture & {
   writeBriefSeen?: (store: BriefSeenStore) => Promise<void>;
   summarizeBriefStory?: CreateAppDeps['summarizeBriefStory'];

@@ -448,6 +448,31 @@ test('links: kept article first, duplicate members in memberIds order, distinct 
   });
 });
 
+test('links: a leading www. on publisherDomain is stripped, so www.x.com and x.com dedupe', () => {
+  const brief = compose({
+    topics: [makeTopic('c1')],
+    articles: [
+      makeArticle('k', { publisherDomain: 'www.outlet.example' }),
+      makeArticle('m1', { publisherDomain: 'outlet.example' }),
+      makeArticle('m2', { publisherDomain: 'www.other.example' }),
+    ],
+    triage: triageOf(
+      kept('k', ['c1'], { memberIds: ['m1', 'm2'] }),
+      duplicate('m1', 'k'),
+      duplicate('m2', 'k'),
+    ),
+  });
+  const story = brief.sections[0]!.stories[0]!;
+  assert.equal(story.domain, 'outlet.example');
+  assert.deepEqual(
+    story.links.map((l) => [l.domain, l.url]),
+    [
+      ['outlet.example', 'https://k.example.com/story'],
+      ['other.example', 'https://m2.example.com/story'],
+    ],
+  );
+});
+
 test('summary source chain: kept body → duplicate member body → post snippet ≥120 → none', () => {
   const longPost = 'p'.repeat(120);
   const articles = new Map(

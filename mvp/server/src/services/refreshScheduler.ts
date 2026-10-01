@@ -41,26 +41,31 @@ function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
-function parseTime(iso: string | null | undefined): number | null {
+/** Parsed time, or null when missing, invalid, or later than `now` (clock skew / bad data). */
+function parsePastTime(iso: string | null | undefined, now: Date): number | null {
   if (!iso) return null;
   const t = Date.parse(iso);
-  return Number.isFinite(t) ? t : null;
+  if (!Number.isFinite(t) || t > now.getTime()) return null;
+  return t;
 }
 
 /**
  * Due when the last success (legacy: `meta.lastFetchAt`) is missing or at
  * least `intervalHours` old — unless the last attempt failed less than
- * REFRESH_RETRY_MINUTES ago.
+ * REFRESH_RETRY_MINUTES ago. Invalid or future timestamps count as missing.
  */
 export function isRefreshDue(meta: StoreMeta, intervalHours: number, now: Date): boolean {
   const last = meta.refresh?.last ?? null;
   if (last && last.ok === false) {
-    const failedAt = parseTime(last.startedAt);
+    const failedAt = parsePastTime(last.startedAt, now);
     if (failedAt !== null && now.getTime() - failedAt < REFRESH_RETRY_MINUTES * MINUTE_MS) {
       return false;
     }
   }
-  const lastDoneAt = parseTime(meta.refresh?.lastSuccess?.completedAt ?? meta.lastFetchAt);
+  const lastDoneAt = parsePastTime(
+    meta.refresh?.lastSuccess?.completedAt ?? meta.lastFetchAt,
+    now,
+  );
   if (lastDoneAt === null) return true;
   return now.getTime() - lastDoneAt >= intervalHours * HOUR_MS;
 }

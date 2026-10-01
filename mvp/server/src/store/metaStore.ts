@@ -1,4 +1,5 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { randomBytes } from 'node:crypto';
+import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { StoreMeta } from '../types/article.js';
 import { META_PATH } from './paths.js';
@@ -36,11 +37,19 @@ export async function readMeta(metaPath: string = META_PATH): Promise<StoreMeta>
 }
 
 /**
- * Write store metadata (last fetch time / last error).
+ * Write store metadata. Atomic: temp file in the same directory, then rename,
+ * so a concurrent reader never sees a partial file.
  */
 export async function writeMeta(meta: StoreMeta, metaPath: string = META_PATH): Promise<void> {
   await ensureDataDir(metaPath);
-  await writeFile(metaPath, `${JSON.stringify(meta, null, 2)}\n`, 'utf8');
+  const tmpPath = `${metaPath}.tmp-${process.pid}-${randomBytes(6).toString('hex')}`;
+  try {
+    await writeFile(tmpPath, `${JSON.stringify(meta, null, 2)}\n`, 'utf8');
+    await rename(tmpPath, metaPath);
+  } catch (err) {
+    await rm(tmpPath, { force: true });
+    throw err;
+  }
 }
 
 /**
