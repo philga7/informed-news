@@ -17,8 +17,8 @@ Claims spine plan: [`.cursor/plans/claims_evidence_spine_8f4cde15.plan.md`](../.
 | 2 | [NEWS-86](https://informedcrew.atlassian.net/browse/NEWS-86) | Topic search ingest: Google News RSS + self-hosted SearXNG, merged — **Done** |
 | 3 | [NEWS-87](https://informedcrew.atlassian.net/browse/NEWS-87) | Triage pipeline: dedupe, keyword + Jev headline gates, survivor-only scrape, budget caps, drop reasons — **Done** ([docs/TRIAGE.md](TRIAGE.md)) |
 | 4 | [NEWS-88](https://informedcrew.atlassian.net/browse/NEWS-88) | Brief by topic: top 3 per topic, summaries for shown stories only, scheduled + manual refresh — **Done** ([docs/BRIEF.md](BRIEF.md)) |
-| **5** | [NEWS-89](https://informedcrew.atlassian.net/browse/NEWS-89) | Full stories: tap-to-expand *(milestone 1, next)*; automatic worth-it bar, topic sections, living updates *(follow-up)* |
-| 6 | [NEWS-90](https://informedcrew.atlassian.net/browse/NEWS-90) | Filtered out view + "Less like this" feedback |
+| 5 | [NEWS-89](https://informedcrew.atlassian.net/browse/NEWS-89) | Full stories: tap-to-expand, automatic worth-it bar, topic sections, living updates — **Done** ([docs/BRIEF.md](BRIEF.md)) |
+| **6** | [NEWS-90](https://informedcrew.atlassian.net/browse/NEWS-90) | Filtered out view + "Less like this" feedback *(next)* |
 | 7 | [NEWS-91](https://informedcrew.atlassian.net/browse/NEWS-91) | Retire review flow from default path; park claims desk; update docs |
 | 8 | [NEWS-99](https://informedcrew.atlassian.net/browse/NEWS-99) | Prune the Brief summaries store (grows without bound today) |
 | 9 | [NEWS-100](https://informedcrew.atlassian.net/browse/NEWS-100) | Prune the Brief full-stories store (sibling of NEWS-99; ship together if practical) |
@@ -27,7 +27,7 @@ Claims spine plan: [`.cursor/plans/claims_evidence_spine_8f4cde15.plan.md`](../.
 | Later | [NEWS-92](https://informedcrew.atlassian.net/browse/NEWS-92) | USAspending contract awards source for company Watch topics |
 | Later | [NEWS-93](https://informedcrew.atlassian.net/browse/NEWS-93) | Always-on hosting decision |
 
-**First milestone:** NEWS-85 → 86 → 87 → 88 (all Done) plus tap-to-expand from NEWS-89 — open the app and get a filtered, topic-grouped Brief with no review step. Only tap-to-expand remains.
+**First milestone:** NEWS-85 → 86 → 87 → 88 → 89 (all Done) — open the app and get a filtered, topic-grouped Brief with tap-to-expand full stories and no review step.
 
 Epic **K** ([NEWS-83](https://informedcrew.atlassian.net/browse/NEWS-83)) stays open as the bug intake from the operator walkthrough: open [NEWS-94](https://informedcrew.atlassian.net/browse/NEWS-94) primary-source plumbing, [NEWS-95](https://informedcrew.atlassian.net/browse/NEWS-95) Topics follow-ups, [NEWS-97](https://informedcrew.atlassian.net/browse/NEWS-97) "WORLD" label on topic Brief cards, [NEWS-101](https://informedcrew.atlassian.net/browse/NEWS-101) full-story unavailable UI feedback, [NEWS-103](https://informedcrew.atlassian.net/browse/NEWS-103) require green CI before merge. [NEWS-96](https://informedcrew.atlassian.net/browse/NEWS-96) (svelte-check 0/0, hermetic e2e/integration stack, no skipped tests) shipped with NEWS-88 — **Done**. Still ask before parked Later under [NEWS-57](https://informedcrew.atlassian.net/browse/NEWS-57) or Epic **B** ([NEWS-34](https://informedcrew.atlassian.net/browse/NEWS-34)).
 
