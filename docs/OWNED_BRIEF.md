@@ -33,7 +33,7 @@ Product next is the **claims / evidence** desk ([NEWS-69](https://informedcrew.a
 | GET | `/api/batches/latest/claims` | Accepted claims for Brief hybrid ([NEWS-76](https://informedcrew.atlassian.net/browse/NEWS-76)) |
 | GET | `/api/batches/:batchId/claims` | Same; `:batchId` must be `owned-latest` or `latest` |
 
-Batch id is always `owned-latest`. Category slug `world` (named **Brief**) / UUID `00000000-0000-4000-8000-000000000001` (matches Kite’s default `/world/latest` route). Session routes the Brief also calls: `POST /api/brief/seen`, `POST /api/brief/stories/:articleId/summary`, `POST /api/fetch` (Refresh) — see [MVP_API_COMPAT.md](MVP_API_COMPAT.md).
+Batch id is always `owned-latest`. Category slug `world` (named **Brief**) / UUID `00000000-0000-4000-8000-000000000001` (matches Kite’s default `/world/latest` route). Session routes the Brief also calls: `POST /api/brief/seen`, `POST /api/brief/stories/:articleId/summary`, `POST /api/brief/stories/:articleId/full`, `POST /api/fetch` (Refresh) — see [MVP_API_COMPAT.md](MVP_API_COMPAT.md).
 
 Claims response: `{ ok: true, claims: BriefClaimItem[] }` — accepted membership only, mute-excluded, sorted `createdAt` desc. See [MVP_API_COMPAT.md](MVP_API_COMPAT.md) for the full item shape.
 
@@ -44,6 +44,7 @@ Claims response: `{ ok: true, claims: BriefClaimItem[] }` — accepted membershi
 - Claim-level verbiage enrichments are stored separately in `mvp/data/claim-enrichments.json` (generated via session `POST /api/claims/enrich` — accepted claims only; Ollama `short_summary` + `talking_points`; never overwrites claim status).
 - If the store is **empty**, the adapter returns a single **fixture** story so Brief still loads (first-run / smoke).
 - If the store has articles, the Brief is the **topic Brief**: triage kept stories (`mvp/data/triage.json`) composed by `mvp/server/src/services/topicBrief.ts` and mapped by `topicBriefToKiteStories` in `kiteBriefAdapter.ts`, with AI summaries from `mvp/data/brief-summaries.json` ([BRIEF.md](BRIEF.md)). No kept stories → no stories, not the fixture.
+- Topic Brief full stories are separately cached by kept article id in `mvp/data/brief-full-stories.json`. A hydrated `ok` record adds rich fields to the public story response; missing, unavailable, and failed records remain explicit glue state for Kite's on-demand control. The cache does not share the legacy cluster-enrichment key space.
 - The fixture path in `kiteBriefAdapter.ts` still groups by `clusterId` and maps the framing summary → `short_summary`.
 
 ### Membership (Developing desk — NEWS-57 / NEWS-65 / NEWS-66)
@@ -147,7 +148,7 @@ Operators can add a story directly to Brief without going through Radar ingest:
 2. To refresh now: log in on `/topics` and press **Refresh** on the Brief, or log in against the MVP API (session cookie — e.g. `curl` to `POST /api/login`, see [MVP_API_COMPAT.md](MVP_API_COMPAT.md)) and `POST /api/fetch` (optional `limit`).
 3. Reload Kite Brief — sections per desired topic from triage's kept stories. The fixture disappears once any article exists; a non-empty store with no kept stories shows an empty Brief (with the "Nothing new:" line when you have topics).
 
-`POST /api/classify` and `POST /api/enrich` (cluster enrichments in `mvp/data/cluster-enrichments.json`) still run on demand, but topic Brief cards don't use them (full stories are [NEWS-89](https://informedcrew.atlassian.net/browse/NEWS-89)).
+`POST /api/classify` and `POST /api/enrich` (cluster enrichments in `mvp/data/cluster-enrichments.json`) still run on demand, but topic Brief cards use their separate [NEWS-89](https://informedcrew.atlassian.net/browse/NEWS-89) full-story path instead.
 
 ## Opt-in Kagi data (dev only)
 
@@ -167,7 +168,7 @@ Session-gated CFP/xcancel article + classify routes remain on the same server �
 
 ### Owned story fields from the MVP store
 
-> **Topic Brief stories (NEWS-88)** use a smaller shape: `title`, `short_summary`, `articles[]` / `domains` from the card's links, `primary_image` from the kept article's image (caption falls back to the headline, credit to the domain), and the `informed_*` fields listed in [MVP_API_COMPAT.md](MVP_API_COMPAT.md#topic-brief-news-88). No `quote*`, `perspectives`, or enrichment fields. The fields below describe the fixture / cluster path.
+> **Topic Brief stories (NEWS-88 / NEWS-89)** use `title`, `short_summary`, `articles[]` / `domains` from the card's links, `primary_image` from the kept article's image (caption falls back to the headline, credit to the domain), and the `informed_*` fields listed in [MVP_API_COMPAT.md](MVP_API_COMPAT.md#topic-brief-news-88). A cached NEWS-89 full story additionally hydrates its supported rich fields (`talking_points`, timeline, suggested Q&A, deterministic perspectives / quote, and requested topic extras); no empty fields or map data are emitted. The fields below otherwise describe the fixture / cluster path.
 
 The owned brief adapter (`mvp/server/src/services/kiteBriefAdapter.ts`) also fills a small set of **story-level** fields directly from the MVP article store:
 

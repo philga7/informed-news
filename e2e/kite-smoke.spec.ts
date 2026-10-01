@@ -28,6 +28,7 @@ type KiteStory = {
 	suggested_qna?: unknown[];
 	informed_article_id?: string;
 	informed_summary_status?: string;
+	informed_full_story_status?: string;
 };
 
 function useScenario(name: 'topics' | 'empty'): void {
@@ -155,6 +156,23 @@ test.describe('Topic Brief (NEWS-88)', () => {
 		);
 
 		expect(kagiHosts, `unexpected kite.kagi.com requests: ${kagiHosts.join(', ')}`).toEqual([]);
+	});
+
+	test('a cached full story expands with rich content and its AI disclaimer', async ({ page }) => {
+		await page.goto('/');
+		await expect(page).toHaveTitle(/Informed News/i, { timeout: 60_000 });
+
+		const stories = await loadOwnedStories(page);
+		const fullStory = stories.find((story) => story.title === 'Operators add battery storage before winter peak');
+		expect(fullStory?.informed_full_story_status).toBe('ok');
+		expect(fullStory?.talking_points).toContain(TOPIC_SCENARIO.fullStoryTalkingPoint);
+		expect(fullStory?.cluster_number, 'expected cached full story to have a card').toBeTruthy();
+
+		const storyCard = page.locator(`article#story-${fullStory?.cluster_number}`);
+		await expect(storyCard).toBeVisible({ timeout: 60_000 });
+		await storyCard.locator('button[aria-label="Expand story"]').click();
+		await expect(storyCard.getByText(TOPIC_SCENARIO.fullStoryTalkingPoint)).toBeVisible();
+		await expect(storyCard.getByText('AI-assisted — not ground truth.')).toBeVisible();
 	});
 });
 

@@ -39,6 +39,16 @@ The first 3,000 characters are used, with the source article's headline. With no
 
 Without `OLLAMA_API_KEY` no summaries are generated; once a refresh has recorded that, the refresh bar shows "Summaries unavailable (Ollama not configured)".
 
+## Full stories
+
+Every topic Brief card has a **Full story** control. Opening a card also loads its full story when it has not yet been generated (or a prior attempt failed); the expanded card says "Loading full story…" while it works. This session action requires login, and otherwise links to **Topics**. A cached full story is included when the Brief is read, so reopening or revisiting a card does not call Ollama again while its source text is unchanged.
+
+Full stories add source-grounded talking points, a timeline, and suggested questions about what to verify or what remains unknown. Where the source set supports them, cards also show deterministic perspectives and a pull quote; topic settings can request business, technical, action, or history context. The existing **"AI-assisted — not ground truth"** label applies to generated sections. Empty or unsupported sections are omitted rather than filled with guesses. A topic's `map` setting is intentionally omitted: Kite has no map section, and the service neither requests nor emits coordinates or maps.
+
+The server stores one living full story per kept article in `brief-full-stories.json`. It reuses an `ok` record when the member-source hash and requested sections match. When material source changes cause regeneration, it retains prior timeline events, replaces supported current analysis, and shows an **Updated: …** note describing the change. A no-usable-text result is recorded as unavailable without calling Ollama; failures stay retryable.
+
+**At refresh:** after summary generation, the server may generate full stories automatically. The automatic bar requires a material story (Core significance at least 1.0; Watch stories were already significant at triage), either at least three independent outlets or an `official` label, and a new or significantly updated source. It ranks qualifying cards by significance, outlet count, then recency, and limits work to **5 total** and **1 per topic**. Other cards remain available on demand. On-demand full-story generation is independently capped at **20 per hour per server process**.
+
 ## Seen stories
 
 A story counts as **seen** when you open it or mark it read in the Brief (including **Mark all as read**). Kite sends seen marks to the server in batches about a second later, and right away when you leave the tab. Seen marks need a login; without one they are silently skipped.
@@ -51,7 +61,7 @@ A story counts as **seen** when you open it or mark it read in the Brief (includ
 
 ## Refresh
 
-A refresh runs the whole pipeline: CFP → curated RSS → xcancel → topic search → clustering → triage → tracked-stories sync → Brief summaries. The timer, the startup catch-up, and the Refresh button share one runner: a refresh requested while one is running joins it instead of starting another.
+A refresh runs the whole pipeline: CFP → curated RSS → xcancel → topic search → clustering → triage → tracked-stories sync → Brief summaries → qualifying full stories. The timer, the startup catch-up, and the Refresh button share one runner: a refresh requested while one is running joins it instead of starting another.
 
 **Timer.** The server checks once at startup and then every 5 minutes. A refresh starts when the last successful one finished at least `REFRESH_INTERVAL_HOURS` ago (default 3), or there has never been one (a store from before NEWS-88 uses its last fetch time instead). After a failed refresh it waits 30 minutes before trying again. A stored time that is unreadable or in the future (e.g. after a clock change) counts as missing, so a refresh runs and the 30-minute wait is skipped. A laptop that slept catches up on the first check after it wakes; an always-on host behaves the same. The server log says at startup whether auto-refresh is on and at what interval.
 
@@ -81,7 +91,7 @@ In `mvp/.env` (see `mvp/.env.example`):
 |----------|----------|
 | `REFRESH_INTERVAL_HOURS` | Hours between auto-refreshes; decimals allowed (`2.5`, `.5`), minimum 0.25. Unset or invalid (including `0.0`, `00`, negatives, `3h`) → 3. Exactly `0`, `off`, `false`, or `no` (trimmed, case-insensitive) turns off the timer **and** the startup catch-up; the Refresh button and `POST /api/fetch` still work. |
 | `TRIAGE_SUMMARY_BUDGET` | Ollama summary calls per refresh (non-negative integer; unset or invalid → 60). Now enforced. Doesn't limit on-demand summaries. |
-| `OLLAMA_API_KEY` / `OLLAMA_MODEL` | Existing Ollama settings, used for summaries. |
+| `OLLAMA_API_KEY` / `OLLAMA_MODEL` | Existing Ollama settings, used for summaries and full-story verbiage. |
 
 Other limits are constants in `mvp/server/src/services/briefConfig.ts` (top 3, 8 links, update thresholds, 7-day seen retention, summary lengths, concurrency, 30/hour on demand, refresh check and retry minutes).
 
@@ -92,9 +102,10 @@ Other limits are constants in `mvp/server/src/services/briefConfig.ts` (top 3, 8
 All gitignored under `mvp/data/`:
 
 - **`brief-summaries.json`** — one summary record per kept article id: `status` (`ok` \| `unavailable` \| `error`), `text`, the source article id and a hash of the source text, `model`, `error`, `generatedAt`, `trigger` (`refresh` \| `on_demand`).
+- **`brief-full-stories.json`** — one full-story record per kept article id: `status`, enriched fields, deterministic perspectives / quote, source hash, requested topic sections, model / error, generation metadata, and optional living-update timeline / note.
 - **`brief-seen.json`** — one entry per seen article id: `seenAt` plus the outlet count and significance at that time.
 - **`meta.json` → `refresh`** — `{ last, lastSuccess }`, each `{ trigger: 'manual' | 'timer' | 'startup', startedAt, completedAt, ok, error }`.
-- **`meta.json` → `brief`** — the last refresh's summary run: `{ at, summaries: { budget, used, generated, reused, unavailable, errors } }`.
+- **`meta.json` → `brief`** — the last refresh's summary and full-story runs: `{ at, summaries: { … }, fullStories: { budget, used, generated, reused, unavailable, errors } }`.
 
 ## Routes
 
@@ -104,6 +115,7 @@ All gitignored under `mvp/data/`:
 | GET | `/api/brief/overview` | Public | Section order, top / More ids, quiet topics, refresh status, notices |
 | POST | `/api/brief/seen` | Session | Record seen stories |
 | POST | `/api/brief/stories/:articleId/summary` | Session | On-demand summary for one visible story |
+| POST | `/api/brief/stories/:articleId/full` | Session | Generate or return the visible story's cached full story |
 | POST | `/api/fetch` | Session | Manual refresh (also returns `refresh` and `brief`) |
 
 Shapes and status codes: [MVP_API_COMPAT.md](MVP_API_COMPAT.md). Kite proxies these under `apps/kite/src/routes/api/`.
@@ -111,6 +123,7 @@ Shapes and status codes: [MVP_API_COMPAT.md](MVP_API_COMPAT.md). Kite proxies th
 ## Failure behavior
 
 - Summary problems never fail a refresh; they are recorded in `meta.json` → `brief`.
+- Full-story generation never fails a refresh; automatic-generation errors are recorded in `meta.json` → `brief.fullStories`, and on-demand errors remain retryable from the card.
 - A CFP failure still fails the refresh (`POST /api/fetch` → 500); it is recorded as the last refresh and shown as a notice.
 - Auto-refresh errors are logged and never stop the server; it starts and serves even if the startup catch-up fails.
 - An unreadable `brief-seen.json` or `brief-summaries.json` doesn't break the Brief: it is read as empty and the refresh bar shows "Read history unavailable (brief-seen.json unreadable)" or "Saved summaries unavailable (brief-summaries.json unreadable)". Any other unreadable store (articles, triage, topics, mutes, meta) still fails the Brief request (500).
@@ -118,6 +131,5 @@ Shapes and status codes: [MVP_API_COMPAT.md](MVP_API_COMPAT.md). Kite proxies th
 ## Still interim
 
 - **Accept / claims lead.** The accepted-claims lead still renders above the topic sections, and Accept / Unaccept endpoints still exist, but Accept no longer decides what is in the Brief. Manual seeds (Add story) are not triaged, so they don't appear in the topic Brief; the Add story form says so. Retiring the review flow is [NEWS-91](https://informedcrew.atlassian.net/browse/NEWS-91).
-- **Full stories** (talking points, timeline, sections) are not on topic Brief cards — [NEWS-89](https://informedcrew.atlassian.net/browse/NEWS-89).
 - **Filtered out view** (dropped stories and why) — [NEWS-90](https://informedcrew.atlassian.net/browse/NEWS-90).
 - The NEWS-86 guards on topic search rows stay ([TOPIC_SEARCH.md](TOPIC_SEARCH.md)); kept search rows get Brief summaries only through this path.

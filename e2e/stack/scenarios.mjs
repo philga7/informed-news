@@ -29,6 +29,8 @@ export const TOPIC_SCENARIO = {
 	gridMoreCount: 1,
 	summaryText:
 		'Regional operators added battery storage ahead of the winter peak, according to the published filing.',
+	fullStoryTalkingPoint:
+		'The published capacity plan combines battery storage, transmission upgrades, and demand response before the winter peak.',
 	duplicateOutletBadge: '+1 outlet',
 };
 
@@ -198,6 +200,39 @@ function topicsScenario(now, imageBaseUrl) {
 					text: TOPIC_SCENARIO.summaryText,
 					sourceArticleId: lead.id,
 					sourceHash: summaryHash(lead.title, BODY),
+					model: 'e2e-fixture',
+					error: null,
+					generatedAt: hoursAgo(now, 0.95),
+					trigger: 'refresh',
+				},
+			},
+			updatedAt: hoursAgo(now, 0.95),
+		},
+		// Keep the full-story smoke hermetic: Kite hydrates this cached record and
+		// expands it without an Ollama key or a live generation request.
+		'brief-full-stories.json': {
+			fullStories: {
+				[lead.id]: {
+					articleId: lead.id,
+					status: 'ok',
+					enrichment: {
+						talking_points: [TOPIC_SCENARIO.fullStoryTalkingPoint],
+						timeline: [
+							{
+								date: 'This week',
+								content: 'Grid operators published the updated capacity plan.',
+							},
+						],
+						suggested_qna: [
+							{
+								question: 'What should readers verify?',
+								answer: 'Which projects have approved funding and construction dates.',
+							},
+						],
+					},
+					deterministic: {},
+					sourceHash: 'e2e-cached-full-story',
+					topicSections: [],
 					model: 'e2e-fixture',
 					error: null,
 					generatedAt: hoursAgo(now, 0.95),
