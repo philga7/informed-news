@@ -18,6 +18,7 @@ import {
 } from '../store/index.js';
 import type { Article, StoreMeta } from '../types/article.js';
 import type { BriefSeenStore, BriefSummariesStore } from '../types/brief.js';
+import type { BriefFullStoriesStore } from '../types/briefFullStory.js';
 import {
   OWNED_BATCH_ID,
   type BriefDegradedStore,
@@ -59,11 +60,17 @@ export type CreateKiteBriefRouterDeps = {
 
 /**
  * Empty article store → the fixture stories; otherwise the topic Brief from triage kept records.
- * `degraded` lists the seen/summaries stores that could not be read (treated as empty).
+ * `degraded` lists regenerable stores that could not be read (treated as empty).
  */
 type OwnedBrief =
   | { fixture: true; articles: Article[] }
-  | { fixture: false; brief: TopicBrief; meta: StoreMeta; degraded: BriefDegradedStore[] };
+  | {
+    fixture: false;
+    brief: TopicBrief;
+    fullStories: BriefFullStoriesStore;
+    meta: StoreMeta;
+    degraded: BriefDegradedStore[];
+  };
 
 function isOwnedBatchId(batchId: string): boolean {
   return batchId === OWNED_BATCH_ID || batchId === 'latest';
@@ -109,7 +116,7 @@ export function createKiteBriefRouter(
     }
 
     const degraded: BriefDegradedStore[] = [];
-    const [triage, topics, mutes, seen, summaries, meta] = await Promise.all([
+    const [triage, topics, mutes, seen, summaries, fullStories, meta] = await Promise.all([
       readTriageStore(),
       readTopicList(),
       readMutes(),
@@ -120,6 +127,10 @@ export function createKiteBriefRouter(
       readSummaries().catch((): BriefSummariesStore => {
         degraded.push('summaries');
         return { summaries: {}, updatedAt: null };
+      }),
+      readFullStories().catch((): BriefFullStoriesStore => {
+        degraded.push('fullStories');
+        return { fullStories: {}, updatedAt: null };
       }),
       readServerMeta(),
     ]);
@@ -134,7 +145,7 @@ export function createKiteBriefRouter(
       refresh: meta.refresh ?? null,
       now: at,
     });
-    return { fixture: false, brief, meta, degraded };
+    return { fixture: false, brief, fullStories, meta, degraded };
   }
 
   async function loadEnrichments() {
@@ -191,11 +202,10 @@ export function createKiteBriefRouter(
           enrichments: await loadEnrichments(),
         });
       } else {
-        const fullStories = await readFullStories();
         body = buildTopicBriefStoriesResponse(owned.brief, req.params.categoryId, {
           now: at,
           lastSuccess: owned.meta.refresh?.lastSuccess ?? null,
-          fullStories: fullStories.fullStories,
+          fullStories: owned.fullStories.fullStories,
         });
       }
       if (!body) {

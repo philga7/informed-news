@@ -40,6 +40,10 @@ export const BRIEF_FULL_STORY_LOGIN_HINT = 'Log in on Topics to load full storie
 
 export const BRIEF_FULL_STORY_ERROR = 'Full story could not be loaded right now.';
 
+export const BRIEF_FULL_STORY_RATE_LIMITED = 'Full story limit reached for this hour. Try again later.';
+
+export const BRIEF_FULL_STORY_NOT_IN_BRIEF = 'This story is no longer in the Brief.';
+
 export const BRIEF_REFRESH_LABEL = 'Refresh';
 
 export const BRIEF_REFRESHING_LABEL = 'Refreshing…';
@@ -225,6 +229,11 @@ export function newlyExpandedKeys(
 	next: Record<string, boolean>,
 ): string[] {
 	return Object.keys(next).filter((key) => next[key] && !prev[key]);
+}
+
+/** Full stories are on-demand work: only a single newly opened card auto-loads one. */
+export function autoFullStoryRequestKeys(newlyExpanded: readonly string[]): readonly string[] {
+	return newlyExpanded.length === 1 ? newlyExpanded : [];
 }
 
 /**
@@ -447,7 +456,9 @@ export function applyFullStory(story: Story, fullStory: FullStoryPayload): void 
 	}
 }
 
-export function fullStoryErrorCopy(_code: string | undefined): string {
+export function fullStoryErrorCopy(code: string | undefined): string {
+	if (code === 'rate_limited') return BRIEF_FULL_STORY_RATE_LIMITED;
+	if (code === 'not_in_brief') return BRIEF_FULL_STORY_NOT_IN_BRIEF;
 	return BRIEF_FULL_STORY_ERROR;
 }
 

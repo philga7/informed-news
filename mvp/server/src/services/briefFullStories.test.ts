@@ -336,3 +336,42 @@ test('refresh full stories selects targets and invokes the shared generator with
     errors: [],
   });
 });
+
+test('refresh reuses an unchanged selected full story instead of forcing Ollama', async () => {
+  const h = harness(undefined, [{ ...kept('main'), outletCount: 3 }]);
+  const cached: BriefFullStoryRecord = {
+    articleId: 'main',
+    status: 'ok',
+    enrichment: { talking_points: ['Cached'], timeline: [], suggested_qna: [] },
+    deterministic: {},
+    sourceHash: 'unchanged',
+    topicSections: [],
+    model: 'm',
+    error: null,
+    generatedAt: ISO,
+    trigger: 'refresh',
+    autoSnapshot: { outletCount: 1, significance: 1.5 },
+  };
+  h.store.fullStories.main = cached;
+  const calls: Array<{ id: string; options: object }> = [];
+
+  const meta = await generateRefreshFullStories({ now: NOW, boundaryAt: null }, {
+    ...h.deps,
+    generateFullStory: async (id, options) => {
+      calls.push({ id, options });
+      return { ok: true, record: cached };
+    },
+  });
+
+  assert.deepEqual(calls, [{
+    id: 'main',
+    options: {
+      now: NOW,
+      trigger: 'refresh',
+      skipRateLimit: true,
+      forceRegenerate: false,
+    },
+  }]);
+  assert.equal(meta.reused, 1);
+  assert.equal(meta.generated, 0);
+});

@@ -865,11 +865,12 @@ function nextRefreshAt(
 }
 
 /** Brief stores that may be unreadable without failing the Brief (read as empty). */
-export type BriefDegradedStore = 'seen' | 'summaries';
+export type BriefDegradedStore = 'seen' | 'summaries' | 'fullStories';
 
 const DEGRADED_NOTICES: Record<BriefDegradedStore, string> = {
   seen: 'Read history unavailable (brief-seen.json unreadable)',
   summaries: 'Saved summaries unavailable (brief-summaries.json unreadable)',
+  fullStories: 'Saved full stories unavailable (brief-full-stories.json unreadable)',
 };
 
 /** `brief: null` = fixture (empty article store): no sections or quiet line. */

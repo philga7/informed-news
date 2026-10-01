@@ -21,6 +21,7 @@ const requestedSummaries = new Set<string>();
 		BRIEF_SUMMARY_LOADING,
 		BRIEF_SUMMARY_LOGIN_HINT,
 		applyFullStory,
+		autoFullStoryRequestKeys,
 		createSeenBatcher,
 		fetchBriefOverview,
 		fullStoryErrorCopy,
@@ -127,6 +128,8 @@ const requestedSummaries = new Set<string>();
 	/**
 	 * Every expand path (click, keyboard, expand-all, shared link) lands in
 	 * `expandedStories`; newly opened topic stories get a summary request and a seen mark.
+	 * Full-story generation is only automatic for a single newly opened card, so
+	 * expand-all cannot consume the hourly on-demand budget in one batch.
 	 */
 	let previousExpanded: Record<string, boolean> = {};
 	$effect(() => {
@@ -137,12 +140,13 @@ const requestedSummaries = new Set<string>();
 		untrack(() => {
 			const byKey = new Map(stories.map((story) => [storyKey(story), story]));
 			const seenIds: string[] = [];
+			const fullStoryKeys = new Set(autoFullStoryRequestKeys(opened));
 			for (const key of opened) {
 				const story = byKey.get(key);
 				if (!story || !isTopicBriefStory(story)) continue;
 				if (story.id) seenIds.push(story.id);
 				void requestSummary(story);
-				void requestFullStory(story);
+				if (fullStoryKeys.has(key)) void requestFullStory(story);
 			}
 			if (seenIds.length > 0) seen.add(seenIds);
 		});

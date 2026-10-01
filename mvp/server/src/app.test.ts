@@ -2531,6 +2531,11 @@ test('GET /api/brief/overview: sections with More split, quiet, notices, nextAt,
 for (const [store, dep, notice] of [
   ['seen', 'readBriefSeen', 'Read history unavailable (brief-seen.json unreadable)'],
   ['summaries', 'readBriefSummaries', 'Saved summaries unavailable (brief-summaries.json unreadable)'],
+  [
+    'full stories',
+    'readBriefFullStories',
+    'Saved full stories unavailable (brief-full-stories.json unreadable)',
+  ],
 ] as const) {
   test(`Kite brief: unreadable ${store} store degrades to empty with an overview notice`, async () => {
     const { baseUrl, close } = await startBriefRouter(

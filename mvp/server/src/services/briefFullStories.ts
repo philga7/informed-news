@@ -454,7 +454,9 @@ export async function generateRefreshFullStories(
           now,
           trigger: 'refresh',
           skipRateLimit: true,
-          forceRegenerate: prior?.status === 'ok',
+          // The shared generator compares source hashes. Do not regenerate an
+          // existing story merely because the auto selector chose it again.
+          forceRegenerate: false,
         });
         if (!result.ok) {
           addError(fullStories.errors, result.error);

@@ -93,7 +93,7 @@ In `mvp/.env` (see `mvp/.env.example`):
 | `TRIAGE_SUMMARY_BUDGET` | Ollama summary calls per refresh (non-negative integer; unset or invalid → 60). Now enforced. Doesn't limit on-demand summaries. |
 | `OLLAMA_API_KEY` / `OLLAMA_MODEL` | Existing Ollama settings, used for summaries and full-story verbiage. |
 
-Other limits are constants in `mvp/server/src/services/briefConfig.ts` (top 3, 8 links, update thresholds, 7-day seen retention, summary lengths, concurrency, 30/hour on demand, refresh check and retry minutes).
+Other limits are constants in `mvp/server/src/services/briefConfig.ts` (top 3, 8 links, update thresholds, 7-day seen retention, summary lengths, concurrency, 30/hour on-demand summaries, 20/hour on-demand full stories, refresh check and retry minutes).
 
 `npm run test:e2e:kite` and the Kite integration suite (`bun run test:integration` in `apps/kite`) start their own stack via `e2e/stack/start.mjs`: mvp/server + Kite on separate ports (e2e: Kite 5174 / API 3101; integration: 5175 / 3102), a fresh temp data dir seeded with a fixed topic Brief (`e2e/stack/scenarios.mjs`), and a generated env file in place of `mvp/.env` (auto-refresh off, no Ollama / TypeSafe keys, test-only password). They never reuse your dev server or read `mvp/data`, so nothing is skipped for lack of local stories and no budget is spent. The server hooks are `MVP_DATA_DIR` (store directory; process env only) and `MVP_ENV_FILE` (env file instead of `mvp/.env`).
 

@@ -2,6 +2,9 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Story } from '$lib/types';
 import {
 	BRIEF_AI_SUMMARY_NOTE,
+	BRIEF_FULL_STORY_ERROR,
+	BRIEF_FULL_STORY_NOT_IN_BRIEF,
+	BRIEF_FULL_STORY_RATE_LIMITED,
 	BRIEF_NOT_REFRESHED,
 	BRIEF_REFRESH_ERROR,
 	BRIEF_REFRESH_POLL_FAILURES_TOLERATED,
@@ -13,9 +16,11 @@ import {
 	BRIEF_SUMMARY_RATE_LIMITED,
 	BRIEF_SUMMARY_UNAVAILABLE,
 	applyFullStory,
+	autoFullStoryRequestKeys,
 	createSeenBatcher,
 	fetchBriefOverview,
 	formatTimeAgoShort,
+	fullStoryErrorCopy,
 	groupTopicBrief,
 	isOfficialStory,
 	isRecoverableRefreshFailure,
@@ -255,6 +260,17 @@ describe('newlyExpandedKeys', () => {
 	});
 });
 
+describe('autoFullStoryRequestKeys', () => {
+	it('allows automatic full-story loading for exactly one newly expanded card', () => {
+		expect(autoFullStoryRequestKeys(['a'])).toEqual(['a']);
+	});
+
+	it('does not fan out full-story loading for expand-all batches', () => {
+		expect(autoFullStoryRequestKeys([])).toEqual([]);
+		expect(autoFullStoryRequestKeys(['a', 'b'])).toEqual([]);
+	});
+});
+
 describe('summaryAttemptCounts', () => {
 	it('counts success, unavailable, not_in_brief and server errors', () => {
 		expect(summaryAttemptCounts({ ok: true, status: 'ok', text: 'x' })).toBe(true);
@@ -271,6 +287,13 @@ describe('summaryAttemptCounts', () => {
 });
 
 describe('full-story helpers', () => {
+	it('fullStoryErrorCopy maps server codes', () => {
+		expect(fullStoryErrorCopy('rate_limited')).toBe(BRIEF_FULL_STORY_RATE_LIMITED);
+		expect(fullStoryErrorCopy('not_in_brief')).toBe(BRIEF_FULL_STORY_NOT_IN_BRIEF);
+		expect(fullStoryErrorCopy('error')).toBe(BRIEF_FULL_STORY_ERROR);
+		expect(fullStoryErrorCopy(undefined)).toBe(BRIEF_FULL_STORY_ERROR);
+	});
+
 	it('requests only missing or failed rich stories', () => {
 		expect(shouldRequestFullStory(makeStory('a', { informed_full_story_status: 'missing' }))).toBe(
 			true,
