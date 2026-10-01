@@ -23,15 +23,16 @@ New stories are upserted as articles with `sourceKind: 'search'`, `sourceTier: '
 | `searchProviders` | `('google_news' \| 'searxng')[]` that returned it |
 | `googleNewsUrl` | Google News article link (`?oc=…` stripped) or `null` |
 
-## Interim behavior (until NEWS-87 / NEWS-88)
+## Interim behavior (until NEWS-88)
 
-Search rows are **untriaged** candidates. Until triage ([NEWS-87](https://informedcrew.atlassian.net/browse/NEWS-87)) and topic-driven Brief ([NEWS-88](https://informedcrew.atlassian.net/browse/NEWS-88)) land:
+Search rows are **triaged** at the end of every refresh ([NEWS-87](https://informedcrew.atlassian.net/browse/NEWS-87), [TRIAGE.md](TRIAGE.md)): each gets a kept or dropped record in `mvp/data/triage.json`. Until topic-driven Brief ([NEWS-88](https://informedcrew.atlassian.net/browse/NEWS-88)) lands:
 
-- **Topics do not select Brief stories yet** (NEWS-88).
+- **Topics do not select Brief stories yet** (NEWS-88). Kept stories are visible only through `GET /api/triage`.
+- **Survivors only get resolved and scraped:** a search row that passes the triage headline check has its Google link resolved to the publisher URL, its body scraped, and (if undated) its date read from page metadata — still undated → dropped `undated`. Rows that fail triage stay `bodyStatus: 'pending'` with no live resolution.
 - **Stored and listed, not on Radar:** search rows are in the shared article store and returned by `GET /api/articles` and `POST /api/fetch` (top-level `articles`), but hidden from Radar (Radar shows `cfp` / `rss` only).
-- **Not clustered:** search rows always get `clusterId: null` and are never grouped with other articles, so they cannot re-key an existing Brief or tracked story or bridge two Radar clusters.
+- **Not clustered:** search rows always get `clusterId: null` and are never grouped with other articles, so they cannot re-key an existing Brief or tracked story or bridge two Radar clusters. (Triage does its own duplicate grouping; it does not set `clusterId`.)
 - **Skipped by Ollama batches:** the batch endpoints `POST /api/classify`, `POST /api/enrich`, and `POST /api/claims/extract` (without `articleIds`) skip search rows. Explicit per-id calls (`POST /api/classify/:id`, `POST /api/claims/extract` with `articleIds`) are unchanged.
-- **No body scrape and no live Google link resolution at ingest** — both are NEWS-87 work on triage survivors.
+- **No body scrape and no live Google link resolution at ingest** — both happen in triage, for survivors only.
 
 ## Google News RSS
 
@@ -39,7 +40,7 @@ Per topic: `https://news.google.com/rss/search?q=<encodeURIComponent(query + ' w
 
 Item links are opaque `news.google.com/rss/articles/CBMi…` URLs, not publisher URLs. Until resolved, a Google-only story uses the Google link as its `canonicalUrl` (and `googleNewsUrl`), with `publisherUrl` = a cached resolution or `null` — the same shape as CFP items (aggregator URL as identity, publisher URL alongside).
 
-**Link resolution** (`services/googleNewsResolve.ts`) decodes a Google link to the publisher URL via the article page signature + Google's `batchexecute` endpoint. Successful resolutions are cached by article id in `mvp/data/google-news-url-cache.json` (gitignored). In NEWS-86 the resolver is built but **not called** during ingest — ingest only reads the cache. NEWS-87 resolves headline-check survivors only.
+**Link resolution** (`services/googleNewsResolve.ts`) decodes a Google link to the publisher URL via the article page signature + Google's `batchexecute` endpoint. Successful resolutions are cached by article id in `mvp/data/google-news-url-cache.json` (gitignored). Ingest never calls the resolver — it only reads the cache. Triage (NEWS-87) resolves headline-check survivors only, several in parallel; cache writes are serialized and atomic so concurrent resolutions don't lose entries.
 
 `batchexecute` is an **undocumented** internal Google endpoint — a gray area that may break or be rate-limited without notice. Any resolver failure returns `null` and the Google link stays the identity.
 

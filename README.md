@@ -59,6 +59,10 @@ See `mvp/.env.example` for the API:
 
 Each refresh searches desired topics on Google News RSS and a local SearXNG container (`TOPIC_SEARCH_ENABLED`, `SEARXNG_URL`). SearXNG is optional — `npm run dev` works without it. Setup, env, and failure behavior: [docs/TOPIC_SEARCH.md](docs/TOPIC_SEARCH.md).
 
+### Triage
+
+After the sources, each refresh triages new stories against your topics (mute/keyword pass, duplicate grouping, TypeSafe Jev headline and body checks, survivor-only scrape) and records kept/dropped with a reason in `mvp/data/triage.json` (`TRIAGE_ENABLED`, `TRIAGE_JEV_BUDGET`, `TRIAGE_SUMMARY_BUDGET`; Jev needs `TYPESAFE_API_KEY`). Kept stories are not shown in the Brief yet (NEWS-88); inspect them via `GET /api/triage`. Details: [docs/TRIAGE.md](docs/TRIAGE.md).
+
 Kite UI env: `apps/kite/.env.example`. Owned brief: [docs/OWNED_BRIEF.md](docs/OWNED_BRIEF.md). API compat: [docs/MVP_API_COMPAT.md](docs/MVP_API_COMPAT.md). Route map: [docs/ROUTE_MAP.md](docs/ROUTE_MAP.md). Kagi service cleanup: [docs/KAGI_SERVICE_CLEANUP.md](docs/KAGI_SERVICE_CLEANUP.md). Sync / license: [docs/UPSTREAM_KITE.md](docs/UPSTREAM_KITE.md), [THIRD_PARTY.md](THIRD_PARTY.md).
 
 ## Scripts
