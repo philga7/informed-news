@@ -30,6 +30,8 @@ import {
   generateRefreshSummaries,
   getRefreshRunner,
   loadClaimsRadar,
+  markBriefSeen,
+  summarizeBriefStory,
 } from './services/index.js';
 import type { RefreshRunner } from './services/index.js';
 import {
@@ -44,6 +46,8 @@ import {
   getClaimById,
   readArticles,
   readBriefMembership,
+  readBriefSeen,
+  readBriefSummaries,
   readClaimMembership,
   readMuteRules,
   readMeta,
@@ -63,6 +67,7 @@ import {
   untrackCluster,
   updateMeta,
   updateTopic,
+  writeBriefSeen,
 } from './store/index.js';
 import type { TrackedEntry } from './store/index.js';
 import type { TrackedClaimEntry } from './store/index.js';
@@ -110,7 +115,37 @@ export type CreateAppDeps = {
   untrackClaim?: typeof untrackClaim;
   ackTrackedClaimUpdate?: typeof ackTrackedClaimUpdate;
   getClaimById?: typeof getClaimById;
+  readBriefSeen?: typeof readBriefSeen;
+  writeBriefSeen?: typeof writeBriefSeen;
+  readBriefSummaries?: typeof readBriefSummaries;
+  summarizeBriefStory?: typeof summarizeBriefStory;
+  now?: () => Date;
 };
+
+const SEEN_IDS_MAX = 100;
+
+/** `articleIds`: array of 1–SEEN_IDS_MAX non-empty strings; else null. */
+function parseSeenArticleIds(body: unknown): string[] | null {
+  const raw = (body as { articleIds?: unknown } | null)?.articleIds;
+  if (!Array.isArray(raw) || raw.length === 0 || raw.length > SEEN_IDS_MAX) return null;
+  const ids: string[] = [];
+  for (const value of raw) {
+    if (typeof value !== 'string' || value.trim() === '') return null;
+    ids.push(value.trim());
+  }
+  return ids;
+}
+
+/** In-process queue for brief-seen.json read-modify-write so concurrent marks aren't lost. */
+let seenWriteChain: Promise<unknown> = Promise.resolve();
+
+function serializeSeenWrite<T>(task: () => Promise<T>): Promise<T> {
+  const run = seenWriteChain.then(task, task);
+  seenWriteChain = run.catch(() => undefined);
+  return run;
+}
+
+const SUMMARY_ERROR_STATUS = { not_in_brief: 404, rate_limited: 429, error: 502 } as const;
 
 function parseClusterId(body: unknown): string | null {
   const raw = (body as { clusterId?: unknown } | null)?.clusterId;
@@ -239,6 +274,11 @@ export function createApp(deps: CreateAppDeps = {}): Express {
   const untrackOneClaim = deps.untrackClaim ?? untrackClaim;
   const ackTrackedClaim = deps.ackTrackedClaimUpdate ?? ackTrackedClaimUpdate;
   const getClaim = deps.getClaimById ?? getClaimById;
+  const readSeen = deps.readBriefSeen ?? readBriefSeen;
+  const writeSeen = deps.writeBriefSeen ?? writeBriefSeen;
+  const readSummaries = deps.readBriefSummaries ?? readBriefSummaries;
+  const summarizeStory = deps.summarizeBriefStory ?? summarizeBriefStory;
+  const now = deps.now ?? (() => new Date());
 
   const app = express();
 
@@ -260,7 +300,21 @@ export function createApp(deps: CreateAppDeps = {}): Express {
   });
 
   // Public Kite brief adapter (NEWS-44) — must stay before requireApiSession.
-  app.use('/api', createKiteBriefRouter());
+  app.use(
+    '/api',
+    createKiteBriefRouter({
+      readArticles: readAllArticles,
+      readTriage: readTriageStore,
+      readTopics: readTopicList,
+      readMuteRules: readMutes,
+      readBriefSeen: readSeen,
+      readBriefSummaries: readSummaries,
+      readMeta: readServerMeta,
+      readBriefMembership: readMembership,
+      now,
+      isRefreshRunning: () => refreshRunner.isRunning(),
+    }),
+  );
 
   app.use('/api', requireApiSession);
   app.use('/api', createAuthRouter());
@@ -368,6 +422,71 @@ export function createApp(deps: CreateAppDeps = {}): Express {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.error('Brief membership read failed:', message);
+      res.status(500).json({ ok: false, error: message });
+    }
+  });
+
+  /**
+   * Topic Brief read marks (NEWS-88): body { articleIds: string[] } (1–100).
+   * Snapshots each kept record so the story stays hidden after the next
+   * refresh unless significantly updated; unknown ids are ignored.
+   */
+  app.post('/api/brief/seen', async (req, res) => {
+    const articleIds = parseSeenArticleIds(req.body);
+    if (!articleIds) {
+      res.status(400).json({
+        ok: false,
+        error: `articleIds must be an array of 1–${SEEN_IDS_MAX} non-empty strings`,
+      });
+      return;
+    }
+    try {
+      const recorded = await serializeSeenWrite(async () => {
+        const [seen, triage] = await Promise.all([readSeen(), readTriageStore()]);
+        const result = markBriefSeen({ seen, triage, articleIds, now: now() });
+        await writeSeen(result.store);
+        return result.recorded;
+      });
+      res.json({ ok: true, recorded });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('Brief seen write failed:', message);
+      res.status(500).json({ ok: false, error: message });
+    }
+  });
+
+  /**
+   * On-demand AI summary for a story visible in the topic Brief (NEWS-88).
+   * 404 not_in_brief · 429 rate_limited · 502 error (Ollama / store).
+   */
+  app.post('/api/brief/stories/:articleId/summary', async (req, res) => {
+    try {
+      const result = await summarizeStory(
+        req.params.articleId,
+        { now: now() },
+        {
+          readTopics: readTopicList,
+          readMuteRules: readMutes,
+          readArticles: readAllArticles,
+          readTriage: readTriageStore,
+          readBriefSeen: readSeen,
+          readBriefSummaries: readSummaries,
+          readMeta: readServerMeta,
+        },
+      );
+      if (!result.ok) {
+        res
+          .status(SUMMARY_ERROR_STATUS[result.code])
+          .json({ ok: false, error: result.code, message: result.error });
+        return;
+      }
+      res.json({
+        ok: true,
+        summary: { status: result.summary.status, text: result.summary.text },
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('Brief summary failed:', message);
       res.status(500).json({ ok: false, error: message });
     }
   });

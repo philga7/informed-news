@@ -17,6 +17,7 @@ import type { Topic } from '../types/topic.js';
 import type { TriageLabel, TriageRecord, TriageStore } from '../types/triage.js';
 import {
   BRIEF_MAX_LINKS,
+  BRIEF_SEEN_RETENTION_DAYS,
   BRIEF_TOP_N,
   SIGNIFICANT_UPDATE_OUTLET_DELTA,
   SIGNIFICANT_UPDATE_SIGNIFICANCE_DELTA,
@@ -31,6 +32,7 @@ export type BriefLink = {
   url: string;
   domain: string | null;
   publishedAt: string | null;
+  fetchedAt: string;
 };
 
 export type BriefSummaryStatus = 'ok' | 'missing' | 'unavailable';
@@ -46,6 +48,7 @@ export type BriefStory = {
   link: string;
   domain: string | null;
   publishedAt: string | null;
+  fetchedAt: string;
   outletCount: number;
   labels: TriageLabel[];
   significance: number | null;
@@ -172,6 +175,37 @@ export function isSignificantlyUpdated(record: TriageRecord, seen: BriefSeenEntr
   );
 }
 
+/**
+ * Record stories the operator read: a snapshot of each id's kept record
+ * (unknown / non-kept ids are ignored; re-reading overwrites). Entries older
+ * than BRIEF_SEEN_RETENTION_DAYS or no longer kept are pruned.
+ */
+export function markBriefSeen(input: {
+  seen: BriefSeenStore;
+  triage: TriageStore;
+  articleIds: string[];
+  now: Date;
+}): { store: BriefSeenStore; recorded: number } {
+  const seenAt = input.now.toISOString();
+  const cutoff = input.now.getTime() - BRIEF_SEEN_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+  const isKept = (id: string) => input.triage.records[id]?.status === 'kept';
+
+  const seen: Record<string, BriefSeenEntry> = {};
+  for (const [id, entry] of Object.entries(input.seen.seen)) {
+    const time = Date.parse(entry.seenAt);
+    if (isKept(id) && !Number.isNaN(time) && time >= cutoff) seen[id] = entry;
+  }
+
+  let recorded = 0;
+  for (const id of new Set(input.articleIds)) {
+    const record = input.triage.records[id];
+    if (record?.status !== 'kept') continue;
+    seen[id] = { seenAt, outletCount: record.outletCount, significance: record.significance };
+    recorded += 1;
+  }
+  return { store: { seen, updatedAt: seenAt }, recorded };
+}
+
 function isHiddenAsSeen(
   record: TriageRecord,
   seen: BriefSeenStore,
@@ -216,6 +250,7 @@ function buildLinks(
       url: articleLink(article),
       domain,
       publishedAt: article.publishedAt,
+      fetchedAt: article.fetchedAt,
     });
   }
   return links;
@@ -305,6 +340,7 @@ export function composeTopicBrief(input: ComposeTopicBriefInput): TopicBrief {
         link: articleLink(article),
         domain: articleDomain(article),
         publishedAt: article.publishedAt,
+        fetchedAt: article.fetchedAt,
         outletCount: record.outletCount ?? 1,
         labels: [...record.labels],
         significance: record.significance,

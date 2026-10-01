@@ -69,6 +69,7 @@ export {
   buildRefreshNotices,
   composeTopicBrief,
   isSignificantlyUpdated,
+  markBriefSeen,
   summarySourceFor,
 } from './topicBrief.js';
 export type {
@@ -190,8 +191,15 @@ export {
   ownedBriefFixtureArticles,
   filterArticlesForBrief,
   resolveOwnedBriefArticles,
+  buildBriefOverview,
+  buildTopicBriefBatchInfo,
+  buildTopicBriefCategoriesResponse,
+  buildTopicBriefStoriesResponse,
+  topicBriefToKiteStories,
 } from './kiteBriefAdapter.js';
+export type { BriefOverview, TopicBriefResponseOptions } from './kiteBriefAdapter.js';
 export { createKiteBriefRouter } from './kiteBriefRoutes.js';
+export type { CreateKiteBriefRouterDeps } from './kiteBriefRoutes.js';
 export { buildBriefClaimsFeed, loadBriefClaims } from './briefClaims.js';
 export type { BuildBriefClaimsFeedInput, LoadBriefClaimsDeps } from './briefClaims.js';
 

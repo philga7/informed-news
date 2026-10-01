@@ -1,8 +1,17 @@
-import type { Article } from '../types/article.js';
+import type { Article, StoreMeta } from '../types/article.js';
+import type { RefreshRun } from '../types/brief.js';
 import type { ClusterEnrichmentPayload } from '../types/clusterEnrichment.js';
+import type { TriageLabel } from '../types/triage.js';
 import type { MuteRule } from '../store/muteRulesStore.js';
 import { briefClusterKey } from './briefClusterKey.js';
 import { clusterMatchesMute } from './muteMatch.js';
+import {
+  buildRefreshNotices,
+  type BriefStory,
+  type BriefSummaryStatus,
+  type BriefTopicRef,
+  type TopicBrief,
+} from './topicBrief.js';
 
 /** Stable batch id for the live owned brief (not a Kagi UUID). */
 export const OWNED_BATCH_ID = 'owned-latest';
@@ -11,11 +20,11 @@ export const OWNED_BATCH_ID = 'owned-latest';
 export const OWNED_CATEGORY_UUID = '00000000-0000-4000-8000-000000000001';
 
 /**
- * Use slug `world` so Kite’s default `/world/latest` route shows owned stories.
- * Display name is interim “News Briefs” until real Brief categories (NEWS-56).
+ * Use slug `world` so Kite’s default `/world/latest` route (and its
+ * default-enabled categories) shows owned stories. One category: the topic Brief.
  */
 export const OWNED_CATEGORY_SLUG = 'world';
-export const OWNED_CATEGORY_NAME = 'News Briefs';
+export const OWNED_CATEGORY_NAME = 'Brief';
 
 /** Distinctive fixture title for empty-store / Playwright smoke. */
 export const OWNED_FIXTURE_TITLE =
@@ -59,6 +68,14 @@ export type KiteBriefStory = {
     text: string;
     sources: Array<{ name: string; url: string }>;
   }>;
+  /** Informed News topic Brief glue (NEWS-88) */
+  informed_article_id?: string;
+  informed_topic_id?: string;
+  informed_topic_name?: string;
+  informed_more?: boolean;
+  informed_outlet_count?: number;
+  informed_labels?: TriageLabel[];
+  informed_summary_status?: BriefSummaryStatus;
 };
 
 export type KiteBatchInfo = {
@@ -482,6 +499,10 @@ export function buildOwnedBatchInfo(
   articles: Article[],
   now: Date = new Date(),
 ): KiteBatchInfo {
+  return ownedBatchInfo(articles.length, now);
+}
+
+function ownedBatchInfo(totalReadCount: number, now: Date): KiteBatchInfo {
   const createdAt = now.toISOString();
   const y = now.getUTCFullYear();
   const m = String(now.getUTCMonth() + 1).padStart(2, '0');
@@ -490,7 +511,7 @@ export function buildOwnedBatchInfo(
     id: OWNED_BATCH_ID,
     createdAt,
     dateSlug: `${y}-${m}-${d}.1`,
-    totalReadCount: articles.length,
+    totalReadCount,
   };
 }
 
@@ -518,6 +539,14 @@ export function buildOwnedCategoriesResponse(
   };
 }
 
+function isOwnedCategoryId(categoryId: string): boolean {
+  return (
+    categoryId === OWNED_CATEGORY_UUID ||
+    categoryId === OWNED_CATEGORY_SLUG ||
+    categoryId === 'latest'
+  );
+}
+
 export function buildOwnedStoriesResponse(
   articles: Article[],
   categoryId: string,
@@ -529,11 +558,7 @@ export function buildOwnedStoriesResponse(
       | Record<string, ClusterEnrichmentPayload>;
   } = {},
 ): KiteBatchStoriesResponse | null {
-  const known =
-    categoryId === OWNED_CATEGORY_UUID ||
-    categoryId === OWNED_CATEGORY_SLUG ||
-    categoryId === 'latest';
-  if (!known) return null;
+  if (!isOwnedCategoryId(categoryId)) return null;
 
   const now = options.now ?? new Date();
   const stories = articlesToKiteStories(articles, {
@@ -600,6 +625,8 @@ function filterMutedClustersForBrief(
 /**
  * Resolve articles for the owned brief: fixture when the store is empty;
  * otherwise filter to accepted cluster keys only (empty accepted → []).
+ * The default Kite path only takes the fixture branch: a non-empty store
+ * serves the topic Brief (NEWS-88).
  */
 export function resolveOwnedBriefArticles(
   stored: Article[],
@@ -619,5 +646,185 @@ export function resolveOwnedBriefArticles(
   return {
     articles: filterMutedClustersForBrief(fixture, rules),
     fromFixture: true,
+  };
+}
+
+function topicStoryToKite(
+  story: BriefStory,
+  topic: BriefTopicRef,
+  clusterNumber: number,
+): KiteBriefStory {
+  const articles: KiteBriefArticle[] = story.links.map((link) => ({
+    title: link.title,
+    link: link.url,
+    domain: link.domain ?? domainFromUrl(link.url),
+    date: link.publishedAt ?? link.fetchedAt,
+  }));
+  const domains = [...new Set(articles.map((a) => a.domain))];
+  const kite: KiteBriefStory = {
+    id: story.articleId,
+    membership_key: story.articleId,
+    cluster_number: clusterNumber,
+    category: OWNED_CATEGORY_SLUG,
+    title: story.title,
+    short_summary: story.summary.status === 'ok' ? (story.summary.text ?? '') : '',
+    articles,
+    informed_article_id: story.articleId,
+    informed_topic_id: topic.id,
+    informed_topic_name: topic.name,
+    informed_more: story.more,
+    informed_outlet_count: story.outletCount,
+    informed_labels: [...story.labels],
+    informed_summary_status: story.summary.status,
+  };
+  if (domains.length > 0) {
+    kite.domains = domains.map((name) => ({ name }));
+  }
+  const imageUrl = story.imageUrl?.trim();
+  if (imageUrl) {
+    kite.primary_image = {
+      url: imageUrl,
+      caption: story.imageCaption?.trim() || story.title,
+      credit: story.imageCredit?.trim() || story.domain || undefined,
+      link: story.link,
+    };
+  }
+  return kite;
+}
+
+/** Topic Brief stories in Brief order (sections in order, ranked within each). */
+export function topicBriefToKiteStories(brief: TopicBrief): KiteBriefStory[] {
+  return brief.sections
+    .flatMap((section) => section.stories.map((story) => ({ topic: section.topic, story })))
+    .map(({ topic, story }, index) => topicStoryToKite(story, topic, index + 1));
+}
+
+function topicBriefStoryCount(brief: TopicBrief): number {
+  return brief.sections.reduce((n, section) => n + section.stories.length, 0);
+}
+
+/** Unix seconds of the last successful refresh; `now` when there is none. */
+function refreshTimestamp(lastSuccess: RefreshRun | null | undefined, now: Date): number {
+  const completed = lastSuccess ? Date.parse(lastSuccess.completedAt) : Number.NaN;
+  return Math.floor((Number.isNaN(completed) ? now.getTime() : completed) / 1000);
+}
+
+export type TopicBriefResponseOptions = { now?: Date; lastSuccess?: RefreshRun | null };
+
+export function buildTopicBriefBatchInfo(
+  brief: TopicBrief,
+  now: Date = new Date(),
+): KiteBatchInfo {
+  return ownedBatchInfo(topicBriefStoryCount(brief), now);
+}
+
+export function buildTopicBriefCategoriesResponse(
+  brief: TopicBrief,
+  options: TopicBriefResponseOptions = {},
+): KiteBatchCategoriesResponse {
+  const now = options.now ?? new Date();
+  const count = topicBriefStoryCount(brief);
+  return {
+    batchId: OWNED_BATCH_ID,
+    createdAt: now.toISOString(),
+    hasOnThisDay: false,
+    categories: [
+      {
+        id: OWNED_CATEGORY_UUID,
+        categoryId: OWNED_CATEGORY_SLUG,
+        categoryName: OWNED_CATEGORY_NAME,
+        timestamp: refreshTimestamp(options.lastSuccess, now),
+        readCount: count,
+        clusterCount: count,
+      },
+    ],
+  };
+}
+
+/** Every visible story in Brief order; Kite's `limit` does not apply to the topic Brief. */
+export function buildTopicBriefStoriesResponse(
+  brief: TopicBrief,
+  categoryId: string,
+  options: TopicBriefResponseOptions = {},
+): KiteBatchStoriesResponse | null {
+  if (!isOwnedCategoryId(categoryId)) return null;
+  const now = options.now ?? new Date();
+  const stories = topicBriefToKiteStories(brief);
+  const domains = [
+    ...new Set(stories.flatMap((s) => s.articles.map((a) => a.domain))),
+  ].map((name) => ({ name }));
+  return {
+    batchId: OWNED_BATCH_ID,
+    categoryId: OWNED_CATEGORY_UUID,
+    categoryName: OWNED_CATEGORY_NAME,
+    timestamp: refreshTimestamp(options.lastSuccess, now),
+    stories,
+    totalStories: stories.length,
+    domains,
+    readCount: stories.length,
+  };
+}
+
+export type BriefOverview = {
+  ok: true;
+  /** Empty article store: Kite renders the fixture stories as before */
+  fixture: boolean;
+  refresh: {
+    last: RefreshRun | null;
+    lastSuccess: RefreshRun | null;
+    /** ISO; null when auto-refresh is disabled or nothing has succeeded yet */
+    nextAt: string | null;
+    intervalHours: number | null;
+    running: boolean;
+  };
+  notices: string[];
+  sections: Array<{
+    topicId: string;
+    name: string;
+    level: BriefTopicRef['level'];
+    storyIds: string[];
+    moreIds: string[];
+  }>;
+  quiet: BriefTopicRef[];
+};
+
+function nextRefreshAt(
+  lastSuccess: RefreshRun | null,
+  intervalHours: number | null,
+): string | null {
+  if (!lastSuccess || intervalHours === null) return null;
+  const completed = Date.parse(lastSuccess.completedAt);
+  if (Number.isNaN(completed)) return null;
+  return new Date(completed + intervalHours * 60 * 60 * 1000).toISOString();
+}
+
+/** `brief: null` = fixture (empty article store): no sections or quiet line. */
+export function buildBriefOverview(input: {
+  brief: TopicBrief | null;
+  meta: StoreMeta;
+  intervalHours: number | null;
+  running: boolean;
+}): BriefOverview {
+  const last = input.meta.refresh?.last ?? null;
+  const lastSuccess = input.meta.refresh?.lastSuccess ?? null;
+  return {
+    ok: true,
+    fixture: input.brief === null,
+    refresh: {
+      last,
+      lastSuccess,
+      nextAt: nextRefreshAt(lastSuccess, input.intervalHours),
+      intervalHours: input.intervalHours,
+      running: input.running,
+    },
+    notices: buildRefreshNotices(input.meta),
+    sections: (input.brief?.sections ?? []).map((section) => ({
+      topicId: section.topic.id,
+      name: section.topic.name,
+      level: section.topic.level,
+      storyIds: section.stories.filter((s) => !s.more).map((s) => s.articleId),
+      moreIds: section.stories.filter((s) => s.more).map((s) => s.articleId),
+    })),
+    quiet: [...(input.brief?.quiet ?? [])],
   };
 }

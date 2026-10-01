@@ -15,7 +15,15 @@ import {
   ownedBriefFixtureArticles,
   filterArticlesForBrief,
   resolveOwnedBriefArticles,
+  buildBriefOverview,
+  buildTopicBriefBatchInfo,
+  buildTopicBriefCategoriesResponse,
+  buildTopicBriefStoriesResponse,
+  topicBriefToKiteStories,
 } from './kiteBriefAdapter.js';
+import type { StoreMeta } from '../types/article.js';
+import type { RefreshRun } from '../types/brief.js';
+import type { BriefStory, TopicBrief } from './topicBrief.js';
 
 function article(
   overrides: Partial<Article> & Pick<Article, 'id' | 'title'>,
@@ -545,4 +553,260 @@ test('fixture articles produce at least one story', () => {
   assert.ok(stories[0]!.quote);
   assert.ok(stories[0]!.perspectives);
   assert.ok(stories[0]!.perspectives!.length >= 1);
+});
+
+function briefStory(
+  articleId: string,
+  overrides: Partial<BriefStory> = {},
+): BriefStory {
+  return {
+    articleId,
+    topicId: 't1',
+    rank: 1,
+    more: false,
+    title: `Headline ${articleId}`,
+    link: `https://${articleId}.example.com/story`,
+    domain: `${articleId}.example.com`,
+    publishedAt: '2026-09-30T10:00:00.000Z',
+    fetchedAt: '2026-09-30T10:05:00.000Z',
+    outletCount: 1,
+    labels: [],
+    significance: 1,
+    links: [
+      {
+        title: `Headline ${articleId}`,
+        url: `https://${articleId}.example.com/story`,
+        domain: `${articleId}.example.com`,
+        publishedAt: '2026-09-30T10:00:00.000Z',
+        fetchedAt: '2026-09-30T10:05:00.000Z',
+      },
+    ],
+    summary: { status: 'missing', text: null },
+    imageUrl: null,
+    imageCaption: null,
+    imageCredit: null,
+    ...overrides,
+  };
+}
+
+const CORE = { id: 't1', name: 'Iran', level: 'core' as const };
+const WATCH = { id: 't2', name: 'Gas prices', level: 'watch' as const };
+
+function topicBrief(): TopicBrief {
+  return {
+    boundaryAt: null,
+    sections: [
+      {
+        topic: CORE,
+        stories: [
+          briefStory('a1', {
+            outletCount: 3,
+            labels: ['official'],
+            summary: { status: 'ok', text: 'Officials said talks resumed.' },
+            imageUrl: ' https://img.example/a1.jpg ',
+            imageCaption: null,
+            imageCredit: null,
+            links: [
+              {
+                title: 'Headline a1',
+                url: 'https://a1.example.com/story',
+                domain: 'a1.example.com',
+                publishedAt: '2026-09-30T10:00:00.000Z',
+                fetchedAt: '2026-09-30T10:05:00.000Z',
+              },
+              {
+                title: 'Dup with no date or domain',
+                url: 'https://www.dup.example/x',
+                domain: null,
+                publishedAt: null,
+                fetchedAt: '2026-09-30T09:00:00.000Z',
+              },
+            ],
+          }),
+          briefStory('a2', { rank: 2, summary: { status: 'unavailable', text: null } }),
+          briefStory('a3', { rank: 3 }),
+          briefStory('a4', { rank: 4, more: true }),
+        ],
+      },
+      {
+        topic: WATCH,
+        stories: [briefStory('b1', { topicId: 't2' })],
+      },
+    ],
+    quiet: [{ id: 't3', name: 'Palantir', level: 'watch' }],
+  };
+}
+
+function refreshRun(completedAt: string, ok = true): RefreshRun {
+  return { trigger: 'timer', startedAt: completedAt, completedAt, ok, error: ok ? null : 'CFP down' };
+}
+
+test('owned category is named Brief (slug stays world)', () => {
+  assert.equal(OWNED_CATEGORY_SLUG, 'world');
+  assert.equal(OWNED_CATEGORY_NAME, 'Brief');
+});
+
+test('topicBriefToKiteStories maps Brief order, cluster numbers, fields and glue', () => {
+  const stories = topicBriefToKiteStories(topicBrief());
+  assert.deepEqual(
+    stories.map((s) => [s.id, s.cluster_number, s.informed_topic_id]),
+    [
+      ['a1', 1, 't1'],
+      ['a2', 2, 't1'],
+      ['a3', 3, 't1'],
+      ['a4', 4, 't1'],
+      ['b1', 5, 't2'],
+    ],
+  );
+
+  const a1 = stories[0]!;
+  assert.equal(a1.membership_key, 'a1');
+  assert.equal(a1.category, 'world');
+  assert.equal(a1.title, 'Headline a1');
+  assert.equal(a1.short_summary, 'Officials said talks resumed.');
+  assert.deepEqual(a1.articles, [
+    {
+      title: 'Headline a1',
+      link: 'https://a1.example.com/story',
+      domain: 'a1.example.com',
+      date: '2026-09-30T10:00:00.000Z',
+    },
+    {
+      title: 'Dup with no date or domain',
+      link: 'https://www.dup.example/x',
+      domain: 'dup.example',
+      date: '2026-09-30T09:00:00.000Z',
+    },
+  ]);
+  assert.deepEqual(a1.domains, [{ name: 'a1.example.com' }, { name: 'dup.example' }]);
+  assert.deepEqual(a1.primary_image, {
+    url: 'https://img.example/a1.jpg',
+    caption: 'Headline a1',
+    credit: 'a1.example.com',
+    link: 'https://a1.example.com/story',
+  });
+  assert.equal(a1.informed_article_id, 'a1');
+  assert.equal(a1.informed_topic_name, 'Iran');
+  assert.equal(a1.informed_more, false);
+  assert.equal(a1.informed_outlet_count, 3);
+  assert.deepEqual(a1.informed_labels, ['official']);
+  assert.equal(a1.informed_summary_status, 'ok');
+
+  const [, a2, a3, a4, b1] = stories;
+  assert.equal(a2!.short_summary, '');
+  assert.equal(a2!.informed_summary_status, 'unavailable');
+  assert.equal(a3!.short_summary, '');
+  assert.equal(a3!.informed_summary_status, 'missing');
+  assert.equal(a3!.primary_image, undefined);
+  assert.equal(a4!.informed_more, true);
+  assert.equal(b1!.informed_topic_name, 'Gas prices');
+  for (const story of stories) {
+    assert.equal(story.talking_points, undefined);
+    assert.equal(story.timeline, undefined);
+    assert.equal(story.perspectives, undefined);
+    assert.equal(story.quote, undefined);
+  }
+});
+
+test('topic Brief categories/stories/batch responses: one world "Brief" category, all stories', () => {
+  const now = new Date('2026-09-30T12:00:00.000Z');
+  const lastSuccess = refreshRun('2026-09-30T11:00:00.000Z');
+  const brief = topicBrief();
+
+  const categories = buildTopicBriefCategoriesResponse(brief, { now, lastSuccess });
+  assert.equal(categories.batchId, OWNED_BATCH_ID);
+  assert.equal(categories.categories.length, 1);
+  assert.equal(categories.categories[0]!.id, OWNED_CATEGORY_UUID);
+  assert.equal(categories.categories[0]!.categoryId, 'world');
+  assert.equal(categories.categories[0]!.categoryName, 'Brief');
+  assert.equal(categories.categories[0]!.clusterCount, 5);
+  assert.equal(categories.categories[0]!.timestamp, Date.parse(lastSuccess.completedAt) / 1000);
+
+  const stories = buildTopicBriefStoriesResponse(brief, 'world', { now, lastSuccess });
+  assert.ok(stories);
+  assert.equal(stories!.categoryId, OWNED_CATEGORY_UUID);
+  assert.equal(stories!.categoryName, 'Brief');
+  assert.equal(stories!.stories.length, 5);
+  assert.equal(stories!.totalStories, 5);
+  assert.equal(stories!.timestamp, Date.parse(lastSuccess.completedAt) / 1000);
+  assert.ok(stories!.domains.some((d) => d.name === 'dup.example'));
+  assert.ok(buildTopicBriefStoriesResponse(brief, OWNED_CATEGORY_UUID, { now }));
+  assert.ok(buildTopicBriefStoriesResponse(brief, 'latest', { now }));
+  assert.equal(buildTopicBriefStoriesResponse(brief, 'sports', { now }), null);
+
+  const noRefresh = buildTopicBriefStoriesResponse(brief, 'world', { now, lastSuccess: null });
+  assert.equal(noRefresh!.timestamp, now.getTime() / 1000);
+
+  const batch = buildTopicBriefBatchInfo(brief, now);
+  assert.equal(batch.id, OWNED_BATCH_ID);
+  assert.equal(batch.totalReadCount, 5);
+});
+
+test('topic Brief with no stories → zero stories, category still world / Brief', () => {
+  const empty: TopicBrief = { boundaryAt: null, sections: [], quiet: [] };
+  const categories = buildTopicBriefCategoriesResponse(empty);
+  assert.equal(categories.categories[0]!.categoryId, 'world');
+  assert.equal(categories.categories[0]!.categoryName, 'Brief');
+  assert.equal(categories.categories[0]!.clusterCount, 0);
+  assert.deepEqual(buildTopicBriefStoriesResponse(empty, 'world')!.stories, []);
+});
+
+test('buildBriefOverview: sections with More split, quiet, notices, nextAt, running', () => {
+  const lastSuccess = refreshRun('2026-09-30T09:00:00.000Z');
+  const last = refreshRun('2026-09-30T11:00:00.000Z', false);
+  const meta: StoreMeta = {
+    lastFetchAt: null,
+    lastError: null,
+    refresh: { last, lastSuccess },
+    topicSearch: {
+      providers: { searxng: { state: 'down' }, google_news: { state: 'ok' } },
+    } as unknown as StoreMeta['topicSearch'],
+  };
+
+  const overview = buildBriefOverview({ brief: topicBrief(), meta, intervalHours: 2.5, running: true });
+  assert.deepEqual(overview, {
+    ok: true,
+    fixture: false,
+    refresh: {
+      last,
+      lastSuccess,
+      nextAt: '2026-09-30T11:30:00.000Z',
+      intervalHours: 2.5,
+      running: true,
+    },
+    notices: ['SearXNG unavailable', 'Last refresh failed: CFP down'],
+    sections: [
+      { topicId: 't1', name: 'Iran', level: 'core', storyIds: ['a1', 'a2', 'a3'], moreIds: ['a4'] },
+      { topicId: 't2', name: 'Gas prices', level: 'watch', storyIds: ['b1'], moreIds: [] },
+    ],
+    quiet: [{ id: 't3', name: 'Palantir', level: 'watch' }],
+  });
+
+  const disabled = buildBriefOverview({ brief: topicBrief(), meta, intervalHours: null, running: false });
+  assert.equal(disabled.refresh.nextAt, null);
+  assert.equal(disabled.refresh.intervalHours, null);
+  assert.equal(disabled.refresh.running, false);
+
+  const never = buildBriefOverview({
+    brief: topicBrief(),
+    meta: { lastFetchAt: null, lastError: null },
+    intervalHours: 3,
+    running: false,
+  });
+  assert.equal(never.refresh.nextAt, null);
+  assert.equal(never.refresh.last, null);
+  assert.equal(never.refresh.lastSuccess, null);
+  assert.deepEqual(never.notices, []);
+});
+
+test('buildBriefOverview: fixture (brief null) → no sections or quiet line', () => {
+  const overview = buildBriefOverview({
+    brief: null,
+    meta: { lastFetchAt: null, lastError: null },
+    intervalHours: 3,
+    running: false,
+  });
+  assert.equal(overview.fixture, true);
+  assert.deepEqual(overview.sections, []);
+  assert.deepEqual(overview.quiet, []);
 });

@@ -17,6 +17,7 @@ import {
   buildRefreshNotices,
   composeTopicBrief,
   isSignificantlyUpdated,
+  markBriefSeen,
   summarySourceFor,
   type ComposeTopicBriefInput,
 } from './topicBrief.js';
@@ -443,6 +444,7 @@ test('links: kept article first, duplicate members in memberIds order, distinct 
     url: 'https://k.example.com/story',
     domain: 'k.example.com',
     publishedAt: HOURS_AGO(1),
+    fetchedAt: HOURS_AGO(1),
   });
 });
 
@@ -616,4 +618,41 @@ test('buildRefreshNotices: one notice per source', () => {
     },
   };
   assert.deepEqual(buildRefreshNotices(disabled), []);
+});
+
+test('markBriefSeen snapshots kept records, ignores unknown ids, prunes old and no-longer-kept entries', () => {
+  const DAYS_AGO = (d: number) => HOURS_AGO(d * 24);
+  const seen: BriefSeenStore = {
+    seen: {
+      recent: { seenAt: DAYS_AGO(6), outletCount: 1, significance: 1 },
+      old: { seenAt: DAYS_AGO(8), outletCount: 1, significance: 1 },
+      dropped: { seenAt: DAYS_AGO(1), outletCount: 1, significance: 1 },
+      gone: { seenAt: DAYS_AGO(1), outletCount: 1, significance: 1 },
+      reread: { seenAt: DAYS_AGO(3), outletCount: 1, significance: 0.5 },
+    },
+    updatedAt: DAYS_AGO(1),
+  };
+  const triage = triageOf(
+    kept('recent', ['c1']),
+    kept('old', ['c1']),
+    duplicate('dropped', 'recent'),
+    kept('reread', ['c1'], { outletCount: 4, significance: 1.5 }),
+    kept('fresh', ['c1'], { outletCount: null, significance: null }),
+  );
+
+  const { store, recorded } = markBriefSeen({
+    seen,
+    triage,
+    articleIds: ['fresh', 'reread', 'unknown', 'dropped', 'fresh'],
+    now: NOW,
+  });
+
+  assert.equal(recorded, 2);
+  assert.equal(store.updatedAt, NOW.toISOString());
+  assert.deepEqual(store.seen, {
+    recent: seen.seen.recent,
+    reread: { seenAt: NOW.toISOString(), outletCount: 4, significance: 1.5 },
+    fresh: { seenAt: NOW.toISOString(), outletCount: null, significance: null },
+  });
+  assert.equal(seen.seen.old !== undefined, true, 'input store is not mutated');
 });
