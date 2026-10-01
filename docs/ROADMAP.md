@@ -15,8 +15,8 @@ Claims spine plan: [`.cursor/plans/claims_evidence_spine_8f4cde15.plan.md`](../.
 |-------|-----|---------|
 | 1 | [NEWS-85](https://informedcrew.atlassian.net/browse/NEWS-85) | Topics store, API, and Topics page (seeded with 23 topics) — **Done** |
 | 2 | [NEWS-86](https://informedcrew.atlassian.net/browse/NEWS-86) | Topic search ingest: Google News RSS + self-hosted SearXNG, merged — **Done** |
-| **3** | [NEWS-87](https://informedcrew.atlassian.net/browse/NEWS-87) | Triage pipeline: dedupe, keyword + Jev headline gates, survivor-only scrape, budget caps, drop reasons *(next)* |
-| 4 | [NEWS-88](https://informedcrew.atlassian.net/browse/NEWS-88) | Brief by topic: top 3 per topic, summaries for shown stories only, scheduled + manual refresh |
+| 3 | [NEWS-87](https://informedcrew.atlassian.net/browse/NEWS-87) | Triage pipeline: dedupe, keyword + Jev headline gates, survivor-only scrape, budget caps, drop reasons — **Done** ([docs/TRIAGE.md](TRIAGE.md)) |
+| **4** | [NEWS-88](https://informedcrew.atlassian.net/browse/NEWS-88) | Brief by topic: top 3 per topic, summaries for shown stories only, scheduled + manual refresh *(next)* |
 | 5 | [NEWS-89](https://informedcrew.atlassian.net/browse/NEWS-89) | Full stories: tap-to-expand *(milestone 1)*; automatic worth-it bar, topic sections, living updates *(follow-up)* |
 | 6 | [NEWS-90](https://informedcrew.atlassian.net/browse/NEWS-90) | Filtered out view + "Less like this" feedback |
 | 7 | [NEWS-91](https://informedcrew.atlassian.net/browse/NEWS-91) | Retire review flow from default path; park claims desk; update docs |
