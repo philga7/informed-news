@@ -1,12 +1,18 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { dataReloadService } from '$lib/services/dataService';
 	import {
 		BRIEF_REFRESHING_LABEL,
 		BRIEF_REFRESH_ERROR,
 		BRIEF_REFRESH_LABEL,
 		BRIEF_REFRESH_LOGIN_HINT,
+		BRIEF_REFRESH_POLL_MS,
+		fetchBriefOverview,
+		isRecoverableRefreshFailure,
+		lastSuccessAt,
 		nextRefreshLabel,
 		postBriefRefresh,
+		refreshPollOutcome,
 		updatedLabel,
 		type BriefOverviewRefresh,
 	} from '$lib/topicBrief';
@@ -20,12 +26,20 @@
 
 	let now = $state(new Date());
 	let refreshing = $state(false);
+	let polling = $state(false);
+	let polled = $state<{ refresh: BriefOverviewRefresh; notices: string[] } | null>(null);
 	let errorMessage = $state<string | null>(null);
 	let loginHint = $state(false);
 
-	const updated = $derived(updatedLabel(refresh, now));
-	const next = $derived(nextRefreshLabel(refresh.nextAt, now));
-	const busy = $derived(refreshing || refresh.running);
+	let pollTimer: ReturnType<typeof setTimeout> | null = null;
+	let pollBaseline: string | null = null;
+	let destroyed = false;
+
+	const currentRefresh = $derived(polled?.refresh ?? refresh);
+	const currentNotices = $derived(polled?.notices ?? notices);
+	const updated = $derived(updatedLabel(currentRefresh, now));
+	const next = $derived(nextRefreshLabel(currentRefresh.nextAt, now));
+	const busy = $derived(refreshing || polling || currentRefresh.running);
 
 	$effect(() => {
 		const timer = setInterval(() => {
@@ -34,26 +48,73 @@
 		return () => clearInterval(timer);
 	});
 
+	onMount(() => {
+		if (refresh.running) startPolling(lastSuccessAt(refresh), false);
+		return () => {
+			destroyed = true;
+			if (pollTimer !== null) clearTimeout(pollTimer);
+		};
+	});
+
+	/** Poll the overview until the refresh stops running, then reload if it produced a new Brief. */
+	function startPolling(baseline: string | null, immediately: boolean): void {
+		if (polling || destroyed) return;
+		polling = true;
+		pollBaseline = baseline;
+		if (immediately) void pollOnce();
+		else schedulePoll();
+	}
+
+	function schedulePoll(): void {
+		pollTimer = setTimeout(() => {
+			pollTimer = null;
+			void pollOnce();
+		}, BRIEF_REFRESH_POLL_MS);
+	}
+
+	async function pollOnce(): Promise<void> {
+		const overview = await fetchBriefOverview();
+		if (destroyed) return;
+		if (!overview) {
+			polling = false;
+			errorMessage = BRIEF_REFRESH_ERROR;
+			return;
+		}
+		polled = { refresh: overview.refresh, notices: overview.notices };
+		const outcome = refreshPollOutcome(pollBaseline, overview.refresh);
+		if (outcome.kind === 'running') {
+			schedulePoll();
+			return;
+		}
+		polling = false;
+		errorMessage = outcome.error;
+		if (outcome.reload) await dataReloadService.reloadData();
+	}
+
 	async function handleRefresh(): Promise<void> {
 		if (busy) return;
+		const baseline = lastSuccessAt(currentRefresh);
 		refreshing = true;
 		errorMessage = null;
 		loginHint = false;
 
 		const result = await postBriefRefresh();
 		refreshing = false;
+		if (destroyed) return;
 
-		if (!result.ok) {
-			loginHint = Boolean(result.unauthenticated);
-			errorMessage = loginHint
-				? null
-				: result.error
-					? `Refresh failed: ${result.error}`
-					: BRIEF_REFRESH_ERROR;
+		if (result.ok) {
+			await dataReloadService.reloadData();
 			return;
 		}
-
-		await dataReloadService.reloadData();
+		if (result.unauthenticated) {
+			loginHint = true;
+			return;
+		}
+		if (isRecoverableRefreshFailure(result)) {
+			startPolling(baseline, true);
+			return;
+		}
+		errorMessage = result.error ? `Refresh failed: ${result.error}` : BRIEF_REFRESH_ERROR;
 	}
 </script>
 
@@ -77,9 +138,9 @@
 		</button>
 	</div>
 
-	{#if notices.length > 0}
+	{#if currentNotices.length > 0}
 		<p class="mt-2 text-[11px] leading-relaxed text-amber-700 dark:text-amber-400">
-			{notices.join(' · ')}
+			{currentNotices.join(' · ')}
 		</p>
 	{/if}
 

@@ -3,6 +3,7 @@ import type { Story } from '$lib/types';
 import {
 	BRIEF_AI_SUMMARY_NOTE,
 	BRIEF_NOT_REFRESHED,
+	BRIEF_REFRESH_ERROR,
 	BRIEF_OTHER_SECTION_NAME,
 	BRIEF_SEEN_MAX_IDS,
 	BRIEF_SUMMARY_ERROR,
@@ -15,7 +16,10 @@ import {
 	formatTimeAgoShort,
 	groupTopicBrief,
 	isOfficialStory,
+	isRecoverableRefreshFailure,
+	lastSuccessAt,
 	moreLabel,
+	newlyExpandedKeys,
 	newlyReadIds,
 	nextRefreshLabel,
 	outletBadge,
@@ -23,6 +27,8 @@ import {
 	postBriefSeen,
 	postStorySummary,
 	quietLine,
+	refreshPollOutcome,
+	summaryAttemptCounts,
 	summaryErrorCopy,
 	summaryLine,
 	updatedLabel,
@@ -233,6 +239,92 @@ describe('refresh labels', () => {
 		expect(nextRefreshLabel('2026-09-30T14:00:00.000Z', now, fmt)).toBe(
 			'Next refresh 2026-09-30T14:00:00.000Z',
 		);
+	});
+});
+
+describe('newlyExpandedKeys', () => {
+	it('returns keys opened since the previous snapshot', () => {
+		expect(newlyExpandedKeys({ a: true }, { a: true, b: true, c: false })).toEqual(['b']);
+		expect(newlyExpandedKeys({ a: true, b: true }, { b: true })).toEqual([]);
+		expect(newlyExpandedKeys({}, { a: true })).toEqual(['a']);
+	});
+});
+
+describe('summaryAttemptCounts', () => {
+	it('counts success, unavailable, not_in_brief and server errors', () => {
+		expect(summaryAttemptCounts({ ok: true, status: 'ok', text: 'x' })).toBe(true);
+		expect(summaryAttemptCounts({ ok: true, status: 'unavailable' })).toBe(true);
+		expect(summaryAttemptCounts({ ok: false, status: 404, error: 'not_in_brief' })).toBe(true);
+		expect(summaryAttemptCounts({ ok: false, status: 502, error: 'error' })).toBe(true);
+	});
+
+	it('keeps login, rate-limit and network failures retryable', () => {
+		expect(summaryAttemptCounts({ ok: false, status: 401, unauthenticated: true })).toBe(false);
+		expect(summaryAttemptCounts({ ok: false, status: 429, error: 'rate_limited' })).toBe(false);
+		expect(summaryAttemptCounts({ ok: false, status: 0 })).toBe(false);
+	});
+});
+
+describe('refresh polling decisions', () => {
+	const run = (completedAt: string, ok = true, error: string | null = null) => ({
+		trigger: 'manual' as const,
+		startedAt: completedAt,
+		completedAt,
+		ok,
+		error,
+	});
+
+	it('isRecoverableRefreshFailure: network, 5xx and proxy errors only', () => {
+		expect(isRecoverableRefreshFailure({ ok: false, status: 0 })).toBe(true);
+		expect(isRecoverableRefreshFailure({ ok: false, status: 500, error: 'Proxy request failed' })).toBe(
+			true,
+		);
+		expect(isRecoverableRefreshFailure({ ok: false, status: 504 })).toBe(true);
+		expect(isRecoverableRefreshFailure({ ok: false, status: 401, unauthenticated: true })).toBe(false);
+		expect(isRecoverableRefreshFailure({ ok: false, status: 400 })).toBe(false);
+		expect(isRecoverableRefreshFailure({ ok: true })).toBe(false);
+	});
+
+	it('lastSuccessAt', () => {
+		expect(lastSuccessAt(null)).toBeNull();
+		expect(lastSuccessAt(makeRefresh())).toBeNull();
+		expect(lastSuccessAt(makeRefresh({ lastSuccess: run('2026-09-30T10:00:00.000Z') }))).toBe(
+			'2026-09-30T10:00:00.000Z',
+		);
+	});
+
+	it('keeps polling while running', () => {
+		expect(refreshPollOutcome(null, makeRefresh({ running: true }))).toEqual({ kind: 'running' });
+	});
+
+	it('reloads only when lastSuccess changed', () => {
+		const before = '2026-09-30T10:00:00.000Z';
+		const after = '2026-09-30T11:00:00.000Z';
+		expect(
+			refreshPollOutcome(before, makeRefresh({ last: run(after), lastSuccess: run(after) })),
+		).toEqual({ kind: 'done', reload: true, error: null });
+		expect(
+			refreshPollOutcome(before, makeRefresh({ last: run(before), lastSuccess: run(before) })),
+		).toEqual({ kind: 'done', reload: false, error: null });
+		expect(refreshPollOutcome(null, makeRefresh({ lastSuccess: run(after) }))).toMatchObject({
+			reload: true,
+		});
+	});
+
+	it('reports the failed run error when the last refresh failed', () => {
+		const before = '2026-09-30T10:00:00.000Z';
+		expect(
+			refreshPollOutcome(
+				before,
+				makeRefresh({
+					last: run('2026-09-30T11:00:00.000Z', false, 'CFP down'),
+					lastSuccess: run(before),
+				}),
+			),
+		).toEqual({ kind: 'done', reload: false, error: 'Refresh failed: CFP down' });
+		expect(
+			refreshPollOutcome(before, makeRefresh({ last: run(before, false, null) })),
+		).toMatchObject({ error: BRIEF_REFRESH_ERROR });
 	});
 });
 

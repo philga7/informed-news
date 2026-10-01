@@ -4,7 +4,7 @@
 </script>
 
 <script lang="ts">
-	import type { Snippet } from 'svelte';
+	import { untrack, type Snippet } from 'svelte';
 	import { s } from '$lib/client/localization.svelte';
 	import { kiteDB } from '$lib/db/dexie';
 	import { keyboardNavigation } from '$lib/stores/keyboardNavigation.svelte';
@@ -24,12 +24,14 @@
 		isOfficialStory,
 		isTopicBriefStory,
 		moreLabel,
+		newlyExpandedKeys,
 		newlyReadIds,
 		outletBadge,
 		postBriefSeen,
 		postStorySummary,
 		quietLine,
 		storyKey,
+		summaryAttemptCounts,
 		summaryErrorCopy,
 		summaryLine,
 		type BriefOverview,
@@ -101,8 +103,38 @@
 
 	const seen = createSeenBatcher({ post: (ids) => postBriefSeen(ids) });
 
-	$effect(() => () => {
-		void seen.flush();
+	$effect(() => {
+		const onVisibilityChange = () => {
+			if (document.visibilityState === 'hidden') void seen.flush();
+		};
+		document.addEventListener('visibilitychange', onVisibilityChange);
+		return () => {
+			document.removeEventListener('visibilitychange', onVisibilityChange);
+			void seen.flush();
+		};
+	});
+
+	/**
+	 * Every expand path (click, keyboard, expand-all, shared link) lands in
+	 * `expandedStories`; newly opened topic stories get a summary request and a seen mark.
+	 */
+	let previousExpanded: Record<string, boolean> = {};
+	$effect(() => {
+		const current = { ...expandedStories };
+		const opened = newlyExpandedKeys(previousExpanded, current);
+		previousExpanded = current;
+		if (opened.length === 0) return;
+		untrack(() => {
+			const byKey = new Map(stories.map((story) => [storyKey(story), story]));
+			const seenIds: string[] = [];
+			for (const key of opened) {
+				const story = byKey.get(key);
+				if (!story || !isTopicBriefStory(story)) continue;
+				if (story.id) seenIds.push(story.id);
+				void requestSummary(story);
+			}
+			if (seenIds.length > 0) seen.add(seenIds);
+		});
 	});
 
 	async function loadOverview(): Promise<void> {
@@ -130,6 +162,7 @@
 		summaryRequests = { ...summaryRequests, [id]: { phase: 'loading' } };
 
 		const result = await postStorySummary(id);
+		if (!summaryAttemptCounts(result)) requestedSummaries.delete(id);
 		const { [id]: _done, ...rest } = summaryRequests;
 
 		if (result.ok) {
@@ -153,12 +186,7 @@
 	}
 
 	function handleToggle(story: Story): void {
-		const key = storyKey(story);
-		const opening = !expandedStories[key];
-		const before = { ...readStories };
-		onStoryToggle?.(key);
-		recordNewlyRead(before);
-		if (opening) void requestSummary(story);
+		onStoryToggle?.(storyKey(story));
 	}
 
 	async function handleReadToggle(story: Story): Promise<void> {

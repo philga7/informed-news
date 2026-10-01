@@ -46,6 +46,8 @@ export const BRIEF_NOT_REFRESHED = 'Not refreshed yet';
 
 export const BRIEF_SEEN_DEBOUNCE_MS = 1000;
 
+export const BRIEF_REFRESH_POLL_MS = 10_000;
+
 /** Server cap per `POST /api/brief/seen` call. */
 export const BRIEF_SEEN_MAX_IDS = 100;
 
@@ -209,6 +211,54 @@ export function newlyReadIds(
 	candidates: ReadonlySet<string>,
 ): string[] {
 	return Object.keys(after).filter((id) => after[id] && !before[id] && candidates.has(id));
+}
+
+/** Keys expanded in `next` but not in `prev`. */
+export function newlyExpandedKeys(
+	prev: Record<string, boolean>,
+	next: Record<string, boolean>,
+): string[] {
+	return Object.keys(next).filter((key) => next[key] && !prev[key]);
+}
+
+/**
+ * Whether a summary attempt uses up the once-per-page-load guard. Login (401),
+ * rate limit (429) and network failures (status 0) stay retryable.
+ */
+export function summaryAttemptCounts(result: StorySummaryResult): boolean {
+	if (result.ok) return true;
+	return result.status !== 0 && result.status !== 401 && result.status !== 429;
+}
+
+/** Refresh POST failures that may hide a still-running refresh (proxy timeout, 5xx, network). */
+export function isRecoverableRefreshFailure(result: BriefPostResult): boolean {
+	return !result.ok && !result.unauthenticated && (result.status === 0 || result.status >= 500);
+}
+
+export function lastSuccessAt(refresh: BriefOverviewRefresh | null | undefined): string | null {
+	return refresh?.lastSuccess?.completedAt ?? null;
+}
+
+export type RefreshPollOutcome =
+	| { kind: 'running' }
+	| { kind: 'done'; reload: boolean; error: string | null };
+
+/** Next step while polling the overview after (or during) a refresh. */
+export function refreshPollOutcome(
+	baselineLastSuccessAt: string | null,
+	refresh: BriefOverviewRefresh,
+): RefreshPollOutcome {
+	if (refresh.running) return { kind: 'running' };
+	const current = lastSuccessAt(refresh);
+	const reload = current !== null && current !== baselineLastSuccessAt;
+	const last = refresh.last;
+	const error =
+		last && last.ok === false
+			? last.error
+				? `Refresh failed: ${last.error}`
+				: BRIEF_REFRESH_ERROR
+			: null;
+	return { kind: 'done', reload, error };
 }
 
 /** "just now" / "5 min ago" / "3 h ago" / "2 d ago"; null for an unparsable time. */
