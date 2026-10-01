@@ -122,6 +122,10 @@ test('buildTriageQuestions keys topics, undesired, quality, significance in orde
 
   const significance = qs.significance;
   assert.equal(significance?.type, 'score');
+  assert.equal(
+    significance?.instructions,
+    'How significant is this development for someone following the topic(s) this story is about?',
+  );
   assert.deepEqual(significance?.type === 'score' ? significance.criteria : null, [
     'Routine or minor update',
     'Notable but incremental development',
@@ -257,6 +261,62 @@ test('buildHeadlineState publisher falls back to domain, then null', () => {
   );
 });
 
+test('buildHeadlineState CFP row uses publisher domain, not the CFP label', () => {
+  const state = buildHeadlineState(
+    makeArticle({
+      sourceKind: 'cfp',
+      citations: [
+        { label: 'CFP', url: 'https://citizenfreepress.com/x' },
+        { label: 'Original', url: 'https://www.reuters.com/world/story' },
+      ],
+      publisherDomain: 'reuters.com',
+    }),
+  );
+  assert.equal(state.publisher, 'reuters.com');
+});
+
+test('buildHeadlineState xcancel row uses @handle', () => {
+  const state = buildHeadlineState(
+    makeArticle({
+      sourceKind: 'xcancel',
+      citations: [
+        { label: 'xcancel', url: 'https://xcancel.com/WhiteHouse/status/1' },
+        { label: 'X', url: 'https://x.com/WhiteHouse/status/1' },
+      ],
+      publisherUrl: null,
+      publisherDomain: null,
+      handle: 'WhiteHouse',
+    }),
+  );
+  assert.equal(state.publisher, '@WhiteHouse');
+});
+
+test('buildHeadlineState search row uses the outlet citation label', () => {
+  const state = buildHeadlineState(
+    makeArticle({
+      citations: [
+        { label: 'Reuters', url: 'https://www.reuters.com/world/story' },
+        { label: 'Google News', url: 'https://news.google.com/rss/articles/abc' },
+      ],
+      publisherDomain: 'reuters.com',
+    }),
+  );
+  assert.equal(state.publisher, 'Reuters');
+});
+
+test('buildHeadlineState with only aggregator labels and no domain → null', () => {
+  const state = buildHeadlineState(
+    makeArticle({
+      citations: [
+        { label: 'google news', url: 'https://news.google.com/rss/articles/abc' },
+        { label: 'Publisher', url: 'https://example.com/story' },
+      ],
+      publisherDomain: null,
+    }),
+  );
+  assert.equal(state.publisher, null);
+});
+
 test('buildBodyState adds truncated bodyExcerpt', () => {
   const body = 'b'.repeat(BODY_EXCERPT_MAX_CHARS + 100);
   const state = buildBodyState(makeArticle({ bodyText: body }));
@@ -386,6 +446,35 @@ test('judgeTriage never throws on a thrown or malformed response', async () => {
   });
   assert.equal(malformed.ok, false);
   assert.match(malformed.ok ? '' : malformed.error, /topic_1/);
+});
+
+test('judgeTriage rejects non-finite noul, confidence, and score', async () => {
+  const one = { candidates: [core], undesired: [] };
+  const valid = (): Record<string, FakeAnswer> => ({
+    topic_0: noulA(0.9),
+    quality: { type: 'choice', choice: 'news', confidence: 0.9, probabilities: {} },
+    significance: { type: 'score', score: 1, confidence: 0.9, legend: {}, probabilities: {} },
+  });
+  const cases: Array<[string, (a: Record<string, FakeAnswer>) => void]> = [
+    ['topic_0', (a) => { a.topic_0 = noulA(Number.NaN); }],
+    ['quality', (a) => {
+      a.quality = { type: 'choice', choice: 'news', confidence: Infinity, probabilities: {} };
+    }],
+    ['significance', (a) => {
+      a.significance = { type: 'score', score: Number.NaN, confidence: 0.9, legend: {}, probabilities: {} };
+    }],
+  ];
+  for (const [key, mutate] of cases) {
+    const res = await judgeTriage('headline', makeArticle(), one, {
+      systemOne: fakeSystemOne(() => {
+        const a = valid();
+        mutate(a);
+        return a;
+      }),
+    });
+    assert.equal(res.ok, false, key);
+    assert.match(res.ok ? '' : res.error, new RegExp(key));
+  }
 });
 
 test('judgeTriage rejects an unknown quality label', async () => {

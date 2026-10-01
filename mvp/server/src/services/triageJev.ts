@@ -108,14 +108,30 @@ export function buildTriageQuestions(ctx: TriageJevContext): Questions {
   });
   questions.quality = choice('What kind of story is this?', QUALITY_CRITERIA);
   questions.significance = score(
-    'How significant is this development for someone following this topic?',
+    'How significant is this development for someone following the topic(s) this story is about?',
     SIGNIFICANCE_RUBRIC,
   );
   return questions;
 }
 
+/** Citation labels that name an aggregator, platform, or placeholder rather than the outlet. */
+const AGGREGATOR_LABELS: ReadonlySet<string> = new Set([
+  'cfp',
+  'xcancel',
+  'google news',
+  'original',
+  'x',
+  'publisher',
+  'source',
+]);
+
 function publisherLabel(article: Article): string | null {
-  return article.citations[0]?.label || article.publisherDomain || null;
+  const handle = article.handle?.trim().replace(/^@/, '');
+  if (handle) return `@${handle}`;
+  const outlet = article.citations.find(
+    (c) => c.label.trim() && !AGGREGATOR_LABELS.has(c.label.trim().toLowerCase()),
+  );
+  return outlet?.label.trim() || article.publisherDomain || null;
 }
 
 export function buildHeadlineState(article: Article): TriageHeadlineState {
@@ -170,9 +186,11 @@ export function routeTriageAnswers(
 
 type RawAnswers = { readonly [name: string]: unknown };
 
+const isFiniteNumber = (v: unknown): v is number => Number.isFinite(v);
+
 function readNoul(raw: RawAnswers, key: string): number {
   const a = raw[key] as { noul?: unknown } | undefined;
-  if (typeof a?.noul !== 'number') {
+  if (!isFiniteNumber(a?.noul)) {
     throw new Error(`Malformed Jev answer: ${key}`);
   }
   return a.noul;
@@ -181,7 +199,7 @@ function readNoul(raw: RawAnswers, key: string): number {
 function readQuality(raw: RawAnswers): TriageJevAnswers['quality'] {
   const a = raw.quality as { choice?: unknown; confidence?: unknown } | undefined;
   if (
-    typeof a?.confidence !== 'number' ||
+    !isFiniteNumber(a?.confidence) ||
     !(QUALITY_LABELS as readonly unknown[]).includes(a.choice)
   ) {
     throw new Error('Malformed Jev answer: quality');
@@ -191,7 +209,7 @@ function readQuality(raw: RawAnswers): TriageJevAnswers['quality'] {
 
 function readSignificance(raw: RawAnswers): number {
   const a = raw.significance as { score?: unknown } | undefined;
-  if (typeof a?.score !== 'number') {
+  if (!isFiniteNumber(a?.score)) {
     throw new Error('Malformed Jev answer: significance');
   }
   return a.score;
