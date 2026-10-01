@@ -4,6 +4,7 @@ import {
   readArticles,
   readBriefMembership,
   readBriefSeen,
+  readBriefFullStories,
   readBriefSummaries,
   readClaimEnrichments,
   readClaimMembership,
@@ -45,6 +46,7 @@ export type CreateKiteBriefRouterDeps = {
   readMuteRules?: typeof readMuteRules;
   readBriefSeen?: typeof readBriefSeen;
   readBriefSummaries?: typeof readBriefSummaries;
+  readBriefFullStories?: typeof readBriefFullStories;
   readMeta?: typeof readMeta;
   readBriefMembership?: typeof readBriefMembership;
   readClusterEnrichments?: typeof readClusterEnrichments;
@@ -85,6 +87,7 @@ export function createKiteBriefRouter(
   const readMutes = deps.readMuteRules ?? readMuteRules;
   const readSeen = deps.readBriefSeen ?? readBriefSeen;
   const readSummaries = deps.readBriefSummaries ?? readBriefSummaries;
+  const readFullStories = deps.readBriefFullStories ?? readBriefFullStories;
   const readServerMeta = deps.readMeta ?? readMeta;
   const readMembership = deps.readBriefMembership ?? readBriefMembership;
   const readEnrichments = deps.readClusterEnrichments ?? readClusterEnrichments;
@@ -188,9 +191,11 @@ export function createKiteBriefRouter(
           enrichments: await loadEnrichments(),
         });
       } else {
+        const fullStories = await readFullStories();
         body = buildTopicBriefStoriesResponse(owned.brief, req.params.categoryId, {
           now: at,
           lastSuccess: owned.meta.refresh?.lastSuccess ?? null,
+          fullStories: fullStories.fullStories,
         });
       }
       if (!body) {
