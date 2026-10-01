@@ -27,6 +27,10 @@ function isStringOrNull(value: unknown): value is string | null {
   return value === null || typeof value === 'string';
 }
 
+function isNumberOrNull(value: unknown): value is number | null {
+  return value === null || (typeof value === 'number' && Number.isFinite(value));
+}
+
 function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((item) => typeof item === 'string');
 }
@@ -145,6 +149,20 @@ function normalizeTopicSections(raw: unknown): TopicSection[] {
   return sections;
 }
 
+function normalizeAutoSnapshot(
+  raw: unknown,
+): BriefFullStoryRecord['autoSnapshot'] {
+  if (
+    !isRecord(raw) ||
+    typeof raw.outletCount !== 'number' ||
+    !Number.isFinite(raw.outletCount) ||
+    !isNumberOrNull(raw.significance)
+  ) {
+    return undefined;
+  }
+  return { outletCount: raw.outletCount, significance: raw.significance };
+}
+
 function normalizeRecord(key: string, raw: unknown): BriefFullStoryRecord | null {
   if (!isRecord(raw)) return null;
   if (raw.articleId !== key) return null;
@@ -179,6 +197,8 @@ function normalizeRecord(key: string, raw: unknown): BriefFullStoryRecord | null
   else if (raw.changeSummary === null) record.changeSummary = null;
   const priorTimeline = normalizeTimeline(raw.priorTimeline);
   if (priorTimeline && priorTimeline.length > 0) record.priorTimeline = priorTimeline;
+  const autoSnapshot = normalizeAutoSnapshot(raw.autoSnapshot);
+  if (autoSnapshot) record.autoSnapshot = autoSnapshot;
 
   return record;
 }

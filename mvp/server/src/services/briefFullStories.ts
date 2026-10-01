@@ -14,9 +14,11 @@ import type {
   BriefFullStoryRecord,
   BriefFullStoriesStore,
 } from '../types/briefFullStory.js';
+import type { FullStoriesRunMeta } from '../types/brief.js';
 import type { TopicSection } from '../types/topic.js';
 import type { TriageRecord } from '../types/triage.js';
 import {
+  FULL_STORY_AUTO_MAX_PER_REFRESH,
   FULL_STORY_MEMBER_MAX,
   ON_DEMAND_FULL_STORY_MAX_PER_HOUR,
   SUMMARY_POST_MIN_CHARS,
@@ -32,6 +34,7 @@ import {
   type BriefSummaryDeps,
   type OnDemandLimiter,
 } from './briefSummaries.js';
+import { selectAutoFullStoryTargets } from './briefFullStoryAuto.js';
 import { pickStoryQuote, storyPerspectives } from './kiteBriefAdapter.js';
 import { getOllamaClient, getOllamaModelName } from './ollamaFraming.js';
 
@@ -47,10 +50,30 @@ export type BriefFullStoryDeps = BriefSummaryDeps & {
   rateLimiter?: OnDemandLimiter;
 };
 
+export type GenerateFullStoryOptions = {
+  now?: Date;
+  trigger?: 'on_demand' | 'refresh';
+  skipRateLimit?: boolean;
+  /** Significant automatic updates may need regeneration despite unchanged text. */
+  forceRegenerate?: boolean;
+};
+
+export type RefreshFullStoriesDeps = BriefFullStoryDeps & {
+  generateFullStory?: (
+    articleId: string,
+    options: GenerateFullStoryOptions,
+  ) => Promise<GenerateFullStoryResult>;
+};
+
 const HOUR_MS = 60 * 60 * 1000;
+const RUN_ERRORS_MAX = 5;
 
 function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
+}
+
+function addError(errors: string[], message: string): void {
+  if (errors.length < RUN_ERRORS_MAX && !errors.includes(message)) errors.push(message);
 }
 
 function articleLink(article: Article): string {
@@ -263,7 +286,7 @@ async function putSafely(
 async function generateFullStoryOnce(
   articleId: string,
   now: Date,
-  options: { trigger?: 'on_demand' | 'refresh'; skipRateLimit?: boolean },
+  options: GenerateFullStoryOptions,
   deps: BriefFullStoryDeps,
 ): Promise<GenerateFullStoryResult> {
   const errors: string[] = [];
@@ -303,7 +326,7 @@ async function generateFullStoryOnce(
     return { ok: false, code: 'error', error: `full stories: ${errorMessage(err)}` };
   }
   const prior = store.fullStories[articleId];
-  if (prior?.status === 'ok' && prior.sourceHash === sourceHash) {
+  if (prior?.status === 'ok' && prior.sourceHash === sourceHash && !options.forceRegenerate) {
     return { ok: true, record: prior };
   }
 
@@ -342,6 +365,10 @@ async function generateFullStoryOnce(
       error: null,
       generatedAt: at,
       trigger,
+      autoSnapshot: {
+        outletCount: record.outletCount ?? 1,
+        significance: record.significance,
+      },
     };
     const merged = prior?.status === 'ok' ? mergeLivingFullStory(prior, next) : next;
     const writeError = await putSafely(deps, merged);
@@ -366,7 +393,7 @@ async function generateFullStoryOnce(
  */
 export function generateFullStory(
   articleId: string,
-  options: { now?: Date; trigger?: 'on_demand' | 'refresh'; skipRateLimit?: boolean } = {},
+  options: GenerateFullStoryOptions = {},
   deps: BriefFullStoryDeps = {},
 ): Promise<GenerateFullStoryResult> {
   const existing = inFlight.get(articleId);
@@ -382,4 +409,72 @@ export function generateFullStory(
     });
   inFlight.set(articleId, promise);
   return promise;
+}
+
+/**
+ * Automatically generates only the most substantiated, material Brief stories
+ * after a refresh. Failures are captured in run metadata so a source refresh
+ * remains successful even if Ollama or the full-story store is unavailable.
+ */
+export async function generateRefreshFullStories(
+  options: { now?: Date; boundaryAt?: string | null } = {},
+  deps: RefreshFullStoriesDeps = {},
+): Promise<FullStoriesRunMeta> {
+  const fullStories: FullStoriesRunMeta = {
+    budget: FULL_STORY_AUTO_MAX_PER_REFRESH,
+    used: 0,
+    generated: 0,
+    reused: 0,
+    unavailable: 0,
+    errors: [],
+  };
+  const now = options.now ?? new Date();
+  try {
+    const loaded = await loadBriefInputs(deps, options.boundaryAt === undefined, fullStories.errors);
+    if (!loaded) return fullStories;
+    let existing: BriefFullStoriesStore;
+    try {
+      existing = await (deps.readBriefFullStories ?? readBriefFullStories)();
+    } catch (err) {
+      addError(fullStories.errors, `full stories: ${errorMessage(err)}`);
+      return fullStories;
+    }
+
+    const brief = composeBriefFromInputs(loaded, now, options.boundaryAt);
+    const articleIds = selectAutoFullStoryTargets(brief, existing.fullStories);
+    const generate = deps.generateFullStory ??
+      ((articleId: string, generateOptions: GenerateFullStoryOptions) =>
+        generateFullStory(articleId, generateOptions, deps));
+
+    for (const articleId of articleIds) {
+      fullStories.used += 1;
+      const prior = existing.fullStories[articleId];
+      try {
+        const result = await generate(articleId, {
+          now,
+          trigger: 'refresh',
+          skipRateLimit: true,
+          forceRegenerate: prior?.status === 'ok',
+        });
+        if (!result.ok) {
+          addError(fullStories.errors, result.error);
+        } else if (result.record.status === 'unavailable') {
+          fullStories.unavailable += 1;
+        } else if (
+          prior?.status === 'ok' &&
+          prior.sourceHash === result.record.sourceHash &&
+          prior.generatedAt === result.record.generatedAt
+        ) {
+          fullStories.reused += 1;
+        } else {
+          fullStories.generated += 1;
+        }
+      } catch (err) {
+        addError(fullStories.errors, errorMessage(err));
+      }
+    }
+  } catch (err) {
+    addError(fullStories.errors, errorMessage(err));
+  }
+  return fullStories;
 }

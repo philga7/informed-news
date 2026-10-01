@@ -38,6 +38,12 @@ export type BriefFullStoryDeterministic = {
   quote?: BriefFullStoryQuote | null;
 };
 
+/** Triage values captured when the full story was last successfully generated. */
+export type BriefFullStoryAutoSnapshot = {
+  outletCount: number;
+  significance: number | null;
+};
+
 export type BriefFullStoryRecord = {
   /** Kept article id (store key) */
   articleId: string;
@@ -57,6 +63,8 @@ export type BriefFullStoryRecord = {
   changeSummary?: string | null;
   /** Prior timeline events retained across living merges (optional archive) */
   priorTimeline?: EnrichmentTimelineEvent[];
+  /** Used only by refresh-time automatic selection. */
+  autoSnapshot?: BriefFullStoryAutoSnapshot;
 };
 
 export type BriefFullStoriesStore = {

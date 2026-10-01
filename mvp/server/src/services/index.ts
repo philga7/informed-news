@@ -107,13 +107,18 @@ export type {
 export {
   createFullStoryOnDemandLimiter,
   generateFullStory,
+  generateRefreshFullStories,
   mergeLivingFullStory,
   sourceHashForMembers,
 } from './briefFullStories.js';
 export type {
   BriefFullStoryDeps,
+  GenerateFullStoryOptions,
   GenerateFullStoryResult,
+  RefreshFullStoriesDeps,
 } from './briefFullStories.js';
+export { selectAutoFullStoryTargets } from './briefFullStoryAuto.js';
+export type { AutoFullStoryOptions } from './briefFullStoryAuto.js';
 export {
   countByClusterIdFromArticles,
   createRefreshRunner,

@@ -8,6 +8,7 @@ import type { TriageRecord, TriageStore } from '../types/triage.js';
 import {
   createFullStoryOnDemandLimiter,
   generateFullStory,
+  generateRefreshFullStories,
   mergeLivingFullStory,
   sourceHashForMembers,
   type BriefFullStoryDeps,
@@ -291,4 +292,47 @@ test('full story limiter uses a one-hour sliding window', () => {
   assert.equal(limiter.tryAcquire(), false);
   now = 3_600_000;
   assert.equal(limiter.tryAcquire(), true);
+});
+
+test('refresh full stories selects targets and invokes the shared generator without rate limiting', async () => {
+  const h = harness(undefined, [{ ...kept('main'), outletCount: 3 }]);
+  const calls: Array<{ id: string; options: object }> = [];
+  const meta = await generateRefreshFullStories({ now: NOW, boundaryAt: null }, {
+    ...h.deps,
+    generateFullStory: async (id, options) => {
+      calls.push({ id, options });
+      return {
+        ok: true,
+        record: {
+          articleId: id,
+          status: 'unavailable',
+          enrichment: null,
+          deterministic: {},
+          sourceHash: null,
+          topicSections: [],
+          model: null,
+          error: null,
+          generatedAt: NOW.toISOString(),
+          trigger: 'refresh',
+        },
+      };
+    },
+  });
+  assert.deepEqual(calls, [{
+    id: 'main',
+    options: {
+      now: NOW,
+      trigger: 'refresh',
+      skipRateLimit: true,
+      forceRegenerate: false,
+    },
+  }]);
+  assert.deepEqual(meta, {
+    budget: 5,
+    used: 1,
+    generated: 0,
+    reused: 0,
+    unavailable: 1,
+    errors: [],
+  });
 });
