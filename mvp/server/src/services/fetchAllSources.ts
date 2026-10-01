@@ -1,3 +1,4 @@
+import { updateMeta } from '../store/index.js';
 import type { Article } from '../types/article.js';
 import { assignClusterIds } from './clusterArticles.js';
 import { fetchCfpArticles } from './cfpFetch.js';
@@ -177,6 +178,12 @@ export async function fetchAllSources(
     triage = await runTriage();
   } catch (err) {
     triage = emptyTriageFailure(err instanceof Error ? err.message : String(err));
+    const { keptIds: _keptIds, ...runMeta } = triage;
+    try {
+      await updateMeta({ triage: runMeta });
+    } catch {
+      // The failure is still returned on the refresh result.
+    }
   }
 
   const byId = new Map(clustered.articles.map((a) => [a.id, a]));

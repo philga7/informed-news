@@ -50,7 +50,7 @@ async function resolvePublisher(
   }
   if (!publisherUrl) return article;
 
-  const publisherDomain = publisherDomainFromUrl(publisherUrl);
+  const publisherDomain = publisherDomainFromUrl(publisherUrl) ?? article.publisherDomain;
   const alreadyCited = article.citations.some((c) => c.url === publisherUrl);
   const label = article.citations[0]?.label ?? publisherDomain ?? 'Publisher';
   return {
@@ -98,10 +98,10 @@ export async function prepareSurvivor(
     ...resolved,
     bodyText: body.bodyText,
     bodyStatus: body.bodyStatus,
-    publisherTitle: body.publisherTitle,
-    imageUrl: body.imageUrl,
-    imageCaption: body.imageCaption,
-    imageCredit: body.imageCredit,
+    publisherTitle: body.publisherTitle ?? resolved.publisherTitle,
+    imageUrl: body.imageUrl ?? resolved.imageUrl,
+    imageCaption: body.imageCaption ?? resolved.imageCaption,
+    imageCredit: body.imageCredit ?? resolved.imageCredit,
     publishedAt: resolved.publishedAt ?? body.publishedAt,
   };
 

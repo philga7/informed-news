@@ -114,6 +114,11 @@ function addError(errors: string[], message: string): void {
   if (errors.length < RUN_ERRORS_MAX && !errors.includes(message)) errors.push(message);
 }
 
+/** Store-write errors bypass the cap: a lost write must always be visible. */
+function addStoreError(errors: string[], message: string): void {
+  if (!errors.includes(message)) errors.push(message);
+}
+
 function articleTime(article: Article): number {
   return Date.parse(article.publishedAt ?? article.fetchedAt);
 }
@@ -156,6 +161,20 @@ function jevFailed(run: TriageRun, error: string): void {
   addError(run.errors, `Jev: ${error}`);
 }
 
+/** A thrown or rejected judge takes the same path as an `ok: false` result. */
+async function judgeSafely(
+  run: TriageRun,
+  stage: 'headline' | 'body',
+  article: Article,
+  ctx: TriageJevContext,
+): ReturnType<typeof judgeTriage> {
+  try {
+    return await run.judge(stage, article, ctx);
+  } catch (err) {
+    return { ok: false, error: errorMessage(err) };
+  }
+}
+
 function contextFor(run: TriageRun, topicIds: string[]): TriageJevContext {
   return {
     candidates: topicIds
@@ -181,7 +200,7 @@ async function triageMember(member: DedupeCandidate, run: TriageRun): Promise<Me
   const ctx = contextFor(run, member.topicIds);
 
   if (!reserve(run, id)) return { kind: 'unscored', reason: 'not_scored_budget', stage: 'budget' };
-  const headline = await run.judge('headline', member.article, ctx);
+  const headline = await judgeSafely(run, 'headline', member.article, ctx);
   if (!headline.ok) {
     jevFailed(run, headline.error);
     return { kind: 'unscored', reason: 'not_scored_error', stage: 'headline' };
@@ -206,7 +225,7 @@ async function triageMember(member: DedupeCandidate, run: TriageRun): Promise<Me
   let cleared = verdict;
   let bodyChecked = false;
   if (prepared.article.bodyStatus === 'ok' && reserve(run, id)) {
-    const body = await run.judge('body', prepared.article, ctx);
+    const body = await judgeSafely(run, 'body', prepared.article, ctx);
     if (!body.ok) {
       jevFailed(run, body.error);
     } else if (body.verdict.decision === 'drop') {
@@ -372,7 +391,7 @@ export async function runTriage(
     try {
       await (deps.updateMeta ?? updateMeta)({ triage: { ...meta, errors: [...meta.errors] } });
     } catch (err) {
-      addError(meta.errors, `meta write: ${errorMessage(err)}`);
+      addStoreError(meta.errors, `meta write: ${errorMessage(err)}`);
     }
     return { ...meta, keptIds };
   };
@@ -388,114 +407,107 @@ export async function runTriage(
     (deps.readArticles ?? readArticles)(),
     (deps.readTriage ?? (() => readTriage()))(),
   ]);
-  if (topicsRead.status === 'rejected' || articlesRead.status === 'rejected') {
+  if (
+    topicsRead.status === 'rejected' ||
+    articlesRead.status === 'rejected' ||
+    storeRead.status === 'rejected'
+  ) {
     meta.skipped = true;
     for (const read of [topicsRead, articlesRead]) {
       if (read.status === 'rejected') addError(meta.errors, errorMessage(read.reason));
+    }
+    if (storeRead.status === 'rejected') {
+      addError(meta.errors, `triage store: ${errorMessage(storeRead.reason)}`);
     }
     return finish();
   }
   let muteRules: MuteRule[] = [];
   if (rulesRead.status === 'fulfilled') muteRules = rulesRead.value.rules;
   else addError(meta.errors, `mute rules: ${errorMessage(rulesRead.reason)}`);
-  let store: TriageStore = { records: {}, updatedAt: null };
-  if (storeRead.status === 'fulfilled') store = storeRead.value;
-  else addError(meta.errors, `triage store: ${errorMessage(storeRead.reason)}`);
+  const store = storeRead.value;
 
-  const topics = topicsRead.value.topics;
-  const articles = articlesRead.value;
-  const desired = topics.filter((t) => t.kind === 'desired');
-  const undesired = topics.filter((t) => t.kind === 'undesired');
-  const articlesById = new Map(articles.map((a) => [a.id, a]));
+  let started: TriageRun | null = null;
+  try {
+    const topics = topicsRead.value.topics;
+    const articles = articlesRead.value;
+    const desired = topics.filter((t) => t.kind === 'desired');
+    const undesired = topics.filter((t) => t.kind === 'undesired');
+    const articlesById = new Map(articles.map((a) => [a.id, a]));
 
-  const run: TriageRun = {
-    now,
-    at: meta.at,
-    budget: budgets.jevCalls,
-    used: 0,
-    jevErrors: 0,
-    prior: store.records,
-    calls: new Map(),
-    records: new Map(),
-    changed: new Map(),
-    errors: meta.errors,
-    desiredById: new Map(desired.map((t) => [t.id, t])),
-    undesired: undesired.slice(0, TRIAGE_MAX_UNDESIRED_TOPICS),
-    judge: deps.judge ?? judgeTriage,
-    prepare: deps.prepareSurvivor ?? prepareSurvivor,
-  };
+    const run: TriageRun = {
+      now,
+      at: meta.at,
+      budget: budgets.jevCalls,
+      used: 0,
+      jevErrors: 0,
+      prior: store.records,
+      calls: new Map(),
+      records: new Map(),
+      changed: new Map(),
+      errors: meta.errors,
+      desiredById: new Map(desired.map((t) => [t.id, t])),
+      undesired: undesired.slice(0, TRIAGE_MAX_UNDESIRED_TOPICS),
+      judge: deps.judge ?? judgeTriage,
+      prepare: deps.prepareSurvivor ?? prepareSurvivor,
+    };
+    started = run;
 
-  const candidates = articles.filter(
-    (a) =>
-      a.sourceKind !== 'manual' &&
-      inWindow(a, now) &&
-      (store.records[a.id] === undefined || store.records[a.id]!.final === false),
-  );
+    const candidates = articles.filter(
+      (a) =>
+        a.sourceKind !== 'manual' &&
+        inWindow(a, now) &&
+        (store.records[a.id] === undefined || store.records[a.id]!.final === false),
+    );
 
-  const survivors: DedupeCandidate[] = [];
-  for (const article of candidates) {
-    const topicIds = candidateTopicIds(article, desired).slice(0, TRIAGE_MAX_CANDIDATE_TOPICS);
-    const muted = muteReason(article, muteRules, undesired);
-    if (muted) {
-      record(run, article.id, { reason: muted, stage: 'keyword', topicIds });
-    } else if (topicIds.length === 0) {
-      record(run, article.id, { reason: 'off_topic', stage: 'keyword', topicIds });
-    } else {
-      survivors.push({ article, topicIds });
-    }
-  }
-
-  const recentKept: DedupeCandidate[] = [];
-  for (const rec of Object.values(store.records)) {
-    const article = articlesById.get(rec.articleId);
-    if (rec.status === 'kept' && article && inWindow(article, now)) {
-      recentKept.push({ article, topicIds: rec.topicIds });
-    }
-  }
-
-  const updatedKept = new Map<string, TriageRecord>();
-  const fresh: DedupeGroup[] = [];
-  for (const group of groupCandidates(survivors, recentKept)) {
-    const keptId = group.existingKeptId;
-    if (keptId === null) {
-      fresh.push(group);
-      continue;
-    }
-    for (const m of group.ordered) {
-      record(run, m.article.id, {
-        reason: 'duplicate',
-        stage: 'dedupe',
-        topicIds: m.topicIds,
-        duplicateOf: keptId,
-      });
-    }
-    const kept = updatedKept.get(keptId) ?? store.records[keptId]!;
-    const memberIds = [...new Set([...kept.memberIds, ...group.ordered.map((m) => m.article.id)])];
-    const members = [keptId, ...memberIds]
-      .map((id) => articlesById.get(id))
-      .filter((a): a is Article => a !== undefined);
-    updatedKept.set(keptId, { ...kept, memberIds, outletCount: outletCount(members) });
-  }
-
-  if (fresh.length > 0 && !(deps.jevAvailable ?? (() => getTypeSafeClient() !== null))()) {
-    addError(meta.errors, JEV_UNAVAILABLE_ERROR);
-    for (const group of fresh) {
-      for (const m of group.ordered) {
-        record(run, m.article.id, {
-          reason: 'not_scored_error',
-          stage: 'headline',
-          topicIds: m.topicIds,
-        });
+    const survivors: DedupeCandidate[] = [];
+    for (const article of candidates) {
+      const topicIds = candidateTopicIds(article, desired).slice(0, TRIAGE_MAX_CANDIDATE_TOPICS);
+      const muted = muteReason(article, muteRules, undesired);
+      if (muted) {
+        record(run, article.id, { reason: muted, stage: 'keyword', topicIds });
+      } else if (topicIds.length === 0) {
+        record(run, article.id, { reason: 'off_topic', stage: 'keyword', topicIds });
+      } else {
+        survivors.push({ article, topicIds });
       }
     }
-  } else {
-    await runPool(orderByBudgetPriority(fresh, desired), TRIAGE_CONCURRENCY, async (group) => {
-      try {
-        await processGroup(group, run);
-      } catch (err) {
-        addError(meta.errors, errorMessage(err));
+
+    const recentKept: DedupeCandidate[] = [];
+    for (const rec of Object.values(store.records)) {
+      const article = articlesById.get(rec.articleId);
+      if (rec.status === 'kept' && article && inWindow(article, now)) {
+        recentKept.push({ article, topicIds: rec.topicIds });
+      }
+    }
+
+    const updatedKept = new Map<string, TriageRecord>();
+    const fresh: DedupeGroup[] = [];
+    for (const group of groupCandidates(survivors, recentKept)) {
+      const keptId = group.existingKeptId;
+      if (keptId === null) {
+        fresh.push(group);
+        continue;
+      }
+      for (const m of group.ordered) {
+        record(run, m.article.id, {
+          reason: 'duplicate',
+          stage: 'dedupe',
+          topicIds: m.topicIds,
+          duplicateOf: keptId,
+        });
+      }
+      const kept = updatedKept.get(keptId) ?? store.records[keptId]!;
+      const memberIds = [...new Set([...kept.memberIds, ...group.ordered.map((m) => m.article.id)])];
+      const members = [keptId, ...memberIds]
+        .map((id) => articlesById.get(id))
+        .filter((a): a is Article => a !== undefined);
+      updatedKept.set(keptId, { ...kept, memberIds, outletCount: outletCount(members) });
+    }
+
+    if (fresh.length > 0 && !(deps.jevAvailable ?? (() => getTypeSafeClient() !== null))()) {
+      addError(meta.errors, JEV_UNAVAILABLE_ERROR);
+      for (const group of fresh) {
         for (const m of group.ordered) {
-          if (run.records.has(m.article.id)) continue;
           record(run, m.article.id, {
             reason: 'not_scored_error',
             stage: 'headline',
@@ -503,44 +515,70 @@ export async function runTriage(
           });
         }
       }
-    });
-  }
+    } else {
+      await runPool(orderByBudgetPriority(fresh, desired), TRIAGE_CONCURRENCY, async (group) => {
+        try {
+          await processGroup(group, run);
+        } catch (err) {
+          addError(meta.errors, errorMessage(err));
+          for (const m of group.ordered) {
+            if (run.records.has(m.article.id)) continue;
+            record(run, m.article.id, {
+              reason: 'not_scored_error',
+              stage: 'headline',
+              topicIds: m.topicIds,
+            });
+          }
+        }
+      });
+    }
 
-  const records = { ...store.records, ...Object.fromEntries(updatedKept) };
-  for (const [id, rec] of run.records) records[id] = rec;
-  for (const id of Object.keys(records)) {
-    if (!articlesById.has(id)) delete records[id];
-  }
-  try {
-    await (deps.writeTriage ?? ((s: TriageStore) => writeTriage(s)))({
-      records,
-      updatedAt: meta.at,
-    });
-  } catch (err) {
-    addError(meta.errors, `triage write: ${errorMessage(err)}`);
-  }
-
-  if (run.changed.size > 0) {
+    const records = { ...store.records, ...Object.fromEntries(updatedKept) };
+    for (const [id, rec] of run.records) records[id] = rec;
+    for (const id of Object.keys(records)) {
+      if (!articlesById.has(id)) delete records[id];
+    }
     try {
-      await (deps.upsertArticles ?? upsertArticles)([...run.changed.values()]);
+      await (deps.writeTriage ?? ((s: TriageStore) => writeTriage(s)))({
+        records,
+        updatedAt: meta.at,
+      });
     } catch (err) {
-      addError(meta.errors, `article write: ${errorMessage(err)}`);
+      addStoreError(meta.errors, `triage write: ${errorMessage(err)}`);
     }
-  }
 
-  meta.candidates = candidates.length;
-  meta.jev.used = run.used;
-  meta.jev.errors = run.jevErrors;
-  keptIds = [];
-  for (const rec of run.records.values()) {
-    if (rec.reason === null) {
-      meta.kept += 1;
-      keptIds.push(rec.articleId);
-      continue;
+    if (run.changed.size > 0) {
+      try {
+        await (deps.upsertArticles ?? upsertArticles)([...run.changed.values()]);
+      } catch (err) {
+        addStoreError(meta.errors, `article write: ${errorMessage(err)}`);
+      }
     }
-    meta.dropped += 1;
-    const key = reasonKey(rec.reason);
-    meta.byReason[key] = (meta.byReason[key] ?? 0) + 1;
+
+    meta.candidates = candidates.length;
+    meta.jev.used = run.used;
+    meta.jev.errors = run.jevErrors;
+    keptIds = [];
+    for (const rec of run.records.values()) {
+      if (rec.reason === null) {
+        meta.kept += 1;
+        keptIds.push(rec.articleId);
+        continue;
+      }
+      meta.dropped += 1;
+      const key = reasonKey(rec.reason);
+      meta.byReason[key] = (meta.byReason[key] ?? 0) + 1;
+    }
+  } catch (err) {
+    addError(meta.errors, errorMessage(err));
+    meta.skipped = true;
+    meta.candidates = 0;
+    meta.kept = 0;
+    meta.dropped = 0;
+    meta.byReason = {};
+    meta.jev.used = started?.used ?? 0;
+    meta.jev.errors = started?.jevErrors ?? 0;
+    keptIds = [];
   }
 
   return finish();

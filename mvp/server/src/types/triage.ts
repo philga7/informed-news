@@ -58,7 +58,7 @@ export type TriageStore = { records: Record<string, TriageRecord>; updatedAt: st
 
 export type TriageRunMeta = {
   at: string;
-  /** Disabled, or topics/articles unreadable */
+  /** Disabled, topics/articles/triage store unreadable, or the run stopped on an unexpected error */
   skipped: boolean;
   candidates: number;
   kept: number;
@@ -67,6 +67,6 @@ export type TriageRunMeta = {
   byReason: Record<string, number>;
   jev: { budget: number; used: number; errors: number };
   summaryBudget: number;
-  /** At most 5 */
+  /** At most 5, plus any store-write errors */
   errors: string[];
 };

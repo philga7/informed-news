@@ -126,6 +126,42 @@ test('resolved citation label falls back to the publisher domain', async () => {
   assert.deepEqual(result.article.citations, [{ label: 'reuters.com', url: PUBLISHER_URL }]);
 });
 
+test('resolved URL with no parseable host keeps the existing publisherDomain', async () => {
+  const article = makeArticle({ publishedAt: '2026-09-30T10:00:00.000Z' });
+  const { deps } = fakeDeps({ resolveTo: 'not a url' });
+
+  const result = await prepareSurvivor(article, NOW, deps);
+
+  assert.equal(result.article.publisherUrl, 'not a url');
+  assert.equal(result.article.publisherDomain, 'reuters.com');
+});
+
+test('null scrape fields keep the article publisherTitle and image fields', async () => {
+  const article = makeArticle({
+    publishedAt: '2026-09-30T10:00:00.000Z',
+    publisherTitle: 'Feed headline | Reuters',
+    imageUrl: 'https://cdn.reuters.com/feed.jpg',
+    imageCaption: 'Feed caption',
+    imageCredit: 'Feed credit',
+  });
+  const { deps } = fakeDeps({
+    body: okBody({ publisherTitle: null, imageUrl: null, imageCaption: null, imageCredit: null }),
+  });
+
+  const result = await prepareSurvivor(article, NOW, deps);
+
+  assert.equal(result.article.bodyStatus, 'ok');
+  assert.equal(result.article.publisherTitle, 'Feed headline | Reuters');
+  assert.equal(result.article.imageUrl, 'https://cdn.reuters.com/feed.jpg');
+  assert.equal(result.article.imageCaption, 'Feed caption');
+  assert.equal(result.article.imageCredit, 'Feed credit');
+
+  const unresolved = await prepareSurvivor(article, NOW, fakeDeps({ resolveTo: null }).deps);
+  assert.equal(unresolved.article.bodyStatus, 'unavailable');
+  assert.equal(unresolved.article.publisherTitle, 'Feed headline | Reuters');
+  assert.equal(unresolved.article.imageUrl, 'https://cdn.reuters.com/feed.jpg');
+});
+
 test('resolve failure skips the scrape, marks unavailable, and flags undated search rows', async () => {
   const article = makeArticle();
   const { deps, calls } = fakeDeps({ resolveTo: null });

@@ -99,8 +99,25 @@ test('keywordMatches: keyword ending in a letter allows an inflection suffix', (
   assert.equal(keywordMatches('furloughs mount', 'furlough'), true);
   assert.equal(keywordMatches('New federal contracts awarded', 'federal contract'), true);
   assert.equal(keywordMatches('Tariffs rise', 'tariff'), true);
-  assert.equal(keywordMatches('Iranians protest', 'Iran'), false);
   assert.equal(keywordMatches('Irate voters', 'Iran'), false);
+});
+
+test('keywordMatches: default endings accept plural demonyms', () => {
+  assert.equal(keywordMatches('Iranians protest', 'Iran'), true);
+  assert.equal(keywordMatches('Israelis rally', 'Israel'), true);
+  assert.equal(keywordMatches('Gazans flee south', 'Gaza'), true);
+  assert.equal(keywordMatches('Iranianism debated', 'Iran'), false);
+});
+
+test('keywordMatches: plural endings option allows only s / es', () => {
+  const plural = { endings: 'plural' } as const;
+  assert.equal(keywordMatches('ICE raids in Chicago', 'raid', plural), true);
+  assert.equal(keywordMatches('Taxes rise', 'tax', plural), true);
+  assert.equal(keywordMatches('Iran talks', 'Ira', plural), false);
+  assert.equal(keywordMatches('Israeli military', 'Israel', plural), false);
+  assert.equal(keywordMatches('Iranians protest', 'Iran', plural), false);
+  assert.equal(keywordMatches('Local shop sells ice cream', 'ICE', plural), false);
+  assert.equal(keywordMatches('Ford recalls F-250s', 'F-250', plural), false);
 });
 
 test('keywordMatches: suffix does not loosen all-caps or non-letter-ending keywords', () => {
@@ -263,6 +280,15 @@ test('muteReason: undesired topic keyword or name in headline haystack', () => {
   );
   assert.equal(muteReason(makeArticle({ title: 'Kardashian and NHL' }), [], undesired), 'muted:celebs');
   assert.equal(muteReason(makeArticle({ title: 'Senate passes budget' }), [], undesired), null);
+});
+
+test('muteReason: undesired keywords match plural endings only', () => {
+  const undesired = [
+    makeTopic('ira', 'Irish republicanism', { kind: 'undesired', level: null, keywords: ['Ira'] }),
+    makeTopic('raids', 'Police raids', { kind: 'undesired', level: null, keywords: ['raid'] }),
+  ];
+  assert.equal(muteReason(makeArticle({ title: 'Iran nuclear talks resume' }), [], undesired), null);
+  assert.equal(muteReason(makeArticle({ title: 'Dawn raids in Leeds' }), [], undesired), 'muted:raids');
 });
 
 test('muteReason: dotted keyword is an outlet block on publisherDomain (equal or subdomain)', () => {

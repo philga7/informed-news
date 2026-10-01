@@ -7,16 +7,33 @@ function escapeRegExp(raw: string): string {
   return raw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+export type KeywordEndings = 'inflections' | 'plural';
+
+export type KeywordMatchOptions = {
+  /** `inflections` (default): plurals + demonyms. `plural`: `s` / `es` only. */
+  endings?: KeywordEndings;
+};
+
+const ENDING_SUFFIXES: Record<KeywordEndings, string> = {
+  inflections: '(?:s|es|n|an|ian|i)?s?',
+  plural: '(?:s|es)?',
+};
+
 /**
  * Word-boundary keyword match. A keyword with no lowercase letters (e.g. `ICE`, `F-250`)
  * is case-sensitive so `ICE` doesn't hit "ice cream"; otherwise case-insensitive.
- * A keyword ending in a letter also matches common inflections ("ICE raids", "Israeli").
+ * A keyword ending in a letter also matches endings: by default inflections and
+ * plural demonyms ("ICE raids", "Israeli", "Iranians"); `endings: 'plural'` only `s` / `es`.
  */
-export function keywordMatches(text: string, keyword: string): boolean {
+export function keywordMatches(
+  text: string,
+  keyword: string,
+  options: KeywordMatchOptions = {},
+): boolean {
   const needle = keyword.trim();
   if (!needle) return false;
   const flags = /\p{Ll}/u.test(needle) ? 'i' : '';
-  const suffix = /[A-Za-z]$/.test(needle) ? '(?:s|es|n|an|ian|i)?' : '';
+  const suffix = /[A-Za-z]$/.test(needle) ? ENDING_SUFFIXES[options.endings ?? 'inflections'] : '';
   const pattern = new RegExp(
     `(?<![A-Za-z0-9])${escapeRegExp(needle)}${suffix}(?![A-Za-z0-9])`,
     flags,
@@ -30,8 +47,11 @@ function headlineHaystack(article: Article): string {
     .join('\n');
 }
 
-function topicMatchesText(topic: Topic, text: string): boolean {
-  return keywordMatches(text, topic.name) || topic.keywords.some((k) => keywordMatches(text, k));
+function topicMatchesText(topic: Topic, text: string, options: KeywordMatchOptions = {}): boolean {
+  return (
+    keywordMatches(text, topic.name, options) ||
+    topic.keywords.some((k) => keywordMatches(text, k, options))
+  );
 }
 
 function isOutletKeyword(keyword: string): boolean {
@@ -66,7 +86,10 @@ export function candidateTopicIds(article: Article, desired: readonly Topic[]): 
   return desired.filter((topic) => ids.has(topic.id)).map((topic) => topic.id);
 }
 
-/** First matching mute rule, else first matching undesired topic (headline or outlet block). */
+/**
+ * First matching mute rule, else first matching undesired topic (headline or outlet block).
+ * Undesired keywords take plural endings only — a mute is a permanent drop.
+ */
 export function muteReason(
   article: Article,
   muteRules: readonly MuteRule[],
@@ -78,7 +101,8 @@ export function muteReason(
   const haystack = headlineHaystack(article);
   const matchedTopic = undesired.find(
     (topic) =>
-      topicMatchesText(topic, haystack) || topicBlocksOutlet(topic, article.publisherDomain),
+      topicMatchesText(topic, haystack, { endings: 'plural' }) ||
+      topicBlocksOutlet(topic, article.publisherDomain),
   );
   return matchedTopic ? `muted:${matchedTopic.id}` : null;
 }

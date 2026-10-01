@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync } from 'node:fs';
+import { chmodSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test, type TestContext } from 'node:test';
@@ -101,6 +101,27 @@ test('resolveGoogleNewsUrl decodes via article page + batchexecute and caches th
   for (const call of timeoutMock.mock.calls) {
     assert.deepEqual(call.arguments, [GOOGLE_RESOLVE_TIMEOUT_MS]);
   }
+});
+
+test('resolveGoogleNewsUrl still returns the resolved URL when the cache write fails', async (t) => {
+  if (process.getuid?.() === 0) {
+    t.skip('root ignores directory permissions');
+    return;
+  }
+  const warn = t.mock.method(console, 'warn', () => {});
+  const cachePath = tempCachePath();
+  const dir = path.dirname(cachePath);
+  chmodSync(dir, 0o500);
+  t.after(() => chmodSync(dir, 0o700));
+  const { fetchImpl } = fakeFetch(
+    () => new Response(ARTICLE_HTML, { status: 200 }),
+    () => new Response(batchResponse(RESOLVED), { status: 200 }),
+  );
+
+  assert.equal(await resolveGoogleNewsUrl(GOOGLE_URL, { cachePath }, { fetch: fetchImpl }), RESOLVED);
+  assert.deepEqual(await readGoogleNewsUrlCache(cachePath), { entries: {} });
+  assert.equal(warn.mock.callCount(), 1);
+  assert.match(String(warn.mock.calls[0]!.arguments[0]), /cache write failed/);
 });
 
 test('resolveGoogleNewsUrl returns a cached URL with no network call', async () => {

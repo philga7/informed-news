@@ -80,7 +80,8 @@ function isPublisherUrl(url: string): boolean {
 /**
  * Decode a news.google.com article link to its publisher URL via the article
  * page signature + batchexecute. Successful resolutions are cached by article
- * id; any failure returns `null` (callers keep the Google link).
+ * id (a failed cache write still returns the URL); any resolve failure returns
+ * `null` (callers keep the Google link).
  */
 export async function resolveGoogleNewsUrl(
   googleUrl: string,
@@ -118,7 +119,11 @@ export async function resolveGoogleNewsUrl(
       throw new Error('batchexecute returned no publisher URL');
     }
 
-    await putCachedGoogleNewsUrl(articleId, url, options.cachePath);
+    try {
+      await putCachedGoogleNewsUrl(articleId, url, options.cachePath);
+    } catch (err) {
+      console.warn(`[googleNewsResolve] ${articleId}: cache write failed: ${(err as Error).message}`);
+    }
     return url;
   } catch (err) {
     console.warn(`[googleNewsResolve] ${articleId}: ${(err as Error).message}`);

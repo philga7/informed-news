@@ -559,6 +559,162 @@ test('unreadable topics skip the run with an error; meta is still written', asyn
   assert.equal(state.meta[0]!.triage!.skipped, true);
 });
 
+test('unreadable triage store skips the run: no Jev, no survivor prep, no writes; meta written', async () => {
+  let triageWrites = 0;
+  const { deps, state } = harness({
+    topics: [TARIFFS],
+    articles: [article('a', 'Tariff ruling hits steel imports')],
+    prepare: (a) => ({ article: a, changed: true, dateIssue: null }),
+    overrides: {
+      readTriage: async () => {
+        throw new Error('triage.json corrupt');
+      },
+      writeTriage: async () => {
+        triageWrites += 1;
+      },
+    },
+  });
+
+  const result = await run(deps);
+
+  assert.equal(result.skipped, true);
+  assert.deepEqual(result.errors, ['triage store: triage.json corrupt']);
+  assert.equal(state.judgeCalls.length, 0);
+  assert.equal(state.prepareCalls.length, 0);
+  assert.equal(triageWrites, 0);
+  assert.equal(state.upserts.length, 0);
+  assert.equal(state.meta.length, 1);
+  assert.equal(state.meta[0]!.triage!.skipped, true);
+  assert.deepEqual(state.meta[0]!.triage!.errors, ['triage store: triage.json corrupt']);
+});
+
+test('an unexpected error after the reads is recorded, the run is skipped, and meta is still written', async () => {
+  let triageWrites = 0;
+  const { deps, state } = harness({
+    topics: [TARIFFS],
+    articles: [article('a', 'Tariff ruling hits steel imports')],
+    overrides: {
+      jevAvailable: () => {
+        throw new Error('client lookup exploded');
+      },
+      writeTriage: async () => {
+        triageWrites += 1;
+      },
+    },
+  });
+
+  const result = await run(deps);
+
+  assert.equal(result.skipped, true);
+  assert.deepEqual(result.errors, ['client lookup exploded']);
+  assert.equal(result.candidates, 0);
+  assert.deepEqual(result.keptIds, []);
+  assert.equal(triageWrites, 0);
+  assert.equal(state.meta.length, 1);
+  assert.equal(state.meta[0]!.triage!.skipped, true);
+  assert.deepEqual(state.meta[0]!.triage!.errors, ['client lookup exploded']);
+});
+
+test('a throwing judge is treated as a Jev failure: not_scored_error and counted', async () => {
+  const title = 'Tariff talks collapse in Geneva overnight';
+  const { deps, state } = harness({
+    topics: [TARIFFS],
+    articles: [article('r', title, { sourceTier: 'primary' }), article('s', title)],
+    overrides: {
+      judge: async () => {
+        throw new Error('socket hang up');
+      },
+    },
+  });
+
+  const result = await run(deps);
+
+  assert.equal(result.skipped, false);
+  assert.equal(result.jev.used, 1);
+  assert.equal(result.jev.errors, 1);
+  assert.ok(result.errors.includes('Jev: socket hang up'));
+  for (const id of ['r', 's']) {
+    assert.equal(state.store.records[id]!.reason, 'not_scored_error');
+    assert.equal(state.store.records[id]!.final, false);
+  }
+  assert.equal(state.store.records.r!.stage, 'headline');
+});
+
+test('store-write errors are appended past the 5-error cap', async () => {
+  const titles = [
+    'Tariff ruling hits steel imports',
+    'Senate debates tariff relief for farmers',
+    'Port operators brace for tariff backlog',
+    'Automakers lobby against tariff expansion',
+    'Retailers warn of tariff price spikes',
+    'Farm groups sue over tariff retaliation',
+  ];
+  const { deps } = harness({
+    topics: [TARIFFS],
+    articles: titles.map((t, i) => article(`t${i}`, t)),
+    overrides: {
+      judge: async (_stage, a) => ({ ok: false, error: `down ${a.id}` }),
+      writeTriage: async () => {
+        throw new Error('disk full');
+      },
+      updateMeta: async () => {
+        throw new Error('meta locked');
+      },
+    },
+  });
+
+  const result = await run(deps);
+
+  assert.equal(result.jev.errors, 6);
+  assert.equal(result.errors.length, 7);
+  assert.equal(result.errors.filter((e) => e.startsWith('Jev: ')).length, 5);
+  assert.deepEqual(result.errors.slice(-2), ['triage write: disk full', 'meta write: meta locked']);
+});
+
+test('budget spent between headline and body keeps the story with bodyChecked false', async () => {
+  const { deps, state } = harness({
+    topics: [TARIFFS],
+    articles: [article('a', 'Tariff ruling hits steel imports')],
+    prepare: (a) => ({
+      article: { ...a, bodyStatus: 'ok', bodyText: 'Full text.' },
+      changed: true,
+      dateIssue: null,
+    }),
+  });
+
+  const result = await run(deps, { TRIAGE_JEV_BUDGET: '1' });
+
+  assert.deepEqual(state.judgeCalls, [{ stage: 'headline', id: 'a' }]);
+  assert.ok(result.jev.used <= result.jev.budget);
+  assert.equal(result.jev.used, 1);
+  const rec = state.store.records.a!;
+  assert.equal(rec.status, 'kept');
+  assert.equal(rec.bodyChecked, false);
+  assert.equal(rec.stage, 'headline');
+  assert.equal(rec.final, true);
+});
+
+test('TRIAGE_MAX_PROMOTIONS: after the representative and 2 alternates are clickbait, the 4th member is a duplicate and never judged', async () => {
+  const title = 'Treasury announces sweeping tariff overhaul';
+  const clickbait = { headline: { quality: { choice: 'clickbait' as const, confidence: 0.95 } } };
+  const { deps, state } = harness({
+    topics: [TARIFFS],
+    articles: ['m1', 'm2', 'm3', 'm4'].map((id) => article(id, title)),
+    script: { m1: clickbait, m2: clickbait, m3: clickbait },
+  });
+
+  const result = await run(deps);
+
+  assert.deepEqual(state.judgeCalls.map((c) => c.id), ['m1', 'm2', 'm3']);
+  for (const id of ['m1', 'm2', 'm3']) assert.equal(state.store.records[id]!.reason, 'clickbait');
+  const fourth = state.store.records.m4!;
+  assert.equal(fourth.reason, 'duplicate');
+  assert.equal(fourth.duplicateOf, 'm1');
+  assert.equal(fourth.jevCalls, 0);
+  assert.equal(result.kept, 0);
+  assert.deepEqual(result.byReason, { clickbait: 3, duplicate: 1 });
+});
+
 test('store write failures are caught into errors and never throw', async () => {
   const { deps, state } = harness({
     topics: [TARIFFS],
