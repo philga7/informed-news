@@ -1,6 +1,6 @@
 <script module lang="ts">
-	/** Story ids whose on-demand summary was already requested this page load. */
-	const requestedSummaries = new Set<string>();
+/** Story ids whose on-demand summary was already requested this page load. */
+const requestedSummaries = new Set<string>();
 </script>
 
 <script lang="ts">
@@ -16,10 +16,14 @@
 		BRIEF_LESS_LABEL,
 		BRIEF_LEVEL_LABEL,
 		BRIEF_OFFICIAL_LABEL,
+		BRIEF_FULL_STORY_LOADING,
+		BRIEF_FULL_STORY_LOGIN_HINT,
 		BRIEF_SUMMARY_LOADING,
 		BRIEF_SUMMARY_LOGIN_HINT,
+		applyFullStory,
 		createSeenBatcher,
 		fetchBriefOverview,
+		fullStoryErrorCopy,
 		groupTopicBrief,
 		isOfficialStory,
 		isTopicBriefStory,
@@ -28,8 +32,10 @@
 		newlyReadIds,
 		outletBadge,
 		postBriefSeen,
+		postFullStory,
 		postStorySummary,
 		quietLine,
+		shouldRequestFullStory,
 		storyKey,
 		summaryAttemptCounts,
 		summaryErrorCopy,
@@ -75,11 +81,15 @@
 	type SummaryRequestState =
 		| { phase: 'loading' }
 		| { phase: 'error'; message: string; login: boolean };
+	type FullStoryRequestState =
+		| { phase: 'loading' }
+		| { phase: 'error'; message: string; login: boolean };
 
 	let overview = $state<BriefOverview | null>(null);
 	let overviewLoaded = $state(false);
 	let openMore = $state<Record<string, boolean>>({});
 	let summaryRequests = $state<Record<string, SummaryRequestState>>({});
+	let fullStoryRequests = $state<Record<string, FullStoryRequestState>>({});
 	let overviewSequence = 0;
 
 	const useSections = $derived(overviewLoaded && overview !== null && !overview.fixture);
@@ -132,6 +142,7 @@
 				if (!story || !isTopicBriefStory(story)) continue;
 				if (story.id) seenIds.push(story.id);
 				void requestSummary(story);
+				void requestFullStory(story);
 			}
 			if (seenIds.length > 0) seen.add(seenIds);
 		});
@@ -185,8 +196,35 @@
 		};
 	}
 
+	async function requestFullStory(story: Story): Promise<void> {
+		const id = story.id;
+		if (!id || !shouldRequestFullStory(story) || fullStoryRequests[id]?.phase === 'loading') return;
+		fullStoryRequests = { ...fullStoryRequests, [id]: { phase: 'loading' } };
+
+		const result = await postFullStory(id);
+		const { [id]: _done, ...rest } = fullStoryRequests;
+		if (result.ok) {
+			applyFullStory(story, result.fullStory);
+			fullStoryRequests = rest;
+			return;
+		}
+
+		story.informed_full_story_status = 'error';
+		fullStoryRequests = {
+			...rest,
+			[id]: result.unauthenticated
+				? { phase: 'error', message: BRIEF_FULL_STORY_LOGIN_HINT, login: true }
+				: { phase: 'error', message: fullStoryErrorCopy(result.error), login: false },
+		};
+	}
+
 	function handleToggle(story: Story): void {
 		onStoryToggle?.(storyKey(story));
+	}
+
+	function handleFullStory(story: Story): void {
+		if (!expandedStories[storyKey(story)]) handleToggle(story);
+		void requestFullStory(story);
 	}
 
 	async function handleReadToggle(story: Story): Promise<void> {
@@ -242,8 +280,9 @@
 	{@const official = isOfficialStory(story)}
 	{@const line = summaryLine(story)}
 	{@const request = story.id ? summaryRequests[story.id] : undefined}
+	{@const fullStoryRequest = story.id ? fullStoryRequests[story.id] : undefined}
 	{@const expanded = Boolean(expandedStories[key])}
-	{#if badge || official || line}
+	{#if badge || official || line || (expanded && fullStoryRequest)}
 		<div class="mb-2 space-y-1">
 			{#if badge || official}
 				<div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-gray-500 dark:text-gray-400">
@@ -283,6 +322,20 @@
 					<p class="text-xs text-gray-500 dark:text-gray-400">{line.text}</p>
 				{/if}
 			{/if}
+			{#if expanded && fullStoryRequest?.phase === 'loading'}
+				<p class="text-xs text-gray-500 dark:text-gray-400" aria-live="polite">{BRIEF_FULL_STORY_LOADING}</p>
+			{:else if expanded && fullStoryRequest?.phase === 'error' && fullStoryRequest.login}
+				<p class="text-xs">
+					<a
+						href="/topics"
+						class="font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+					>
+						{fullStoryRequest.message}
+					</a>
+				</p>
+			{:else if expanded && fullStoryRequest?.phase === 'error'}
+				<p class="text-xs text-gray-500 dark:text-gray-400">{fullStoryRequest.message}</p>
+			{/if}
 		</div>
 	{/if}
 {/snippet}
@@ -297,8 +350,11 @@
 		{categoryId}
 		isRead={Boolean(story.id && readStories[story.id])}
 		isExpanded={Boolean(expandedStories[storyKey(story)])}
+		fullStoryAvailable={isTopicBriefStory(story)}
+		fullStoryUpdated={story.informed_full_story_updated}
 		shouldAutoScroll={!allVisibleExpanded}
 		onToggle={() => handleToggle(story)}
+		onFullStory={() => handleFullStory(story)}
 		onReadToggle={() => handleReadToggle(story)}
 		priority={index >= 0 && index < 3}
 		bind:showSourceOverlay

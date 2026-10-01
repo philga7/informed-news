@@ -12,6 +12,7 @@ import {
 	BRIEF_SUMMARY_NOT_IN_BRIEF,
 	BRIEF_SUMMARY_RATE_LIMITED,
 	BRIEF_SUMMARY_UNAVAILABLE,
+	applyFullStory,
 	createSeenBatcher,
 	fetchBriefOverview,
 	formatTimeAgoShort,
@@ -27,12 +28,14 @@ import {
 	overviewPollFailure,
 	postBriefRefresh,
 	postBriefSeen,
+	postFullStory,
 	postStorySummary,
 	quietLine,
 	refreshPollOutcome,
 	summaryAttemptCounts,
 	summaryErrorCopy,
 	summaryLine,
+	shouldRequestFullStory,
 	updatedLabel,
 	type BriefOverview,
 	type BriefOverviewRefresh,
@@ -267,6 +270,41 @@ describe('summaryAttemptCounts', () => {
 	});
 });
 
+describe('full-story helpers', () => {
+	it('requests only missing or failed rich stories', () => {
+		expect(shouldRequestFullStory(makeStory('a', { informed_full_story_status: 'missing' }))).toBe(
+			true,
+		);
+		expect(shouldRequestFullStory(makeStory('a', { informed_full_story_status: 'error' }))).toBe(
+			true,
+		);
+		expect(shouldRequestFullStory(makeStory('a', { informed_full_story_status: 'ok' }))).toBe(
+			false,
+		);
+		expect(
+			shouldRequestFullStory(makeStory('a', { informed_full_story_status: 'unavailable' })),
+		).toBe(false);
+	});
+
+	it('patches rich-story fields onto the existing story object', () => {
+		const story = makeStory('a', { informed_full_story_status: 'missing' });
+		applyFullStory(story, {
+			status: 'ok',
+			talking_points: ['Key point'],
+			timeline: [{ date: 'Today', content: 'Event' }],
+			suggested_qna: [{ question: 'What?', answer: 'Unknown.' }],
+			technical_details: ['Detail'],
+			changeSummary: '1 new outlet; timeline +1',
+		});
+		expect(story).toMatchObject({
+			informed_full_story_status: 'ok',
+			informed_full_story_updated: '1 new outlet; timeline +1',
+			talking_points: ['Key point'],
+			technical_details: ['Detail'],
+		});
+	});
+});
+
 describe('refresh polling decisions', () => {
 	const run = (completedAt: string, ok = true, error: string | null = null) => ({
 		trigger: 'manual' as const,
@@ -278,11 +316,13 @@ describe('refresh polling decisions', () => {
 
 	it('isRecoverableRefreshFailure: network, 5xx and proxy errors only', () => {
 		expect(isRecoverableRefreshFailure({ ok: false, status: 0 })).toBe(true);
-		expect(isRecoverableRefreshFailure({ ok: false, status: 500, error: 'Proxy request failed' })).toBe(
-			true,
-		);
+		expect(
+			isRecoverableRefreshFailure({ ok: false, status: 500, error: 'Proxy request failed' }),
+		).toBe(true);
 		expect(isRecoverableRefreshFailure({ ok: false, status: 504 })).toBe(true);
-		expect(isRecoverableRefreshFailure({ ok: false, status: 401, unauthenticated: true })).toBe(false);
+		expect(isRecoverableRefreshFailure({ ok: false, status: 401, unauthenticated: true })).toBe(
+			false,
+		);
 		expect(isRecoverableRefreshFailure({ ok: false, status: 400 })).toBe(false);
 		expect(isRecoverableRefreshFailure({ ok: true })).toBe(false);
 	});
@@ -442,6 +482,36 @@ describe('client fetch helpers', () => {
 
 		const unauth = vi.fn(async () => jsonResponse(401, { error: 'Unauthorized' }));
 		expect(await postStorySummary('a', unauth as unknown as typeof fetch)).toMatchObject({
+			ok: false,
+			unauthenticated: true,
+		});
+	});
+
+	it('postFullStory encodes its id, posts an empty body, and returns the patch payload', async () => {
+		const ok = vi.fn(async () =>
+			jsonResponse(200, {
+				ok: true,
+				fullStory: {
+					status: 'ok',
+					talking_points: ['Key point'],
+					changeSummary: '1 new outlet',
+				},
+			}),
+		);
+		expect(await postFullStory('a/b', ok as unknown as typeof fetch)).toEqual({
+			ok: true,
+			fullStory: {
+				status: 'ok',
+				talking_points: ['Key point'],
+				changeSummary: '1 new outlet',
+			},
+		});
+		const [url, init] = ok.mock.calls[0] as unknown as [string, RequestInit];
+		expect(url).toBe('/api/brief/stories/a%2Fb/full');
+		expect(JSON.parse(init.body as string)).toEqual({});
+
+		const unauth = vi.fn(async () => jsonResponse(401, { error: 'Unauthorized' }));
+		expect(await postFullStory('a', unauth as unknown as typeof fetch)).toMatchObject({
 			ok: false,
 			unauthenticated: true,
 		});

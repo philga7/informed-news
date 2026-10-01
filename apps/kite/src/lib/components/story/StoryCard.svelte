@@ -23,6 +23,10 @@ interface Props {
 	isRead?: boolean;
 	isExpanded?: boolean;
 	onToggle?: () => void;
+	/** Topic Brief only: request the cached/generated rich story and expand the card. */
+	onFullStory?: () => void;
+	fullStoryAvailable?: boolean;
+	fullStoryUpdated?: string;
 	onReadToggle?: () => void;
 	onUnaccept?: () => void;
 	unacceptPending?: boolean;
@@ -51,6 +55,9 @@ let {
 	isExpanded = false,
 	shouldAutoScroll = false,
 	onToggle,
+	onFullStory,
+	fullStoryAvailable = false,
+	fullStoryUpdated,
 	onReadToggle,
 	onUnaccept,
 	unacceptPending = false,
@@ -238,7 +245,10 @@ $effect(() => {
       {isRead}
       {isSharedView}
       {isExpanded}
+      {fullStoryAvailable}
+      {fullStoryUpdated}
       onTitleClick={handleStoryClick}
+      {onFullStory}
       onReadClick={handleReadClick}
       onFlashcardsClick={flashcards.toggle}
       onExportClick={flashcards.exportFlashcards}
