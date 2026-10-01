@@ -103,6 +103,19 @@ export type {
   OnDemandLimiter,
   SummarizeBriefStoryResult,
 } from './briefSummaries.js';
+export {
+  countByClusterIdFromArticles,
+  createRefreshRunner,
+  createTrackedStoriesSync,
+  getRefreshRunner,
+} from './refreshRunner.js';
+export type { RefreshResult, RefreshRunner, RefreshRunnerDeps } from './refreshRunner.js';
+export { isRefreshDue, startRefreshScheduler } from './refreshScheduler.js';
+export type {
+  IntervalHandle,
+  RefreshScheduler,
+  RefreshSchedulerDeps,
+} from './refreshScheduler.js';
 export { resolveGoogleNewsUrl } from './googleNewsResolve.js';
 export type {
   ResolveGoogleNewsUrlDeps,

@@ -7,7 +7,9 @@ import type { Server } from 'node:http';
 import express from 'express';
 
 import type { Article } from './types/article.js';
+import type { BriefRunMeta } from './types/brief.js';
 import type { TriageRecord, TriageRunMeta } from './types/triage.js';
+import type { RefreshResult, RefreshRunner } from './services/refreshRunner.js';
 import { acceptCluster, readBriefMembership } from './store/briefMembershipStore.js';
 import {
   ackTrackedUpdate,
@@ -82,6 +84,17 @@ function tempClaimReviewQueuePath(): string {
   const dir = mkdtempSync(path.join(tmpdir(), 'claim-review-queue-'));
   return path.join(dir, 'claim-review-queue.json');
 }
+
+const BRIEF_RUN: BriefRunMeta = {
+  at: '2026-09-30T12:00:05.000Z',
+  summaries: { budget: 60, used: 2, generated: 1, reused: 1, unavailable: 0, errors: ['Ollama: x'] },
+};
+
+/** Keeps refresh-time summaries and meta.refresh writes out of mvp/data. */
+const noRefreshSideEffects = {
+  generateRefreshSummaries: async () => BRIEF_RUN,
+  updateMeta: async () => ({ lastFetchAt: null, lastError: null }),
+};
 
 async function startServer(app: { listen: (...args: any[]) => Server }): Promise<{
   baseUrl: string;
@@ -337,6 +350,7 @@ test('POST /api/fetch calls syncTrackedAfterFetch with briefClusterKey counts', 
       seenMap = countByClusterId;
       return { entries: [] };
     },
+    ...noRefreshSideEffects,
   });
 
   const { baseUrl, close } = await startServer(app);
@@ -372,6 +386,7 @@ test('POST /api/fetch calls syncTrackedAfterFetch with briefClusterKey counts', 
       articles: 1,
     });
     assert.deepEqual(seenMap, { c1: 3, 'solo:solo-1': 1 });
+    assert.deepEqual((json as { brief?: unknown }).brief, { summaries: BRIEF_RUN.summaries });
   } finally {
     await close();
   }
@@ -420,6 +435,7 @@ test('POST /api/fetch succeeds even when syncTrackedAfterFetch throws', async ()
     syncTrackedAfterFetch: async () => {
       throw new Error('boom');
     },
+    ...noRefreshSideEffects,
   });
 
   const { baseUrl, close } = await startServer(app);
@@ -433,6 +449,174 @@ test('POST /api/fetch succeeds even when syncTrackedAfterFetch throws', async ()
     assert.equal(resp.status, 200);
     const json = (await resp.json()) as { ok: boolean };
     assert.equal(json.ok, true);
+  } finally {
+    await close();
+  }
+});
+
+function stubFetchResult(): RefreshResult['fetch'] {
+  return {
+    fetched: 1,
+    clustered: 0,
+    clusters: 0,
+    tiers: { sensor: { fetched: 1, upserted: 1 }, primary: { fetched: 0, upserted: 0 } },
+    cfp: { feedUrl: 'x', limit: 5, fetched: 1, upserted: [] },
+    curated: { skipped: true, sources: [], fetched: 0, errors: [], upserted: [] },
+    xcancel: { skipped: true, handles: [], fetched: 0, errors: [], upserted: [] },
+    topicSearch: {
+      skipped: true,
+      providers: {
+        google_news: { state: 'disabled', topicsAttempted: 0, topicsFailed: 0, items: 0, errors: [] },
+        searxng: { state: 'disabled', topicsAttempted: 0, topicsFailed: 0, items: 0, errors: [] },
+      },
+      fetched: 0,
+      perTopic: {},
+      upserted: [],
+      errors: [],
+    },
+    triage: {
+      at: '2026-09-30T12:00:00.000Z',
+      skipped: true,
+      candidates: 0,
+      kept: 0,
+      dropped: 0,
+      byReason: {},
+      jev: { budget: 300, used: 0, errors: 0 },
+      summaryBudget: 60,
+      errors: [],
+      keptIds: [],
+    },
+    articles: [],
+  } as unknown as RefreshResult['fetch'];
+}
+
+test('POST /api/fetch runs the refresh runner (manual) and returns refresh + brief', async () => {
+  process.env.SESSION_SECRET = 'test-secret';
+  process.env.MVP_PASSWORD = 'pw';
+  delete process.env.MVP_PASSWORD_HASH;
+
+  const calls: Array<{ trigger: string; options: unknown }> = [];
+  const refreshRunner: RefreshRunner = {
+    isRunning: () => false,
+    run: async (trigger, options) => {
+      calls.push({ trigger, options });
+      return {
+        trigger: 'timer',
+        joined: true,
+        startedAt: '2026-09-30T12:00:00.000Z',
+        completedAt: '2026-09-30T12:00:06.000Z',
+        fetch: stubFetchResult(),
+        brief: BRIEF_RUN,
+      };
+    },
+  };
+
+  const { createApp } = await import('./app.js');
+  const app = createApp({ refreshRunner });
+
+  const { baseUrl, close } = await startServer(app);
+  try {
+    const cookie = await login(baseUrl);
+    const resp = await fetch(`${baseUrl}/api/fetch`, {
+      method: 'POST',
+      headers: { cookie, 'content-type': 'application/json' },
+      body: JSON.stringify({ limit: 5, feedUrl: 'https://feed.example/rss' }),
+    });
+    assert.equal(resp.status, 200);
+    const json = (await resp.json()) as {
+      ok: boolean;
+      feedUrl: string;
+      limit: number;
+      fetched: number;
+      refresh: unknown;
+      brief: unknown;
+    };
+    assert.deepEqual(calls, [
+      { trigger: 'manual', options: { limit: 5, feedUrl: 'https://feed.example/rss' } },
+    ]);
+    assert.equal(json.ok, true);
+    assert.equal(json.feedUrl, 'x');
+    assert.equal(json.limit, 5);
+    assert.equal(json.fetched, 1);
+    assert.deepEqual(json.refresh, {
+      trigger: 'timer',
+      joined: true,
+      startedAt: '2026-09-30T12:00:00.000Z',
+      completedAt: '2026-09-30T12:00:06.000Z',
+    });
+    assert.deepEqual(json.brief, { summaries: BRIEF_RUN.summaries });
+  } finally {
+    await close();
+  }
+});
+
+test('POST /api/fetch returns 500 when the refresh fails (CFP)', async () => {
+  process.env.SESSION_SECRET = 'test-secret';
+  process.env.MVP_PASSWORD = 'pw';
+  delete process.env.MVP_PASSWORD_HASH;
+
+  const refreshRunner: RefreshRunner = {
+    isRunning: () => false,
+    run: async () => {
+      throw new Error('CFP feed unreachable');
+    },
+  };
+
+  const { createApp } = await import('./app.js');
+  const app = createApp({ refreshRunner });
+
+  const { baseUrl, close } = await startServer(app);
+  try {
+    const cookie = await login(baseUrl);
+    const resp = await fetch(`${baseUrl}/api/fetch`, {
+      method: 'POST',
+      headers: { cookie, 'content-type': 'application/json' },
+      body: '{}',
+    });
+    assert.equal(resp.status, 500);
+    assert.deepEqual(await resp.json(), { ok: false, error: 'CFP feed unreachable' });
+  } finally {
+    await close();
+  }
+});
+
+test('POST /api/fetch with injected fetchAllSources records a failed refresh and 500s', async () => {
+  process.env.SESSION_SECRET = 'test-secret';
+  process.env.MVP_PASSWORD = 'pw';
+  delete process.env.MVP_PASSWORD_HASH;
+
+  const patches: unknown[] = [];
+  const { createApp } = await import('./app.js');
+  const app = createApp({
+    fetchAllSources: async () => {
+      throw new Error('CFP down');
+    },
+    readMeta: async () => ({ lastFetchAt: null, lastError: null }),
+    updateMeta: async (patch) => {
+      patches.push(patch);
+      return { lastFetchAt: null, lastError: null };
+    },
+    generateRefreshSummaries: async () => {
+      throw new Error('summaries must not run after a failed fetch');
+    },
+  });
+
+  const { baseUrl, close } = await startServer(app);
+  try {
+    const cookie = await login(baseUrl);
+    const resp = await fetch(`${baseUrl}/api/fetch`, {
+      method: 'POST',
+      headers: { cookie, 'content-type': 'application/json' },
+      body: '{}',
+    });
+    assert.equal(resp.status, 500);
+    assert.deepEqual(await resp.json(), { ok: false, error: 'CFP down' });
+    assert.equal(patches.length, 1);
+    const refresh = (patches[0] as { refresh: { last: { ok: boolean; trigger: string; error: string }; lastSuccess: unknown } }).refresh;
+    assert.equal(refresh.last.ok, false);
+    assert.equal(refresh.last.trigger, 'manual');
+    assert.equal(refresh.last.error, 'CFP down');
+    assert.equal(refresh.lastSuccess, null);
   } finally {
     await close();
   }

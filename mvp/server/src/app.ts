@@ -25,8 +25,13 @@ import {
   buildRadarFeed,
   briefClusterKey,
   clusterMatchesMute,
+  createRefreshRunner,
+  createTrackedStoriesSync,
+  generateRefreshSummaries,
+  getRefreshRunner,
   loadClaimsRadar,
 } from './services/index.js';
+import type { RefreshRunner } from './services/index.js';
 import {
   acceptCluster,
   acceptClaim,
@@ -56,6 +61,7 @@ import {
   unacceptClaim,
   untrackClaim,
   untrackCluster,
+  updateMeta,
   updateTopic,
 } from './store/index.js';
 import type { TrackedEntry } from './store/index.js';
@@ -63,8 +69,12 @@ import type { TrackedClaimEntry } from './store/index.js';
 import type { Article } from './types/article.js';
 
 export type CreateAppDeps = {
+  /** Default: the process runner, or one built from the deps below when `fetchAllSources` is injected */
+  refreshRunner?: RefreshRunner;
   fetchAllSources?: typeof fetchAllSources;
   syncTrackedAfterFetch?: typeof syncTrackedAfterFetch;
+  generateRefreshSummaries?: typeof generateRefreshSummaries;
+  updateMeta?: typeof updateMeta;
   readArticles?: typeof readArticles;
   readMeta?: typeof readMeta;
   acceptCluster?: typeof acceptCluster;
@@ -179,22 +189,23 @@ function countMembersForClusterId(
   return count;
 }
 
-function countByClusterIdFromArticles(
-  articles: ReadonlyArray<Pick<Article, 'id' | 'clusterId'>>,
-): Record<string, number> {
-  const counts: Record<string, number> = {};
-  for (const article of articles) {
-    const key = briefClusterKey(article);
-    counts[key] = (counts[key] ?? 0) + 1;
-  }
-  return counts;
-}
-
 export function createApp(deps: CreateAppDeps = {}): Express {
-  const fetchAll = deps.fetchAllSources ?? fetchAllSources;
-  const syncTracked = deps.syncTrackedAfterFetch ?? syncTrackedAfterFetch;
   const readAllArticles = deps.readArticles ?? readArticles;
   const readServerMeta = deps.readMeta ?? readMeta;
+  const refreshRunner =
+    deps.refreshRunner ??
+    (deps.fetchAllSources
+      ? createRefreshRunner({
+          fetchAll: deps.fetchAllSources,
+          syncTracked: createTrackedStoriesSync({
+            readArticles: readAllArticles,
+            syncTrackedAfterFetch: deps.syncTrackedAfterFetch ?? syncTrackedAfterFetch,
+          }),
+          generateSummaries: deps.generateRefreshSummaries ?? generateRefreshSummaries,
+          readMeta: readServerMeta,
+          updateMeta: deps.updateMeta ?? updateMeta,
+        })
+      : getRefreshRunner());
   const accept = deps.acceptCluster ?? acceptCluster;
   const unaccept = deps.unacceptCluster ?? unacceptCluster;
   const readMembership = deps.readBriefMembership ?? readBriefMembership;
@@ -255,8 +266,9 @@ export function createApp(deps: CreateAppDeps = {}): Express {
   app.use('/api', createAuthRouter());
 
   /**
-   * Unified refresh: CFP → curated RSS → xcancel (when configured) → topic search → triage.
-   * Optional body/query: { limit?: number, feedUrl?: string }
+   * Unified refresh: CFP → curated RSS → xcancel (when configured) → topic search → triage
+   * → tracked-stories sync → Brief summaries (shared single-flight runner with the timer).
+   * Optional body/query: { limit?: number, feedUrl?: string } — ignored when joining a running refresh.
    * Empty/missing radar-sources.json skips curated without failing CFP.
    * Empty XCANCEL_PROFILES / x-profiles.json skips xcancel without failing CFP.
    * Curated/xcancel/topic search errors are returned in the payload; CFP still succeeds.
@@ -269,18 +281,8 @@ export function createApp(deps: CreateAppDeps = {}): Express {
         limitRaw !== undefined && limitRaw !== '' ? Number(limitRaw) : undefined;
       const feedUrl = typeof feedUrlRaw === 'string' ? feedUrlRaw : undefined;
 
-      const result = await fetchAll({ limit, feedUrl });
-
-      try {
-        // Important: build counts from the full rewritten store (same denominator as Accept),
-        // not just the upserted rows from this fetch result.
-        const allArticles = await readAllArticles();
-        const countByClusterId = countByClusterIdFromArticles(allArticles);
-        await syncTracked(countByClusterId);
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        console.error('Tracked stories sync after fetch failed:', message);
-      }
+      const refresh = await refreshRunner.run('manual', { limit, feedUrl });
+      const result = refresh.fetch;
 
       res.json({
         ok: true,
@@ -324,6 +326,13 @@ export function createApp(deps: CreateAppDeps = {}): Express {
           errors: result.triage.errors,
         },
         articles: result.articles,
+        refresh: {
+          trigger: refresh.trigger,
+          joined: refresh.joined,
+          startedAt: refresh.startedAt,
+          completedAt: refresh.completedAt,
+        },
+        brief: { summaries: refresh.brief.summaries },
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
