@@ -68,7 +68,7 @@ function addStoreError(errors: string[], message: string): void {
   if (!errors.includes(message)) errors.push(message);
 }
 
-type Loaded = {
+export type LoadedBriefInputs = {
   topics: Topic[];
   muteRules: MuteRule[];
   articles: Article[];
@@ -84,11 +84,11 @@ type Loaded = {
  * without mute rules or seen entries we can't tell which stories are shown,
  * so no Ollama call is made.
  */
-async function loadBriefInputs(
+export async function loadBriefInputs(
   deps: BriefSummaryDeps,
   needMeta: boolean,
   errors: string[],
-): Promise<Loaded | null> {
+): Promise<LoadedBriefInputs | null> {
   const reads = await Promise.allSettled([
     (deps.readTopics ?? (() => readTopics()))(),
     (deps.readMuteRules ?? (() => readMuteRules()))(),
@@ -132,7 +132,11 @@ async function loadBriefInputs(
 }
 
 /** Omitting `boundaryAt` lets composition use `meta.refresh.lastSuccess.startedAt`. */
-function composeFrom(loaded: Loaded, now: Date, boundaryAt?: string | null): TopicBrief {
+export function composeBriefFromInputs(
+  loaded: LoadedBriefInputs,
+  now: Date,
+  boundaryAt?: string | null,
+): TopicBrief {
   return composeTopicBrief({
     topics: loaded.topics,
     muteRules: loaded.muteRules,
@@ -146,7 +150,7 @@ function composeFrom(loaded: Loaded, now: Date, boundaryAt?: string | null): Top
   });
 }
 
-function sourceForStory(loaded: Loaded, articleId: string): SummarySource | null {
+function sourceForStory(loaded: LoadedBriefInputs, articleId: string): SummarySource | null {
   const record = loaded.triage.records[articleId];
   if (!record) return null;
   return summarySourceFor(record, loaded.articlesById, loaded.triage);
@@ -262,7 +266,7 @@ export async function generateRefreshSummaries(
     const loaded = await loadBriefInputs(deps, options.boundaryAt === undefined, errors);
     if (!loaded) return await finish();
 
-    const brief = composeFrom(loaded, now, options.boundaryAt);
+  const brief = composeBriefFromInputs(loaded, now, options.boundaryAt);
     const records: BriefSummaryRecord[] = [];
     const pending: Pending[] = [];
     for (const section of brief.sections) {
@@ -343,7 +347,7 @@ async function summarizeBriefStoryOnce(
   const loaded = await loadBriefInputs(deps, true, errors);
   if (!loaded) return { ok: false, code: 'error', error: errors.join('; ') };
 
-  const brief = composeFrom(loaded, now);
+  const brief = composeBriefFromInputs(loaded, now);
   const story = brief.sections.flatMap((s) => s.stories).find((s) => s.articleId === articleId);
   if (!story) return { ok: false, code: 'not_in_brief', error: 'Story is not in the current Brief' };
 

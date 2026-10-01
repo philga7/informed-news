@@ -105,6 +105,16 @@ export type {
   SummarizeBriefStoryResult,
 } from './briefSummaries.js';
 export {
+  createFullStoryOnDemandLimiter,
+  generateFullStory,
+  mergeLivingFullStory,
+  sourceHashForMembers,
+} from './briefFullStories.js';
+export type {
+  BriefFullStoryDeps,
+  GenerateFullStoryResult,
+} from './briefFullStories.js';
+export {
   countByClusterIdFromArticles,
   createRefreshRunner,
   createTrackedStoriesSync,

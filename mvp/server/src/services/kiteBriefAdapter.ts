@@ -300,12 +300,12 @@ function storyDomains(
   return names.map((name) => ({ name }));
 }
 
-type StoryPerspective = {
+export type StoryPerspective = {
   text: string;
   sources: Array<{ name: string; url: string }>;
 };
 
-function storyPerspectives(
+export function storyPerspectives(
   members: Article[],
 ): StoryPerspective[] | undefined {
   if (members.length < 2) return undefined;
@@ -357,7 +357,7 @@ function pickStoryPrimaryImage(
   return undefined;
 }
 
-type StoryQuoteFields = {
+export type StoryQuoteFields = {
   quote: string;
   quote_author: string | null;
   quote_attribution: string | null;
@@ -365,7 +365,7 @@ type StoryQuoteFields = {
   quote_source_domain: string | null;
 };
 
-function pickStoryQuote(members: Article[]): StoryQuoteFields | null {
+export function pickStoryQuote(members: Article[]): StoryQuoteFields | null {
   for (const article of members) {
     const quoteText =
       article.classification?.evidenceQuotes?.find(
