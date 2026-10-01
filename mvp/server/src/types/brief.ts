@@ -54,6 +54,16 @@ export type RefreshRun = {
 
 export type RefreshMeta = { last: RefreshRun | null; lastSuccess: RefreshRun | null };
 
+export type FullStoriesRunMeta = {
+  budget: number;
+  /** Full-story generation attempts made (including failures). */
+  used: number;
+  generated: number;
+  reused: number;
+  unavailable: number;
+  errors: string[];
+};
+
 export type BriefRunMeta = {
   at: string;
   summaries: {
@@ -65,4 +75,6 @@ export type BriefRunMeta = {
     unavailable: number;
     errors: string[];
   };
+  /** Automatic full-story run after refresh-time summaries. */
+  fullStories?: FullStoriesRunMeta;
 };

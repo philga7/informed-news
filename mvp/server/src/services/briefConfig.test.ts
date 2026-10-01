@@ -2,9 +2,26 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   DEFAULT_REFRESH_INTERVAL_HOURS,
+  FULL_STORY_AUTO_MAX_PER_REFRESH,
+  FULL_STORY_AUTO_MAX_PER_TOPIC,
+  FULL_STORY_AUTO_MIN_SIGNIFICANCE,
+  FULL_STORY_BODY_MAX_CHARS,
+  FULL_STORY_MEMBER_MAX,
+  FULL_STORY_MIN_OUTLETS_AUTO,
   MIN_REFRESH_INTERVAL_HOURS,
+  ON_DEMAND_FULL_STORY_MAX_PER_HOUR,
   resolveRefreshIntervalHours,
 } from './briefConfig.js';
+
+test('full-story constants match NEWS-89 plan', () => {
+  assert.equal(FULL_STORY_AUTO_MAX_PER_REFRESH, 5);
+  assert.equal(FULL_STORY_AUTO_MAX_PER_TOPIC, 1);
+  assert.equal(FULL_STORY_MIN_OUTLETS_AUTO, 3);
+  assert.equal(FULL_STORY_AUTO_MIN_SIGNIFICANCE, 1);
+  assert.equal(ON_DEMAND_FULL_STORY_MAX_PER_HOUR, 20);
+  assert.equal(FULL_STORY_BODY_MAX_CHARS, 4000);
+  assert.equal(FULL_STORY_MEMBER_MAX, 6);
+});
 
 test('resolveRefreshIntervalHours defaults to 3 hours when unset', () => {
   assert.equal(DEFAULT_REFRESH_INTERVAL_HOURS, 3);

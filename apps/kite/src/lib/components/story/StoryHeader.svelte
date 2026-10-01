@@ -19,6 +19,9 @@ interface Props {
 	isSharedView?: boolean;
 	isExpanded?: boolean;
 	onTitleClick?: () => void;
+	onFullStory?: () => void;
+	fullStoryAvailable?: boolean;
+	fullStoryUpdated?: string;
 	onReadClick?: (e: Event) => void;
 	onFlashcardsClick?: () => void;
 	onExportClick?: () => void;
@@ -44,6 +47,9 @@ let {
 	isSharedView = false,
 	isExpanded = false,
 	onTitleClick,
+	onFullStory,
+	fullStoryAvailable = false,
+	fullStoryUpdated,
 	onReadClick,
 	onFlashcardsClick,
 	onExportClick,
@@ -74,9 +80,7 @@ function handleSimplifyToggle() {
 const session = getContext<Session | null>('session');
 
 // Check if user is a subscriber (Kagi Translate simplify — gated NEWS-47)
-const isSubscriber = $derived(
-	FEATURES.kagiReadingLevel && session?.subscription === true,
-);
+const isSubscriber = $derived(FEATURES.kagiReadingLevel && session?.subscription === true);
 
 // Ask Assistant → kagi.com (gated NEWS-47)
 const isLoggedIn = $derived(FEATURES.kagiAssistant && session?.loggedIn === true);
@@ -416,6 +420,21 @@ const isCJKStory = $derived(containsCJK(story.title));
       {/if}
       <span dir="auto">{displayTitle}</span>
     </button>
+    {#if fullStoryAvailable && !isExpanded}
+      <button
+        type="button"
+        class="mb-2 text-xs font-medium text-gray-500 underline underline-offset-2 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+        onclick={(e) => {
+          e.stopPropagation();
+          onFullStory?.();
+        }}
+      >
+        Full story
+      </button>
+    {/if}
+    {#if fullStoryUpdated}
+      <p class="mb-2 text-xs text-gray-500 dark:text-gray-400">Updated: {fullStoryUpdated}</p>
+    {/if}
   </div>
 
   <!-- Read Status Button -->

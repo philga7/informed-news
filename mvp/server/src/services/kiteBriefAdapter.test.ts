@@ -24,6 +24,7 @@ import {
 import type { StoreMeta } from '../types/article.js';
 import type { RefreshRun } from '../types/brief.js';
 import type { BriefStory, TopicBrief } from './topicBrief.js';
+import type { BriefFullStoryRecord } from '../types/briefFullStory.js';
 
 function article(
   overrides: Partial<Article> & Pick<Article, 'id' | 'title'>,
@@ -706,6 +707,48 @@ test('topicBriefToKiteStories maps Brief order, cluster numbers, fields and glue
     assert.equal(story.perspectives, undefined);
     assert.equal(story.quote, undefined);
   }
+});
+
+test('topicBriefToKiteStories hydrates cached full stories and reports cache states', () => {
+  const record: BriefFullStoryRecord = {
+    articleId: 'a1',
+    status: 'ok',
+    enrichment: {
+      talking_points: ['Talks resumed.'],
+      timeline: [{ date: 'Sep. 30', content: 'Officials met.' }],
+      suggested_qna: [{ question: 'What remains unknown?', answer: 'The next meeting date.' }],
+      technical_details: ['A technical detail.'],
+    },
+    deterministic: {
+      perspectives: [{ text: 'Officials described renewed talks.', sources: [] }],
+      quote: {
+        quote: 'We will continue.',
+        quote_author: 'A spokesperson',
+        quote_attribution: 'Example',
+        quote_source_url: 'https://a1.example.com/story',
+        quote_source_domain: 'a1.example.com',
+      },
+    },
+    sourceHash: 'abc',
+    topicSections: [],
+    model: 'test',
+    error: null,
+    generatedAt: '2026-09-30T12:00:00.000Z',
+    trigger: 'on_demand',
+    changeSummary: '1 new outlet; timeline +1',
+  };
+  const stories = topicBriefToKiteStories(topicBrief(), {
+    a1: record,
+    a2: { ...record, articleId: 'a2', status: 'unavailable', enrichment: null },
+  });
+
+  assert.equal(stories[0]!.informed_full_story_status, 'ok');
+  assert.equal(stories[0]!.informed_full_story_updated, '1 new outlet; timeline +1');
+  assert.deepEqual(stories[0]!.talking_points, ['Talks resumed.']);
+  assert.deepEqual(stories[0]!.technical_details, ['A technical detail.']);
+  assert.equal(stories[0]!.quote, 'We will continue.');
+  assert.equal(stories[1]!.informed_full_story_status, 'unavailable');
+  assert.equal(stories[2]!.informed_full_story_status, 'missing');
 });
 
 test('topic Brief categories/stories/batch responses: one world "Brief" category, all stories', () => {

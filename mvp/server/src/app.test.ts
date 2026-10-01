@@ -13,6 +13,7 @@ import type { Topic } from './types/topic.js';
 import type { TriageRecord, TriageRunMeta, TriageStore } from './types/triage.js';
 import type { RefreshResult, RefreshRunner } from './services/refreshRunner.js';
 import type { SummarizeBriefStoryResult } from './services/briefSummaries.js';
+import type { GenerateFullStoryResult } from './services/briefFullStories.js';
 import {
   OWNED_FIXTURE_TITLE,
   buildOwnedStoriesResponse,
@@ -2262,6 +2263,7 @@ function briefReads(f: BriefFixture) {
     readMuteRules: async () => ({ rules: [], updatedAt: null }),
     readBriefSeen: async () => f.seen ?? { seen: {}, updatedAt: null },
     readBriefSummaries: async () => ({ summaries: {}, updatedAt: null }),
+    readBriefFullStories: async () => ({ fullStories: {}, updatedAt: null }),
     readMeta: async (): Promise<StoreMeta> => f.meta ?? { lastFetchAt: null, lastError: null },
     readBriefMembership: async () => ({
       acceptedClusterIds: f.acceptedClusterIds ?? [],
@@ -2422,6 +2424,47 @@ test('Kite brief via createApp: kept stories only (accepted-but-not-kept gone), 
   }
 });
 
+test('Kite Brief stories hydrate cached full-story fields from the full-story store', async () => {
+  const { baseUrl, close } = await startBriefRouter(
+    {
+      articles: [briefArticle('k1')],
+      records: [keptRecord('k1', ['t1'])],
+    },
+    {
+      readBriefFullStories: async () => ({
+        fullStories: {
+          k1: {
+            articleId: 'k1',
+            status: 'ok',
+            enrichment: {
+              talking_points: ['Cached talking point.'],
+              timeline: [],
+              suggested_qna: [],
+            },
+            deterministic: { perspectives: [], quote: null },
+            sourceHash: 'abc',
+            topicSections: [],
+            model: 'm',
+            error: null,
+            generatedAt: BRIEF_RECENT,
+            trigger: 'on_demand',
+          },
+        },
+        updatedAt: BRIEF_RECENT,
+      }),
+    },
+  );
+  try {
+    const body = await getJson<KiteBatchStoriesResponse>(
+      `${baseUrl}/api/batches/latest/categories/world/stories`,
+    );
+    assert.deepEqual(body.stories[0]!.talking_points, ['Cached talking point.']);
+    assert.equal(body.stories[0]!.informed_full_story_status, 'ok');
+  } finally {
+    await close();
+  }
+});
+
 test('GET /api/brief/overview: sections with More split, quiet, notices, nextAt, running (public)', async () => {
   const lastSuccess = {
     trigger: 'manual' as const,
@@ -2488,6 +2531,11 @@ test('GET /api/brief/overview: sections with More split, quiet, notices, nextAt,
 for (const [store, dep, notice] of [
   ['seen', 'readBriefSeen', 'Read history unavailable (brief-seen.json unreadable)'],
   ['summaries', 'readBriefSummaries', 'Saved summaries unavailable (brief-summaries.json unreadable)'],
+  [
+    'full stories',
+    'readBriefFullStories',
+    'Saved full stories unavailable (brief-full-stories.json unreadable)',
+  ],
 ] as const) {
   test(`Kite brief: unreadable ${store} store degrades to empty with an overview notice`, async () => {
     const { baseUrl, close } = await startBriefRouter(
@@ -2537,6 +2585,7 @@ test('Kite brief: unreadable triage store still fails with 500', async () => {
 async function startSeenServer(f: BriefFixture & {
   writeBriefSeen?: (store: BriefSeenStore) => Promise<void>;
   summarizeBriefStory?: CreateAppDeps['summarizeBriefStory'];
+  generateFullStory?: CreateAppDeps['generateFullStory'];
 }): Promise<{ baseUrl: string; close: () => Promise<void> }> {
   process.env.SESSION_SECRET = 'test-secret';
   process.env.MVP_PASSWORD = 'pw';
@@ -2547,6 +2596,7 @@ async function startSeenServer(f: BriefFixture & {
     ...briefReads(f),
     writeBriefSeen: f.writeBriefSeen ?? (async () => {}),
     ...(f.summarizeBriefStory ? { summarizeBriefStory: f.summarizeBriefStory } : {}),
+    ...(f.generateFullStory ? { generateFullStory: f.generateFullStory } : {}),
   });
   return await startServer(app);
 }
@@ -2740,6 +2790,80 @@ test('POST /api/brief/stories/:articleId/summary maps results to 200 / 404 / 429
     ];
     for (const [id, status, code] of expected) {
       const resp = await postJson(baseUrl, `/api/brief/stories/${id}/summary`, {}, cookie);
+      assert.equal(resp.status, status, id);
+      const body = (await resp.json()) as { ok: boolean; error: string };
+      assert.equal(body.ok, false);
+      assert.equal(body.error, code);
+    }
+    assert.deepEqual(calls, ['ok', 'none', 'busy', 'broken']);
+  } finally {
+    await close();
+  }
+});
+
+test('POST /api/brief/stories/:articleId/full maps results to 200 / 404 / 429 / 502 and requires session', async () => {
+  const calls: string[] = [];
+  const record = {
+    articleId: 'ok',
+    status: 'ok' as const,
+    enrichment: {
+      talking_points: ['A talking point.'],
+      timeline: [],
+      suggested_qna: [],
+      business_angle_text: 'Business context.',
+    },
+    deterministic: {
+      perspectives: [{ text: 'An official view.', sources: [] }],
+      quote: null,
+    },
+    sourceHash: 'abc',
+    topicSections: [],
+    model: 'm',
+    error: null,
+    generatedAt: BRIEF_RECENT,
+    trigger: 'on_demand' as const,
+    changeSummary: '1 new outlet; timeline +1',
+  };
+  const results: Record<string, GenerateFullStoryResult> = {
+    ok: { ok: true, record },
+    none: { ok: false, code: 'not_in_brief', error: 'Story is not in the current Brief' },
+    busy: { ok: false, code: 'rate_limited', error: 'limit' },
+    broken: { ok: false, code: 'error', error: 'Ollama not configured' },
+  };
+  const { baseUrl, close } = await startSeenServer({
+    articles: [],
+    generateFullStory: async (articleId) => {
+      calls.push(articleId);
+      return results[articleId]!;
+    },
+  });
+  try {
+    const anonymous = await postJson(baseUrl, '/api/brief/stories/ok/full', {});
+    assert.equal(anonymous.status, 401);
+
+    const cookie = await login(baseUrl);
+    const ok = await postJson(baseUrl, '/api/brief/stories/ok/full', {}, cookie);
+    assert.equal(ok.status, 200);
+    assert.deepEqual(await ok.json(), {
+      ok: true,
+      fullStory: {
+        status: 'ok',
+        talking_points: ['A talking point.'],
+        timeline: [],
+        suggested_qna: [],
+        business_angle_text: 'Business context.',
+        perspectives: [{ text: 'An official view.', sources: [] }],
+        changeSummary: '1 new outlet; timeline +1',
+      },
+    });
+
+    const expected: Array<[string, number, string]> = [
+      ['none', 404, 'not_in_brief'],
+      ['busy', 429, 'rate_limited'],
+      ['broken', 502, 'error'],
+    ];
+    for (const [id, status, code] of expected) {
+      const resp = await postJson(baseUrl, `/api/brief/stories/${id}/full`, {}, cookie);
       assert.equal(resp.status, status, id);
       const body = (await resp.json()) as { ok: boolean; error: string };
       assert.equal(body.ok, false);

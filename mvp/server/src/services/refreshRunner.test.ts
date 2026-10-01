@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { Article, StoreMeta } from '../types/article.js';
-import type { BriefRunMeta, RefreshRun } from '../types/brief.js';
+import type { BriefRunMeta, FullStoriesRunMeta, RefreshRun } from '../types/brief.js';
 import type { FetchAllResult } from './fetchAllSources.js';
 import {
   countByClusterIdFromArticles,
@@ -15,6 +15,9 @@ const T0 = Date.parse('2026-09-30T12:00:00.000Z');
 const BRIEF: BriefRunMeta = {
   at: '2026-09-30T12:00:03.000Z',
   summaries: { budget: 60, used: 1, generated: 1, reused: 0, unavailable: 0, errors: [] },
+};
+const FULL_STORIES: FullStoriesRunMeta = {
+  budget: 5, used: 1, generated: 1, reused: 0, unavailable: 0, errors: [],
 };
 
 function fetchResult(fetched = 1): FetchAllResult {
@@ -43,6 +46,7 @@ type Harness = {
   meta: StoreMeta;
   logs: string[];
   summaryCalls: Array<{ now?: Date; boundaryAt?: string | null }>;
+  fullStoryCalls: Array<{ now?: Date; boundaryAt?: string | null }>;
 };
 
 function harness(overrides: Partial<RefreshRunnerDeps> = {}, meta?: StoreMeta): Harness {
@@ -51,6 +55,7 @@ function harness(overrides: Partial<RefreshRunnerDeps> = {}, meta?: StoreMeta): 
     meta: meta ?? { lastFetchAt: null, lastError: null },
     logs: [],
     summaryCalls: [],
+    fullStoryCalls: [],
     deps: {},
   };
   h.deps = {
@@ -59,6 +64,10 @@ function harness(overrides: Partial<RefreshRunnerDeps> = {}, meta?: StoreMeta): 
     generateSummaries: async (options) => {
       h.summaryCalls.push(options);
       return BRIEF;
+    },
+    generateFullStories: async (options) => {
+      h.fullStoryCalls.push(options);
+      return FULL_STORIES;
     },
     readMeta: async () => h.meta,
     updateMeta: async (patch) => {
@@ -89,15 +98,20 @@ test('run: success → fetch, sync, summaries with boundaryAt = startedAt, meta 
     order.push('summaries');
     return baseSummaries(options);
   };
+  const baseFullStories = h.deps.generateFullStories!;
+  h.deps.generateFullStories = async (options) => {
+    order.push('full-stories');
+    return baseFullStories(options);
+  };
   const runner = createRefreshRunner(h.deps);
 
   const result = await runner.run('manual', { limit: 4 });
 
-  assert.deepEqual(order, ['fetch:{"limit":4}', 'sync', 'summaries']);
+  assert.deepEqual(order, ['fetch:{"limit":4}', 'sync', 'summaries', 'full-stories']);
   assert.equal(result.trigger, 'manual');
   assert.equal(result.joined, false);
   assert.equal(result.fetch.fetched, 4);
-  assert.deepEqual(result.brief, BRIEF);
+  assert.deepEqual(result.brief, { ...BRIEF, fullStories: FULL_STORIES });
   assert.equal(result.startedAt, '2026-09-30T12:00:00.000Z');
   assert.equal(h.summaryCalls.length, 1);
   assert.equal(h.summaryCalls[0]!.boundaryAt, result.startedAt);
@@ -110,7 +124,10 @@ test('run: success → fetch, sync, summaries with boundaryAt = startedAt, meta 
     ok: true,
     error: null,
   };
-  assert.deepEqual(h.patches, [{ refresh: { last: expected, lastSuccess: expected } }]);
+  assert.deepEqual(h.patches, [
+    { brief: { ...BRIEF, fullStories: FULL_STORIES } },
+    { refresh: { last: expected, lastSuccess: expected } },
+  ]);
   assert.equal(runner.isRunning(), false);
 });
 
@@ -137,7 +154,7 @@ test('run: two concurrent calls → one fetch; second joins with joined: true', 
   assert.equal(b.trigger, 'timer');
   assert.equal(b.startedAt, a.startedAt);
   assert.equal(b.fetch, a.fetch);
-  assert.equal(h.patches.length, 1);
+  assert.equal(h.patches.length, 2);
   assert.equal(runner.isRunning(), false);
 });
 
@@ -227,7 +244,7 @@ test('run: meta write failure is logged and does not fail a successful run', asy
   const runner = createRefreshRunner(h.deps);
 
   const result = await runner.run('manual');
-  assert.deepEqual(result.brief, BRIEF);
+  assert.deepEqual(result.brief, { ...BRIEF, fullStories: FULL_STORIES });
   assert.ok(h.logs.some((l) => l.includes('disk full')));
 });
 
@@ -256,6 +273,28 @@ test('run: a throwing summaries dep does not fail the run', async () => {
 
   const result = await runner.run('manual');
   assert.deepEqual(result.brief.summaries.errors, ['unexpected']);
+  assert.equal(h.meta.refresh!.last!.ok, true);
+});
+
+test('run: a throwing full-story generator is captured after summaries', async () => {
+  const h = harness({
+    generateFullStories: async () => {
+      throw new Error('full story boom');
+    },
+  });
+  const runner = createRefreshRunner(h.deps);
+
+  const result = await runner.run('manual');
+  assert.equal(h.summaryCalls.length, 1);
+  assert.deepEqual(result.brief.fullStories, {
+    budget: 0,
+    used: 0,
+    generated: 0,
+    reused: 0,
+    unavailable: 0,
+    errors: ['full story boom'],
+  });
+  assert.deepEqual(h.meta.brief, result.brief);
   assert.equal(h.meta.refresh!.last!.ok, true);
 });
 

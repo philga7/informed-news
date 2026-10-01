@@ -34,6 +34,16 @@ export const BRIEF_SUMMARY_RATE_LIMITED = 'Summary limit reached for this hour. 
 
 export const BRIEF_SUMMARY_NOT_IN_BRIEF = 'This story is no longer in the Brief.';
 
+export const BRIEF_FULL_STORY_LOADING = 'Loading full story…';
+
+export const BRIEF_FULL_STORY_LOGIN_HINT = 'Log in on Topics to load full stories';
+
+export const BRIEF_FULL_STORY_ERROR = 'Full story could not be loaded right now.';
+
+export const BRIEF_FULL_STORY_RATE_LIMITED = 'Full story limit reached for this hour. Try again later.';
+
+export const BRIEF_FULL_STORY_NOT_IN_BRIEF = 'This story is no longer in the Brief.';
+
 export const BRIEF_REFRESH_LABEL = 'Refresh';
 
 export const BRIEF_REFRESHING_LABEL = 'Refreshing…';
@@ -221,6 +231,11 @@ export function newlyExpandedKeys(
 	return Object.keys(next).filter((key) => next[key] && !prev[key]);
 }
 
+/** Full stories are on-demand work: only a single newly opened card auto-loads one. */
+export function autoFullStoryRequestKeys(newlyExpanded: readonly string[]): readonly string[] {
+	return newlyExpanded.length === 1 ? newlyExpanded : [];
+}
+
 /**
  * Whether a summary attempt uses up the once-per-page-load guard. Login (401),
  * rate limit (429) and network failures (status 0) stay retryable.
@@ -377,6 +392,76 @@ export type StorySummaryResult =
 	| { ok: true; status: 'unavailable' }
 	| { ok: false; status: number; error?: string; unauthenticated?: boolean };
 
+export type FullStoryStatus = 'ok' | 'unavailable' | 'error';
+
+export type FullStoryPayload = Partial<
+	Pick<
+		Story,
+		| 'talking_points'
+		| 'timeline'
+		| 'suggested_qna'
+		| 'business_angle_text'
+		| 'business_angle_points'
+		| 'technical_details'
+		| 'user_action_items'
+		| 'historical_background'
+		| 'perspectives'
+		| 'quote'
+		| 'quote_author'
+		| 'quote_attribution'
+		| 'quote_source_url'
+		| 'quote_source_domain'
+	>
+> & {
+	status: FullStoryStatus;
+	changeSummary?: string;
+};
+
+export type StoryFullStoryResult =
+	| { ok: true; fullStory: FullStoryPayload }
+	| { ok: false; status: number; error?: string; unauthenticated?: boolean };
+
+/** A Brief full story should be requested when no usable cached content exists. */
+export function shouldRequestFullStory(story: Story): boolean {
+	return (
+		story.informed_full_story_status === 'missing' || story.informed_full_story_status === 'error'
+	);
+}
+
+/** Mutates the existing Brief story so its mounted StorySectionManager sees the new sections. */
+export function applyFullStory(story: Story, fullStory: FullStoryPayload): void {
+	const fields: Array<keyof Omit<FullStoryPayload, 'status' | 'changeSummary'>> = [
+		'talking_points',
+		'timeline',
+		'suggested_qna',
+		'business_angle_text',
+		'business_angle_points',
+		'technical_details',
+		'user_action_items',
+		'historical_background',
+		'perspectives',
+		'quote',
+		'quote_author',
+		'quote_attribution',
+		'quote_source_url',
+		'quote_source_domain',
+	];
+	for (const field of fields) {
+		const value = fullStory[field];
+		if (value !== undefined) Object.assign(story, { [field]: value });
+	}
+	story.informed_full_story_status = fullStory.status;
+	if (typeof fullStory.changeSummary === 'string' && fullStory.changeSummary.trim()) {
+		story.informed_full_story_updated = fullStory.changeSummary.trim();
+	}
+}
+
+export function fullStoryErrorCopy(code: string | undefined): string {
+	if (code === 'rate_limited') return BRIEF_FULL_STORY_RATE_LIMITED;
+	if (code === 'not_in_brief') return BRIEF_FULL_STORY_NOT_IN_BRIEF;
+	return BRIEF_FULL_STORY_ERROR;
+}
+
 export async function postStorySummary(
 	articleId: string,
 	fetchFn: typeof fetch = fetch,
@@ -396,6 +481,34 @@ export async function postStorySummary(
 	}
 	if (summary?.status === 'unavailable') return { ok: true, status: 'unavailable' };
 	return { ok: false, status: res.status };
+}
+
+function isFullStoryStatus(status: unknown): status is FullStoryStatus {
+	return status === 'ok' || status === 'unavailable' || status === 'error';
+}
+
+export async function postFullStory(
+	articleId: string,
+	fetchFn: typeof fetch = fetch,
+): Promise<StoryFullStoryResult> {
+	const res = await postJson(
+		fetchFn,
+		`/api/brief/stories/${encodeURIComponent(articleId)}/full`,
+		{},
+	);
+	if (!res) return { ok: false, status: 0 };
+	if (res.status === 401) return { ok: false, status: 401, unauthenticated: true };
+	const error = typeof res.body?.error === 'string' ? res.body.error : undefined;
+	if (res.status >= 400 || res.body?.ok !== true) return { ok: false, status: res.status, error };
+	const fullStory = res.body.fullStory;
+	if (
+		!fullStory ||
+		typeof fullStory !== 'object' ||
+		!isFullStoryStatus((fullStory as { status?: unknown }).status)
+	) {
+		return { ok: false, status: res.status };
+	}
+	return { ok: true, fullStory: fullStory as FullStoryPayload };
 }
 
 /** Manual refresh (session); may take minutes. */

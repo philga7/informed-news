@@ -1,6 +1,7 @@
 import type { Article, StoreMeta } from '../types/article.js';
 import type { RefreshRun } from '../types/brief.js';
 import type { ClusterEnrichmentPayload } from '../types/clusterEnrichment.js';
+import type { BriefFullStoryRecord } from '../types/briefFullStory.js';
 import type { TriageLabel } from '../types/triage.js';
 import type { MuteRule } from '../store/muteRulesStore.js';
 import { briefClusterKey } from './briefClusterKey.js';
@@ -64,6 +65,11 @@ export type KiteBriefStory = {
   talking_points?: string[];
   timeline?: Array<{ date: string; content: string; date_iso?: string }>;
   suggested_qna?: Array<{ question: string; answer: string }>;
+  business_angle_text?: string;
+  business_angle_points?: string[];
+  technical_details?: string[];
+  user_action_items?: string[];
+  historical_background?: string;
   perspectives?: Array<{
     text: string;
     sources: Array<{ name: string; url: string }>;
@@ -76,6 +82,10 @@ export type KiteBriefStory = {
   informed_outlet_count?: number;
   informed_labels?: TriageLabel[];
   informed_summary_status?: BriefSummaryStatus;
+  /** Full-story cache state; missing means it has never been requested. */
+  informed_full_story_status?: 'missing' | 'ok' | 'unavailable' | 'error';
+  /** Plain-language living-update note, when the cached full story changed. */
+  informed_full_story_updated?: string;
 };
 
 export type KiteBatchInfo = {
@@ -300,12 +310,12 @@ function storyDomains(
   return names.map((name) => ({ name }));
 }
 
-type StoryPerspective = {
+export type StoryPerspective = {
   text: string;
   sources: Array<{ name: string; url: string }>;
 };
 
-function storyPerspectives(
+export function storyPerspectives(
   members: Article[],
 ): StoryPerspective[] | undefined {
   if (members.length < 2) return undefined;
@@ -357,7 +367,7 @@ function pickStoryPrimaryImage(
   return undefined;
 }
 
-type StoryQuoteFields = {
+export type StoryQuoteFields = {
   quote: string;
   quote_author: string | null;
   quote_attribution: string | null;
@@ -365,7 +375,7 @@ type StoryQuoteFields = {
   quote_source_domain: string | null;
 };
 
-function pickStoryQuote(members: Article[]): StoryQuoteFields | null {
+export function pickStoryQuote(members: Article[]): StoryQuoteFields | null {
   for (const article of members) {
     const quoteText =
       article.classification?.evidenceQuotes?.find(
@@ -676,6 +686,7 @@ function topicStoryToKite(
   story: BriefStory,
   topic: BriefTopicRef,
   clusterNumber: number,
+  fullStory?: BriefFullStoryRecord,
 ): KiteBriefStory {
   const articles: KiteBriefArticle[] = story.links.map((link) => ({
     title: link.title,
@@ -699,6 +710,7 @@ function topicStoryToKite(
     informed_outlet_count: story.outletCount,
     informed_labels: [...story.labels],
     informed_summary_status: story.summary.status,
+    informed_full_story_status: fullStory?.status ?? 'missing',
   };
   if (domains.length > 0) {
     kite.domains = domains.map((name) => ({ name }));
@@ -712,14 +724,41 @@ function topicStoryToKite(
       link: story.link,
     };
   }
+  if (fullStory?.changeSummary) {
+    kite.informed_full_story_updated = fullStory.changeSummary;
+  }
+  if (fullStory?.status === 'ok') {
+    const enrichment = fullStory.enrichment;
+    if (enrichment) {
+      kite.talking_points = enrichment.talking_points;
+      kite.timeline = enrichment.timeline;
+      kite.suggested_qna = enrichment.suggested_qna;
+      if (enrichment.business_angle_text) kite.business_angle_text = enrichment.business_angle_text;
+      if (enrichment.business_angle_points) kite.business_angle_points = enrichment.business_angle_points;
+      if (enrichment.technical_details) kite.technical_details = enrichment.technical_details;
+      if (enrichment.user_action_items) kite.user_action_items = enrichment.user_action_items;
+      if (enrichment.historical_background) kite.historical_background = enrichment.historical_background;
+    }
+    if (fullStory.deterministic.perspectives) {
+      kite.perspectives = fullStory.deterministic.perspectives;
+    }
+    if (fullStory.deterministic.quote) {
+      Object.assign(kite, fullStory.deterministic.quote);
+    }
+  }
   return kite;
 }
 
 /** Topic Brief stories in Brief order (sections in order, ranked within each). */
-export function topicBriefToKiteStories(brief: TopicBrief): KiteBriefStory[] {
+export function topicBriefToKiteStories(
+  brief: TopicBrief,
+  fullStories: Readonly<Record<string, BriefFullStoryRecord>> = {},
+): KiteBriefStory[] {
   return brief.sections
     .flatMap((section) => section.stories.map((story) => ({ topic: section.topic, story })))
-    .map(({ topic, story }, index) => topicStoryToKite(story, topic, index + 1));
+    .map(({ topic, story }, index) =>
+      topicStoryToKite(story, topic, index + 1, fullStories[story.articleId]),
+    );
 }
 
 function topicBriefStoryCount(brief: TopicBrief): number {
@@ -732,7 +771,11 @@ function refreshTimestamp(lastSuccess: RefreshRun | null | undefined, now: Date)
   return Math.floor((Number.isNaN(completed) ? now.getTime() : completed) / 1000);
 }
 
-export type TopicBriefResponseOptions = { now?: Date; lastSuccess?: RefreshRun | null };
+export type TopicBriefResponseOptions = {
+  now?: Date;
+  lastSuccess?: RefreshRun | null;
+  fullStories?: Readonly<Record<string, BriefFullStoryRecord>>;
+};
 
 export function buildTopicBriefBatchInfo(
   brief: TopicBrief,
@@ -772,7 +815,7 @@ export function buildTopicBriefStoriesResponse(
 ): KiteBatchStoriesResponse | null {
   if (!isOwnedCategoryId(categoryId)) return null;
   const now = options.now ?? new Date();
-  const stories = topicBriefToKiteStories(brief);
+  const stories = topicBriefToKiteStories(brief, options.fullStories);
   const domains = [
     ...new Set(stories.flatMap((s) => s.articles.map((a) => a.domain))),
   ].map((name) => ({ name }));
@@ -822,11 +865,12 @@ function nextRefreshAt(
 }
 
 /** Brief stores that may be unreadable without failing the Brief (read as empty). */
-export type BriefDegradedStore = 'seen' | 'summaries';
+export type BriefDegradedStore = 'seen' | 'summaries' | 'fullStories';
 
 const DEGRADED_NOTICES: Record<BriefDegradedStore, string> = {
   seen: 'Read history unavailable (brief-seen.json unreadable)',
   summaries: 'Saved summaries unavailable (brief-summaries.json unreadable)',
+  fullStories: 'Saved full stories unavailable (brief-full-stories.json unreadable)',
 };
 
 /** `brief: null` = fixture (empty article store): no sections or quiet line. */

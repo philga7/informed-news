@@ -57,6 +57,7 @@ export { NON_FINAL_REASONS, TRIAGE_STATIC_REASONS } from './triage.js';
 
 export type {
   BriefRunMeta,
+  FullStoriesRunMeta,
   BriefSeenEntry,
   BriefSeenStore,
   BriefSummariesStore,

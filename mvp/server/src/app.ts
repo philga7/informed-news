@@ -28,6 +28,7 @@ import {
   createRefreshRunner,
   createTrackedStoriesSync,
   generateRefreshSummaries,
+  generateFullStory,
   getRefreshRunner,
   loadClaimsRadar,
   markBriefSeen,
@@ -47,6 +48,7 @@ import {
   readArticles,
   readBriefMembership,
   readBriefSeen,
+  readBriefFullStories,
   readBriefSummaries,
   readClaimMembership,
   readMuteRules,
@@ -123,7 +125,9 @@ export type CreateAppDeps = {
   readBriefSeen?: typeof readBriefSeen;
   writeBriefSeen?: typeof writeBriefSeen;
   readBriefSummaries?: typeof readBriefSummaries;
+  readBriefFullStories?: typeof readBriefFullStories;
   summarizeBriefStory?: typeof summarizeBriefStory;
+  generateFullStory?: typeof generateFullStory;
   now?: () => Date;
 };
 
@@ -282,7 +286,9 @@ export function createApp(deps: CreateAppDeps = {}): Express {
   const readSeen = deps.readBriefSeen ?? readBriefSeen;
   const writeSeen = deps.writeBriefSeen ?? writeBriefSeen;
   const readSummaries = deps.readBriefSummaries ?? readBriefSummaries;
+  const readFullStories = deps.readBriefFullStories ?? readBriefFullStories;
   const summarizeStory = deps.summarizeBriefStory ?? summarizeBriefStory;
+  const generateStory = deps.generateFullStory ?? generateFullStory;
   const now = deps.now ?? (() => new Date());
 
   const app = express();
@@ -314,6 +320,7 @@ export function createApp(deps: CreateAppDeps = {}): Express {
       readMuteRules: readMutes,
       readBriefSeen: readSeen,
       readBriefSummaries: readSummaries,
+      readBriefFullStories: readFullStories,
       readMeta: readServerMeta,
       readBriefMembership: readMembership,
       now,
@@ -492,6 +499,50 @@ export function createApp(deps: CreateAppDeps = {}): Express {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.error('Brief summary failed:', message);
+      res.status(500).json({ ok: false, error: message });
+    }
+  });
+
+  /**
+   * On-demand rich story for a story visible in the topic Brief (NEWS-89).
+   * 404 not_in_brief · 429 rate_limited · 502 error (Ollama / store).
+   */
+  app.post('/api/brief/stories/:articleId/full', async (req, res) => {
+    try {
+      const result = await generateStory(
+        req.params.articleId,
+        { now: now() },
+        {
+          readTopics: readTopicList,
+          readMuteRules: readMutes,
+          readArticles: readAllArticles,
+          readTriage: readTriageStore,
+          readBriefSeen: readSeen,
+          readBriefSummaries: readSummaries,
+          readMeta: readServerMeta,
+          readBriefFullStories: readFullStories,
+        },
+      );
+      if (!result.ok) {
+        res
+          .status(SUMMARY_ERROR_STATUS[result.code])
+          .json({ ok: false, error: result.code, message: result.error });
+        return;
+      }
+      const { enrichment, deterministic, status, changeSummary } = result.record;
+      res.json({
+        ok: true,
+        fullStory: {
+          status,
+          ...(enrichment ?? {}),
+          ...(deterministic.perspectives ? { perspectives: deterministic.perspectives } : {}),
+          ...(deterministic.quote ?? {}),
+          ...(changeSummary ? { changeSummary } : {}),
+        },
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('Brief full story failed:', message);
       res.status(500).json({ ok: false, error: message });
     }
   });

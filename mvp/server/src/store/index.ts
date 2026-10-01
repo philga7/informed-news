@@ -49,6 +49,12 @@ export type {
 } from './googleNewsUrlCacheStore.js';
 export { readTriage, writeTriage } from './triageStore.js';
 export { putBriefSummaries, readBriefSummaries } from './briefSummariesStore.js';
+export {
+  pruneBriefFullStoriesByKeptIds,
+  putBriefFullStories,
+  readBriefFullStories,
+  writeBriefFullStories,
+} from './briefFullStoryStore.js';
 export { readBriefSeen, writeBriefSeen } from './briefSeenStore.js';
 export { acceptClaim, readClaimMembership, unacceptClaim } from './claimMembershipStore.js';
 export type { ClaimMembership } from './claimMembershipStore.js';
@@ -76,6 +82,7 @@ export type { ClaimExtractProcessed } from './claimExtractProcessedStore.js';
 export {
   ARTICLES_PATH,
   BRIEF_MEMBERSHIP_PATH,
+  BRIEF_FULL_STORIES_PATH,
   BRIEF_SEEN_PATH,
   BRIEF_SUMMARIES_PATH,
   CLAIM_EXTRACT_PROCESSED_PATH,

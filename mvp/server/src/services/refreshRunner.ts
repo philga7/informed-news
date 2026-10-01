@@ -6,8 +6,9 @@
  */
 import { readArticles, readMeta, syncTrackedAfterFetch, updateMeta } from '../store/index.js';
 import type { Article, StoreMeta } from '../types/article.js';
-import type { BriefRunMeta, RefreshRun, RefreshTrigger } from '../types/brief.js';
+import type { BriefRunMeta, FullStoriesRunMeta, RefreshRun, RefreshTrigger } from '../types/brief.js';
 import { briefClusterKey } from './briefClusterKey.js';
+import { generateRefreshFullStories } from './briefFullStories.js';
 import { generateRefreshSummaries } from './briefSummaries.js';
 import { fetchAllSources } from './fetchAllSources.js';
 import type { FetchAllOptions, FetchAllResult } from './fetchAllSources.js';
@@ -28,6 +29,9 @@ export type RefreshRunnerDeps = {
   generateSummaries?: (
     options: { now?: Date; boundaryAt?: string | null },
   ) => Promise<BriefRunMeta>;
+  generateFullStories?: (
+    options: { now?: Date; boundaryAt?: string | null },
+  ) => Promise<FullStoriesRunMeta>;
   readMeta?: () => Promise<StoreMeta>;
   updateMeta?: (patch: Partial<StoreMeta>) => Promise<unknown>;
   now?: () => Date;
@@ -85,6 +89,8 @@ export function createRefreshRunner(deps: RefreshRunnerDeps = {}): RefreshRunner
   const syncTracked = deps.syncTracked ?? createTrackedStoriesSync();
   const generateSummaries =
     deps.generateSummaries ?? ((options) => generateRefreshSummaries(options));
+  const generateFullStories =
+    deps.generateFullStories ?? ((options) => generateRefreshFullStories(options));
   const readServerMeta = deps.readMeta ?? (() => readMeta());
   const updateServerMeta = deps.updateMeta ?? ((patch: Partial<StoreMeta>) => updateMeta(patch));
   const now = deps.now ?? (() => new Date());
@@ -135,6 +141,25 @@ export function createRefreshRunner(deps: RefreshRunnerDeps = {}): RefreshRunner
       brief = await generateSummaries({ now: now(), boundaryAt: startedAt });
     } catch (err) {
       brief = emptyBriefRun(now().toISOString(), errorMessage(err));
+    }
+    let fullStories: FullStoriesRunMeta;
+    try {
+      fullStories = await generateFullStories({ now: now(), boundaryAt: startedAt });
+    } catch (err) {
+      fullStories = {
+        budget: 0,
+        used: 0,
+        generated: 0,
+        reused: 0,
+        unavailable: 0,
+        errors: [errorMessage(err)],
+      };
+    }
+    brief = { ...brief, fullStories };
+    try {
+      await updateServerMeta({ brief });
+    } catch (err) {
+      log(`Brief full-story meta write failed: ${errorMessage(err)}`);
     }
 
     const completedAt = now().toISOString();

@@ -20,6 +20,15 @@ export const SUMMARY_POST_MIN_CHARS = 120;
 export const SUMMARY_CONCURRENCY = 2;
 export const ON_DEMAND_SUMMARY_MAX_PER_HOUR = 30;
 
+/** Full Kite stories (NEWS-89) */
+export const FULL_STORY_AUTO_MAX_PER_REFRESH = 5;
+export const FULL_STORY_AUTO_MAX_PER_TOPIC = 1;
+export const FULL_STORY_MIN_OUTLETS_AUTO = 3;
+export const FULL_STORY_AUTO_MIN_SIGNIFICANCE = 1;
+export const ON_DEMAND_FULL_STORY_MAX_PER_HOUR = 20;
+export const FULL_STORY_BODY_MAX_CHARS = 4000;
+export const FULL_STORY_MEMBER_MAX = 6;
+
 export const DEFAULT_REFRESH_INTERVAL_HOURS = 3;
 export const MIN_REFRESH_INTERVAL_HOURS = 0.25;
 export const REFRESH_CHECK_MINUTES = 5;

@@ -115,6 +115,10 @@ export interface Story {
 	informed_outlet_count?: number;
 	informed_labels?: 'official'[];
 	informed_summary_status?: 'ok' | 'missing' | 'unavailable';
+	/** Topic Brief rich-story cache state (NEWS-89). */
+	informed_full_story_status?: 'missing' | 'ok' | 'unavailable' | 'error';
+	/** Plain-language note about a regenerated rich story. */
+	informed_full_story_updated?: string;
 }
 
 export interface Category {
