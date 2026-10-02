@@ -53,7 +53,7 @@ rg -n -i 'NEWS-|CURA-|EVAL-|KIN-|informed|kindling|course-evaluator|curator|/Use
 | `skills-lock.json` | Add `using-git-worktrees`, `requesting-code-review`, `finishing-a-development-branch`, `verification-before-completion` (same entries as here) |
 | `docs/AGENT_SKILLS.md` | Inventory rows + the `npx skills add obra/superpowers …` line |
 | CI workflow | Add the `scripts.test.sh` step if the repo has CI |
-| `THIRD_PARTY.md` | superpowers MIT notice, if the repo keeps one |
+| `THIRD_PARTY.md` | superpowers MIT notice (create the file if the repo has none) |
 
 | Repo | Ship loop | Tracker | Stack | PR CI |
 |------|-----------|---------|-------|-------|
