@@ -38,7 +38,7 @@ digraph when_to_use {
     "Tasks mostly independent?" [shape=diamond];
     "Stay in this session?" [shape=diamond];
     "subagent-driven-development" [shape=box];
-    "executing-plans" [shape=box];
+    "Inline execution (AGENTS.md fallback build path)" [shape=box];
     "Manual execution or brainstorm first" [shape=box];
 
     "Have implementation plan?" -> "Tasks mostly independent?" [label="yes"];
@@ -46,11 +46,11 @@ digraph when_to_use {
     "Tasks mostly independent?" -> "Stay in this session?" [label="yes"];
     "Tasks mostly independent?" -> "Manual execution or brainstorm first" [label="no - tightly coupled"];
     "Stay in this session?" -> "subagent-driven-development" [label="yes"];
-    "Stay in this session?" -> "executing-plans" [label="no - parallel session"];
+    "Stay in this session?" -> "Inline execution (AGENTS.md fallback build path)" [label="no subagent tool"];
 }
 ```
 
-**vs. Executing Plans (parallel session):**
+**vs. inline execution (no subagents):**
 - Same session (no context switch)
 - Fresh subagent per task (no context pollution)
 - Review after each task (spec compliance + code quality), broad review at the end
@@ -88,7 +88,7 @@ digraph process {
     "Dispatch final code reviewer (../requesting-code-review/code-reviewer.md)" [shape=box];
     "Final findings? ONE fix dispatch, one scoped re-review, adjudicate residuals" [shape=box];
     "Final review clean: delete this plan's workspace" [shape=box];
-    "Use superpowers:finishing-a-development-branch" [shape=box style=filled fillcolor=lightgreen];
+    "Use finishing-a-development-branch (../finishing-a-development-branch/SKILL.md)" [shape=box style=filled fillcolor=lightgreen];
 
     "Setup: worktree, ledger check, read plan, pre-flight review" -> "Dispatch implementer subagent (./implementer-prompt.md)";
     "Dispatch implementer subagent (./implementer-prompt.md)" -> "Implementer asks questions?";
@@ -117,16 +117,18 @@ digraph process {
     "More tasks remain?" -> "Dispatch final code reviewer (../requesting-code-review/code-reviewer.md)" [label="no"];
     "Dispatch final code reviewer (../requesting-code-review/code-reviewer.md)" -> "Final findings? ONE fix dispatch, one scoped re-review, adjudicate residuals";
     "Final findings? ONE fix dispatch, one scoped re-review, adjudicate residuals" -> "Final review clean: delete this plan's workspace";
-    "Final review clean: delete this plan's workspace" -> "Use superpowers:finishing-a-development-branch";
+    "Final review clean: delete this plan's workspace" -> "Use finishing-a-development-branch (../finishing-a-development-branch/SKILL.md)";
 }
 ```
 
 ## Setup
 
 Ensure the work happens in an isolated workspace: use
-superpowers:using-git-worktrees to create one or verify the existing one.
-Never start implementation on a main/master branch without your human
-partner's explicit consent.
+[using-git-worktrees](../using-git-worktrees/SKILL.md) to create one or
+verify the existing one (in a cloud run, see
+[Running in a Cloud Agent](#running-in-a-cloud-agent)). Never start
+implementation on a main/master branch without your human partner's
+explicit consent.
 
 Conversation memory does not survive compaction. In real sessions,
 controllers that lost their place have re-dispatched entire completed task
@@ -450,7 +452,7 @@ branch started from, e.g. `git merge-base main HEAD`) and include the
 printed path in the final review dispatch, so the final reviewer reads
 one file instead of re-deriving the branch diff with git commands. Dispatch
 on the most capable available model (see Model Selection), using
-superpowers:requesting-code-review's
+[requesting-code-review](../requesting-code-review/SKILL.md)'s
 [code-reviewer.md](../requesting-code-review/code-reviewer.md). Point it at
 the ledger's deferred-minor and parked lines so it can triage which must be
 fixed before merge.
@@ -466,7 +468,8 @@ Adjudicate any residual findings as in the task loop's breaker: park with
 rulings, or rule on the load-bearing ones and ledger what you decided. Only
 the four classes above stop you here. There is no second fix wave —
 residual load-bearing findings surface to your human partner when
-finishing-a-development-branch presents the options.
+[finishing-a-development-branch](../finishing-a-development-branch/SKILL.md)
+presents the options.
 
 ## Finish
 
@@ -484,7 +487,42 @@ delete this plan's workspace (`rm -rf <workspace>`) — the git history is
 the record now. Sibling directories belong to other plans; leave them
 alone.
 
-Use superpowers:finishing-a-development-branch.
+Use [finishing-a-development-branch](../finishing-a-development-branch/SKILL.md).
+
+## Running in a Cloud Agent
+
+A cloud run is a session on a remote VM (Cursor Cloud Agents, or a chat or
+bot integration that starts one) with no human watching in real time. The
+VM has only what the repository commits: the skills, rules, and scripts
+under `.cursor/`, plus `AGENTS.md`. Nothing from anyone's local machine.
+
+- **Isolation:** the VM checkout is already isolated and disposable. Treat
+  the cloud run as the consent in using-git-worktrees Step 0 to work in
+  place: do not create a worktree. Work on the branch the harness checked
+  out, or create a feature branch — never commit to main/master.
+- **Scripts:** `scripts/sdd-workspace`, `scripts/task-brief`, and
+  `scripts/review-package` need only bash, git, awk, and coreutils. Run
+  them with `bash <path>` if the executable bit was lost.
+  `tests/scripts.test.sh` smoke-tests them.
+- **Subagents:** if the harness gives you a subagent / Task tool, run this
+  skill as written. If it does not, never fabricate a dispatch: use the
+  fallback build path the repo's `AGENTS.md` names (inline execution —
+  implement each task yourself in plan order, keep the same ledger, run the
+  tests each task names, then review the whole-branch package yourself
+  against [code-reviewer.md](../requesting-code-review/code-reviewer.md)).
+  Ledger `Ruling: no subagent tool — inline execution — weaker review than
+  fresh reviewers` and state the fallback in the PR body.
+- **Waiting:** ending your turn on a dispatched subagent still applies; a
+  cloud run gains nothing from timer waits.
+- **Finishing:** nobody is at the keyboard to pick from the
+  finishing-a-development-branch menu. The request that started the run is
+  the decision: push the feature branch and open a PR (option 2) unless the
+  request said otherwise. Never merge locally, merge the PR, push to
+  main/master, or discard in a cloud run. If no forge CLI (such as `gh`) is
+  installed, push the branch and report the compare URL, or let the
+  harness open the PR.
+- **Rulings:** put the "Rulings I made" list in the PR body as well as
+  your final message — the PR is what your human partner reads.
 
 ## Common Rationalizations
 
@@ -507,8 +545,8 @@ Use superpowers:finishing-a-development-branch.
 You: I'm using Subagent-Driven Development to execute this plan.
 
 [Setup: worktree verified]
-[Read plan file once: docs/superpowers/plans/feature-plan.md]
-[Resolve workspace: scripts/sdd-workspace docs/superpowers/plans/feature-plan.md — no ledger inside, fresh start]
+[Read plan file once: .cursor/plans/feature-plan.md]
+[Resolve workspace: scripts/sdd-workspace .cursor/plans/feature-plan.md — no ledger inside, fresh start]
 [Create todos for all tasks]
 
 Task 1: Hook installation script
@@ -517,7 +555,7 @@ Task 1: Hook installation script
 
 Implementer: "Before I begin - should the hook be installed at user or system level?"
 
-You: "User level (~/.config/superpowers/hooks/)"
+You: "User level (the plan's Global Constraints say so)"
 
 Implementer: [Later]
   - Implemented install-hook command
@@ -565,5 +603,5 @@ Final reviewer: All requirements met. Deferred minors triaged: none block merge.
 
 [Delete this plan's workspace — the record now lives in git]
 
-Done! Using superpowers:finishing-a-development-branch.
+Done! Using finishing-a-development-branch.
 ```

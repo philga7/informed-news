@@ -58,6 +58,29 @@ _legacy/
 
 Do **not** treat `_legacy/` (including `_legacy/mvp-web`) as the primary product UI.
 
+## Running in a Cloud Agent
+
+Cursor Cloud Agents (and bots that start them) run on a fresh Ubuntu VM with only what this repo commits. Every skill, rule, and script the SDD + ship flow uses lives under `.cursor/` — nothing comes from a local machine. Shared vs repo-specific files: [docs/PROPAGATING-SKILLS.md](docs/PROPAGATING-SKILLS.md).
+
+- **Node:** 22 (`.nvmrc`, same as CI). Check `node -v`; if it differs, `nvm install 22 && nvm use 22` when nvm is present, otherwise proceed and note the version in the PR.
+- **Install:** `.cursor/environment.json` runs `bash .cursor/cloud-agent-install.sh` at Build time: `npm ci`, `npm ci --prefix mvp/server`, then Bun 1.2.19 + `npm run install:kite` (Kite part is best-effort and warns). Re-run that script after switching to a branch that changes dependencies.
+- **No secrets:** there is no `mvp/.env` and no API keys. None of the test suites below need them. Do not start `npm run dev` (the refresh scheduler spends real CFP / search / Jev / Ollama budget); if you must run the server, set `REFRESH_INTERVAL_HOURS=off`.
+- **Test suites:**
+
+| Command | Needs | In PR CI |
+|---------|-------|----------|
+| `npm run typecheck`, `npm test`, `npm run test:kite` | Node only (hermetic) | Yes |
+| `bash .cursor/skills/subagent-driven-development/tests/scripts.test.sh` | bash, git, awk | Yes |
+| `npm ci --prefix _legacy/mvp-web && npm run build` | Node only | Yes |
+| `cd apps/kite && bun run check` / `bun run test:unit` / `bun run test:integration` | Bun + Kite install | No |
+| `npm run test:e2e:kite` | Bun + Kite install + Playwright Chromium (`npx playwright install --with-deps chromium`, needs sudo for system libs) | No |
+
+  No suite needs Docker; SearXNG (Docker), Ollama, and TypeSafe are runtime-only. If a suite can't run on the VM, say so under "Not verified in the cloud VM" in the PR body — the PR CI (`.github/workflows/ci.yml`) is the gate.
+- **`gh` may be missing:** check `command -v gh`. Without it, push the branch and use the harness's PR creation or `https://github.com/philga7/informed-news/compare/main...<branch>?expand=1`.
+- **MCP servers in `.cursor/mcp.json` are local-only:** Atlassian (OAuth), `jev` (key file under `~/.config/jev-mcp/`), `shrimp-task-manager` (local binary + local data dir), `cipher` (private endpoint). Expect them to be missing; Jira steps go in the PR body per `/news-ship-loop` § Cloud agent notes.
+- **Build path:** use `/subagent-driven-development` with subagents when the harness has a subagent / Task tool. Without one, use the ship loop's **focused build** (inline execution, same ledger, self-review with `.cursor/skills/requesting-code-review/code-reviewer.md`) and note that in the PR body's "Build path" section.
+- **Finish:** push the feat branch and open a PR; never merge or push to `main` from a cloud run.
+
 ## Agent responsibilities
 
 ### Code generation
@@ -136,6 +159,7 @@ Repo-local skills live under `.cursor/skills/` (see [docs/AGENT_SKILLS.md](docs/
 | `/prototype` | Throwaway code to answer one design/logic question | Sanity-check state model or UI variants |
 | `/image-to-code` | Generate/analyze design images, then match in code | Vision-led frontend from mocks/refs |
 | `/subagent-driven-development` | Fresh implementer subagent per task + review loop | Executing a **grilled** multi-step plan |
+| `/using-git-worktrees` · `/requesting-code-review` · `/finishing-a-development-branch` | SDD companions: isolation, final reviewer template, finish menu | Pulled in by SDD; `/news-ship-loop` decides how a branch ends here |
 | `/news-ship-loop` | NEWS Jira In Progress → PR/merge → Done + plan cleanup | Starting/finishing a NEWS-* item or merging its PR |
 | `/update-skills` | Check copied skills for freshness | Refreshing repo-local skills with the portable recipe |
 | `/agent-browser` | Scripted browser CLI (stub skill; install CLI separately) | Inspect/verify pages outside IDE browser |

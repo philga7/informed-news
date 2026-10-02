@@ -34,6 +34,9 @@ jobs:
       - name: Kite provenance tests
         run: npm run test:kite
 
+      - name: SDD skill scripts (Linux smoke test)
+        run: bash .cursor/skills/subagent-driven-development/tests/scripts.test.sh
+
       - name: Install & build archived React feed (Vercel artifact until hosting cutover)
         run: |
           npm ci --prefix _legacy/mvp-web

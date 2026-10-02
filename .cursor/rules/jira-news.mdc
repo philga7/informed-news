@@ -33,3 +33,4 @@ When creating, searching, updating, or commenting on Jira work for this repo, us
 - Pass `cloudId` on every Atlassian MCP call.
 - Do not use HARN, KIND, TASK, or SCRUM for Informed News work.
 - After editing `.cursor/mcp.json`, reload MCP / re-auth if tools show `needsAuth`.
+- Cloud Agents: the Atlassian MCP is OAuth-bound to a local Cursor session and is treated as unavailable. Do not fail the run over Jira; follow `.cursor/skills/news-ship-loop/SKILL.md` § Cloud agent notes.

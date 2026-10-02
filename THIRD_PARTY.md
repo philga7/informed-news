@@ -53,6 +53,42 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
+### superpowers agent skills (dev tooling)
+
+| Field | Value |
+|-------|-------|
+| Location | `.cursor/skills/subagent-driven-development/`, `.cursor/skills/using-git-worktrees/`, `.cursor/skills/requesting-code-review/`, `.cursor/skills/finishing-a-development-branch/` |
+| Upstream | https://github.com/obra/superpowers (`skills/<name>/`) |
+| License | MIT |
+| Copyright | Copyright (c) 2025 Jesse Vincent |
+| Lock | `skills-lock.json` → each skill name |
+
+`using-git-worktrees`, `requesting-code-review`, and `finishing-a-development-branch` are byte-identical to upstream. `subagent-driven-development` carries local edits (repo-relative skill links, no-timer waits, Cloud Agent section, `tests/`). The notice lives here so the folders need no in-folder `LICENSE`. Not part of the product build.
+
+```text
+MIT License
+
+Copyright (c) 2025 Jesse Vincent
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
 ### Remote data (optional / not the product default)
 
 Kite’s hosted application data at `https://kite.kagi.com` (e.g. `kite.json`) is licensed separately under [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/). It is **not** copied into this tree. The default Informed News path serves an **owned** brief from `mvp/server` ([docs/OWNED_BRIEF.md](docs/OWNED_BRIEF.md)). Opt in only via `KITE_API_BASE=https://kite.kagi.com/api` for private non-commercial UI experiments.
