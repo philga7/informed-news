@@ -11,7 +11,7 @@
       "source": "mattpocock/skills",
       "sourceType": "github",
       "skillPath": "skills/engineering/diagnosing-bugs/SKILL.md",
-      "computedHash": "37b5e9c624513551da790b52864dc8c84bff996a6d03a380cc6facdcc0a88354"
+      "computedHash": "b35c6a6e37c61ca3169532fbab2300dea26f2ad190e1d2dac065800b8b2bb0aa"
     },
     "find-skills": {
       "source": "vercel-labs/skills",
@@ -53,7 +53,7 @@
       "source": "jkudish/jev-mcp",
       "sourceType": "github",
       "skillPath": "skills/jev/SKILL.md",
-      "computedHash": "d836292154695500e81554806e3e7a0afdb386ce904dfbeb205e70b0f281e075"
+      "computedHash": "35b07d039dd4c887094980cd66d5cb8c7123fd765a60d4fe71993adcd0a98a67"
     },
     "mcp-builder": {
       "source": "anthropics/skills",

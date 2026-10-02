@@ -32,7 +32,7 @@ rg -n -i 'NEWS-|CURA-|EVAL-|KIN-|informed|kindling|course-evaluator|curator|/Use
 
 ### Local edits to `subagent-driven-development`
 
-`/update-skills` reports this skill as drifted from upstream. Refreshing it from upstream drops these edits; re-apply them afterwards:
+`/update-skills` always reports this skill as outdated. Don't refresh it with `apply.sh`, because that overwrites these edits. Last synced with obra/superpowers at `8ca22db`. To sync again, copy upstream's `scripts/` and prompt files unchanged, then three-way merge `SKILL.md` (`git merge-file`, with the previously vendored upstream copy as the base). After merging, check that upstream didn't overwrite item 3 without a conflict:
 
 1. `superpowers:using-git-worktrees`, `superpowers:requesting-code-review`, `superpowers:finishing-a-development-branch` → repo-relative links (`../<skill>/SKILL.md`).
 2. The `executing-plans` alternative → "Inline execution (AGENTS.md fallback build path)". `executing-plans` is not vendored: upstream it pulls in `writing-plans`, `test-driven-development`, `verification-before-completion`, `systematic-debugging`, `using-superpowers`, and its own scripts.
