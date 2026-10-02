@@ -36,7 +36,9 @@ Mid-epic: do not re-grill finished work. New discoveries → additional tickets 
 | `frontend-design` | Shape | [anthropics/skills](https://github.com/anthropics/skills) |
 | `prototype` | Shape | mattpocock/skills |
 | `image-to-code` | Shape | [leonxlnx/taste-skill](https://github.com/leonxlnx/taste-skill) |
-| `subagent-driven-development` | Build | [obra/superpowers](https://github.com/obra/superpowers) |
+| `subagent-driven-development` | Build | [obra/superpowers](https://github.com/obra/superpowers) (locally adapted — see [PROPAGATING-SKILLS.md](PROPAGATING-SKILLS.md)) |
+| `using-git-worktrees` · `requesting-code-review` · `finishing-a-development-branch` | Build (SDD companions) | obra/superpowers (unmodified) |
+| `verification-before-completion` | Build / Ship | obra/superpowers (unmodified) |
 | `news-ship-loop` | Ship | Informed News (repo-local) |
 | `update-skills` | Package / Maintain | Informed News (portable recipe) |
 | `agent-browser` | Verify | [vercel-labs/agent-browser](https://github.com/vercel-labs/agent-browser) |
@@ -55,7 +57,7 @@ npx skills add mattpocock/skills --skill grill-me --skill grilling --skill proto
 npx skills add anthropics/skills --skill frontend-design --skill skill-creator --skill mcp-builder -a cursor --copy -y
 npx skills add vercel-labs/agent-browser -a cursor --copy -y
 npx skills add https://github.com/Leonxlnx/taste-skill --skill image-to-code -a cursor --copy -y
-npx skills add obra/superpowers --skill subagent-driven-development -a cursor --copy -y
+npx skills add obra/superpowers --skill subagent-driven-development --skill using-git-worktrees --skill requesting-code-review --skill finishing-a-development-branch --skill verification-before-completion -a cursor --copy -y
 npx skills add jkudish/jev-mcp --skill jev -a cursor --copy -y
 ```
 
@@ -75,6 +77,8 @@ Normalize the `image-to-code` directory name to match frontmatter `name: image-t
 ### Refresh / update
 
 Re-run the same `npx skills add …` commands from the repo root, then re-consolidate into `.cursor/skills/` if needed. Commit the updated `skills-lock.json` (written by the CLI) alongside skill trees so the lockfile matches what’s installed.
+
+`subagent-driven-development` carries local edits (repo-relative companion-skill links, no-timer waits, Cloud Agent section, `tests/scripts.test.sh`), so `/update-skills` always reports it as drifted. Re-running the `obra/superpowers` line overwrites those edits — re-apply them afterwards (list in [PROPAGATING-SKILLS.md](PROPAGATING-SKILLS.md)).
 
 For repo-local freshness checks, prefer `/update-skills` as the check-then-ask path. The `update-skills` skill itself is copied with this recipe as part of the skill tree, not installed with `npx skills add`.
 
@@ -132,3 +136,4 @@ In Cursor Agent chat: `/skill-name` (e.g. `/grill-me`) or `@` attach. Model-invo
 - Product path: `npm run dev` → Kite Brief + `mvp/server`. Prototypes stay off that default entrypoint.
 - Skills do not replace [AGENTS.md](../AGENTS.md) rules or `.cursor/rules/`.
 - Ship ritual: `/news-ship-loop` + `.cursor/rules/news-ship-loop.mdc`.
+- Cloud Agents: [AGENTS.md](../AGENTS.md) § Running in a Cloud Agent; Jira steps move to the PR body (`/news-ship-loop` § Cloud agent notes).

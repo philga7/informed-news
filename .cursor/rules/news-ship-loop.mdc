@@ -8,3 +8,5 @@ alwaysApply: true
 For Informed News ticket lifecycle (In Progress → build → follow-up Jira gate → PR → squash-merge → Done → delete SDD plan), follow `.cursor/skills/news-ship-loop/SKILL.md`.
 
 Do not invent alternate Jira status or merge rituals. Push / open PR / merge to `main` only when the user asks. Propose leftover NEWS follow-ups and wait for confirm before creating issues.
+
+In a Cloud Agent (or whenever the Atlassian MCP is unavailable), follow the skill's **Cloud agent notes**: no Jira calls, Jira steps and follow-up proposals go in the PR body, push + PR but never merge.
