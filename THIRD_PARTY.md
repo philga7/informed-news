@@ -57,13 +57,13 @@ SOFTWARE.
 
 | Field | Value |
 |-------|-------|
-| Location | `.cursor/skills/subagent-driven-development/`, `.cursor/skills/using-git-worktrees/`, `.cursor/skills/requesting-code-review/`, `.cursor/skills/finishing-a-development-branch/` |
+| Location | `.cursor/skills/subagent-driven-development/`, `.cursor/skills/using-git-worktrees/`, `.cursor/skills/requesting-code-review/`, `.cursor/skills/finishing-a-development-branch/`, `.cursor/skills/verification-before-completion/` |
 | Upstream | https://github.com/obra/superpowers (`skills/<name>/`) |
 | License | MIT |
 | Copyright | Copyright (c) 2025 Jesse Vincent |
 | Lock | `skills-lock.json` → each skill name |
 
-`using-git-worktrees`, `requesting-code-review`, and `finishing-a-development-branch` are byte-identical to upstream. `subagent-driven-development` carries local edits (repo-relative skill links, no-timer waits, Cloud Agent section, `tests/`). The notice lives here so the folders need no in-folder `LICENSE`. Not part of the product build.
+`using-git-worktrees`, `requesting-code-review`, `finishing-a-development-branch`, and `verification-before-completion` are byte-identical to upstream. `subagent-driven-development` carries local edits (repo-relative skill links, no-timer waits, Cloud Agent section, `tests/`). The notice lives here so the folders need no in-folder `LICENSE`. Not part of the product build.
 
 ```text
 MIT License

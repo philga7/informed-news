@@ -137,7 +137,7 @@ You are in **cloud mode** when running as a Cursor Cloud Agent (remote Ubuntu VM
 | Push + PR | When the user asks | The request that started the run is the ask: push the feat branch and open a PR. **Never merge**, never push to `main` |
 | Plan delete after merge | On `main` after merge | Leave the plan; list "delete `.cursor/plans/<plan>.md` after merge" |
 
-**Build path:** use `/subagent-driven-development` when the harness has a subagent / Task tool. Otherwise use the **focused build** fallback: implement the plan's tasks yourself in order on the feat branch, keep the SDD ledger (`scripts/sdd-workspace`), run the test commands each task names, then review the whole branch yourself against `.cursor/skills/requesting-code-review/code-reviewer.md` using `scripts/review-package`. State which path ran in the PR body.
+**Build path:** use `/subagent-driven-development` when the harness has a subagent / Task tool. Otherwise use the **focused build** fallback: implement the plan's tasks yourself in order on the feat branch, keep the SDD ledger (`scripts/sdd-workspace`), run the test commands each task names, then review the whole branch yourself against `.cursor/skills/requesting-code-review/code-reviewer.md` using `scripts/review-package`. State which path ran in the PR body. Either path: apply `/verification-before-completion` before opening the PR — every Test plan checkbox comes from a command run in this session.
 
 **PR body additions (cloud mode):**
 

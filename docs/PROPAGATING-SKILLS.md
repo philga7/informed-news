@@ -14,6 +14,7 @@ These files never name a repo, tracker key, test command, or local path. Anythin
 | `.cursor/skills/using-git-worktrees/SKILL.md` | obra/superpowers `skills/using-git-worktrees` | Unmodified |
 | `.cursor/skills/requesting-code-review/SKILL.md`, `code-reviewer.md` | obra/superpowers `skills/requesting-code-review` | Unmodified |
 | `.cursor/skills/finishing-a-development-branch/SKILL.md` | obra/superpowers `skills/finishing-a-development-branch` | Unmodified |
+| `.cursor/skills/verification-before-completion/SKILL.md` | obra/superpowers `skills/verification-before-completion` | Unmodified |
 | `.cursor/rules/no-subagent-timers.mdc` | Repo-local | End the turn on background subagents; no timer waits |
 | `docs/PROPAGATING-SKILLS.md` | Repo-local | This page |
 
@@ -25,6 +26,7 @@ Portability check (should print nothing):
 rg -n -i 'NEWS-|CURA-|EVAL-|KIN-|informed|kindling|course-evaluator|curator|/Users/|superpowers:' \
   .cursor/skills/subagent-driven-development .cursor/skills/using-git-worktrees \
   .cursor/skills/requesting-code-review .cursor/skills/finishing-a-development-branch \
+  .cursor/skills/verification-before-completion \
   .cursor/rules/no-subagent-timers.mdc
 ```
 
@@ -38,6 +40,7 @@ rg -n -i 'NEWS-|CURA-|EVAL-|KIN-|informed|kindling|course-evaluator|curator|/Use
 4. `## Running in a Cloud Agent` section.
 5. Example paths neutralized (`.cursor/plans/…`, no `~/` paths).
 6. `tests/scripts.test.sh`.
+7. Cloud section points at `verification-before-completion` (fallback path and before the PR).
 
 ## Repo-specific — adapt in each repo
 
@@ -47,7 +50,7 @@ rg -n -i 'NEWS-|CURA-|EVAL-|KIN-|informed|kindling|course-evaluator|curator|/Use
 | `.cursor/rules/<prefix>-ship-loop.mdc`, `.cursor/rules/jira-<prefix>.mdc` | One-line pointer to the ship loop's Cloud agent notes |
 | `AGENTS.md` § Running in a Cloud Agent | Runtime version, install command, test-suite table (what needs Docker / services / devices, what CI gates), `gh` fallback, local-only MCP servers, SDD build-path fallback |
 | `.cursor/environment.json` + `.cursor/cloud-agent-install.sh` | Idempotent install for the Cloud Agent Build (runs from the repo root) |
-| `skills-lock.json` | Add `using-git-worktrees`, `requesting-code-review`, `finishing-a-development-branch` (same entries as here) |
+| `skills-lock.json` | Add `using-git-worktrees`, `requesting-code-review`, `finishing-a-development-branch`, `verification-before-completion` (same entries as here) |
 | `docs/AGENT_SKILLS.md` | Inventory rows + the `npx skills add obra/superpowers …` line |
 | CI workflow | Add the `scripts.test.sh` step if the repo has CI |
 | `THIRD_PARTY.md` | superpowers MIT notice, if the repo keeps one |
@@ -72,14 +75,14 @@ From the target repo's root, with `informed-news` as the source:
 
 ```bash
 SRC=../informed-news
-for p in subagent-driven-development using-git-worktrees requesting-code-review finishing-a-development-branch; do
+for p in subagent-driven-development using-git-worktrees requesting-code-review finishing-a-development-branch verification-before-completion; do
   rm -rf ".cursor/skills/$p"
   cp -R "$SRC/.cursor/skills/$p" ".cursor/skills/$p"
 done
 cp "$SRC/.cursor/rules/no-subagent-timers.mdc" .cursor/rules/
 cp "$SRC/docs/PROPAGATING-SKILLS.md" docs/
 bash .cursor/skills/subagent-driven-development/tests/scripts.test.sh
-for p in subagent-driven-development using-git-worktrees requesting-code-review finishing-a-development-branch; do
+for p in subagent-driven-development using-git-worktrees requesting-code-review finishing-a-development-branch verification-before-completion; do
   diff -r "$SRC/.cursor/skills/$p" ".cursor/skills/$p"
 done
 ```

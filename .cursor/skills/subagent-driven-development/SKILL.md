@@ -510,14 +510,18 @@ under `.cursor/`, plus `AGENTS.md`. Nothing from anyone's local machine.
   implement each task yourself in plan order, keep the same ledger, run the
   tests each task names, then review the whole-branch package yourself
   against [code-reviewer.md](../requesting-code-review/code-reviewer.md)).
-  Ledger `Ruling: no subagent tool — inline execution — weaker review than
-  fresh reviewers` and state the fallback in the PR body.
+  Apply [verification-before-completion](../verification-before-completion/SKILL.md)
+  before each task's completion line. Ledger `Ruling: no subagent tool —
+  inline execution — weaker review than fresh reviewers` and state the
+  fallback in the PR body.
 - **Waiting:** ending your turn on a dispatched subagent still applies; a
   cloud run gains nothing from timer waits.
 - **Finishing:** nobody is at the keyboard to pick from the
   finishing-a-development-branch menu. The request that started the run is
   the decision: push the feature branch and open a PR (option 2) unless the
-  request said otherwise. Never merge locally, merge the PR, push to
+  request said otherwise. Apply
+  [verification-before-completion](../verification-before-completion/SKILL.md)
+  first: every claim in the PR's test plan comes from a command you ran. Never merge locally, merge the PR, push to
   main/master, or discard in a cloud run. If no forge CLI (such as `gh`) is
   installed, push the branch and report the compare URL, or let the
   harness open the PR.
