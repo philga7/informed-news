@@ -15,6 +15,10 @@ import {
 	BRIEF_SUMMARY_NOT_IN_BRIEF,
 	BRIEF_SUMMARY_RATE_LIMITED,
 	BRIEF_SUMMARY_UNAVAILABLE,
+	LESS_LIKE_THIS_ERROR,
+	LESS_LIKE_THIS_NAME_MAX,
+	LESS_LIKE_THIS_NO_OUTLET,
+	LESS_LIKE_THIS_NOT_STORED,
 	applyFullStory,
 	autoFullStoryRequestKeys,
 	createSeenBatcher,
@@ -25,6 +29,9 @@ import {
 	isOfficialStory,
 	isRecoverableRefreshFailure,
 	lastSuccessAt,
+	lessLikeThisErrorCopy,
+	lessLikeThisSubjectDefault,
+	lessLikeThisSubjectRequest,
 	moreLabel,
 	newlyExpandedKeys,
 	newlyReadIds,
@@ -34,6 +41,7 @@ import {
 	postBriefRefresh,
 	postBriefSeen,
 	postFullStory,
+	postLessLikeThis,
 	postStorySummary,
 	quietLine,
 	refreshPollOutcome,
@@ -556,6 +564,110 @@ describe('client fetch helpers', () => {
 			ok: false,
 			status: 500,
 			error: 'CFP down',
+		});
+	});
+});
+
+describe('Less like this', () => {
+	const topic = { id: 't9', kind: 'undesired', name: 'example.com', keywords: ['example.com'] };
+
+	it('postLessLikeThis posts the body to the encoded story route and maps 201 created', async () => {
+		const fetchFn = vi.fn(async () =>
+			jsonResponse(201, { ok: true, created: true, topic: { ...topic, name: 'Tariff talk' }, topics: [] }),
+		);
+		const body = { kind: 'subject' as const, name: 'Tariff talk', keywords: ['tariffs'] };
+		expect(await postLessLikeThis('a/b', body, fetchFn as unknown as typeof fetch)).toEqual({
+			ok: true,
+			created: true,
+			topicName: 'Tariff talk',
+		});
+		const [url, init] = fetchFn.mock.calls[0] as unknown as [string, RequestInit];
+		expect(url).toBe('/api/brief/stories/a%2Fb/less-like-this');
+		expect(init.method).toBe('POST');
+		expect(init.credentials).toBe('include');
+		expect(JSON.parse(init.body as string)).toEqual(body);
+	});
+
+	it('postLessLikeThis maps 200 already blocked to created false', async () => {
+		const fetchFn = vi.fn(async () =>
+			jsonResponse(200, { ok: true, created: false, topic, topics: [topic] }),
+		);
+		expect(
+			await postLessLikeThis('a', { kind: 'outlet' }, fetchFn as unknown as typeof fetch),
+		).toEqual({ ok: true, created: false, topicName: 'example.com' });
+	});
+
+	it('postLessLikeThis passes 400 / 404 / 409 error codes through', async () => {
+		for (const [status, error] of [
+			[400, 'no_outlet'],
+			[404, 'story_not_found'],
+			[409, 'A topic named "x" already exists'],
+		] as const) {
+			const fetchFn = vi.fn(async () => jsonResponse(status, { ok: false, error }));
+			expect(
+				await postLessLikeThis('a', { kind: 'outlet' }, fetchFn as unknown as typeof fetch),
+			).toEqual({ ok: false, unauthenticated: false, error });
+		}
+	});
+
+	it('postLessLikeThis flags 401 and maps network failure and malformed bodies to a blank error', async () => {
+		const unauth = vi.fn(async () => jsonResponse(401, { error: 'Unauthorized' }));
+		expect(
+			await postLessLikeThis('a', { kind: 'outlet' }, unauth as unknown as typeof fetch),
+		).toMatchObject({ ok: false, unauthenticated: true });
+
+		const offline = vi.fn(async () => {
+			throw new Error('offline');
+		});
+		expect(
+			await postLessLikeThis('a', { kind: 'outlet' }, offline as unknown as typeof fetch),
+		).toEqual({ ok: false, unauthenticated: false, error: '' });
+
+		const malformed = vi.fn(async () => jsonResponse(201, { ok: true }));
+		expect(
+			await postLessLikeThis('a', { kind: 'outlet' }, malformed as unknown as typeof fetch),
+		).toEqual({ ok: false, unauthenticated: false, error: '' });
+	});
+
+	it('lessLikeThisErrorCopy maps known codes, else the server message, else a generic retry', () => {
+		expect(lessLikeThisErrorCopy('no_outlet')).toBe(LESS_LIKE_THIS_NO_OUTLET);
+		expect(lessLikeThisErrorCopy('story_not_found')).toBe(LESS_LIKE_THIS_NOT_STORED);
+		expect(lessLikeThisErrorCopy('name must be at most 80 characters')).toBe(
+			'name must be at most 80 characters',
+		);
+		expect(lessLikeThisErrorCopy('')).toBe(LESS_LIKE_THIS_ERROR);
+		expect(lessLikeThisErrorCopy(undefined)).toBe(LESS_LIKE_THIS_ERROR);
+	});
+
+	it('lessLikeThisSubjectDefault trims and keeps titles up to the name cap', () => {
+		expect(lessLikeThisSubjectDefault({ title: '  Short headline  ' })).toBe('Short headline');
+		const exact = 'x'.repeat(LESS_LIKE_THIS_NAME_MAX);
+		expect(lessLikeThisSubjectDefault({ title: exact })).toBe(exact);
+	});
+
+	it('lessLikeThisSubjectDefault cuts long titles on a word boundary, or hard-cuts without one', () => {
+		const words = `${'word '.repeat(15)}tail end here`;
+		const cut = lessLikeThisSubjectDefault({ title: words });
+		expect(cut.length).toBeLessThanOrEqual(LESS_LIKE_THIS_NAME_MAX);
+		expect(cut).toBe(`${'word '.repeat(15)}tail`);
+
+		const spaceAtCap = `${'a'.repeat(LESS_LIKE_THIS_NAME_MAX)} next`;
+		expect(lessLikeThisSubjectDefault({ title: spaceAtCap })).toBe('a'.repeat(LESS_LIKE_THIS_NAME_MAX));
+
+		const noSpace = 'y'.repeat(LESS_LIKE_THIS_NAME_MAX + 20);
+		expect(lessLikeThisSubjectDefault({ title: noSpace })).toBe('y'.repeat(LESS_LIKE_THIS_NAME_MAX));
+	});
+
+	it('lessLikeThisSubjectRequest sends the title as description and omits blank fields', () => {
+		expect(lessLikeThisSubjectRequest(' Tariffs ', 'tariffs, Tariffs, steel', ' A headline ')).toEqual({
+			kind: 'subject',
+			name: 'Tariffs',
+			keywords: ['tariffs', 'steel'],
+			description: 'A headline',
+		});
+		expect(lessLikeThisSubjectRequest('Tariffs', ' , ', '  ')).toEqual({
+			kind: 'subject',
+			name: 'Tariffs',
 		});
 	});
 });
