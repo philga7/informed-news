@@ -15,6 +15,7 @@ function story(id: string, overrides: Partial<BriefStory> = {}): BriefStory {
     title: id,
     link: `https://example.com/${id}`,
     domain: 'example.com',
+    publisherDomain: 'example.com',
     publishedAt: AT,
     fetchedAt: AT,
     outletCount: 3,

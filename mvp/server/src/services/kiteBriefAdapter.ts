@@ -86,6 +86,8 @@ export type KiteBriefStory = {
   informed_full_story_status?: 'missing' | 'ok' | 'unavailable' | 'error';
   /** Plain-language living-update note, when the cached full story changed. */
   informed_full_story_updated?: string;
+  /** Kept article's normalized publisher domain ("Less like this" outlet block, NEWS-90). */
+  informed_publisher_domain?: string;
 };
 
 export type KiteBatchInfo = {
@@ -714,6 +716,9 @@ function topicStoryToKite(
   };
   if (domains.length > 0) {
     kite.domains = domains.map((name) => ({ name }));
+  }
+  if (story.publisherDomain) {
+    kite.informed_publisher_domain = story.publisherDomain;
   }
   const imageUrl = story.imageUrl?.trim();
   if (imageUrl) {

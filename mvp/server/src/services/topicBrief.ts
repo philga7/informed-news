@@ -25,7 +25,7 @@ import {
   SUMMARY_SOURCE_MAX_CHARS,
 } from './briefConfig.js';
 import { TRIAGE_WINDOW_HOURS } from './triageConfig.js';
-import { muteReason } from './triageKeywords.js';
+import { muteReason, normalizeOutletDomain } from './triageKeywords.js';
 
 export type BriefLink = {
   title: string;
@@ -47,6 +47,8 @@ export type BriefStory = {
   title: string;
   link: string;
   domain: string | null;
+  /** Kept article's `publisherDomain`, normalized; no URL fallback (outlet blocks match on it) */
+  publisherDomain: string | null;
   publishedAt: string | null;
   fetchedAt: string;
   outletCount: number;
@@ -340,6 +342,7 @@ export function composeTopicBrief(input: ComposeTopicBriefInput): TopicBrief {
         title: article.title,
         link: articleLink(article),
         domain: articleDomain(article),
+        publisherDomain: normalizeOutletDomain(article.publisherDomain),
         publishedAt: article.publishedAt,
         fetchedAt: article.fetchedAt,
         outletCount: record.outletCount ?? 1,

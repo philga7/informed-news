@@ -36,7 +36,7 @@ import {
 } from './triageConfig.js';
 import { groupCandidates, outletCount, type DedupeCandidate, type DedupeGroup } from './triageDedupe.js';
 import { judgeTriage, type TriageJevContext, type TriageVerdict } from './triageJev.js';
-import { candidateTopicIds, muteReason } from './triageKeywords.js';
+import { candidateTopicIds, isOutletOnlyTopic, muteReason } from './triageKeywords.js';
 import { prepareSurvivor } from './triageSurvivor.js';
 import { getTypeSafeClient } from './typesafeClient.js';
 
@@ -446,7 +446,9 @@ export async function runTriage(
       changed: new Map(),
       errors: meta.errors,
       desiredById: new Map(desired.map((t) => [t.id, t])),
-      undesired: undesired.slice(0, TRIAGE_MAX_UNDESIRED_TOPICS),
+      undesired: undesired
+        .filter((t) => !isOutletOnlyTopic(t))
+        .slice(0, TRIAGE_MAX_UNDESIRED_TOPICS),
       judge: deps.judge ?? judgeTriage,
       prepare: deps.prepareSurvivor ?? prepareSurvivor,
     };

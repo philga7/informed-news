@@ -406,6 +406,7 @@ test('story fields: link, domain, labels, image, outletCount', () => {
   const story = brief.sections[0]!.stories[0]!;
   assert.equal(story.link, 'https://www.cfp.example/item/1');
   assert.equal(story.domain, 'cfp.example');
+  assert.equal(story.publisherDomain, null);
   assert.deepEqual(story.labels, ['official']);
   assert.equal(story.outletCount, 3);
   assert.equal(story.title, 'Headline a1');
@@ -413,6 +414,15 @@ test('story fields: link, domain, labels, image, outletCount', () => {
     [story.imageUrl, story.imageCaption, story.imageCredit],
     ['https://img.example/1.jpg', 'cap', 'credit'],
   );
+});
+
+test('story publisherDomain: kept article publisherDomain, normalized', () => {
+  const brief = compose({
+    topics: [makeTopic('c1')],
+    articles: [makeArticle('a1', { publisherDomain: ' WWW.News.Example.com ' })],
+    triage: triageOf(kept('a1', ['c1'])),
+  });
+  assert.equal(brief.sections[0]!.stories[0]!.publisherDomain, 'news.example.com');
 });
 
 test('links: kept article first, duplicate members in memberIds order, distinct domains, capped', () => {

@@ -116,6 +116,13 @@ export type {
   SummarizeBriefStoryResult,
 } from './briefSummaries.js';
 export {
+  LESS_LIKE_THIS_KIND_ERROR,
+  lessLikeThis,
+  lessLikeThisNotes,
+  OUTLET_BLOCK_DESCRIPTION,
+} from './briefLessLikeThis.js';
+export type { LessLikeThisDeps, LessLikeThisResult } from './briefLessLikeThis.js';
+export {
   createFullStoryOnDemandLimiter,
   generateFullStory,
   generateRefreshFullStories,

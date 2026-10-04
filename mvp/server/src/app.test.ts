@@ -1072,6 +1072,167 @@ test('DELETE /api/topics/:id removes a topic idempotently', async () => {
   }
 });
 
+// --- Less like this (NEWS-90) ----------------------------------------------
+
+type LessLikeThisBody = {
+  ok: boolean;
+  created?: boolean;
+  error?: string;
+  topic?: TopicBody & { keywords: string[]; description: string; notes: string };
+  topics?: TopicBody[];
+};
+
+async function startLessLikeThisServer(
+  articles: Article[],
+  overrides: Partial<CreateAppDeps> = {},
+): Promise<{ baseUrl: string; close: () => Promise<void> }> {
+  process.env.SESSION_SECRET = 'test-secret';
+  process.env.MVP_PASSWORD = 'pw';
+  delete process.env.MVP_PASSWORD_HASH;
+
+  const topicsPath = tempTopicsPath();
+  const { createApp } = await import('./app.js');
+  const app = createApp({
+    readArticles: async () => articles,
+    readTopics: async () => await readTopics({ topicsPath }),
+    createTopic: async (fields) => await createTopic(fields, { topicsPath }),
+    ...overrides,
+  });
+  return await startServer(app);
+}
+
+function postLessLikeThis(baseUrl: string, articleId: string, body: unknown, cookie?: string) {
+  return fetch(`${baseUrl}/api/brief/stories/${encodeURIComponent(articleId)}/less-like-this`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...(cookie ? { cookie } : {}) },
+    body: JSON.stringify(body),
+  });
+}
+
+function lessArticles(): Article[] {
+  return [
+    briefArticle('mail', { title: 'Royal row deepens', publisherDomain: 'www.dailymail.co.uk' }),
+    briefArticle('usmail', { title: 'US edition story', publisherDomain: 'us.dailymail.co.uk' }),
+    briefArticle('nodomain', { publisherDomain: null }),
+    briefArticle('long', { title: 'L'.repeat(600) }),
+  ];
+}
+
+test('POST /api/brief/stories/:articleId/less-like-this requires session', async () => {
+  const { baseUrl, close } = await startLessLikeThisServer(lessArticles());
+  try {
+    const resp = await postLessLikeThis(baseUrl, 'mail', { kind: 'outlet' });
+    assert.equal(resp.status, 401);
+  } finally {
+    await close();
+  }
+});
+
+test('POST /api/brief/stories/:articleId/less-like-this 400s bad kind and no outlet, 404s unknown stories', async () => {
+  const { baseUrl, close } = await startLessLikeThisServer(lessArticles());
+  try {
+    const cookie = await login(baseUrl);
+    for (const body of [{}, { kind: 'mute' }, { kind: 'OUTLET' }]) {
+      const resp = await postLessLikeThis(baseUrl, 'mail', body, cookie);
+      assert.equal(resp.status, 400);
+      assert.deepEqual(await resp.json(), { ok: false, error: 'kind must be outlet or subject' });
+    }
+
+    const missing = await postLessLikeThis(baseUrl, 'no-such-story', { kind: 'outlet' }, cookie);
+    assert.equal(missing.status, 404);
+    assert.deepEqual(await missing.json(), { ok: false, error: 'story_not_found' });
+
+    const noOutlet = await postLessLikeThis(baseUrl, 'nodomain', { kind: 'outlet' }, cookie);
+    assert.equal(noOutlet.status, 400);
+    assert.deepEqual(await noOutlet.json(), { ok: false, error: 'no_outlet' });
+  } finally {
+    await close();
+  }
+});
+
+test('POST /api/brief/stories/:articleId/less-like-this outlet creates a block once, then dedupes', async () => {
+  const { baseUrl, close } = await startLessLikeThisServer(lessArticles());
+  try {
+    const cookie = await login(baseUrl);
+    const first = await postLessLikeThis(baseUrl, 'mail', { kind: 'outlet' }, cookie);
+    assert.equal(first.status, 201);
+    const created = (await first.json()) as LessLikeThisBody;
+    assert.equal(created.ok, true);
+    assert.equal(created.created, true);
+    assert.equal(created.topic!.name, 'dailymail.co.uk');
+    assert.equal(created.topic!.kind, 'undesired');
+    assert.deepEqual(created.topic!.keywords, ['dailymail.co.uk']);
+    assert.equal(created.topic!.description, 'Outlet blocked from the Brief.');
+    assert.equal(created.topic!.notes, 'Added with Less like this on: Royal row deepens');
+    assert.ok(created.topics!.some((t) => t.id === created.topic!.id));
+    assert.ok((await listTopics(baseUrl, cookie)).some((t) => t.id === created.topic!.id));
+
+    for (const id of ['mail', 'usmail']) {
+      const again = await postLessLikeThis(baseUrl, id, { kind: 'outlet' }, cookie);
+      assert.equal(again.status, 200);
+      const body = (await again.json()) as LessLikeThisBody;
+      assert.equal(body.ok, true);
+      assert.equal(body.created, false);
+      assert.equal(body.topic!.id, created.topic!.id);
+      assert.equal(body.topics!.length, created.topics!.length);
+    }
+  } finally {
+    await close();
+  }
+});
+
+test('POST /api/brief/stories/:articleId/less-like-this subject creates an undesired topic; validation and conflicts map to 400 / 409', async () => {
+  const { baseUrl, close } = await startLessLikeThisServer(lessArticles());
+  try {
+    const cookie = await login(baseUrl);
+    const resp = await postLessLikeThis(
+      baseUrl,
+      'long',
+      { kind: 'subject', name: 'Royal family', keywords: ['royal'], description: 'Palace news' },
+      cookie,
+    );
+    assert.equal(resp.status, 201);
+    const body = (await resp.json()) as LessLikeThisBody;
+    assert.equal(body.created, true);
+    assert.equal(body.topic!.name, 'Royal family');
+    assert.equal(body.topic!.kind, 'undesired');
+    assert.equal(body.topic!.level, null);
+    assert.deepEqual(body.topic!.keywords, ['royal']);
+    assert.equal(body.topic!.description, 'Palace news');
+    assert.equal(body.topic!.notes.length, 500);
+    assert.ok(body.topic!.notes.startsWith('Added with Less like this on: LLL'));
+    assert.ok(body.topic!.notes.endsWith('L…'));
+
+    const invalid = await postLessLikeThis(baseUrl, 'mail', { kind: 'subject', name: '' }, cookie);
+    assert.equal(invalid.status, 400);
+    assert.deepEqual(await invalid.json(), { ok: false, error: 'name is required' });
+
+    const dup = await postLessLikeThis(baseUrl, 'mail', { kind: 'subject', name: 'royal FAMILY' }, cookie);
+    assert.equal(dup.status, 409);
+    const dupBody = (await dup.json()) as LessLikeThisBody;
+    assert.equal(dupBody.ok, false);
+    assert.match(dupBody.error!, /already exists/);
+  } finally {
+    await close();
+  }
+});
+
+test('POST /api/brief/stories/:articleId/less-like-this store write failure → 500', async () => {
+  const { baseUrl, close } = await startLessLikeThisServer(lessArticles(), {
+    createTopic: async () => {
+      throw new Error('disk full');
+    },
+  });
+  try {
+    const cookie = await login(baseUrl);
+    const resp = await postLessLikeThis(baseUrl, 'mail', { kind: 'outlet' }, cookie);
+    assert.equal(resp.status, 500);
+    assert.deepEqual(await resp.json(), { ok: false, error: 'disk full' });
+  } finally {
+    await close();
+  }
+});
+
 test('GET /api/batches/latest/claims returns empty array when no claims are accepted', async () => {
   const app = express();
   app.use(

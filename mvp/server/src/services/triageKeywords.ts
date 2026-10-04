@@ -54,16 +54,33 @@ function topicMatchesText(topic: Topic, text: string, options: KeywordMatchOptio
   );
 }
 
-function isOutletKeyword(keyword: string): boolean {
+/** Trimmed, lowercased, leading `www.` stripped; empty → null. */
+export function normalizeOutletDomain(raw: string | null | undefined): string | null {
+  const domain = raw?.trim().toLowerCase().replace(/^www\./, '');
+  return domain ? domain : null;
+}
+
+/** A keyword containing `.` and no whitespace is an outlet block, not a headline keyword. */
+export function isOutletKeyword(keyword: string): boolean {
   return keyword.includes('.') && !/\s/.test(keyword);
 }
 
-function topicBlocksOutlet(topic: Topic, publisherDomain: string | null): boolean {
-  const domain = publisherDomain?.trim().toLowerCase();
+/** Undesired topic with ≥1 keyword, every one an outlet keyword. */
+export function isOutletOnlyTopic(topic: Topic): boolean {
+  return (
+    topic.kind === 'undesired' &&
+    topic.keywords.length > 0 &&
+    topic.keywords.every((keyword) => isOutletKeyword(keyword.trim()))
+  );
+}
+
+/** An outlet keyword on the topic equals the domain or is a parent domain of it. */
+export function topicBlocksOutlet(topic: Topic, publisherDomain: string | null): boolean {
+  const domain = normalizeOutletDomain(publisherDomain);
   if (!domain) return false;
   return topic.keywords.some((raw) => {
-    const keyword = raw.trim().toLowerCase().replace(/^www\./, '');
-    if (!isOutletKeyword(keyword)) return false;
+    const keyword = normalizeOutletDomain(raw);
+    if (!keyword || !isOutletKeyword(keyword)) return false;
     return domain === keyword || domain.endsWith(`.${keyword}`);
   });
 }

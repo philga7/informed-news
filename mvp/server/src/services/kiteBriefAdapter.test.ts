@@ -569,6 +569,7 @@ function briefStory(
     title: `Headline ${articleId}`,
     link: `https://${articleId}.example.com/story`,
     domain: `${articleId}.example.com`,
+    publisherDomain: `${articleId}.example.com`,
     publishedAt: '2026-09-30T10:00:00.000Z',
     fetchedAt: '2026-09-30T10:05:00.000Z',
     outletCount: 1,
@@ -693,6 +694,7 @@ test('topicBriefToKiteStories maps Brief order, cluster numbers, fields and glue
   assert.equal(a1.informed_outlet_count, 3);
   assert.deepEqual(a1.informed_labels, ['official']);
   assert.equal(a1.informed_summary_status, 'ok');
+  assert.equal(a1.informed_publisher_domain, 'a1.example.com');
 
   const [, a2, a3, a4, b1] = stories;
   assert.equal(a2!.short_summary, '');
@@ -708,6 +710,17 @@ test('topicBriefToKiteStories maps Brief order, cluster numbers, fields and glue
     assert.equal(story.perspectives, undefined);
     assert.equal(story.quote, undefined);
   }
+});
+
+test('topicBriefToKiteStories omits informed_publisher_domain when the story has none', () => {
+  const brief: TopicBrief = {
+    boundaryAt: null,
+    sections: [{ topic: CORE, stories: [briefStory('nodomain', { publisherDomain: null })] }],
+    quiet: [],
+  };
+  const [story] = topicBriefToKiteStories(brief);
+  assert.ok(story);
+  assert.equal('informed_publisher_domain' in story, false);
 });
 
 test('topicBriefToKiteStories hydrates cached full stories and reports cache states', () => {
