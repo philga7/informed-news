@@ -33,6 +33,8 @@ describe('NEWS-43 MVP API compat surface', () => {
 		assert.match(src, /app\.post\('\/api\/topics'/);
 		assert.match(src, /app\.patch\('\/api\/topics\/:id'/);
 		assert.match(src, /app\.delete\('\/api\/topics\/:id'/);
+		assert.match(src, /app\.get\('\/api\/triage\/filtered'/);
+		assert.match(src, /app\.post\('\/api\/brief\/stories\/:articleId\/less-like-this'/);
 		assert.match(src, /hiddenMutedCount/);
 		assert.match(src, /requireApiSession/);
 		assert.match(src, /createKiteBriefRouter/);
@@ -67,6 +69,9 @@ describe('NEWS-43 MVP API compat surface', () => {
 		assert.match(doc, /POST \| `\/api\/topics`/);
 		assert.match(doc, /PATCH \| `\/api\/topics\/:id`/);
 		assert.match(doc, /DELETE \| `\/api\/topics\/:id`/);
+		assert.match(doc, /GET \| `\/api\/triage\/filtered`/);
+		assert.match(doc, /POST \| `\/api\/brief\/stories\/:articleId\/less-like-this`/);
+		assert.match(doc, /filteredOut/);
 		assert.match(doc, /hiddenMutedCount/);
 		assert.match(doc, /muted/);
 		assert.match(doc, /pendingUpdate/);
