@@ -852,6 +852,8 @@ export type BriefOverview = {
     moreIds: string[];
   }>;
   quiet: BriefTopicRef[];
+  /** Dropped by the last triage run; null when none ran or it was skipped */
+  filteredOut: number | null;
 };
 
 function nextRefreshAt(
@@ -883,6 +885,7 @@ export function buildBriefOverview(input: {
 }): BriefOverview {
   const last = input.meta.refresh?.last ?? null;
   const lastSuccess = input.meta.refresh?.lastSuccess ?? null;
+  const triage = input.meta.triage ?? null;
   const notices = [
     ...buildRefreshNotices(input.meta),
     ...(input.degraded ?? []).map((store) => DEGRADED_NOTICES[store]),
@@ -906,5 +909,6 @@ export function buildBriefOverview(input: {
       moreIds: section.stories.filter((s) => s.more).map((s) => s.articleId),
     })),
     quiet: [...(input.brief?.quiet ?? [])],
+    filteredOut: triage && !triage.skipped ? triage.dropped : null,
   };
 }

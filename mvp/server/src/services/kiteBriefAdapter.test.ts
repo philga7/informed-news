@@ -23,6 +23,7 @@ import {
 } from './kiteBriefAdapter.js';
 import type { StoreMeta } from '../types/article.js';
 import type { RefreshRun } from '../types/brief.js';
+import type { TriageRunMeta } from '../types/triage.js';
 import type { BriefStory, TopicBrief } from './topicBrief.js';
 import type { BriefFullStoryRecord } from '../types/briefFullStory.js';
 
@@ -823,6 +824,7 @@ test('buildBriefOverview: sections with More split, quiet, notices, nextAt, runn
       { topicId: 't2', name: 'Gas prices', level: 'watch', storyIds: ['b1'], moreIds: [] },
     ],
     quiet: [{ id: 't3', name: 'Palantir', level: 'watch' }],
+    filteredOut: null,
   });
 
   const disabled = buildBriefOverview({ brief: topicBrief(), meta, intervalHours: null, running: false });
@@ -854,6 +856,28 @@ test('buildBriefOverview: sections with More split, quiet, notices, nextAt, runn
     'Read history unavailable (brief-seen.json unreadable)',
     'Saved summaries unavailable (brief-summaries.json unreadable)',
   ]);
+});
+
+test('buildBriefOverview: filteredOut from the last triage run; null when skipped or none', () => {
+  const triage: TriageRunMeta = {
+    at: '2026-09-30T11:00:00.000Z',
+    skipped: false,
+    candidates: 9,
+    kept: 2,
+    dropped: 7,
+    byReason: { off_topic: 7 },
+    jev: { budget: 300, used: 0, errors: 0 },
+    summaryBudget: 60,
+    errors: [],
+  };
+  const overview = (meta: StoreMeta) =>
+    buildBriefOverview({ brief: topicBrief(), meta, intervalHours: 3, running: false });
+  const base = { lastFetchAt: null, lastError: null };
+  assert.equal(overview({ ...base, triage }).filteredOut, 7);
+  assert.equal(overview({ ...base, triage: { ...triage, dropped: 0 } }).filteredOut, 0);
+  assert.equal(overview({ ...base, triage: { ...triage, skipped: true } }).filteredOut, null);
+  assert.equal(overview({ ...base, triage: null }).filteredOut, null);
+  assert.equal(overview(base).filteredOut, null);
 });
 
 test('buildBriefOverview: fixture (brief null) → no sections or quiet line', () => {

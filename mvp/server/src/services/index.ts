@@ -66,6 +66,17 @@ export type {
 export { listTriageRecords, runTriage, TRIAGE_LIST_MAX } from './triagePipeline.js';
 export type { TriageDeps, TriageListing, TriageResult } from './triagePipeline.js';
 export {
+  buildFilteredOut,
+  FILTERED_REASON_GROUPS,
+  parseFilteredOutScope,
+} from './triageFiltered.js';
+export type {
+  FilteredOut,
+  FilteredOutItem,
+  FilteredOutScope,
+  FilteredReasonGroup,
+} from './triageFiltered.js';
+export {
   buildRefreshNotices,
   composeTopicBrief,
   isSignificantlyUpdated,

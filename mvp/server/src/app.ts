@@ -17,6 +17,8 @@ import {
   fetchAllSources,
   listTriageRecords,
   ManualSeedValidationError,
+  buildFilteredOut,
+  parseFilteredOutScope,
   parseManualSeedBody,
   parseTopicCreate,
   parseTopicPatch,
@@ -661,6 +663,38 @@ export function createApp(deps: CreateAppDeps = {}): Express {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.error('Triage read failed:', message);
+      res.status(500).json({ ok: false, error: message });
+    }
+  });
+
+  /**
+   * Filtered out (NEWS-90): dropped records for `scope=last` (default; the last
+   * triage run) or `scope=window` (last TRIAGE_WINDOW_HOURS), grouped by reason.
+   */
+  app.get('/api/triage/filtered', async (req, res) => {
+    try {
+      const [store, articles, topics, mutes, meta] = await Promise.all([
+        readTriageStore(),
+        readAllArticles(),
+        readTopicList(),
+        readMutes(),
+        readServerMeta(),
+      ]);
+      res.json({
+        ok: true,
+        ...buildFilteredOut({
+          store,
+          articles,
+          topics: topics.topics,
+          muteRules: mutes.rules,
+          run: meta.triage ?? null,
+          scope: parseFilteredOutScope(req.query.scope),
+          now: now(),
+        }),
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('Filtered out read failed:', message);
       res.status(500).json({ ok: false, error: message });
     }
   });

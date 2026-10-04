@@ -50,6 +50,7 @@ import {
   addMuteRule,
   readMuteRules,
   removeMuteRule,
+  type MuteRule,
 } from './store/muteRulesStore.js';
 import {
   createTopic,
@@ -2068,6 +2069,10 @@ async function startTriageServer(opts: {
   records: Record<string, TriageRecord>;
   articles: Article[];
   run: TriageRunMeta | null;
+  topics?: Topic[];
+  muteRules?: MuteRule[];
+  now?: Date;
+  readTriage?: CreateAppDeps['readTriage'];
 }): Promise<{ baseUrl: string; close: () => Promise<void> }> {
   process.env.SESSION_SECRET = 'test-secret';
   process.env.MVP_PASSWORD = 'pw';
@@ -2075,9 +2080,12 @@ async function startTriageServer(opts: {
 
   const { createApp } = await import('./app.js');
   const app = createApp({
-    readTriage: async () => ({ records: opts.records, updatedAt: null }),
+    readTriage: opts.readTriage ?? (async () => ({ records: opts.records, updatedAt: null })),
     readArticles: async () => opts.articles,
     readMeta: async () => ({ lastFetchAt: null, lastError: null, triage: opts.run }),
+    readTopics: async () => ({ topics: opts.topics ?? [], updatedAt: null }),
+    readMuteRules: async () => ({ rules: opts.muteRules ?? [], updatedAt: null }),
+    ...(opts.now ? { now: () => opts.now! } : {}),
   });
   return await startServer(app);
 }
@@ -2170,6 +2178,156 @@ test('GET /api/triage returns run null when no triage has run', async () => {
     const resp = await fetch(`${baseUrl}/api/triage`, { headers: { cookie } });
     assert.equal(resp.status, 200);
     assert.deepEqual(await resp.json(), { ok: true, run: null, records: [] });
+  } finally {
+    await close();
+  }
+});
+
+const FILTERED_RUN: TriageRunMeta = {
+  at: '2026-09-30T11:00:00.000Z',
+  skipped: false,
+  candidates: 3,
+  kept: 1,
+  dropped: 2,
+  byReason: { muted: 1, off_topic: 1 },
+  jev: { budget: 300, used: 0, errors: 0 },
+  summaryBudget: 60,
+  errors: [],
+};
+
+function filteredFixture() {
+  const records: Record<string, TriageRecord> = {
+    m1: { ...triageRecordFixture('m1', FILTERED_RUN.at), reason: 'muted:r1', topicIds: ['t1'] },
+    o1: triageRecordFixture('o1', FILTERED_RUN.at),
+    k1: { ...triageRecordFixture('k1', FILTERED_RUN.at), status: 'kept', reason: null },
+    old: triageRecordFixture('old', '2026-09-29T20:00:00.000Z'),
+  };
+  return {
+    records,
+    articles: [
+      { id: 'm1', title: 'Celebrity news', canonicalUrl: 'https://cfp.example/m1', publisherUrl: null, publisherDomain: null, publishedAt: '2026-09-30T09:00:00.000Z', sourceKind: 'rss' } as Article,
+      { id: 'o1', title: 'Off topic', canonicalUrl: 'https://cfp.example/o1', publisherUrl: 'https://o1.example.com/x', publisherDomain: 'o1.example.com', publishedAt: '2026-09-30T08:00:00.000Z', sourceKind: 'search' } as Article,
+    ],
+    run: FILTERED_RUN,
+    topics: [briefTopic('t1', { name: 'Iran' })],
+    muteRules: [{ id: 'r1', keyword: 'celebrity', source: null, createdAt: '2026-09-01T00:00:00.000Z' }],
+    now: new Date('2026-09-30T12:00:00.000Z'),
+  };
+}
+
+test('GET /api/triage/filtered requires session', async () => {
+  const { baseUrl, close } = await startTriageServer(filteredFixture());
+  try {
+    const resp = await fetch(`${baseUrl}/api/triage/filtered`);
+    assert.equal(resp.status, 401);
+  } finally {
+    await close();
+  }
+});
+
+test('GET /api/triage/filtered defaults to scope last: dropped records of the last run, joined', async () => {
+  const { baseUrl, close } = await startTriageServer(filteredFixture());
+  try {
+    const cookie = await login(baseUrl);
+    for (const query of ['', '?scope=bogus', '?scope=last']) {
+      const resp = await fetch(`${baseUrl}/api/triage/filtered${query}`, { headers: { cookie } });
+      assert.equal(resp.status, 200, query);
+      assert.deepEqual(await resp.json(), {
+        ok: true,
+        scope: 'last',
+        run: FILTERED_RUN,
+        counts: { muted: 1, off_topic: 1 },
+        items: [
+          {
+            articleId: 'm1',
+            title: 'Celebrity news',
+            url: 'https://cfp.example/m1',
+            publisherDomain: null,
+            publishedAt: '2026-09-30T09:00:00.000Z',
+            sourceKind: 'rss',
+            reason: 'muted:r1',
+            group: 'muted',
+            final: true,
+            stage: 'keyword',
+            mutedBy: { kind: 'rule', id: 'r1', label: 'celebrity' },
+            topics: [{ id: 't1', name: 'Iran' }],
+            duplicateOf: null,
+            triagedAt: FILTERED_RUN.at,
+          },
+          {
+            articleId: 'o1',
+            title: 'Off topic',
+            url: 'https://o1.example.com/x',
+            publisherDomain: 'o1.example.com',
+            publishedAt: '2026-09-30T08:00:00.000Z',
+            sourceKind: 'search',
+            reason: 'off_topic',
+            group: 'off_topic',
+            final: true,
+            stage: 'keyword',
+            mutedBy: null,
+            topics: [],
+            duplicateOf: null,
+            triagedAt: FILTERED_RUN.at,
+          },
+        ],
+      }, query);
+    }
+  } finally {
+    await close();
+  }
+});
+
+test('GET /api/triage/filtered?scope=window includes earlier runs within 48h', async () => {
+  const { baseUrl, close } = await startTriageServer(filteredFixture());
+  try {
+    const cookie = await login(baseUrl);
+    const resp = await fetch(`${baseUrl}/api/triage/filtered?scope=window`, { headers: { cookie } });
+    assert.equal(resp.status, 200);
+    const body = (await resp.json()) as {
+      scope: string;
+      counts: Record<string, number>;
+      items: Array<{ articleId: string; title: string | null }>;
+    };
+    assert.equal(body.scope, 'window');
+    assert.deepEqual(body.counts, { muted: 1, off_topic: 2 });
+    assert.deepEqual(body.items.map((i) => i.articleId), ['m1', 'o1', 'old']);
+    assert.equal(body.items[2]!.title, null);
+  } finally {
+    await close();
+  }
+});
+
+test('GET /api/triage/filtered: no triage run → run null, no items', async () => {
+  const { baseUrl, close } = await startTriageServer({ ...filteredFixture(), run: null });
+  try {
+    const cookie = await login(baseUrl);
+    const resp = await fetch(`${baseUrl}/api/triage/filtered`, { headers: { cookie } });
+    assert.equal(resp.status, 200);
+    assert.deepEqual(await resp.json(), {
+      ok: true,
+      scope: 'last',
+      run: null,
+      counts: {},
+      items: [],
+    });
+  } finally {
+    await close();
+  }
+});
+
+test('GET /api/triage/filtered: unreadable triage store → 500', async () => {
+  const { baseUrl, close } = await startTriageServer({
+    ...filteredFixture(),
+    readTriage: async () => {
+      throw new Error('corrupt triage');
+    },
+  });
+  try {
+    const cookie = await login(baseUrl);
+    const resp = await fetch(`${baseUrl}/api/triage/filtered`, { headers: { cookie } });
+    assert.equal(resp.status, 500);
+    assert.deepEqual(await resp.json(), { ok: false, error: 'corrupt triage' });
   } finally {
     await close();
   }
@@ -2522,9 +2680,37 @@ test('GET /api/brief/overview: sections with More split, quiet, notices, nextAt,
         { topicId: 'watch', name: 'Gas prices', level: 'watch', storyIds: ['w1'], moreIds: [] },
       ],
       quiet: [{ id: 'quiet', name: 'Palantir', level: 'core' }],
+      filteredOut: null,
     });
   } finally {
     await close();
+  }
+});
+
+test('GET /api/brief/overview: filteredOut = last triage run dropped count; null when skipped or none', async () => {
+  const cases: Array<[TriageRunMeta | null, number | null]> = [
+    [FILTERED_RUN, 2],
+    [{ ...FILTERED_RUN, dropped: 0, byReason: {} }, 0],
+    [{ ...FILTERED_RUN, skipped: true, dropped: 0 }, null],
+    [null, null],
+  ];
+  for (const [triage, expected] of cases) {
+    for (const articles of [[briefArticle('k1')], []]) {
+      const { baseUrl, close } = await startBriefRouter({
+        articles,
+        records: [keptRecord('k1', ['t1'])],
+        meta: { lastFetchAt: null, lastError: null, triage },
+      });
+      try {
+        const overview = await getJson<{ fixture: boolean; filteredOut: number | null }>(
+          `${baseUrl}/api/brief/overview`,
+        );
+        assert.equal(overview.fixture, articles.length === 0);
+        assert.equal(overview.filteredOut, expected, JSON.stringify(triage));
+      } finally {
+        await close();
+      }
+    }
   }
 });
 
