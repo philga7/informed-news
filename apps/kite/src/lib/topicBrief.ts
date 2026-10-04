@@ -96,6 +96,8 @@ export type BriefOverview = {
 	notices: string[];
 	sections: BriefOverviewSection[];
 	quiet: BriefTopicRef[];
+	/** Stories the last triage run dropped; null when no run (or it was skipped). */
+	filteredOut: number | null;
 };
 
 export type TopicBriefSection = {

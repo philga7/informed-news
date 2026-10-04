@@ -3,6 +3,7 @@ import { onMount } from 'svelte';
 import { PRODUCT_NAME } from '$lib/brand';
 import TopicCard from '$lib/components/topics/TopicCard.svelte';
 import TopicForm from '$lib/components/topics/TopicForm.svelte';
+import { FILTERED_TOPICS_LINK } from '$lib/filteredOut';
 import {
 	RADAR_MUTES_ADD_LABEL,
 	RADAR_MUTES_DELETE_ERROR,
@@ -527,8 +528,16 @@ onMount(() => {
 				{/if}
 			</section>
 
-			<div class="mt-8 flex items-center justify-between">
-				<p class="text-xs text-gray-500 dark:text-gray-400">{TOPICS_FOOTER_NOTE}</p>
+			<div class="mt-8 flex items-center justify-between gap-4">
+				<p class="text-xs text-gray-500 dark:text-gray-400">
+					{TOPICS_FOOTER_NOTE}
+					<a
+						href="/filtered"
+						class="ml-1 font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+					>
+						{FILTERED_TOPICS_LINK}
+					</a>
+				</p>
 				<button
 					type="button"
 					class="text-xs font-medium text-gray-500 underline underline-offset-2 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"

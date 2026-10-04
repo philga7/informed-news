@@ -384,7 +384,11 @@ const requestedSummaries = new Set<string>();
 	{@render fallback()}
 {:else}
 	<div class="topic-brief">
-		<BriefRefreshBar refresh={overview.refresh} notices={overview.notices} />
+		<BriefRefreshBar
+			refresh={overview.refresh}
+			notices={overview.notices}
+			filteredOut={overview.filteredOut}
+		/>
 
 		{#if sections.length === 0}
 			<p class="py-6 text-sm text-gray-600 dark:text-gray-400">

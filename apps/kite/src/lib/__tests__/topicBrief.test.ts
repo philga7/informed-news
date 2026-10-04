@@ -444,6 +444,7 @@ describe('client fetch helpers', () => {
 		notices: [],
 		sections: [],
 		quiet: [],
+		filteredOut: 3,
 	};
 
 	it('fetchBriefOverview returns the body or null', async () => {
