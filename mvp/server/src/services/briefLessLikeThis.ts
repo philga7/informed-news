@@ -6,7 +6,7 @@
 import type { Article } from '../types/article.js';
 import type { Topic, TopicFields } from '../types/topic.js';
 import { parseTopicCreate, TOPIC_TEXT_MAX } from './topicInput.js';
-import { isOutletKeyword, normalizeOutletDomain, topicBlocksOutlet } from './triageKeywords.js';
+import { isHostnameLike, normalizeOutletDomain, topicBlocksOutlet } from './triageKeywords.js';
 
 export const LESS_LIKE_THIS_KIND_ERROR = 'kind must be outlet or subject';
 export const OUTLET_BLOCK_DESCRIPTION = 'Outlet blocked from the Brief.';
@@ -77,7 +77,7 @@ export async function lessLikeThis(
   }
 
   const domain = normalizeOutletDomain(article.publisherDomain);
-  if (!domain || !isOutletKeyword(domain)) return { ok: false, status: 400, error: 'no_outlet' };
+  if (!domain || !isHostnameLike(domain)) return { ok: false, status: 400, error: 'no_outlet' };
 
   const { topics } = await deps.readTopics();
   const existing = topics.find((t) => t.kind === 'undesired' && topicBlocksOutlet(t, domain));

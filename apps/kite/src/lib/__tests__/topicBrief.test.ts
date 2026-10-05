@@ -15,6 +15,7 @@ import {
 	BRIEF_SUMMARY_NOT_IN_BRIEF,
 	BRIEF_SUMMARY_RATE_LIMITED,
 	BRIEF_SUMMARY_UNAVAILABLE,
+	LESS_LIKE_THIS_DESCRIPTION_MAX,
 	LESS_LIKE_THIS_ERROR,
 	LESS_LIKE_THIS_NAME_MAX,
 	LESS_LIKE_THIS_NO_OUTLET,
@@ -29,6 +30,7 @@ import {
 	isOfficialStory,
 	isRecoverableRefreshFailure,
 	lastSuccessAt,
+	lessLikeThisAddedCopy,
 	lessLikeThisErrorCopy,
 	lessLikeThisSubjectDefault,
 	lessLikeThisSubjectRequest,
@@ -669,5 +671,21 @@ describe('Less like this', () => {
 			kind: 'subject',
 			name: 'Tariffs',
 		});
+	});
+
+	it('lessLikeThisSubjectRequest cuts the description to the server cap', () => {
+		const request = lessLikeThisSubjectRequest('Tariffs', '', ` ${'z'.repeat(600)} `);
+		expect(LESS_LIKE_THIS_DESCRIPTION_MAX).toBe(500);
+		expect(request).toEqual({
+			kind: 'subject',
+			name: 'Tariffs',
+			description: 'z'.repeat(LESS_LIKE_THIS_DESCRIPTION_MAX),
+		});
+	});
+
+	it('lessLikeThisAddedCopy says when matching stories disappear', () => {
+		expect(lessLikeThisAddedCopy('Tariffs')).toBe(
+			'Added "Tariffs" to undesired topics. Matching stories are hidden the next time the Brief loads, and filtered out from the next refresh.',
+		);
 	});
 });

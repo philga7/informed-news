@@ -248,7 +248,7 @@ test.describe('Filtered out + Less like this (NEWS-90)', () => {
 			await expect(card.getByLabel('Undesired topic name')).toHaveValue(title);
 			await card.getByRole('button', { name: `Block ${domain}`, exact: true }).click();
 			await expect(card.getByTestId('less-like-this-success')).toContainText(
-				`Added "${domain}" to undesired topics. Takes effect next refresh.`,
+				`Added "${domain}" to undesired topics. Matching stories are hidden the next time the Brief loads, and filtered out from the next refresh.`,
 			);
 
 			await page.goto('/topics');

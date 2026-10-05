@@ -301,6 +301,35 @@ test('article fields joined; url prefers publisherUrl; gone article → null fie
   assert.equal(gone!.sourceKind, null);
 });
 
+test('url and duplicateOf.url: only http(s) URLs pass through; javascript: and malformed → null', () => {
+  const out = build({
+    records: [
+      dropped('http', { reason: 'duplicate', stage: 'dedupe', duplicateOf: 'jsKeeper' }),
+      dropped('https'),
+      dropped('js', { reason: 'duplicate', stage: 'dedupe', duplicateOf: 'httpKeeper' }),
+      dropped('broken'),
+      dropped('ftp'),
+    ],
+    articles: [
+      article('http', { publisherUrl: 'http://http.example.com/a' }),
+      article('https', { publisherUrl: 'https://https.example.com/a' }),
+      article('js', { publisherUrl: 'javascript:alert(1)' }),
+      article('broken', { publisherUrl: 'not a url' }),
+      article('ftp', { publisherUrl: 'ftp://ftp.example.com/a' }),
+      article('jsKeeper', { publisherUrl: 'JavaScript:alert(1)' }),
+      article('httpKeeper', { publisherUrl: 'http://keeper.example.com/a' }),
+    ],
+  });
+  const byId = new Map(out.items.map((item) => [item.articleId, item]));
+  assert.equal(byId.get('http')!.url, 'http://http.example.com/a');
+  assert.equal(byId.get('https')!.url, 'https://https.example.com/a');
+  assert.equal(byId.get('js')!.url, null);
+  assert.equal(byId.get('broken')!.url, null);
+  assert.equal(byId.get('ftp')!.url, null);
+  assert.equal(byId.get('http')!.duplicateOf!.url, null);
+  assert.equal(byId.get('js')!.duplicateOf!.url, 'http://keeper.example.com/a');
+});
+
 test('sort: group order, then publishedAt newest first (null last), then articleId', () => {
   const out = build({
     records: [

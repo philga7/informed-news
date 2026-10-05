@@ -85,6 +85,9 @@ export const LESS_LIKE_THIS_ERROR = 'Could not save. Try again.';
 /** Server topic name cap (`TOPIC_NAME_MAX` in mvp/server `topicInput.ts`). */
 export const LESS_LIKE_THIS_NAME_MAX = 80;
 
+/** Server topic description cap (`TOPIC_TEXT_MAX` in mvp/server `topicInput.ts`). */
+export const LESS_LIKE_THIS_DESCRIPTION_MAX = 500;
+
 export const BRIEF_SEEN_DEBOUNCE_MS = 1000;
 
 export const BRIEF_REFRESH_POLL_MS = 10_000;
@@ -557,7 +560,7 @@ export function lessLikeThisOutletButton(domain: string): string {
 }
 
 export function lessLikeThisAddedCopy(name: string): string {
-	return `Added "${name}" to undesired topics. Takes effect next refresh.`;
+	return `Added "${name}" to undesired topics. Matching stories are hidden the next time the Brief loads, and filtered out from the next refresh.`;
 }
 
 export function lessLikeThisAlreadyBlockedCopy(domain: string): string {
@@ -579,14 +582,14 @@ export function lessLikeThisSubjectDefault(story: Pick<Story, 'title'>): string 
 	return title.slice(0, LESS_LIKE_THIS_NAME_MAX);
 }
 
-/** Subject request body; blank keywords / description are omitted. */
+/** Subject request body; description = title cut to the server cap; blank keywords / description are omitted. */
 export function lessLikeThisSubjectRequest(
 	name: string,
 	keywordsText: string,
 	title: string | null | undefined,
 ): LessLikeThisRequest {
 	const keywords = parseKeywordsInput(keywordsText);
-	const description = title?.trim() ?? '';
+	const description = (title?.trim() ?? '').slice(0, LESS_LIKE_THIS_DESCRIPTION_MAX);
 	return {
 		kind: 'subject',
 		name: name.trim(),

@@ -13,6 +13,7 @@ import {
   type BriefTopicRef,
   type TopicBrief,
 } from './topicBrief.js';
+import { isHostnameLike, normalizeOutletDomain } from './triageKeywords.js';
 
 /** Stable batch id for the live owned brief (not a Kagi UUID). */
 export const OWNED_BATCH_ID = 'owned-latest';
@@ -717,8 +718,9 @@ function topicStoryToKite(
   if (domains.length > 0) {
     kite.domains = domains.map((name) => ({ name }));
   }
-  if (story.publisherDomain) {
-    kite.informed_publisher_domain = story.publisherDomain;
+  const publisherDomain = normalizeOutletDomain(story.publisherDomain);
+  if (publisherDomain && isHostnameLike(publisherDomain)) {
+    kite.informed_publisher_domain = publisherDomain;
   }
   const imageUrl = story.imageUrl?.trim();
   if (imageUrl) {

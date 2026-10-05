@@ -65,12 +65,20 @@ export function isOutletKeyword(keyword: string): boolean {
   return keyword.includes('.') && !/\s/.test(keyword);
 }
 
-/** Undesired topic with ≥1 keyword, every one an outlet keyword. */
+const HOSTNAME_PATTERN = /^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$/;
+
+/** Normalized value is a dotted hostname (`bbc.co.uk`), not a dotted abbreviation (`U.S.`). */
+export function isHostnameLike(value: string | null | undefined): boolean {
+  const domain = normalizeOutletDomain(value);
+  return domain !== null && HOSTNAME_PATTERN.test(domain);
+}
+
+/** Undesired topic with ≥1 keyword, every one hostname-like. */
 export function isOutletOnlyTopic(topic: Topic): boolean {
   return (
     topic.kind === 'undesired' &&
     topic.keywords.length > 0 &&
-    topic.keywords.every((keyword) => isOutletKeyword(keyword.trim()))
+    topic.keywords.every((keyword) => isHostnameLike(keyword))
   );
 }
 

@@ -58,7 +58,7 @@ Nothing unscored is ever kept, and nothing over budget is silently dropped.
 Each Jev call is one TypeSafe `systemOne` request (via the existing `TYPESAFE_API_KEY` / `TYPESAFE_MODEL`) that asks, in plain terms:
 
 - **Topic relevance**, per candidate topic: "Is this story substantively about <topic>?" — a passing mention counts as no. Needs 0.5 or higher.
-- **Undesired match**, per undesired topic (up to 10): "Is this story about <topic> (a subject the reader excluded)?" — judged on the topic's description, so it catches stories the keywords miss. 0.6 or higher → `muted:<topicId>`, even if it is also relevant. **Outlet-only** undesired topics — every keyword is an outlet (a dot and no spaces), e.g. the outlet blocks **Less like this** creates ([BRIEF.md](BRIEF.md#less-like-this)) — are not asked about here and don't use up the 10 slots; they still mute by outlet in step 1.
+- **Undesired match**, per undesired topic (up to 10): "Is this story about <topic> (a subject the reader excluded)?" — judged on the topic's description, so it catches stories the keywords miss. 0.6 or higher → `muted:<topicId>`, even if it is also relevant. **Outlet-only** undesired topics — every keyword is a hostname such as `dailymail.co.uk` (dotted abbreviations like `U.S.` or `D.C.` don't count), e.g. the outlet blocks **Less like this** creates ([BRIEF.md](BRIEF.md#less-like-this)) — are not asked about here and don't use up the 10 slots; they still mute by outlet in step 1.
 - **Story kind**: news, official statement, clickbait, opinion, rewrite, or sponsored. Clickbait / opinion / rewrite / sponsored with confidence 0.6 or higher → dropped with that reason; at lower confidence the story is not dropped for its kind.
 - **Significance** on a 0–2 scale (routine → notable → must-know). **Watch** topics below 1.4 are removed from the story's topics; if none are left → `not_significant`. **Core** topics are never significance-gated.
 
@@ -149,7 +149,7 @@ Session required. `?scope=last` (default; anything other than `window` means `la
 
 - `run` — `meta.json` → `triage`, or `null` before the first run.
 - `counts` — items per reason group (`muted`, `off_topic`, …); groups with none are absent.
-- `items` — every matching dropped record (no cap), sorted by group order, then newest `publishedAt` (undated last), then article id. Each: `{ articleId, title, url, publisherDomain, publishedAt, sourceKind, reason, group, final, stage, mutedBy, topics, duplicateOf, triagedAt }`. Article fields are `null` when the article is gone; `url` is `publisherUrl ?? canonicalUrl`. `mutedBy` is `{ kind: 'rule' | 'topic', id, label }` for `muted:<id>` reasons, else `null`. `topics` is `[{ id, name }]` for the record's topics that still exist, in topics-list order. `duplicateOf` is `{ articleId, title, url }` or `null`.
+- `items` — every matching dropped record (no cap), sorted by group order, then newest `publishedAt` (undated last), then article id. Each: `{ articleId, title, url, publisherDomain, publishedAt, sourceKind, reason, group, final, stage, mutedBy, topics, duplicateOf, triagedAt }`. Article fields are `null` when the article is gone; `url` is `publisherUrl ?? canonicalUrl`, or `null` unless it is an `http:` / `https:` URL (same for `duplicateOf.url`). `mutedBy` is `{ kind: 'rule' | 'topic', id, label }` for `muted:<id>` reasons, else `null`. `topics` is `[{ id, name }]` for the record's topics that still exist, in topics-list order. `duplicateOf` is `{ articleId, title, url }` or `null`.
 - A store read failure → `500 { ok: false, error }`.
 
 ```bash

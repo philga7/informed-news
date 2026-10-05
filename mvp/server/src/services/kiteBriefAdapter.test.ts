@@ -723,6 +723,27 @@ test('topicBriefToKiteStories omits informed_publisher_domain when the story has
   assert.equal('informed_publisher_domain' in story, false);
 });
 
+test('topicBriefToKiteStories omits informed_publisher_domain when the domain is not hostname-like', () => {
+  const brief: TopicBrief = {
+    boundaryAt: null,
+    sections: [
+      {
+        topic: CORE,
+        stories: [
+          briefStory('dotless', { publisherDomain: 'localhost' }),
+          briefStory('abbrev', { publisherDomain: 'u.s.' }),
+          briefStory('bbc', { publisherDomain: 'bbc.co.uk' }),
+        ],
+      },
+    ],
+    quiet: [],
+  };
+  const [dotless, abbrev, bbc] = topicBriefToKiteStories(brief);
+  assert.equal('informed_publisher_domain' in dotless!, false);
+  assert.equal('informed_publisher_domain' in abbrev!, false);
+  assert.equal(bbc!.informed_publisher_domain, 'bbc.co.uk');
+});
+
 test('topicBriefToKiteStories hydrates cached full stories and reports cache states', () => {
   const record: BriefFullStoryRecord = {
     articleId: 'a1',

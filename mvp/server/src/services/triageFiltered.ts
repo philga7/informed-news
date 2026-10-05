@@ -11,6 +11,7 @@ import type {
   TriageRecord,
   TriageRunMeta,
   TriageStage,
+  TriageStaticReason,
   TriageStore,
 } from '../types/triage.js';
 import { TRIAGE_WINDOW_HOURS } from './triageConfig.js';
@@ -32,13 +33,18 @@ export const FILTERED_REASON_GROUPS = [
 ] as const;
 export type FilteredReasonGroup = (typeof FILTERED_REASON_GROUPS)[number];
 
+type SameUnion<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
+/** Fails typecheck until every static triage reason (plus `muted`) has a display group. */
+const GROUPS_COVER_REASONS: SameUnion<FilteredReasonGroup, TriageStaticReason | 'muted'> = true;
+void GROUPS_COVER_REASONS;
+
 export type FilteredOutScope = 'last' | 'window';
 
 export type FilteredOutItem = {
   articleId: string;
   /** null when the article is gone */
   title: string | null;
-  /** publisherUrl ?? canonicalUrl */
+  /** publisherUrl ?? canonicalUrl; null unless http(s) */
   url: string | null;
   publisherDomain: string | null;
   publishedAt: string | null;
@@ -76,8 +82,16 @@ export function parseFilteredOutScope(raw: unknown): FilteredOutScope {
   return raw === 'window' ? 'window' : 'last';
 }
 
+/** publisherUrl ?? canonicalUrl, only when it parses as http(s); else null. */
 function articleUrl(article: Article | undefined): string | null {
-  return article ? (article.publisherUrl ?? article.canonicalUrl) : null;
+  const url = article ? (article.publisherUrl ?? article.canonicalUrl) : null;
+  if (!url) return null;
+  try {
+    const { protocol } = new URL(url);
+    return protocol === 'http:' || protocol === 'https:' ? url : null;
+  } catch {
+    return null;
+  }
 }
 
 function resolveMutedBy(

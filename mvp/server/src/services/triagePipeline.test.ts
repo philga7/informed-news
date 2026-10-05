@@ -229,6 +229,37 @@ test('outlet-only undesired topics skip the Jev undesired slots but still mute b
   }
 });
 
+test('undesired topics keyed by dotted abbreviations stay in the Jev undesired context', async () => {
+  const abbrev = topic('us-politics', {
+    name: 'Beltway politics',
+    kind: 'undesired',
+    level: null,
+    keywords: ['U.S.', 'D.C.'],
+  });
+  const contexts: string[][] = [];
+  const { deps } = harness({
+    topics: [TARIFFS, abbrev],
+    articles: [article('good', 'Tariff refunds begin for importers')],
+    overrides: {
+      judge: async (_stage, _a, ctx) => {
+        contexts.push(ctx.undesired.map((t) => t.id));
+        const answers: TriageJevAnswers = {
+          relevance: Object.fromEntries(ctx.candidates.map((t) => [t.id, 1])),
+          undesired: Object.fromEntries(ctx.undesired.map((t) => [t.id, 0])),
+          quality: { choice: 'news', confidence: 0.9 },
+          significance: 2,
+        };
+        return { ok: true, answers, verdict: routeTriageAnswers(answers, ctx), model: 'fake' };
+      },
+    },
+  });
+
+  await run(deps);
+
+  assert.ok(contexts.length > 0);
+  for (const ids of contexts) assert.deepEqual(ids, ['us-politics']);
+});
+
 test('acceptance: every candidate ends kept or dropped with a reason; old, manual, and pruned rows get no record', async () => {
   const articles = [
     article('a', 'Tariff deal reached with Canada'),

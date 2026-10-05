@@ -151,8 +151,11 @@ test('outlet: no usable publisher domain → 400 no_outlet', async () => {
     article('none', { publisherDomain: null }),
     article('blank', { publisherDomain: '  ' }),
     article('dotless', { publisherDomain: 'localhost' }),
+    article('abbrev', { publisherDomain: 'U.S.' }),
+    article('trailing', { publisherDomain: 'foo.' }),
+    article('doubledot', { publisherDomain: 'a..b.com' }),
   ]);
-  for (const id of ['none', 'blank', 'dotless']) {
+  for (const id of ['none', 'blank', 'dotless', 'abbrev', 'trailing', 'doubledot']) {
     assert.deepEqual(await lessLikeThis(id, { kind: 'outlet' }, deps), {
       ok: false,
       status: 400,
