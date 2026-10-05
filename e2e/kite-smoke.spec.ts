@@ -61,6 +61,12 @@ async function loadOwnedStories(page: Page): Promise<KiteStory[]> {
 	return body.stories ?? [];
 }
 
+/** Session for session pages: the page's request context shares its cookie jar with the page. */
+async function logIn(page: Page): Promise<void> {
+	const login = await page.request.post('/api/login', { data: { password: E2E_MVP_PASSWORD } });
+	expect(login.ok()).toBeTruthy();
+}
+
 function watchKagiRequests(page: Page): string[] {
 	const kagiHosts: string[] = [];
 	page.on('request', (req) => {
@@ -173,6 +179,100 @@ test.describe('Topic Brief (NEWS-88)', () => {
 		await storyCard.locator('button[aria-label="Expand story"]').click();
 		await expect(storyCard.getByText(TOPIC_SCENARIO.fullStoryTalkingPoint)).toBeVisible();
 		await expect(storyCard.getByText('AI-assisted — not ground truth.')).toBeVisible();
+	});
+});
+
+test.describe('Filtered out + Less like this (NEWS-90)', () => {
+	test.beforeEach(() => useScenario('topics'));
+
+	test('refresh bar links to /filtered, which lists every dropped story under its reason', async ({
+		page,
+	}) => {
+		await logIn(page);
+		await page.goto('/');
+		await expect(page).toHaveTitle(/Informed News/i, { timeout: 60_000 });
+
+		const link = page.getByTestId('brief-filtered-link');
+		await expect(link).toHaveText(`${TOPIC_SCENARIO.filtered.length} filtered out`, {
+			timeout: 60_000,
+		});
+		await link.click();
+		await expect(page).toHaveURL(/\/filtered\/?$/);
+		await expect(page).toHaveTitle(/Filtered out/i);
+		await expect(page.getByRole('heading', { name: 'Filtered out', exact: true })).toBeVisible();
+		await expect(
+			page.getByText('Reasons from story scoring are AI-assisted judgments, not ground truth.'),
+		).toBeVisible();
+
+		const groups = page.getByTestId('filtered-group');
+		await expect(groups.getByRole('heading')).toHaveText(
+			TOPIC_SCENARIO.filtered.map((f) => `${f.label} (1)`),
+		);
+		const group = (label: string) =>
+			groups.filter({ has: page.getByRole('heading', { name: `${label} (1)`, exact: true }) });
+		for (const { title, label } of TOPIC_SCENARIO.filtered) {
+			await expect(group(label).getByTestId('filtered-item')).toContainText(title);
+		}
+		await expect(
+			group('Muted').getByText(`Muted by: ${TOPIC_SCENARIO.undesiredTopic.name}`, { exact: true }),
+		).toBeVisible();
+		await expect(group('Duplicate').getByText(/^Duplicate of:/)).toContainText(
+			'Port workers reach tentative agreement',
+		);
+
+		await page.getByRole('button', { name: 'Last 48 hours' }).click();
+		await expect(page.getByRole('button', { name: 'Last 48 hours' })).toHaveAttribute(
+			'aria-pressed',
+			'true',
+		);
+		await expect(groups).toHaveCount(TOPIC_SCENARIO.filtered.length);
+	});
+
+	test('Less like this blocks the outlet and Topics lists it under Undesired', async ({ page }) => {
+		const { title, domain } = TOPIC_SCENARIO.lessLikeThis;
+		await logIn(page);
+		await page.goto('/');
+		await expect(page).toHaveTitle(/Informed News/i, { timeout: 60_000 });
+
+		const stories = await loadOwnedStories(page);
+		const story = stories.find((s) => s.title === title);
+		expect(story?.cluster_number, 'expected the outlet-block story to have a card').toBeTruthy();
+		const card = page.locator(`article#story-${story?.cluster_number}`);
+		await expect(card).toBeVisible({ timeout: 60_000 });
+		const trigger = card.getByRole('button', { name: 'Less like this', exact: true });
+		await expect(trigger).toHaveCount(0);
+
+		try {
+			await card.locator('button[aria-label="Expand story"]').click();
+			await trigger.click();
+			await expect(card.getByLabel('Undesired topic name')).toHaveValue(title);
+			await card.getByRole('button', { name: `Block ${domain}`, exact: true }).click();
+			await expect(card.getByTestId('less-like-this-success')).toContainText(
+				`Added "${domain}" to undesired topics. Matching stories are hidden the next time the Brief loads, and filtered out from the next refresh.`,
+			);
+
+			await page.goto('/topics');
+			const undesired = page.locator('section[aria-labelledby="topics-undesired"]');
+			await expect(undesired.getByRole('heading', { name: domain, exact: true })).toBeVisible({
+				timeout: 60_000,
+			});
+			await expect(
+				undesired.getByRole('heading', { name: TOPIC_SCENARIO.undesiredTopic.name, exact: true }),
+			).toBeVisible();
+		} finally {
+			const list = await page.request.get('/api/topics');
+			expect(list.ok()).toBeTruthy();
+			const { topics } = (await list.json()) as {
+				topics: Array<{ id: string; name: string; kind: string }>;
+			};
+			for (const topic of topics.filter((t) => t.kind === 'undesired' && t.name === domain)) {
+				const removed = await page.request.delete(`/api/topics/${topic.id}`);
+				expect(removed.ok()).toBeTruthy();
+			}
+		}
+
+		const after = (await loadOwnedStories(page)).map((s) => s.title);
+		expect(after).toContain(title);
 	});
 });
 

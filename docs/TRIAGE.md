@@ -58,7 +58,7 @@ Nothing unscored is ever kept, and nothing over budget is silently dropped.
 Each Jev call is one TypeSafe `systemOne` request (via the existing `TYPESAFE_API_KEY` / `TYPESAFE_MODEL`) that asks, in plain terms:
 
 - **Topic relevance**, per candidate topic: "Is this story substantively about <topic>?" — a passing mention counts as no. Needs 0.5 or higher.
-- **Undesired match**, per undesired topic (up to 10): "Is this story about <topic> (a subject the reader excluded)?" — judged on the topic's description, so it catches stories the keywords miss. 0.6 or higher → `muted:<topicId>`, even if it is also relevant.
+- **Undesired match**, per undesired topic (up to 10): "Is this story about <topic> (a subject the reader excluded)?" — judged on the topic's description, so it catches stories the keywords miss. 0.6 or higher → `muted:<topicId>`, even if it is also relevant. **Outlet-only** undesired topics — every keyword is a hostname such as `dailymail.co.uk` (dotted abbreviations like `U.S.` or `D.C.` don't count), e.g. the outlet blocks **Less like this** creates ([BRIEF.md](BRIEF.md#less-like-this)) — are not asked about here and don't use up the 10 slots; they still mute by outlet in step 1.
 - **Story kind**: news, official statement, clickbait, opinion, rewrite, or sponsored. Clickbait / opinion / rewrite / sponsored with confidence 0.6 or higher → dropped with that reason; at lower confidence the story is not dropped for its kind.
 - **Significance** on a 0–2 scale (routine → notable → must-know). **Watch** topics below 1.4 are removed from the story's topics; if none are left → `not_significant`. **Core** topics are never significance-gated.
 
@@ -110,6 +110,52 @@ Session required. Returns `{ ok: true, run, records }`:
 curl -s -b /tmp/mvp-cookies http://127.0.0.1:3001/api/triage
 ```
 
+## Filtered out view
+
+Ticket: [NEWS-90](https://informedcrew.atlassian.net/browse/NEWS-90). The Kite page **`/filtered`** (session) lists what triage dropped and why, for spot checks and trust. Nothing on it needs action, and there is no "Show anyway". It is linked from the Brief refresh bar (**N filtered out** when the last run dropped any, else **Filtered out** — [BRIEF.md](BRIEF.md#refresh)) and from the Topics page (**See what was filtered out**). Without a login it shows "Log in on Topics to see filtered stories", linking to `/topics`.
+
+- **Last refresh** (default): every record with `status: 'dropped'` whose `triagedAt` equals the last run's `at` (`meta.json` → `triage`). Every record a run writes gets that run's time, so this is exactly what the latest refresh dropped. No run yet → nothing listed ("No refresh has triaged stories yet.").
+- **Last 48 hours**: dropped records with `triagedAt` in the last 48 hours (the triage window), across refreshes.
+
+The page shows a run line (`Last refresh 3:40 PM: 120 candidates, 18 kept, 102 dropped`, or "Last refresh did not triage stories" plus its first error for a skipped run), a row of reason counts that jump to their group, and one group per reason in this order, empty groups omitted:
+
+| Group | Label |
+|-------|-------|
+| `muted:<id>` (any) | Muted |
+| `off_topic` | Off-topic |
+| `clickbait` | Clickbait |
+| `opinion` | Opinion |
+| `rewrite` | Rewrite / roundup |
+| `sponsored` | Sponsored |
+| `not_significant` | Not significant |
+| `duplicate` | Duplicate |
+| `undated` | Undated |
+| `stale` | Too old |
+| `not_scored_budget` | Not scored (budget) |
+| `not_scored_error` | Not scored (error) |
+
+Within a group, newest `publishedAt` first (undated last). A group shows 20 stories, then **Show all (N)**. Each story shows its headline (linked to the publisher URL, else the canonical URL), outlet, age, and the candidate topics that still exist, plus:
+
+- **Muted by: …** — the mute rule's keyword (with ` (<source>)` when the rule has one) or the undesired topic's name; "Removed rule or topic" when neither exists any more.
+- **Duplicate of: …** — the story it duplicates (linked), or "Article no longer stored".
+- **Retried next refresh** — for the non-final reasons (`not_scored_budget`, `not_scored_error`).
+- A dropped record whose article is gone shows "Article no longer stored" as its headline.
+
+The page says: "Reasons from story scoring are AI-assisted judgments, not ground truth."
+
+### `GET /api/triage/filtered`
+
+Session required. `?scope=last` (default; anything other than `window` means `last`) or `?scope=window`. Returns `{ ok: true, scope, run, counts, items }`:
+
+- `run` — `meta.json` → `triage`, or `null` before the first run.
+- `counts` — items per reason group (`muted`, `off_topic`, …); groups with none are absent.
+- `items` — every matching dropped record (no cap), sorted by group order, then newest `publishedAt` (undated last), then article id. Each: `{ articleId, title, url, publisherDomain, publishedAt, sourceKind, reason, group, final, stage, mutedBy, topics, duplicateOf, triagedAt }`. Article fields are `null` when the article is gone; `url` is `publisherUrl ?? canonicalUrl`, or `null` unless it is an `http:` / `https:` URL (same for `duplicateOf.url`). `mutedBy` is `{ kind: 'rule' | 'topic', id, label }` for `muted:<id>` reasons, else `null`. `topics` is `[{ id, name }]` for the record's topics that still exist, in topics-list order. `duplicateOf` is `{ articleId, title, url }` or `null`.
+- A store read failure → `500 { ok: false, error }`.
+
+```bash
+curl -s -b /tmp/mvp-cookies 'http://127.0.0.1:3001/api/triage/filtered?scope=window'
+```
+
 ## Failure behavior
 
 - Triage never fails a refresh. A CFP failure still fails `POST /api/fetch`, as before.
@@ -120,7 +166,6 @@ curl -s -b /tmp/mvp-cookies http://127.0.0.1:3001/api/triage
 
 ## Interim limits
 
-- **Kept stories are shown in the Brief** by topic ([BRIEF.md](BRIEF.md)); `GET /api/triage` still lists every record.
-- **Filtered-out view** (browse dropped stories with their reasons) is [NEWS-90](https://informedcrew.atlassian.net/browse/NEWS-90).
+- **Kept stories are shown in the Brief** by topic ([BRIEF.md](BRIEF.md)); dropped stories are on the [Filtered out view](#filtered-out-view); `GET /api/triage` still lists every record.
 - **Topic edits don't re-triage final records** while they are in the window. A new or changed topic only affects stories triaged after the edit. The Brief does re-check mute rules and undesired topics when it is read, and drops a kept story whose topics are all deleted or undesired.
 - The NEWS-86 guards on topic search rows stay in place (not clustered, not on Radar, skipped by Ollama batch endpoints) — see [TOPIC_SEARCH.md](TOPIC_SEARCH.md).

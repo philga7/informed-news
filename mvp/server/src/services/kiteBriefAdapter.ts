@@ -13,6 +13,7 @@ import {
   type BriefTopicRef,
   type TopicBrief,
 } from './topicBrief.js';
+import { isHostnameLike, normalizeOutletDomain } from './triageKeywords.js';
 
 /** Stable batch id for the live owned brief (not a Kagi UUID). */
 export const OWNED_BATCH_ID = 'owned-latest';
@@ -86,6 +87,8 @@ export type KiteBriefStory = {
   informed_full_story_status?: 'missing' | 'ok' | 'unavailable' | 'error';
   /** Plain-language living-update note, when the cached full story changed. */
   informed_full_story_updated?: string;
+  /** Kept article's normalized publisher domain ("Less like this" outlet block, NEWS-90). */
+  informed_publisher_domain?: string;
 };
 
 export type KiteBatchInfo = {
@@ -715,6 +718,10 @@ function topicStoryToKite(
   if (domains.length > 0) {
     kite.domains = domains.map((name) => ({ name }));
   }
+  const publisherDomain = normalizeOutletDomain(story.publisherDomain);
+  if (publisherDomain && isHostnameLike(publisherDomain)) {
+    kite.informed_publisher_domain = publisherDomain;
+  }
   const imageUrl = story.imageUrl?.trim();
   if (imageUrl) {
     kite.primary_image = {
@@ -852,6 +859,8 @@ export type BriefOverview = {
     moreIds: string[];
   }>;
   quiet: BriefTopicRef[];
+  /** Dropped by the last triage run; null when none ran or it was skipped */
+  filteredOut: number | null;
 };
 
 function nextRefreshAt(
@@ -883,6 +892,7 @@ export function buildBriefOverview(input: {
 }): BriefOverview {
   const last = input.meta.refresh?.last ?? null;
   const lastSuccess = input.meta.refresh?.lastSuccess ?? null;
+  const triage = input.meta.triage ?? null;
   const notices = [
     ...buildRefreshNotices(input.meta),
     ...(input.degraded ?? []).map((store) => DEGRADED_NOTICES[store]),
@@ -906,5 +916,6 @@ export function buildBriefOverview(input: {
       moreIds: section.stories.filter((s) => s.more).map((s) => s.articleId),
     })),
     quiet: [...(input.brief?.quiet ?? [])],
+    filteredOut: triage && !triage.skipped ? triage.dropped : null,
   };
 }

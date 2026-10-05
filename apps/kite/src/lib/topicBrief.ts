@@ -1,5 +1,9 @@
-/** Topic-driven Brief (NEWS-88): overview, seen marks, on-demand summaries, manual refresh. */
+/**
+ * Topic-driven Brief (NEWS-88): overview, seen marks, on-demand summaries, manual refresh,
+ * Less like this (NEWS-90).
+ */
 
+import { parseKeywordsInput } from '$lib/topics';
 import type { Story } from '$lib/types';
 
 /** The owned Brief category slug served by mvp/server (named "Brief"). */
@@ -54,6 +58,36 @@ export const BRIEF_REFRESH_ERROR = 'Refresh failed. Try again.';
 
 export const BRIEF_NOT_REFRESHED = 'Not refreshed yet';
 
+export const LESS_LIKE_THIS_LABEL = 'Less like this';
+
+export const LESS_LIKE_THIS_SUBJECT_HEADING = 'Not interested in this subject';
+
+export const LESS_LIKE_THIS_OUTLET_HEADING = 'Block this outlet';
+
+export const LESS_LIKE_THIS_NAME_LABEL = 'Undesired topic name';
+
+export const LESS_LIKE_THIS_KEYWORDS_LABEL = 'Keywords (optional, comma separated)';
+
+export const LESS_LIKE_THIS_SUBJECT_SUBMIT = 'Add undesired topic';
+
+export const LESS_LIKE_THIS_CANCEL = 'Cancel';
+
+export const LESS_LIKE_THIS_TOPICS_LINK = 'View Topics';
+
+export const LESS_LIKE_THIS_LOGIN_HINT = 'Log in on Topics to use Less like this';
+
+export const LESS_LIKE_THIS_NO_OUTLET = 'This story has no outlet to block.';
+
+export const LESS_LIKE_THIS_NOT_STORED = 'This story is no longer stored.';
+
+export const LESS_LIKE_THIS_ERROR = 'Could not save. Try again.';
+
+/** Server topic name cap (`TOPIC_NAME_MAX` in mvp/server `topicInput.ts`). */
+export const LESS_LIKE_THIS_NAME_MAX = 80;
+
+/** Server topic description cap (`TOPIC_TEXT_MAX` in mvp/server `topicInput.ts`). */
+export const LESS_LIKE_THIS_DESCRIPTION_MAX = 500;
+
 export const BRIEF_SEEN_DEBOUNCE_MS = 1000;
 
 export const BRIEF_REFRESH_POLL_MS = 10_000;
@@ -96,6 +130,8 @@ export type BriefOverview = {
 	notices: string[];
 	sections: BriefOverviewSection[];
 	quiet: BriefTopicRef[];
+	/** Stories the last triage run dropped; null when no run (or it was skipped). */
+	filteredOut: number | null;
 };
 
 export type TopicBriefSection = {
@@ -509,6 +545,78 @@ export async function postFullStory(
 		return { ok: false, status: res.status };
 	}
 	return { ok: true, fullStory: fullStory as FullStoryPayload };
+}
+
+export type LessLikeThisRequest =
+	| { kind: 'outlet' }
+	| { kind: 'subject'; name: string; keywords?: string[]; description?: string };
+
+export type LessLikeThisResult =
+	| { ok: true; created: boolean; topicName: string }
+	| { ok: false; unauthenticated: boolean; error: string };
+
+export function lessLikeThisOutletButton(domain: string): string {
+	return `Block ${domain}`;
+}
+
+export function lessLikeThisAddedCopy(name: string): string {
+	return `Added "${name}" to undesired topics. Matching stories are hidden the next time the Brief loads, and filtered out from the next refresh.`;
+}
+
+export function lessLikeThisAlreadyBlockedCopy(domain: string): string {
+	return `${domain} is already blocked.`;
+}
+
+export function lessLikeThisErrorCopy(code: string | undefined): string {
+	if (code === 'no_outlet') return LESS_LIKE_THIS_NO_OUTLET;
+	if (code === 'story_not_found') return LESS_LIKE_THIS_NOT_STORED;
+	return code?.trim() || LESS_LIKE_THIS_ERROR;
+}
+
+/** Story title as an undesired topic name, cut on a word boundary to fit the name cap. */
+export function lessLikeThisSubjectDefault(story: Pick<Story, 'title'>): string {
+	const title = story.title?.trim() ?? '';
+	if (title.length <= LESS_LIKE_THIS_NAME_MAX) return title;
+	const space = title.lastIndexOf(' ', LESS_LIKE_THIS_NAME_MAX);
+	if (space > 0) return title.slice(0, space).trimEnd();
+	return title.slice(0, LESS_LIKE_THIS_NAME_MAX);
+}
+
+/** Subject request body; description = title cut to the server cap; blank keywords / description are omitted. */
+export function lessLikeThisSubjectRequest(
+	name: string,
+	keywordsText: string,
+	title: string | null | undefined,
+): LessLikeThisRequest {
+	const keywords = parseKeywordsInput(keywordsText);
+	const description = (title?.trim() ?? '').slice(0, LESS_LIKE_THIS_DESCRIPTION_MAX);
+	return {
+		kind: 'subject',
+		name: name.trim(),
+		...(keywords.length > 0 ? { keywords } : {}),
+		...(description ? { description } : {}),
+	};
+}
+
+export async function postLessLikeThis(
+	articleId: string,
+	body: LessLikeThisRequest,
+	fetchFn: typeof fetch = fetch,
+): Promise<LessLikeThisResult> {
+	const res = await postJson(
+		fetchFn,
+		`/api/brief/stories/${encodeURIComponent(articleId)}/less-like-this`,
+		body,
+	);
+	if (!res) return { ok: false, unauthenticated: false, error: '' };
+	const error = typeof res.body?.error === 'string' ? res.body.error : '';
+	if (res.status === 401) return { ok: false, unauthenticated: true, error };
+	if (res.status >= 400 || res.body?.ok !== true) return { ok: false, unauthenticated: false, error };
+	const topic = res.body.topic as { name?: unknown } | undefined;
+	if (typeof res.body.created !== 'boolean' || typeof topic?.name !== 'string') {
+		return { ok: false, unauthenticated: false, error: '' };
+	}
+	return { ok: true, created: res.body.created, topicName: topic.name };
 }
 
 /** Manual refresh (session); may take minutes. */

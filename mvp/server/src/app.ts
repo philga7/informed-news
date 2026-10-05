@@ -17,6 +17,8 @@ import {
   fetchAllSources,
   listTriageRecords,
   ManualSeedValidationError,
+  buildFilteredOut,
+  parseFilteredOutScope,
   parseManualSeedBody,
   parseTopicCreate,
   parseTopicPatch,
@@ -30,6 +32,7 @@ import {
   generateRefreshSummaries,
   generateFullStory,
   getRefreshRunner,
+  lessLikeThis,
   loadClaimsRadar,
   markBriefSeen,
   summarizeBriefStory,
@@ -548,6 +551,33 @@ export function createApp(deps: CreateAppDeps = {}): Express {
   });
 
   /**
+   * "Less like this" (NEWS-90): body { kind: 'outlet' } or
+   * { kind: 'subject', name, keywords?, description? } → undesired topic.
+   * 201 created · 200 outlet already blocked · 400 / 404 / 409 / 500 { ok: false, error }.
+   */
+  app.post('/api/brief/stories/:articleId/less-like-this', async (req, res) => {
+    try {
+      const result = await lessLikeThis(req.params.articleId, req.body, {
+        getArticle: async (id) => (await readAllArticles()).find((a) => a.id === id) ?? null,
+        readTopics: readTopicList,
+        createTopic: createOneTopic,
+      });
+      if (!result.ok) {
+        res.status(result.status).json({ ok: false, error: result.error });
+        return;
+      }
+      res.status(result.created ? 201 : 200).json({
+        ok: true,
+        created: result.created,
+        topic: result.topic,
+        topics: result.topics,
+      });
+    } catch (err) {
+      sendTopicWriteError(res, 'less-like-this', err);
+    }
+  });
+
+  /**
    * Global mute rules: veto on Radar + Brief.
    */
   app.get('/api/brief/mutes', async (_req, res) => {
@@ -661,6 +691,38 @@ export function createApp(deps: CreateAppDeps = {}): Express {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.error('Triage read failed:', message);
+      res.status(500).json({ ok: false, error: message });
+    }
+  });
+
+  /**
+   * Filtered out (NEWS-90): dropped records for `scope=last` (default; the last
+   * triage run) or `scope=window` (last TRIAGE_WINDOW_HOURS), grouped by reason.
+   */
+  app.get('/api/triage/filtered', async (req, res) => {
+    try {
+      const [store, articles, topics, mutes, meta] = await Promise.all([
+        readTriageStore(),
+        readAllArticles(),
+        readTopicList(),
+        readMutes(),
+        readServerMeta(),
+      ]);
+      res.json({
+        ok: true,
+        ...buildFilteredOut({
+          store,
+          articles,
+          topics: topics.topics,
+          muteRules: mutes.rules,
+          run: meta.triage ?? null,
+          scope: parseFilteredOutScope(req.query.scope),
+          now: now(),
+        }),
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('Filtered out read failed:', message);
       res.status(500).json({ ok: false, error: message });
     }
   });

@@ -49,6 +49,17 @@ The server stores one living full story per kept article in `brief-full-stories.
 
 **At refresh:** after summary generation, the server may generate full stories automatically. The automatic bar requires a material story (Core significance at least 1.0; Watch stories were already significant at triage), either at least three independent outlets or an `official` label, and a new or significantly updated source. It ranks qualifying cards by significance, outlet count, then recency, and limits work to **5 total** and **1 per topic**. Other cards remain available on demand. On-demand full-story generation is independently capped at **20 per hour per server process**.
 
+## Less like this
+
+Ticket: [NEWS-90](https://informedcrew.atlassian.net/browse/NEWS-90). An **expanded** topic Brief card has a **Less like this** link (collapsed cards, the fixture story, and the plain `StoryList` don't). It opens a small panel with two options; both write an **undesired** topic to the Topics store, where it shows under **Undesired** on `/topics` and can be edited or removed like any other topic.
+
+- **Not interested in this subject.** **Undesired topic name** is prefilled with the headline, cut on a word boundary to 80 characters (the topic name limit). **Keywords** are optional, comma separated. **Add undesired topic** saves it with the story's headline (cut to 500 characters) as its description, so the triage Jev check can judge later stories against it ([TRIAGE.md](TRIAGE.md#jev-questions)).
+- **Block this outlet.** Shown only when the story has a publisher domain that is a hostname such as `bbc.co.uk` (`informed_publisher_domain`). **Block `<domain>`** saves an outlet block: an undesired topic named after the domain with that domain as its only keyword, description "Outlet blocked from the Brief." Triage mutes that outlet and its subdomains by keyword; outlet-only topics (every keyword a hostname; dotted abbreviations like `U.S.` don't count) skip the Jev undesired check. If an undesired topic already blocks the outlet — same domain or a parent domain, ignoring case and a leading `www.` — nothing new is saved and the panel says "`<domain>` is already blocked."
+
+Both kinds get the note `Added with Less like this on: <headline>`. On success the card says `Added "<name>" to undesired topics. Matching stories are hidden the next time the Brief loads, and filtered out from the next refresh.` with a **View Topics** link. Triage applies the topic to stories from the **next refresh**; final records already triaged are not re-triaged. The Brief also re-checks undesired topics each time it is read, so stories already shown that match the new topic (by name, keyword, or outlet) drop out the next time the Brief loads.
+
+It needs a login: otherwise the panel shows "Log in on Topics to use Less like this" linking to `/topics`. A topic name that already exists shows the server's message (`a topic named "…" already exists`); validation errors show the server's message too.
+
 ## Seen stories
 
 A story counts as **seen** when you open it or mark it read in the Brief (including **Mark all as read**). Kite sends seen marks to the server in batches about a second later, and right away when you leave the tab. Seen marks need a login; without one they are silently skipped.
@@ -69,6 +80,7 @@ A refresh runs the whole pipeline: CFP → curated RSS → xcancel → topic sea
 
 - "Updated 5 min ago" from the last successful refresh, or "Not refreshed yet".
 - "Next refresh 3:40 PM" when the timer is on and a refresh has succeeded ("Next refresh due now" once it is overdue).
+- A link to the [Filtered out view](TRIAGE.md#filtered-out-view) (`/filtered`, session): **N filtered out** when the last triage run dropped N > 0 stories (overview `filteredOut`), else **Filtered out**. `filteredOut` is the last run's `dropped` count, or `null` before the first run or when that run was skipped.
 - **Refresh** button → runs a refresh and reloads the Brief. It shows "Refreshing…" and is disabled while a refresh is running. It needs a login: otherwise it shows "Log in on Topics to refresh" linking to `/topics`. A refresh can take minutes. The bar checks every 10 seconds and reloads the Brief when the refresh finishes in two cases: a refresh was already running when the page loaded, or your Refresh request timed out or failed in a way that may hide a still-running refresh (network error or server error). If 3 checks in a row fail, it stops and shows "Refresh failed. Try again." A timer refresh that starts after the page loaded shows up the next time you reload.
 - Notices, in plain language:
 
@@ -95,7 +107,7 @@ In `mvp/.env` (see `mvp/.env.example`):
 
 Other limits are constants in `mvp/server/src/services/briefConfig.ts` (top 3, 8 links, update thresholds, 7-day seen retention, summary lengths, concurrency, 30/hour on-demand summaries, 20/hour on-demand full stories, refresh check and retry minutes).
 
-`npm run test:e2e:kite` and the Kite integration suite (`bun run test:integration` in `apps/kite`) start their own stack via `e2e/stack/start.mjs`: mvp/server + Kite on separate ports (e2e: Kite 5174 / API 3101; integration: 5175 / 3102), a fresh temp data dir seeded with a fixed topic Brief (`e2e/stack/scenarios.mjs`), and a generated env file in place of `mvp/.env` (auto-refresh off, no Ollama / TypeSafe keys, test-only password). They never reuse your dev server or read `mvp/data`, so nothing is skipped for lack of local stories and no budget is spent. The server hooks are `MVP_DATA_DIR` (store directory; process env only) and `MVP_ENV_FILE` (env file instead of `mvp/.env`).
+`npm run test:e2e:kite` and the Kite integration suite (`bun run test:integration` in `apps/kite`) start their own stack via `e2e/stack/start.mjs`: mvp/server + Kite on separate ports (e2e: Kite 5174 / API 3101; integration: 5175 / 3102), a fresh temp data dir seeded with a fixed topic Brief and a last triage run with dropped stories for the Filtered out view (`e2e/stack/scenarios.mjs`), and a generated env file in place of `mvp/.env` (auto-refresh off, no Ollama / TypeSafe keys, test-only password). They never reuse your dev server or read `mvp/data`, so nothing is skipped for lack of local stories and no budget is spent. The server hooks are `MVP_DATA_DIR` (store directory; process env only) and `MVP_ENV_FILE` (env file instead of `mvp/.env`).
 
 ## What's stored where
 
@@ -112,10 +124,12 @@ All gitignored under `mvp/data/`:
 | Method | Path | Auth | Role |
 |--------|------|------|------|
 | GET | `/api/batches/…/categories/…/stories` | Public | All visible Brief stories in Brief order (`limit` ignored) |
-| GET | `/api/brief/overview` | Public | Section order, top / More ids, quiet topics, refresh status, notices |
+| GET | `/api/brief/overview` | Public | Section order, top / More ids, quiet topics, refresh status, notices, `filteredOut` |
 | POST | `/api/brief/seen` | Session | Record seen stories |
 | POST | `/api/brief/stories/:articleId/summary` | Session | On-demand summary for one visible story |
 | POST | `/api/brief/stories/:articleId/full` | Session | Generate or return the visible story's cached full story |
+| POST | `/api/brief/stories/:articleId/less-like-this` | Session | Less like this: undesired topic for the subject, or outlet block |
+| GET | `/api/triage/filtered` | Session | Filtered out view: dropped stories and why (`scope=last` \| `window`) |
 | POST | `/api/fetch` | Session | Manual refresh (also returns `refresh` and `brief`) |
 
 Shapes and status codes: [MVP_API_COMPAT.md](MVP_API_COMPAT.md). Kite proxies these under `apps/kite/src/routes/api/`.
@@ -131,5 +145,4 @@ Shapes and status codes: [MVP_API_COMPAT.md](MVP_API_COMPAT.md). Kite proxies th
 ## Still interim
 
 - **Accept / claims lead.** The accepted-claims lead still renders above the topic sections, and Accept / Unaccept endpoints still exist, but Accept no longer decides what is in the Brief. Manual seeds (Add story) are not triaged, so they don't appear in the topic Brief; the Add story form says so. Retiring the review flow is [NEWS-91](https://informedcrew.atlassian.net/browse/NEWS-91).
-- **Filtered out view** (dropped stories and why) — [NEWS-90](https://informedcrew.atlassian.net/browse/NEWS-90).
 - The NEWS-86 guards on topic search rows stay ([TOPIC_SEARCH.md](TOPIC_SEARCH.md)); kept search rows get Brief summaries only through this path.

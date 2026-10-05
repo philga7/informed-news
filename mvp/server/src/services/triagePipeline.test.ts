@@ -186,6 +186,80 @@ test('acceptance: off-topic, muted, and trash never reach survivor prep; only al
   assert.deepEqual(result.byReason, { muted: 2, off_topic: 1, clickbait: 1 });
 });
 
+test('outlet-only undesired topics skip the Jev undesired slots but still mute by domain', async () => {
+  const outlet = topic('tabloid-outlet', {
+    name: 'dailymail.co.uk',
+    kind: 'undesired',
+    level: null,
+    keywords: ['dailymail.co.uk'],
+  });
+  const keywordTopics = Array.from({ length: 10 }, (_, i) =>
+    topic(`u${i}`, { name: `Unwanted ${i}`, kind: 'undesired', level: null, keywords: [`zzz${i}`] }),
+  );
+  const contexts: string[][] = [];
+  const { deps, state } = harness({
+    topics: [TARIFFS, outlet, ...keywordTopics],
+    articles: [
+      article('blocked', 'Commerce Department sets new tariff schedule', {
+        publisherDomain: 'www.dailymail.co.uk',
+      }),
+      article('good', 'Tariff refunds begin for importers'),
+    ],
+    overrides: {
+      judge: async (_stage, _a, ctx) => {
+        contexts.push(ctx.undesired.map((t) => t.id));
+        const answers: TriageJevAnswers = {
+          relevance: Object.fromEntries(ctx.candidates.map((t) => [t.id, 1])),
+          undesired: Object.fromEntries(ctx.undesired.map((t) => [t.id, 0])),
+          quality: { choice: 'news', confidence: 0.9 },
+          significance: 2,
+        };
+        return { ok: true, answers, verdict: routeTriageAnswers(answers, ctx), model: 'fake' };
+      },
+    },
+  });
+
+  await run(deps);
+
+  assert.equal(state.store.records.blocked!.reason, 'muted:tabloid-outlet');
+  assert.equal(state.store.records.good!.status, 'kept');
+  assert.ok(contexts.length > 0);
+  for (const ids of contexts) {
+    assert.deepEqual(ids, keywordTopics.map((t) => t.id));
+  }
+});
+
+test('undesired topics keyed by dotted abbreviations stay in the Jev undesired context', async () => {
+  const abbrev = topic('us-politics', {
+    name: 'Beltway politics',
+    kind: 'undesired',
+    level: null,
+    keywords: ['U.S.', 'D.C.'],
+  });
+  const contexts: string[][] = [];
+  const { deps } = harness({
+    topics: [TARIFFS, abbrev],
+    articles: [article('good', 'Tariff refunds begin for importers')],
+    overrides: {
+      judge: async (_stage, _a, ctx) => {
+        contexts.push(ctx.undesired.map((t) => t.id));
+        const answers: TriageJevAnswers = {
+          relevance: Object.fromEntries(ctx.candidates.map((t) => [t.id, 1])),
+          undesired: Object.fromEntries(ctx.undesired.map((t) => [t.id, 0])),
+          quality: { choice: 'news', confidence: 0.9 },
+          significance: 2,
+        };
+        return { ok: true, answers, verdict: routeTriageAnswers(answers, ctx), model: 'fake' };
+      },
+    },
+  });
+
+  await run(deps);
+
+  assert.ok(contexts.length > 0);
+  for (const ids of contexts) assert.deepEqual(ids, ['us-politics']);
+});
+
 test('acceptance: every candidate ends kept or dropped with a reason; old, manual, and pruned rows get no record', async () => {
   const articles = [
     article('a', 'Tariff deal reached with Canada'),

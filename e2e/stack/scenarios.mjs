@@ -32,17 +32,31 @@ export const TOPIC_SCENARIO = {
 	fullStoryTalkingPoint:
 		'The published capacity plan combines battery storage, transmission upgrades, and demand response before the winter peak.',
 	duplicateOutletBadge: '+1 outlet',
+	/** Undesired topic that muted one seeded story (Filtered out, NEWS-90). */
+	undesiredTopic: { id: 'e2e-topic-gossip', name: 'Celebrity gossip' },
+	/** Every story the last seeded triage run dropped, with its Filtered out reason label. */
+	filtered: [
+		{ title: 'Celebrity spotted at power plant ribbon cutting', label: 'Muted' },
+		{ title: 'Local bakery wins regional pastry award', label: 'Off-topic' },
+		{ title: 'You will not believe what this battery can do', label: 'Clickbait' },
+		{ title: 'Tentative deal ends port walkout', label: 'Duplicate' },
+	],
+	/** Seeded Brief story Less like this blocks by outlet (has a cached full story). */
+	lessLikeThis: {
+		title: 'Operators add battery storage before winter peak',
+		domain: 'gridwatch.example',
+	},
 };
 
-function topic(def, now, keywords) {
+function topic(def, now, keywords, kind = 'desired') {
 	return {
 		id: def.id,
 		name: def.name,
-		kind: 'desired',
-		level: def.level,
+		kind,
+		level: kind === 'desired' ? def.level : null,
 		description: `${def.name} (e2e fixture topic)`,
 		keywords,
-		searchQuery: def.name,
+		searchQuery: kind === 'desired' ? def.name : '',
 		sections: [],
 		notes: '',
 		createdAt: hoursAgo(now, 72),
@@ -117,6 +131,48 @@ function duplicate(now, a, { topicId, of }) {
 	};
 }
 
+function dropped(now, a, { topicId, reason, stage, jevCalls }) {
+	return {
+		articleId: a.id,
+		status: 'dropped',
+		reason,
+		stage,
+		final: true,
+		topicIds: [topicId],
+		labels: [],
+		duplicateOf: null,
+		memberIds: [],
+		outletCount: null,
+		significance: null,
+		bodyChecked: false,
+		jevCalls,
+		triagedAt: hoursAgo(now, 1),
+	};
+}
+
+/** `meta.json → triage` for a non-skipped run whose records all carry `triagedAt === at`. */
+function triageRun(now, records) {
+	const list = Object.values(records);
+	const byReason = {};
+	for (const rec of list) {
+		if (rec.status !== 'dropped') continue;
+		const key = rec.reason.startsWith('muted:') ? 'muted' : rec.reason;
+		byReason[key] = (byReason[key] ?? 0) + 1;
+	}
+	const keptCount = list.filter((rec) => rec.status === 'kept').length;
+	return {
+		at: hoursAgo(now, 1),
+		skipped: false,
+		candidates: list.length,
+		kept: keptCount,
+		dropped: list.length - keptCount,
+		byReason,
+		jev: { budget: 300, used: list.reduce((sum, rec) => sum + rec.jevCalls, 0), errors: 0 },
+		summaryBudget: 60,
+		errors: [],
+	};
+}
+
 const BODY =
 	'Grid operators filed updated capacity plans this week. The filing lists new battery storage, transmission upgrades and demand response programs intended to cover the winter peak.';
 
@@ -172,6 +228,30 @@ function topicsScenario(now, imageBaseUrl) {
 	});
 	records[portDuplicate.id] = duplicate(now, portDuplicate, { topicId: ports.id, of: portLead.id });
 
+	const [mutedTitle, offTopicTitle, clickbaitTitle] = TOPIC_SCENARIO.filtered.map((f) => f.title);
+	const droppedStories = [
+		{ slug: 'ribbon', title: mutedTitle, domain: 'tabloid.example', reason: `muted:${TOPIC_SCENARIO.undesiredTopic.id}`, stage: 'keyword', jevCalls: 0 },
+		{ slug: 'bakery', title: offTopicTitle, domain: 'townpaper.example', reason: 'off_topic', stage: 'headline', jevCalls: 1 },
+		{ slug: 'viral', title: clickbaitTitle, domain: 'viralhub.example', reason: 'clickbait', stage: 'headline', jevCalls: 1 },
+	].map((s, i) => {
+		const a = article(now, {
+			slug: s.slug,
+			title: s.title,
+			domain: s.domain,
+			topicId: grid.id,
+			hours: 5 + i,
+			body: null,
+			imageBaseUrl: null,
+		});
+		records[a.id] = dropped(now, a, {
+			topicId: grid.id,
+			reason: s.reason,
+			stage: s.stage,
+			jevCalls: s.jevCalls,
+		});
+		return a;
+	});
+
 	const lead = gridStories[0];
 	const refreshRun = {
 		trigger: 'manual',
@@ -187,10 +267,11 @@ function topicsScenario(now, imageBaseUrl) {
 				topic(grid, now, ['grid', 'battery']),
 				topic(ports, now, ['port', 'shipping']),
 				topic(space, now, ['launch', 'rocket']),
+				topic(TOPIC_SCENARIO.undesiredTopic, now, ['celebrity', 'gossip'], 'undesired'),
 			],
 			updatedAt: hoursAgo(now, 72),
 		},
-		'articles.json': [...gridStories, portLead, portDuplicate],
+		'articles.json': [...gridStories, portLead, portDuplicate, ...droppedStories],
 		'triage.json': { records, updatedAt: hoursAgo(now, 1) },
 		'brief-summaries.json': {
 			summaries: {
@@ -245,6 +326,7 @@ function topicsScenario(now, imageBaseUrl) {
 			lastFetchAt: hoursAgo(now, 1),
 			lastError: null,
 			refresh: { last: refreshRun, lastSuccess: refreshRun },
+			triage: triageRun(now, records),
 		},
 	};
 }
@@ -259,7 +341,8 @@ function emptyScenario() {
 /**
  * Replace every store file in `dataDir` with the named scenario.
  * - `topics`: the topic Brief (NEWS-88) — 2 sections, 1 quiet topic, a "More" story,
- *   a duplicate-member story and one cached summary.
+ *   a duplicate-member story and one cached summary; the last triage run also dropped
+ *   one story each as muted (undesired topic), off-topic, clickbait and duplicate (NEWS-90).
  * - `empty`: empty article store → the owned-brief fixture stories (NEWS-44/51).
  * Files not starting with "." are removed first; the generated env file survives.
  */

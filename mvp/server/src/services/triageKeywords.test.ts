@@ -6,8 +6,13 @@ import type { Topic } from '../types/topic.js';
 import {
   candidateTopicIds,
   desiredTopicHits,
+  isHostnameLike,
+  isOutletKeyword,
+  isOutletOnlyTopic,
   keywordMatches,
   muteReason,
+  normalizeOutletDomain,
+  topicBlocksOutlet,
 } from './triageKeywords.js';
 
 function makeTopic(id: string, name: string, overrides: Partial<Topic> = {}): Topic {
@@ -342,4 +347,69 @@ test('muteReason: keyword with spaces is not an outlet block', () => {
 
 test('muteReason: no rules, no undesired → null', () => {
   assert.equal(muteReason(makeArticle({ title: 'Anything' }), [], []), null);
+});
+
+test('muteReason: www. publisher domain matches a bare outlet keyword', () => {
+  const undesired = [
+    makeTopic('tabloids', 'Tabloids', { kind: 'undesired', level: null, keywords: ['dailymail.co.uk'] }),
+  ];
+  assert.equal(
+    muteReason(makeArticle({ title: 'Senate', publisherDomain: 'WWW.DailyMail.co.uk' }), [], undesired),
+    'muted:tabloids',
+  );
+});
+
+test('normalizeOutletDomain: trims, lowercases, strips one leading www.; empty → null', () => {
+  assert.equal(normalizeOutletDomain('  WWW.Example.COM '), 'example.com');
+  assert.equal(normalizeOutletDomain('news.example.com'), 'news.example.com');
+  assert.equal(normalizeOutletDomain('wwwexample.com'), 'wwwexample.com');
+  assert.equal(normalizeOutletDomain('   '), null);
+  assert.equal(normalizeOutletDomain(''), null);
+  assert.equal(normalizeOutletDomain(null), null);
+  assert.equal(normalizeOutletDomain(undefined), null);
+});
+
+test('isOutletKeyword: dotted with no whitespace', () => {
+  assert.equal(isOutletKeyword('dailymail.co.uk'), true);
+  assert.equal(isOutletKeyword('Daily Mail'), false);
+  assert.equal(isOutletKeyword('example.com story'), false);
+});
+
+test('isHostnameLike: dotted hostnames after normalizing, not abbreviations or malformed names', () => {
+  assert.equal(isHostnameLike('dailymail.co.uk'), true);
+  assert.equal(isHostnameLike('www.bbc.co.uk'), true);
+  assert.equal(isHostnameLike(' News-1.Example.COM '), true);
+  assert.equal(isHostnameLike('U.S.'), false);
+  assert.equal(isHostnameLike('D.C.'), false);
+  assert.equal(isHostnameLike('St.'), false);
+  assert.equal(isHostnameLike('localhost'), false);
+  assert.equal(isHostnameLike('foo.'), false);
+  assert.equal(isHostnameLike('.com'), false);
+  assert.equal(isHostnameLike('a..b.com'), false);
+  assert.equal(isHostnameLike('-bad.com'), false);
+  assert.equal(isHostnameLike(''), false);
+  assert.equal(isHostnameLike(null), false);
+});
+
+test('isOutletOnlyTopic: undesired, ≥1 keyword, every keyword hostname-like', () => {
+  const undesired = (keywords: string[]) =>
+    makeTopic('x', 'X', { kind: 'undesired', level: null, keywords });
+  assert.equal(isOutletOnlyTopic(undesired(['dailymail.co.uk', ' www.thesun.co.uk '])), true);
+  assert.equal(isOutletOnlyTopic(undesired(['www.bbc.co.uk'])), true);
+  assert.equal(isOutletOnlyTopic(undesired(['dailymail.co.uk', 'gossip'])), false);
+  assert.equal(isOutletOnlyTopic(undesired(['U.S.', 'D.C.'])), false);
+  assert.equal(isOutletOnlyTopic(undesired(['dailymail.co.uk', 'U.S.'])), false);
+  assert.equal(isOutletOnlyTopic(undesired([])), false);
+  assert.equal(isOutletOnlyTopic(makeTopic('d', 'D', { keywords: ['example.com'] })), false);
+});
+
+test('topicBlocksOutlet: equal or subdomain after normalizing both sides', () => {
+  const block = makeTopic('b', 'B', { kind: 'undesired', level: null, keywords: ['www.Example.com'] });
+  assert.equal(topicBlocksOutlet(block, 'example.com'), true);
+  assert.equal(topicBlocksOutlet(block, 'www.example.com'), true);
+  assert.equal(topicBlocksOutlet(block, 'news.example.com'), true);
+  assert.equal(topicBlocksOutlet(block, 'notexample.com'), false);
+  assert.equal(topicBlocksOutlet(block, null), false);
+  const subdomainBlock = makeTopic('s', 'S', { kind: 'undesired', level: null, keywords: ['news.example.com'] });
+  assert.equal(topicBlocksOutlet(subdomainBlock, 'example.com'), false);
 });

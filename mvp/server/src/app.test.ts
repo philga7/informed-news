@@ -50,6 +50,7 @@ import {
   addMuteRule,
   readMuteRules,
   removeMuteRule,
+  type MuteRule,
 } from './store/muteRulesStore.js';
 import {
   createTopic,
@@ -1071,6 +1072,167 @@ test('DELETE /api/topics/:id removes a topic idempotently', async () => {
   }
 });
 
+// --- Less like this (NEWS-90) ----------------------------------------------
+
+type LessLikeThisBody = {
+  ok: boolean;
+  created?: boolean;
+  error?: string;
+  topic?: TopicBody & { keywords: string[]; description: string; notes: string };
+  topics?: TopicBody[];
+};
+
+async function startLessLikeThisServer(
+  articles: Article[],
+  overrides: Partial<CreateAppDeps> = {},
+): Promise<{ baseUrl: string; close: () => Promise<void> }> {
+  process.env.SESSION_SECRET = 'test-secret';
+  process.env.MVP_PASSWORD = 'pw';
+  delete process.env.MVP_PASSWORD_HASH;
+
+  const topicsPath = tempTopicsPath();
+  const { createApp } = await import('./app.js');
+  const app = createApp({
+    readArticles: async () => articles,
+    readTopics: async () => await readTopics({ topicsPath }),
+    createTopic: async (fields) => await createTopic(fields, { topicsPath }),
+    ...overrides,
+  });
+  return await startServer(app);
+}
+
+function postLessLikeThis(baseUrl: string, articleId: string, body: unknown, cookie?: string) {
+  return fetch(`${baseUrl}/api/brief/stories/${encodeURIComponent(articleId)}/less-like-this`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...(cookie ? { cookie } : {}) },
+    body: JSON.stringify(body),
+  });
+}
+
+function lessArticles(): Article[] {
+  return [
+    briefArticle('mail', { title: 'Royal row deepens', publisherDomain: 'www.dailymail.co.uk' }),
+    briefArticle('usmail', { title: 'US edition story', publisherDomain: 'us.dailymail.co.uk' }),
+    briefArticle('nodomain', { publisherDomain: null }),
+    briefArticle('long', { title: 'L'.repeat(600) }),
+  ];
+}
+
+test('POST /api/brief/stories/:articleId/less-like-this requires session', async () => {
+  const { baseUrl, close } = await startLessLikeThisServer(lessArticles());
+  try {
+    const resp = await postLessLikeThis(baseUrl, 'mail', { kind: 'outlet' });
+    assert.equal(resp.status, 401);
+  } finally {
+    await close();
+  }
+});
+
+test('POST /api/brief/stories/:articleId/less-like-this 400s bad kind and no outlet, 404s unknown stories', async () => {
+  const { baseUrl, close } = await startLessLikeThisServer(lessArticles());
+  try {
+    const cookie = await login(baseUrl);
+    for (const body of [{}, { kind: 'mute' }, { kind: 'OUTLET' }]) {
+      const resp = await postLessLikeThis(baseUrl, 'mail', body, cookie);
+      assert.equal(resp.status, 400);
+      assert.deepEqual(await resp.json(), { ok: false, error: 'kind must be outlet or subject' });
+    }
+
+    const missing = await postLessLikeThis(baseUrl, 'no-such-story', { kind: 'outlet' }, cookie);
+    assert.equal(missing.status, 404);
+    assert.deepEqual(await missing.json(), { ok: false, error: 'story_not_found' });
+
+    const noOutlet = await postLessLikeThis(baseUrl, 'nodomain', { kind: 'outlet' }, cookie);
+    assert.equal(noOutlet.status, 400);
+    assert.deepEqual(await noOutlet.json(), { ok: false, error: 'no_outlet' });
+  } finally {
+    await close();
+  }
+});
+
+test('POST /api/brief/stories/:articleId/less-like-this outlet creates a block once, then dedupes', async () => {
+  const { baseUrl, close } = await startLessLikeThisServer(lessArticles());
+  try {
+    const cookie = await login(baseUrl);
+    const first = await postLessLikeThis(baseUrl, 'mail', { kind: 'outlet' }, cookie);
+    assert.equal(first.status, 201);
+    const created = (await first.json()) as LessLikeThisBody;
+    assert.equal(created.ok, true);
+    assert.equal(created.created, true);
+    assert.equal(created.topic!.name, 'dailymail.co.uk');
+    assert.equal(created.topic!.kind, 'undesired');
+    assert.deepEqual(created.topic!.keywords, ['dailymail.co.uk']);
+    assert.equal(created.topic!.description, 'Outlet blocked from the Brief.');
+    assert.equal(created.topic!.notes, 'Added with Less like this on: Royal row deepens');
+    assert.ok(created.topics!.some((t) => t.id === created.topic!.id));
+    assert.ok((await listTopics(baseUrl, cookie)).some((t) => t.id === created.topic!.id));
+
+    for (const id of ['mail', 'usmail']) {
+      const again = await postLessLikeThis(baseUrl, id, { kind: 'outlet' }, cookie);
+      assert.equal(again.status, 200);
+      const body = (await again.json()) as LessLikeThisBody;
+      assert.equal(body.ok, true);
+      assert.equal(body.created, false);
+      assert.equal(body.topic!.id, created.topic!.id);
+      assert.equal(body.topics!.length, created.topics!.length);
+    }
+  } finally {
+    await close();
+  }
+});
+
+test('POST /api/brief/stories/:articleId/less-like-this subject creates an undesired topic; validation and conflicts map to 400 / 409', async () => {
+  const { baseUrl, close } = await startLessLikeThisServer(lessArticles());
+  try {
+    const cookie = await login(baseUrl);
+    const resp = await postLessLikeThis(
+      baseUrl,
+      'long',
+      { kind: 'subject', name: 'Royal family', keywords: ['royal'], description: 'Palace news' },
+      cookie,
+    );
+    assert.equal(resp.status, 201);
+    const body = (await resp.json()) as LessLikeThisBody;
+    assert.equal(body.created, true);
+    assert.equal(body.topic!.name, 'Royal family');
+    assert.equal(body.topic!.kind, 'undesired');
+    assert.equal(body.topic!.level, null);
+    assert.deepEqual(body.topic!.keywords, ['royal']);
+    assert.equal(body.topic!.description, 'Palace news');
+    assert.equal(body.topic!.notes.length, 500);
+    assert.ok(body.topic!.notes.startsWith('Added with Less like this on: LLL'));
+    assert.ok(body.topic!.notes.endsWith('L…'));
+
+    const invalid = await postLessLikeThis(baseUrl, 'mail', { kind: 'subject', name: '' }, cookie);
+    assert.equal(invalid.status, 400);
+    assert.deepEqual(await invalid.json(), { ok: false, error: 'name is required' });
+
+    const dup = await postLessLikeThis(baseUrl, 'mail', { kind: 'subject', name: 'royal FAMILY' }, cookie);
+    assert.equal(dup.status, 409);
+    const dupBody = (await dup.json()) as LessLikeThisBody;
+    assert.equal(dupBody.ok, false);
+    assert.match(dupBody.error!, /already exists/);
+  } finally {
+    await close();
+  }
+});
+
+test('POST /api/brief/stories/:articleId/less-like-this store write failure → 500', async () => {
+  const { baseUrl, close } = await startLessLikeThisServer(lessArticles(), {
+    createTopic: async () => {
+      throw new Error('disk full');
+    },
+  });
+  try {
+    const cookie = await login(baseUrl);
+    const resp = await postLessLikeThis(baseUrl, 'mail', { kind: 'outlet' }, cookie);
+    assert.equal(resp.status, 500);
+    assert.deepEqual(await resp.json(), { ok: false, error: 'disk full' });
+  } finally {
+    await close();
+  }
+});
+
 test('GET /api/batches/latest/claims returns empty array when no claims are accepted', async () => {
   const app = express();
   app.use(
@@ -2068,6 +2230,10 @@ async function startTriageServer(opts: {
   records: Record<string, TriageRecord>;
   articles: Article[];
   run: TriageRunMeta | null;
+  topics?: Topic[];
+  muteRules?: MuteRule[];
+  now?: Date;
+  readTriage?: CreateAppDeps['readTriage'];
 }): Promise<{ baseUrl: string; close: () => Promise<void> }> {
   process.env.SESSION_SECRET = 'test-secret';
   process.env.MVP_PASSWORD = 'pw';
@@ -2075,9 +2241,12 @@ async function startTriageServer(opts: {
 
   const { createApp } = await import('./app.js');
   const app = createApp({
-    readTriage: async () => ({ records: opts.records, updatedAt: null }),
+    readTriage: opts.readTriage ?? (async () => ({ records: opts.records, updatedAt: null })),
     readArticles: async () => opts.articles,
     readMeta: async () => ({ lastFetchAt: null, lastError: null, triage: opts.run }),
+    readTopics: async () => ({ topics: opts.topics ?? [], updatedAt: null }),
+    readMuteRules: async () => ({ rules: opts.muteRules ?? [], updatedAt: null }),
+    ...(opts.now ? { now: () => opts.now! } : {}),
   });
   return await startServer(app);
 }
@@ -2170,6 +2339,156 @@ test('GET /api/triage returns run null when no triage has run', async () => {
     const resp = await fetch(`${baseUrl}/api/triage`, { headers: { cookie } });
     assert.equal(resp.status, 200);
     assert.deepEqual(await resp.json(), { ok: true, run: null, records: [] });
+  } finally {
+    await close();
+  }
+});
+
+const FILTERED_RUN: TriageRunMeta = {
+  at: '2026-09-30T11:00:00.000Z',
+  skipped: false,
+  candidates: 3,
+  kept: 1,
+  dropped: 2,
+  byReason: { muted: 1, off_topic: 1 },
+  jev: { budget: 300, used: 0, errors: 0 },
+  summaryBudget: 60,
+  errors: [],
+};
+
+function filteredFixture() {
+  const records: Record<string, TriageRecord> = {
+    m1: { ...triageRecordFixture('m1', FILTERED_RUN.at), reason: 'muted:r1', topicIds: ['t1'] },
+    o1: triageRecordFixture('o1', FILTERED_RUN.at),
+    k1: { ...triageRecordFixture('k1', FILTERED_RUN.at), status: 'kept', reason: null },
+    old: triageRecordFixture('old', '2026-09-29T20:00:00.000Z'),
+  };
+  return {
+    records,
+    articles: [
+      { id: 'm1', title: 'Celebrity news', canonicalUrl: 'https://cfp.example/m1', publisherUrl: null, publisherDomain: null, publishedAt: '2026-09-30T09:00:00.000Z', sourceKind: 'rss' } as Article,
+      { id: 'o1', title: 'Off topic', canonicalUrl: 'https://cfp.example/o1', publisherUrl: 'https://o1.example.com/x', publisherDomain: 'o1.example.com', publishedAt: '2026-09-30T08:00:00.000Z', sourceKind: 'search' } as Article,
+    ],
+    run: FILTERED_RUN,
+    topics: [briefTopic('t1', { name: 'Iran' })],
+    muteRules: [{ id: 'r1', keyword: 'celebrity', source: null, createdAt: '2026-09-01T00:00:00.000Z' }],
+    now: new Date('2026-09-30T12:00:00.000Z'),
+  };
+}
+
+test('GET /api/triage/filtered requires session', async () => {
+  const { baseUrl, close } = await startTriageServer(filteredFixture());
+  try {
+    const resp = await fetch(`${baseUrl}/api/triage/filtered`);
+    assert.equal(resp.status, 401);
+  } finally {
+    await close();
+  }
+});
+
+test('GET /api/triage/filtered defaults to scope last: dropped records of the last run, joined', async () => {
+  const { baseUrl, close } = await startTriageServer(filteredFixture());
+  try {
+    const cookie = await login(baseUrl);
+    for (const query of ['', '?scope=bogus', '?scope=last']) {
+      const resp = await fetch(`${baseUrl}/api/triage/filtered${query}`, { headers: { cookie } });
+      assert.equal(resp.status, 200, query);
+      assert.deepEqual(await resp.json(), {
+        ok: true,
+        scope: 'last',
+        run: FILTERED_RUN,
+        counts: { muted: 1, off_topic: 1 },
+        items: [
+          {
+            articleId: 'm1',
+            title: 'Celebrity news',
+            url: 'https://cfp.example/m1',
+            publisherDomain: null,
+            publishedAt: '2026-09-30T09:00:00.000Z',
+            sourceKind: 'rss',
+            reason: 'muted:r1',
+            group: 'muted',
+            final: true,
+            stage: 'keyword',
+            mutedBy: { kind: 'rule', id: 'r1', label: 'celebrity' },
+            topics: [{ id: 't1', name: 'Iran' }],
+            duplicateOf: null,
+            triagedAt: FILTERED_RUN.at,
+          },
+          {
+            articleId: 'o1',
+            title: 'Off topic',
+            url: 'https://o1.example.com/x',
+            publisherDomain: 'o1.example.com',
+            publishedAt: '2026-09-30T08:00:00.000Z',
+            sourceKind: 'search',
+            reason: 'off_topic',
+            group: 'off_topic',
+            final: true,
+            stage: 'keyword',
+            mutedBy: null,
+            topics: [],
+            duplicateOf: null,
+            triagedAt: FILTERED_RUN.at,
+          },
+        ],
+      }, query);
+    }
+  } finally {
+    await close();
+  }
+});
+
+test('GET /api/triage/filtered?scope=window includes earlier runs within 48h', async () => {
+  const { baseUrl, close } = await startTriageServer(filteredFixture());
+  try {
+    const cookie = await login(baseUrl);
+    const resp = await fetch(`${baseUrl}/api/triage/filtered?scope=window`, { headers: { cookie } });
+    assert.equal(resp.status, 200);
+    const body = (await resp.json()) as {
+      scope: string;
+      counts: Record<string, number>;
+      items: Array<{ articleId: string; title: string | null }>;
+    };
+    assert.equal(body.scope, 'window');
+    assert.deepEqual(body.counts, { muted: 1, off_topic: 2 });
+    assert.deepEqual(body.items.map((i) => i.articleId), ['m1', 'o1', 'old']);
+    assert.equal(body.items[2]!.title, null);
+  } finally {
+    await close();
+  }
+});
+
+test('GET /api/triage/filtered: no triage run → run null, no items', async () => {
+  const { baseUrl, close } = await startTriageServer({ ...filteredFixture(), run: null });
+  try {
+    const cookie = await login(baseUrl);
+    const resp = await fetch(`${baseUrl}/api/triage/filtered`, { headers: { cookie } });
+    assert.equal(resp.status, 200);
+    assert.deepEqual(await resp.json(), {
+      ok: true,
+      scope: 'last',
+      run: null,
+      counts: {},
+      items: [],
+    });
+  } finally {
+    await close();
+  }
+});
+
+test('GET /api/triage/filtered: unreadable triage store → 500', async () => {
+  const { baseUrl, close } = await startTriageServer({
+    ...filteredFixture(),
+    readTriage: async () => {
+      throw new Error('corrupt triage');
+    },
+  });
+  try {
+    const cookie = await login(baseUrl);
+    const resp = await fetch(`${baseUrl}/api/triage/filtered`, { headers: { cookie } });
+    assert.equal(resp.status, 500);
+    assert.deepEqual(await resp.json(), { ok: false, error: 'corrupt triage' });
   } finally {
     await close();
   }
@@ -2522,9 +2841,37 @@ test('GET /api/brief/overview: sections with More split, quiet, notices, nextAt,
         { topicId: 'watch', name: 'Gas prices', level: 'watch', storyIds: ['w1'], moreIds: [] },
       ],
       quiet: [{ id: 'quiet', name: 'Palantir', level: 'core' }],
+      filteredOut: null,
     });
   } finally {
     await close();
+  }
+});
+
+test('GET /api/brief/overview: filteredOut = last triage run dropped count; null when skipped or none', async () => {
+  const cases: Array<[TriageRunMeta | null, number | null]> = [
+    [FILTERED_RUN, 2],
+    [{ ...FILTERED_RUN, dropped: 0, byReason: {} }, 0],
+    [{ ...FILTERED_RUN, skipped: true, dropped: 0 }, null],
+    [null, null],
+  ];
+  for (const [triage, expected] of cases) {
+    for (const articles of [[briefArticle('k1')], []]) {
+      const { baseUrl, close } = await startBriefRouter({
+        articles,
+        records: [keptRecord('k1', ['t1'])],
+        meta: { lastFetchAt: null, lastError: null, triage },
+      });
+      try {
+        const overview = await getJson<{ fixture: boolean; filteredOut: number | null }>(
+          `${baseUrl}/api/brief/overview`,
+        );
+        assert.equal(overview.fixture, articles.length === 0);
+        assert.equal(overview.filteredOut, expected, JSON.stringify(triage));
+      } finally {
+        await close();
+      }
+    }
   }
 });
 

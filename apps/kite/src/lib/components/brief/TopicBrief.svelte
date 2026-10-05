@@ -12,6 +12,7 @@ const requestedSummaries = new Set<string>();
 	import StoryCard from '$lib/components/story/StoryCard.svelte';
 	import StoryCardSkeleton from '$lib/components/story/StoryCardSkeleton.svelte';
 	import BriefRefreshBar from './BriefRefreshBar.svelte';
+	import LessLikeThis from './LessLikeThis.svelte';
 	import {
 		BRIEF_LESS_LABEL,
 		BRIEF_LEVEL_LABEL,
@@ -286,7 +287,8 @@ const requestedSummaries = new Set<string>();
 	{@const request = story.id ? summaryRequests[story.id] : undefined}
 	{@const fullStoryRequest = story.id ? fullStoryRequests[story.id] : undefined}
 	{@const expanded = Boolean(expandedStories[key])}
-	{#if badge || official || line || (expanded && fullStoryRequest)}
+	{@const lessLikeThisId = expanded && isTopicBriefStory(story) ? story.informed_article_id : undefined}
+	{#if badge || official || line || (expanded && fullStoryRequest) || lessLikeThisId}
 		<div class="mb-2 space-y-1">
 			{#if badge || official}
 				<div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-gray-500 dark:text-gray-400">
@@ -340,6 +342,9 @@ const requestedSummaries = new Set<string>();
 			{:else if expanded && fullStoryRequest?.phase === 'error'}
 				<p class="text-xs text-gray-500 dark:text-gray-400">{fullStoryRequest.message}</p>
 			{/if}
+			{#if lessLikeThisId}
+				<LessLikeThis {story} articleId={lessLikeThisId} />
+			{/if}
 		</div>
 	{/if}
 {/snippet}
@@ -384,7 +389,11 @@ const requestedSummaries = new Set<string>();
 	{@render fallback()}
 {:else}
 	<div class="topic-brief">
-		<BriefRefreshBar refresh={overview.refresh} notices={overview.notices} />
+		<BriefRefreshBar
+			refresh={overview.refresh}
+			notices={overview.notices}
+			filteredOut={overview.filteredOut}
+		/>
 
 		{#if sections.length === 0}
 			<p class="py-6 text-sm text-gray-600 dark:text-gray-400">

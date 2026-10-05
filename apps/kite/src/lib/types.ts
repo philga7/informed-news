@@ -113,6 +113,8 @@ export interface Story {
 	informed_topic_name?: string;
 	informed_more?: boolean;
 	informed_outlet_count?: number;
+	/** Normalized publisher domain (lowercase, no `www.`) for outlet blocks (NEWS-90). */
+	informed_publisher_domain?: string;
 	informed_labels?: 'official'[];
 	informed_summary_status?: 'ok' | 'missing' | 'unavailable';
 	/** Topic Brief rich-story cache state (NEWS-89). */

@@ -66,6 +66,17 @@ export type {
 export { listTriageRecords, runTriage, TRIAGE_LIST_MAX } from './triagePipeline.js';
 export type { TriageDeps, TriageListing, TriageResult } from './triagePipeline.js';
 export {
+  buildFilteredOut,
+  FILTERED_REASON_GROUPS,
+  parseFilteredOutScope,
+} from './triageFiltered.js';
+export type {
+  FilteredOut,
+  FilteredOutItem,
+  FilteredOutScope,
+  FilteredReasonGroup,
+} from './triageFiltered.js';
+export {
   buildRefreshNotices,
   composeTopicBrief,
   isSignificantlyUpdated,
@@ -104,6 +115,13 @@ export type {
   OnDemandLimiter,
   SummarizeBriefStoryResult,
 } from './briefSummaries.js';
+export {
+  LESS_LIKE_THIS_KIND_ERROR,
+  lessLikeThis,
+  lessLikeThisNotes,
+  OUTLET_BLOCK_DESCRIPTION,
+} from './briefLessLikeThis.js';
+export type { LessLikeThisDeps, LessLikeThisResult } from './briefLessLikeThis.js';
 export {
   createFullStoryOnDemandLimiter,
   generateFullStory,

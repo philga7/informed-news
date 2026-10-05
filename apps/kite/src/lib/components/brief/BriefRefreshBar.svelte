@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount, untrack } from 'svelte';
+	import { filteredOutLinkLabel } from '$lib/filteredOut';
 	import { dataReloadService } from '$lib/services/dataService';
 	import {
 		BRIEF_REFRESHING_LABEL,
@@ -21,14 +22,19 @@
 	interface Props {
 		refresh: BriefOverviewRefresh;
 		notices?: string[];
+		filteredOut?: number | null;
 	}
 
-	let { refresh, notices = [] }: Props = $props();
+	let { refresh, notices = [], filteredOut = null }: Props = $props();
 
 	let now = $state(new Date());
 	let refreshing = $state(false);
 	let polling = $state(false);
-	let polled = $state<{ refresh: BriefOverviewRefresh; notices: string[] } | null>(null);
+	let polled = $state<{
+		refresh: BriefOverviewRefresh;
+		notices: string[];
+		filteredOut: number | null;
+	} | null>(null);
 	let errorMessage = $state<string | null>(null);
 	let loginHint = $state(false);
 
@@ -39,6 +45,7 @@
 
 	const currentRefresh = $derived(polled?.refresh ?? refresh);
 	const currentNotices = $derived(polled?.notices ?? notices);
+	const filteredLabel = $derived(filteredOutLinkLabel(polled ? polled.filteredOut : filteredOut));
 	const updated = $derived(updatedLabel(currentRefresh, now));
 	const next = $derived(nextRefreshLabel(currentRefresh.nextAt, now));
 	const busy = $derived(refreshing || polling || currentRefresh.running);
@@ -98,7 +105,11 @@
 			return;
 		}
 		pollFailures = 0;
-		polled = { refresh: overview.refresh, notices: overview.notices };
+		polled = {
+			refresh: overview.refresh,
+			notices: overview.notices,
+			filteredOut: overview.filteredOut ?? null,
+		};
 		const outcome = refreshPollOutcome(pollBaseline, overview.refresh);
 		if (outcome.kind === 'running') {
 			schedulePoll();
@@ -145,6 +156,14 @@
 				<span aria-hidden="true" class="text-gray-400 dark:text-gray-600">·</span>
 				<span>{next}</span>
 			{/if}
+			<span aria-hidden="true" class="text-gray-400 dark:text-gray-600">·</span>
+			<a
+				href="/filtered"
+				class="text-blue-600 underline underline-offset-2 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+				data-testid="brief-filtered-link"
+			>
+				{filteredLabel}
+			</a>
 		</p>
 		<button
 			type="button"

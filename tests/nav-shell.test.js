@@ -23,6 +23,14 @@ describe('NEWS-42 nav shell route map', () => {
 		const shippedSection = map.split('## Shipped (live)')[1]?.split('## Planned')[0];
 		assert.ok(shippedSection?.includes('`/radar`'), 'expected /radar in Shipped section');
 		assert.ok(shippedSection?.includes('`/topics`'), 'expected /topics in Shipped section');
+		assert.ok(shippedSection?.includes('`/filtered`'), 'expected /filtered in Shipped section');
+	});
+
+	it('ships the session /filtered page (NEWS-90)', () => {
+		assert.equal(
+			existsSync(join(root, 'apps/kite/src/routes/filtered/+page.svelte')),
+			true,
+		);
 	});
 
 	it('ships /topics page with footer link (NEWS-85)', () => {
