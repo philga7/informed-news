@@ -18,8 +18,8 @@ Claims spine plan: [`.cursor/plans/claims_evidence_spine_8f4cde15.plan.md`](../.
 | 3 | [NEWS-87](https://informedcrew.atlassian.net/browse/NEWS-87) | Triage pipeline: dedupe, keyword + Jev headline gates, survivor-only scrape, budget caps, drop reasons — **Done** ([docs/TRIAGE.md](TRIAGE.md)) |
 | 4 | [NEWS-88](https://informedcrew.atlassian.net/browse/NEWS-88) | Brief by topic: top 3 per topic, summaries for shown stories only, scheduled + manual refresh — **Done** ([docs/BRIEF.md](BRIEF.md)) |
 | 5 | [NEWS-89](https://informedcrew.atlassian.net/browse/NEWS-89) | Full stories: tap-to-expand, automatic worth-it bar, topic sections, living updates — **Done** ([docs/BRIEF.md](BRIEF.md)) |
-| **6** | [NEWS-90](https://informedcrew.atlassian.net/browse/NEWS-90) | Filtered out view + "Less like this" feedback *(next)* |
-| 7 | [NEWS-91](https://informedcrew.atlassian.net/browse/NEWS-91) | Retire review flow from default path; park claims desk; update docs |
+| 6 | [NEWS-90](https://informedcrew.atlassian.net/browse/NEWS-90) | Filtered out view (`/filtered`) + "Less like this" feedback — **Done** ([docs/TRIAGE.md](TRIAGE.md), [docs/BRIEF.md](BRIEF.md)) |
+| **7** | [NEWS-91](https://informedcrew.atlassian.net/browse/NEWS-91) | Retire review flow from default path; park claims desk; update docs *(next)* |
 | 8 | [NEWS-99](https://informedcrew.atlassian.net/browse/NEWS-99) | Prune the Brief summaries store (grows without bound today) |
 | 9 | [NEWS-100](https://informedcrew.atlassian.net/browse/NEWS-100) | Prune the Brief full-stories store (sibling of NEWS-99; ship together if practical) |
 | 10 | [NEWS-102](https://informedcrew.atlassian.net/browse/NEWS-102) | Share significant-update helper between Brief seen gate and full-story auto bar |
