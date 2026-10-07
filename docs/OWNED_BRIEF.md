@@ -16,7 +16,9 @@ The Brief is the **topic-driven Brief** ([Epic L](https://informedcrew.atlassian
 | Method | Path | Role |
 |--------|------|------|
 | GET | `/api/batches/latest` | Live batch metadata |
+| GET | `/api/batches/latest/claims` | **Parked (no UI, NEWS-91).** Accepted claims for the retired Brief claims lead ([NEWS-76](https://informedcrew.atlassian.net/browse/NEWS-76)); server-only, no Kite proxy |
 | GET | `/api/batches/:batchId` | Same for `owned-latest` |
+| GET | `/api/batches/:batchId/claims` | **Parked (no UI, NEWS-91).** Same; `:batchId` must be `owned-latest` or `latest` |
 | GET | `/api/batches/:batchId/categories` | The single **Brief** category |
 | GET | `/api/batches/:batchId/categories/:categoryId/stories` | Topic Brief stories (all visible, Brief order) |
 | GET | `/api/brief/overview` | Topic sections, More split, quiet topics, refresh status ([NEWS-88](https://informedcrew.atlassian.net/browse/NEWS-88)) |

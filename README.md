@@ -67,7 +67,9 @@ After the sources, each refresh triages new stories against your topics (mute/ke
 
 ### Brief and refresh
 
-The product flow is topics (`/topics`) → search → triage → Brief → full stories (tap to expand), with dropped stories on `/filtered`; there is no review queue and no Accept / Track step (the Radar page and claims desk are parked — `/radar` redirects to `/topics`). The Brief (`/`) shows triage's kept stories grouped by your topics: top 3 per topic with **More**, a "Nothing new: …" line for quiet topics, and short Ollama summaries (labelled AI) written only for stories shown. Stories you open or mark read are hidden after the next refresh unless significantly updated.
+Topics (`/topics`) → search → triage → Brief by topic → full stories (tap to expand); dropped stories on `/filtered`.
+
+There is no review queue and no Accept / Track step (the Radar page and claims desk are parked — `/radar` redirects to `/topics`). The Brief (`/`) shows triage's kept stories grouped by your topics: top 3 per topic with **More**, a "Nothing new: …" line for quiet topics, and short Ollama summaries (labelled AI) written only for stories shown. Stories you open or mark read are hidden after the next refresh unless significantly updated.
 
 The server refreshes on its own: a check at startup (catch-up) and every 5 minutes, refreshing when the last success is older than `REFRESH_INTERVAL_HOURS` (default 3; `off` disables the timer). The Brief's **Refresh** button (log in on `/topics` first) refreshes now. `TRIAGE_SUMMARY_BUDGET` caps summaries per refresh. A refresh spends API budget; the e2e and integration stacks run with auto-refresh off and no Ollama / TypeSafe keys. Details: [docs/BRIEF.md](docs/BRIEF.md).
 

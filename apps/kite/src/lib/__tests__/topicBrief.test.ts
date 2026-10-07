@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Story } from '$lib/types';
 import {
 	BRIEF_AI_SUMMARY_NOTE,
+	BRIEF_STORIES_SECTION_TITLE,
 	BRIEF_FULL_STORY_ERROR,
 	BRIEF_FULL_STORY_NOT_IN_BRIEF,
 	BRIEF_FULL_STORY_RATE_LIMITED,
@@ -407,6 +408,12 @@ describe('refresh polling decisions', () => {
 		expect(overviewPollFailure(0)).toEqual({ failures: 1, stop: false });
 		expect(overviewPollFailure(1)).toEqual({ failures: 2, stop: false });
 		expect(overviewPollFailure(2)).toEqual({ failures: 3, stop: true });
+	});
+});
+
+describe('Brief copy constants (NEWS-91)', () => {
+	it('keeps BRIEF_STORIES_SECTION_TITLE', () => {
+		expect(BRIEF_STORIES_SECTION_TITLE).toBe('Your topics');
 	});
 });
 
