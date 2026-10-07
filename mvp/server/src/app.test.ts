@@ -307,19 +307,10 @@ test('POST /api/brief/track does not Accept the cluster', async () => {
   }
 });
 
-test('POST /api/fetch calls syncTrackedAfterFetch with briefClusterKey counts', async () => {
+test('POST /api/fetch returns topicSearch + triage summaries and the Brief run', async () => {
   process.env.SESSION_SECRET = 'test-secret';
   process.env.MVP_PASSWORD = 'pw';
   delete process.env.MVP_PASSWORD_HASH;
-
-  const fullStoreArticles: Article[] = [
-    { id: 'a1', clusterId: 'c1' } as Article,
-    { id: 'a2', clusterId: 'c1' } as Article,
-    { id: 'a3', clusterId: 'c1' } as Article,
-    { id: 'solo-1', clusterId: null } as Article,
-  ];
-
-  let seenMap: Readonly<Record<string, number>> | null = null;
 
   const { createApp } = await import('./app.js');
   const app = createApp({
@@ -354,15 +345,8 @@ test('POST /api/fetch calls syncTrackedAfterFetch with briefClusterKey counts', 
           errors: [],
           keptIds: ['a2'],
         },
-        // NOTE: syncTrackedAfterFetch must be based on the full rewritten store, not only
-        // the upserted article set returned from the fetch result.
         articles: [{ id: 'a2', clusterId: 'c1' } as Article],
       }) as any,
-    readArticles: async () => fullStoreArticles,
-    syncTrackedAfterFetch: async (countByClusterId) => {
-      seenMap = countByClusterId;
-      return { entries: [] };
-    },
     ...noRefreshSideEffects,
   });
 
@@ -398,70 +382,7 @@ test('POST /api/fetch calls syncTrackedAfterFetch with briefClusterKey counts', 
       errors: [],
       articles: 1,
     });
-    assert.deepEqual(seenMap, { c1: 3, 'solo:solo-1': 1 });
     assert.deepEqual((json as { brief?: unknown }).brief, { summaries: BRIEF_RUN.summaries });
-  } finally {
-    await close();
-  }
-});
-
-test('POST /api/fetch succeeds even when syncTrackedAfterFetch throws', async () => {
-  process.env.SESSION_SECRET = 'test-secret';
-  process.env.MVP_PASSWORD = 'pw';
-  delete process.env.MVP_PASSWORD_HASH;
-
-  const { createApp } = await import('./app.js');
-  const app = createApp({
-    fetchAllSources: async () =>
-      ({
-        fetched: 0,
-        clustered: 0,
-        clusters: [],
-        cfp: { feedUrl: 'x', limit: 1, fetched: 0, upserted: [] },
-        curated: { skipped: true, sources: [], fetched: 0, errors: [], upserted: [] },
-        xcancel: { skipped: true, handles: [], fetched: 0, errors: [], upserted: [] },
-        topicSearch: {
-          skipped: true,
-          providers: {
-            google_news: { state: 'disabled', topicsAttempted: 0, topicsFailed: 0, items: 0, errors: [] },
-            searxng: { state: 'disabled', topicsAttempted: 0, topicsFailed: 0, items: 0, errors: [] },
-          },
-          fetched: 0,
-          perTopic: {},
-          upserted: [],
-          errors: [],
-        },
-        triage: {
-          at: '2026-09-30T12:00:00.000Z',
-          skipped: true,
-          candidates: 0,
-          kept: 0,
-          dropped: 0,
-          byReason: {},
-          jev: { budget: 300, used: 0, errors: 0 },
-          summaryBudget: 60,
-          errors: [],
-          keptIds: [],
-        },
-        articles: [],
-      }) as any,
-    syncTrackedAfterFetch: async () => {
-      throw new Error('boom');
-    },
-    ...noRefreshSideEffects,
-  });
-
-  const { baseUrl, close } = await startServer(app);
-  try {
-    const cookie = await login(baseUrl);
-    const resp = await fetch(`${baseUrl}/api/fetch`, {
-      method: 'POST',
-      headers: { cookie, 'content-type': 'application/json' },
-      body: JSON.stringify({ limit: 1 }),
-    });
-    assert.equal(resp.status, 200);
-    const json = (await resp.json()) as { ok: boolean };
-    assert.equal(json.ok, true);
   } finally {
     await close();
   }

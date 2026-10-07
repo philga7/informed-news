@@ -1,13 +1,12 @@
 /**
  * Refresh runner (NEWS-88): one pipeline for manual, timer and startup
- * refreshes — fetch all sources → tracked-stories sync → refresh-time Brief
- * summaries → `meta.refresh`. Single-flight per process: a call while a
- * refresh is running joins it.
+ * refreshes — fetch all sources (ingest + topic search + triage) →
+ * refresh-time Brief summaries → full stories → `meta.refresh`. Single-flight
+ * per process: a call while a refresh is running joins it.
  */
-import { readArticles, readMeta, syncTrackedAfterFetch, updateMeta } from '../store/index.js';
-import type { Article, StoreMeta } from '../types/article.js';
+import { readMeta, updateMeta } from '../store/index.js';
+import type { StoreMeta } from '../types/article.js';
 import type { BriefRunMeta, FullStoriesRunMeta, RefreshRun, RefreshTrigger } from '../types/brief.js';
-import { briefClusterKey } from './briefClusterKey.js';
 import { generateRefreshFullStories } from './briefFullStories.js';
 import { generateRefreshSummaries } from './briefSummaries.js';
 import { fetchAllSources } from './fetchAllSources.js';
@@ -25,7 +24,6 @@ export type RefreshResult = {
 
 export type RefreshRunnerDeps = {
   fetchAll?: (options?: FetchAllOptions) => Promise<FetchAllResult>;
-  syncTracked?: () => Promise<void>;
   generateSummaries?: (
     options: { now?: Date; boundaryAt?: string | null },
   ) => Promise<BriefRunMeta>;
@@ -48,35 +46,6 @@ function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
-export function countByClusterIdFromArticles(
-  articles: ReadonlyArray<Pick<Article, 'id' | 'clusterId'>>,
-): Record<string, number> {
-  const counts: Record<string, number> = {};
-  for (const article of articles) {
-    const key = briefClusterKey(article);
-    counts[key] = (counts[key] ?? 0) + 1;
-  }
-  return counts;
-}
-
-/**
- * Tracked developing-story sync after a fetch. Counts come from the full
- * rewritten store (same denominator as Accept), not just this fetch's upserts.
- */
-export function createTrackedStoriesSync(
-  deps: {
-    readArticles?: () => Promise<ReadonlyArray<Pick<Article, 'id' | 'clusterId'>>>;
-    syncTrackedAfterFetch?: (countByClusterId: Readonly<Record<string, number>>) => Promise<unknown>;
-  } = {},
-): () => Promise<void> {
-  const readAll = deps.readArticles ?? (() => readArticles());
-  const sync = deps.syncTrackedAfterFetch ?? ((counts) => syncTrackedAfterFetch(counts));
-  return async () => {
-    const allArticles = await readAll();
-    await sync(countByClusterIdFromArticles(allArticles));
-  };
-}
-
 function emptyBriefRun(at: string, error: string): BriefRunMeta {
   return {
     at,
@@ -86,7 +55,6 @@ function emptyBriefRun(at: string, error: string): BriefRunMeta {
 
 export function createRefreshRunner(deps: RefreshRunnerDeps = {}): RefreshRunner {
   const fetchAll = deps.fetchAll ?? ((options?: FetchAllOptions) => fetchAllSources(options));
-  const syncTracked = deps.syncTracked ?? createTrackedStoriesSync();
   const generateSummaries =
     deps.generateSummaries ?? ((options) => generateRefreshSummaries(options));
   const generateFullStories =
@@ -128,12 +96,6 @@ export function createRefreshRunner(deps: RefreshRunnerDeps = {}): RefreshRunner
         error: errorMessage(err),
       });
       throw err;
-    }
-
-    try {
-      await syncTracked();
-    } catch (err) {
-      log(`Tracked stories sync after fetch failed: ${errorMessage(err)}`);
     }
 
     let brief: BriefRunMeta;
