@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
+	MUTES_ADD_LABEL,
+	MUTES_DELETE_ERROR,
+	MUTES_DELETE_LABEL,
+	MUTES_EMPTY_COPY,
+	MUTES_KEYWORD_LABEL,
+	MUTES_LOAD_ERROR,
+	MUTES_SAVE_ERROR,
+	MUTES_SOURCE_LABEL,
 	emptyTopicForm,
 	formToPayload,
 	formatKeywordsInput,
@@ -172,5 +180,29 @@ describe('removeConfirmMessage', () => {
 	it('fills the template with the topic name', () => {
 		expect(removeConfirmMessage('Ford Super Duty')).toBe('Remove topic "Ford Super Duty"?');
 		expect(removeConfirmMessage('A$&B')).toBe('Remove topic "A$&B"?');
+	});
+});
+
+describe('mute-rule copy (NEWS-91)', () => {
+	it('keeps the original string values', () => {
+		expect({
+			MUTES_KEYWORD_LABEL,
+			MUTES_SOURCE_LABEL,
+			MUTES_ADD_LABEL,
+			MUTES_DELETE_LABEL,
+			MUTES_EMPTY_COPY,
+			MUTES_LOAD_ERROR,
+			MUTES_SAVE_ERROR,
+			MUTES_DELETE_ERROR,
+		}).toEqual({
+			MUTES_KEYWORD_LABEL: 'Keyword',
+			MUTES_SOURCE_LABEL: 'Source (optional)',
+			MUTES_ADD_LABEL: 'Mute',
+			MUTES_DELETE_LABEL: 'Delete',
+			MUTES_EMPTY_COPY: 'No mute rules yet.',
+			MUTES_LOAD_ERROR: 'Could not load mute rules. Try again.',
+			MUTES_SAVE_ERROR: 'Could not save mute rule. Try again.',
+			MUTES_DELETE_ERROR: 'Could not delete mute rule. Try again.',
+		});
 	});
 });

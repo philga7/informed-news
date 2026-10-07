@@ -24,8 +24,11 @@ export const BRIEF_SEED_ERROR_GENERIC =
 export const BRIEF_SEED_NETWORK_ERROR =
 	'Network error while creating the story. Check that the server is running.';
 
-export const BRIEF_SEED_LOGIN_HINT =
-	'Session required to seed the Brief. Sign in on Radar, then try again.';
+export const BRIEF_SEED_LOGIN_HINT = 'Session required to seed the Brief.';
+
+export const BRIEF_SEED_LOGIN_LINK_LABEL = 'Log in on Topics';
+
+export const BRIEF_SEED_LOGIN_HREF = '/topics';
 
 export const BRIEF_UNACCEPT_LABEL = 'Unaccept';
 

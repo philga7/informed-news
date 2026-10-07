@@ -68,10 +68,6 @@ export const BRAND_STRING_OVERRIDES: LocaleMap = {
 		text: 'Topics',
 		translationContext: 'Footer link to session-gated topics management page (NEWS-85)',
 	},
-	'footer.radar': {
-		text: 'Radar',
-		translationContext: 'Footer link to session-gated radar triage page (NEWS-58)',
-	},
 	'settings.about.aboutKite': {
 		text: `About ${PRODUCT_NAME}`,
 		translationContext: 'Settings about section title',

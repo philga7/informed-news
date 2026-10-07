@@ -1,5 +1,4 @@
 <script lang="ts">
-import { onMount } from 'svelte';
 import { s } from '$lib/client/localization.svelte';
 import { displaySettings, languageSettings, themeSettings } from '$lib/data/settings.svelte.js';
 import type { Category, Story } from '$lib/types';
@@ -25,44 +24,6 @@ interface Props {
 
 let { currentCategory = 'world', categories = [], stories = [], onShowAbout }: Props = $props();
 
-type TrackedEntry = {
-	clusterId: string;
-	trackedAt: string;
-	memberCountSnapshot: number;
-	pendingUpdate: boolean;
-	muted?: boolean;
-};
-
-type TrackedResponse =
-	| {
-			ok: true;
-			entries: TrackedEntry[];
-			updatedAt: string | null;
-	  }
-	| {
-			ok: false;
-			error: string;
-	  };
-
-type TrackedClaimEntry = {
-	claimId: string;
-	trackedAt: string;
-	pendingUpdate: boolean;
-};
-
-type TrackedClaimsResponse =
-	| {
-			ok: true;
-			entries: TrackedClaimEntry[];
-			updatedAt: string | null;
-	  }
-	| {
-			ok: false;
-			error: string;
-	  };
-
-let pendingTrackedCount = $state(0);
-
 // Handle about click
 function handleAboutClick() {
 	// Push /about to the URL
@@ -84,45 +45,6 @@ function getRSSFeedUrl(): string {
 
 	return `/${categoryLower}.xml`;
 }
-
-async function loadPendingTrackedCount(): Promise<void> {
-	try {
-		const [claimsResponse, briefResponse] = await Promise.all([
-			fetch('/api/claims/tracked', { credentials: 'include' }),
-			fetch('/api/brief/tracked', { credentials: 'include' }),
-		]);
-		// Ruling: no footer badge when unauthenticated.
-		if (claimsResponse.status === 401 || briefResponse.status === 401) {
-			pendingTrackedCount = 0;
-			return;
-		}
-
-		let claimCount = 0;
-		if (claimsResponse.ok) {
-			const body = (await claimsResponse.json().catch(() => null)) as TrackedClaimsResponse | null;
-			if (body && body.ok && Array.isArray(body.entries)) {
-				claimCount = body.entries.filter((entry) => entry.pendingUpdate).length;
-			}
-		}
-
-		let briefCount = 0;
-		if (briefResponse.ok) {
-			const body = (await briefResponse.json().catch(() => null)) as TrackedResponse | null;
-			if (body && body.ok && Array.isArray(body.entries)) {
-				briefCount = body.entries.filter((entry) => entry.pendingUpdate).length;
-			}
-		}
-
-		pendingTrackedCount = claimCount + briefCount;
-	} catch (err) {
-		console.error('Error loading tracked pending count', err);
-		pendingTrackedCount = 0;
-	}
-}
-
-onMount(() => {
-	void loadPendingTrackedCount();
-});
 </script>
 
 <footer class="mt-8 pt-4 pb-8 md:pb-4">
@@ -218,46 +140,6 @@ onMount(() => {
       </svg>
       <span class="text-xs sm:text-sm">
         {s("footer.topics") || "Topics"}
-      </span>
-    </a>
-
-    <a
-      href="/radar"
-      class="flex items-center space-x-2 text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
-      title={s("footer.radar") || "Radar"}
-    >
-      <svg
-        class="h-5 w-5 text-gray-600 dark:text-gray-400"
-        xmlns="http://www.w3.org/2000/svg"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="1.5"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        aria-hidden="true"
-      >
-        <circle cx="12" cy="12" r="9" />
-        <circle cx="12" cy="12" r="4" />
-        <path d="M12 12V3" />
-      </svg>
-      <span class="inline-flex items-center gap-1 text-xs sm:text-sm">
-        {s("footer.radar") || "Radar"}
-        {#if pendingTrackedCount > 0}
-          <span class="sr-only">
-            {pendingTrackedCount} tracked update{pendingTrackedCount === 1 ? '' : 's'} pending
-          </span>
-          {#if pendingTrackedCount === 1}
-            <span class="h-2 w-2 rounded-full bg-amber-500" aria-hidden="true"></span>
-          {:else}
-            <span
-              class="inline-flex min-w-[1rem] items-center justify-center rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white"
-              aria-hidden="true"
-            >
-              {pendingTrackedCount > 9 ? '9+' : pendingTrackedCount}
-            </span>
-          {/if}
-        {/if}
       </span>
     </a>
 

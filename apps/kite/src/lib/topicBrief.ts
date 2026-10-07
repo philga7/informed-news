@@ -9,6 +9,9 @@ import type { Story } from '$lib/types';
 /** The owned Brief category slug served by mvp/server (named "Brief"). */
 export const TOPIC_BRIEF_CATEGORY_ID = 'world';
 
+/** Heading above the story list on the Brief page. */
+export const BRIEF_STORIES_SECTION_TITLE = 'Your topics';
+
 export const BRIEF_LEVEL_LABEL: Record<TopicBriefLevel, string> = {
 	core: 'Core',
 	watch: 'Watch',

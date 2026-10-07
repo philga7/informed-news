@@ -373,12 +373,20 @@ test.describe('Nav shell (NEWS-42)', () => {
 		await expect(page.getByRole('link', { name: /Back to Brief/i })).toBeVisible();
 	});
 
-	test('/radar loads session shell with Radar title', async ({ page }) => {
+	test('/radar redirects to /topics', async ({ page }) => {
 		await page.goto('/radar');
-		await expect(page).toHaveTitle(/Radar/i, { timeout: 60_000 });
-		await expect(page.getByRole('heading', { name: 'Radar' })).toBeVisible({
+		await expect(page).toHaveURL(/\/topics\/?$/, { timeout: 60_000 });
+		await expect(page.getByRole('heading', { name: 'Topics', exact: true })).toBeVisible({
 			timeout: 60_000,
 		});
+	});
+
+	test('Brief footer has no /radar link', async ({ page }) => {
+		await page.goto('/');
+		await expect(page.getByRole('link', { name: /^Topics$/i })).toBeVisible({
+			timeout: 60_000,
+		});
+		await expect(page.locator('footer a[href="/radar"]')).toHaveCount(0);
 	});
 
 	test('/topics loads session shell with Topics title', async ({ page }) => {

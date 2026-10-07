@@ -5,6 +5,8 @@ import {
 	BRIEF_SEED_ERROR_GENERIC,
 	BRIEF_SEED_LOGIN_HINT,
 	BRIEF_SEED_MODAL_TITLE,
+	BRIEF_SEED_LOGIN_HREF,
+	BRIEF_SEED_LOGIN_LINK_LABEL,
 	BRIEF_SEED_NOTE_LABEL,
 	BRIEF_SEED_PENDING_LABEL,
 	BRIEF_SEED_SUBMIT_LABEL,
@@ -143,10 +145,10 @@ async function handleSubmit(event: Event): Promise<void> {
 			<p class="text-xs text-gray-600 dark:text-gray-400">
 				{BRIEF_SEED_LOGIN_HINT}
 				<a
-					href="/radar"
+					href={BRIEF_SEED_LOGIN_HREF}
 					class="ms-1 font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
 				>
-					Open Radar login
+					{BRIEF_SEED_LOGIN_LINK_LABEL}
 				</a>
 			</p>
 		{/if}

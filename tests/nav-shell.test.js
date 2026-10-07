@@ -45,7 +45,7 @@ describe('NEWS-42 nav shell route map', () => {
 		assert.match(footer, /href="\/topics"/);
 	});
 
-	it('ships /transparency and /radar pages with footer links', () => {
+	it('ships /transparency with a footer link and retires the /radar page (NEWS-91)', () => {
 		assert.equal(
 			existsSync(
 				join(root, 'apps/kite/src/routes/transparency/+page.svelte'),
@@ -54,17 +54,29 @@ describe('NEWS-42 nav shell route map', () => {
 		);
 		assert.equal(
 			existsSync(join(root, 'apps/kite/src/routes/radar/+page.svelte')),
-			true,
+			false,
 		);
+		const redirectFile = join(root, 'apps/kite/src/routes/radar/+page.server.ts');
+		assert.equal(existsSync(redirectFile), true);
+		assert.match(readFileSync(redirectFile, 'utf8'), /redirect\(307, '\/topics'\)/);
 		const footer = readFileSync(
 			join(root, 'apps/kite/src/lib/components/Footer.svelte'),
 			'utf8',
 		);
 		assert.match(footer, /href="\/transparency"/);
-		assert.match(footer, /href="\/radar"/);
+		assert.match(footer, /href="\/topics"/);
+		assert.doesNotMatch(footer, /href="\/radar"/);
 		assert.doesNotMatch(footer, /href="\/finance"/);
 		assert.doesNotMatch(footer, /href="\/situation"/);
 		assert.doesNotMatch(footer, /href="\/listen"/);
+		assert.equal(
+			existsSync(join(root, 'apps/kite/src/routes/topics/+page.svelte')),
+			true,
+		);
+		assert.equal(
+			existsSync(join(root, 'apps/kite/src/routes/filtered/+page.svelte')),
+			true,
+		);
 	});
 
 	it('does not add empty Finance/Situation/Listen chrome in Header', () => {
