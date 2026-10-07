@@ -138,9 +138,7 @@ export type {
 export { selectAutoFullStoryTargets } from './briefFullStoryAuto.js';
 export type { AutoFullStoryOptions } from './briefFullStoryAuto.js';
 export {
-  countByClusterIdFromArticles,
   createRefreshRunner,
-  createTrackedStoriesSync,
   getRefreshRunner,
 } from './refreshRunner.js';
 export type { RefreshResult, RefreshRunner, RefreshRunnerDeps } from './refreshRunner.js';

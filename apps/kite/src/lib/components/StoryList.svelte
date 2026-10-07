@@ -15,6 +15,8 @@ import StoryCard from './story/StoryCard.svelte';
 import {
 	BRIEF_SEED_ADD_LABEL,
 	BRIEF_SEED_LOGIN_HINT,
+	BRIEF_SEED_LOGIN_HREF,
+	BRIEF_SEED_LOGIN_LINK_LABEL,
 	BRIEF_UNACCEPT_ERROR,
 	postBriefUnaccept,
 } from '$lib/briefSeed';
@@ -402,10 +404,10 @@ const allStoriesExpanded = $derived(
         {unacceptError}
         {#if unacceptLoginHint}
           <a
-            href="/radar"
+            href={BRIEF_SEED_LOGIN_HREF}
             class="ms-1 font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
           >
-            Open Radar login
+            {BRIEF_SEED_LOGIN_LINK_LABEL}
           </a>
           <span class="ms-1 text-gray-500 dark:text-gray-400">({BRIEF_SEED_LOGIN_HINT})</span>
         {/if}

@@ -2,17 +2,9 @@
 
 Informed News serves the Kite shell from **our** brief API by default — not `https://kite.kagi.com` (CC BY-NC).
 
-## Topic Brief (NEWS-88 — default story path)
+## Topic Brief (default story path)
 
-Since [NEWS-88](https://informedcrew.atlassian.net/browse/NEWS-88), a non-empty article store makes the Brief's stories come from **triage's kept stories, grouped by your desired topics** — no Accept step. Sections, summaries, seen stories, and the refresh timer / Refresh button are covered in **[BRIEF.md](BRIEF.md)**. The Accept / claims sections below describe the earlier review flow: its endpoints and the accepted-claims lead remain until [NEWS-91](https://informedcrew.atlassian.net/browse/NEWS-91), but story Accept no longer decides what the Brief shows.
-
-## Direction (Epic J — parked by Epic L)
-
-Product next is the **claims / evidence** desk ([NEWS-69](https://informedcrew.atlassian.net/browse/NEWS-69)): Brief `/` **leads with accepted claims** plus expandable **linked story clusters / outlets** ([NEWS-76](https://informedcrew.atlassian.net/browse/NEWS-76)); Radar is the **claim inbox** on `/radar` ([NEWS-74](https://informedcrew.atlassian.net/browse/NEWS-74)). Claim **Accept / Track / ack** on `claimId` ship on `/radar` ([NEWS-75](https://informedcrew.atlassian.net/browse/NEWS-75)); accepted-story `StoryList` remains **secondary** below claims on `/` (transition + manual seeds). This document covers both the **hybrid Brief claims lead** and the **live story-desk** path (Accept / Track / Mute on `clusterId`). Honesty invariant for claims: status + evidence only — Accept ≠ truth; no Verified badges ([CLAIMS_DISCERNMENT.md](CLAIMS_DISCERNMENT.md)).
-
-**Store foundation ([NEWS-70](https://informedcrew.atlassian.net/browse/NEWS-70)):** Claim/evidence JSON stores + status derivation are landed in `mvp/server`; extract HTTP ships in NEWS-72; claim inbox UI + `GET /api/claims/radar` ship in NEWS-74; claim accept/track HTTP ships in NEWS-75.
-
-**Judgment spine ([NEWS-71](https://informedcrew.atlassian.net/browse/NEWS-71)):** TypeSafe client + claim question library + confidence gates are landed in `mvp/server`. **Extract ([NEWS-72](https://informedcrew.atlassian.net/browse/NEWS-72)):** `POST /api/claims/extract` ships Ollama propose + TypeSafe judge batch (session-gated); claim status stays **code-derived** ([NEWS-70](https://informedcrew.atlassian.net/browse/NEWS-70)).
+The Brief is the **topic-driven Brief** ([Epic L](https://informedcrew.atlassian.net/browse/NEWS-84)): your topics (`/topics`) → search (Google News RSS + SearXNG) → triage (keyword/mute → dedupe → Jev headline → scrape → Jev body) → Brief by topic (top 3 per topic, Ollama summaries for shown stories) → full stories (tap to expand). Stories triage drops are visible on `/filtered`. A non-empty article store makes the Brief's stories come from **triage's kept stories, grouped by your desired topics** ([NEWS-88](https://informedcrew.atlassian.net/browse/NEWS-88)) — there is no review queue and no Accept / Track step. Sections, summaries, seen stories, and the refresh timer / Refresh button are covered in **[BRIEF.md](BRIEF.md)**. The earlier story desk and claims desk are parked — see [Parked: story desk and claims desk](#parked-story-desk-and-claims-desk).
 
 ## Default path
 
@@ -24,94 +16,29 @@ Product next is the **claims / evidence** desk ([NEWS-69](https://informedcrew.a
 | Method | Path | Role |
 |--------|------|------|
 | GET | `/api/batches/latest` | Live batch metadata |
+| GET | `/api/batches/latest/claims` | **Parked (no UI, NEWS-91).** Accepted claims for the retired Brief claims lead ([NEWS-76](https://informedcrew.atlassian.net/browse/NEWS-76)); server-only, no Kite proxy |
 | GET | `/api/batches/:batchId` | Same for `owned-latest` |
+| GET | `/api/batches/:batchId/claims` | **Parked (no UI, NEWS-91).** Same; `:batchId` must be `owned-latest` or `latest` |
 | GET | `/api/batches/:batchId/categories` | The single **Brief** category |
 | GET | `/api/batches/:batchId/categories/:categoryId/stories` | Topic Brief stories (all visible, Brief order) |
 | GET | `/api/brief/overview` | Topic sections, More split, quiet topics, refresh status ([NEWS-88](https://informedcrew.atlassian.net/browse/NEWS-88)) |
 | GET | `/api/categories/metadata` | Kite category metadata: the single core **Brief** category |
 | GET | `/api/chaos/history` | Always `[]` (no chaos index on the owned brief; `/api/batches/:batchId/chaos` stays 404 = "not available") |
-| GET | `/api/batches/latest/claims` | Accepted claims for Brief hybrid ([NEWS-76](https://informedcrew.atlassian.net/browse/NEWS-76)) |
-| GET | `/api/batches/:batchId/claims` | Same; `:batchId` must be `owned-latest` or `latest` |
 
 Batch id is always `owned-latest`. Category slug `world` (named **Brief**) / UUID `00000000-0000-4000-8000-000000000001` (matches Kite’s default `/world/latest` route). Session routes the Brief also calls: `POST /api/brief/seen`, `POST /api/brief/stories/:articleId/summary`, `POST /api/brief/stories/:articleId/full`, `POST /api/fetch` (Refresh) — see [MVP_API_COMPAT.md](MVP_API_COMPAT.md).
 
-Claims response: `{ ok: true, claims: BriefClaimItem[] }` — accepted membership only, mute-excluded, sorted `createdAt` desc. See [MVP_API_COMPAT.md](MVP_API_COMPAT.md) for the full item shape.
-
 ## Source data
 
-- Prefer articles in `mvp/data/articles.json` (CFP / xcancel + framing; curated RSS via Developing desk).
+- Prefer articles in `mvp/data/articles.json` (CFP / xcancel + framing; curated RSS from `radar-sources.json`; topic search rows).
 - Cluster-level enrichments are stored separately in `mvp/data/cluster-enrichments.json` (generated via `POST /api/enrich`).
-- Claim-level verbiage enrichments are stored separately in `mvp/data/claim-enrichments.json` (generated via session `POST /api/claims/enrich` — accepted claims only; Ollama `short_summary` + `talking_points`; never overwrites claim status).
 - If the store is **empty**, the adapter returns a single **fixture** story so Brief still loads (first-run / smoke).
 - If the store has articles, the Brief is the **topic Brief**: triage kept stories (`mvp/data/triage.json`) composed by `mvp/server/src/services/topicBrief.ts` and mapped by `topicBriefToKiteStories` in `kiteBriefAdapter.ts`, with AI summaries from `mvp/data/brief-summaries.json` ([BRIEF.md](BRIEF.md)). No kept stories → no stories, not the fixture.
 - Topic Brief full stories are separately cached by kept article id in `mvp/data/brief-full-stories.json`. A hydrated `ok` record adds rich fields to the public story response; missing, unavailable, and failed records remain explicit glue state for Kite's on-demand control. The cache does not share the legacy cluster-enrichment key space.
 - The fixture path in `kiteBriefAdapter.ts` still groups by `clusterId` and maps the framing summary → `short_summary`.
 
-### Membership (Developing desk — NEWS-57 / NEWS-65 / NEWS-66)
-
-> **Since NEWS-88** membership no longer gates the default Brief (topic Brief above). Accept / Unaccept / seed still write `brief-membership.json` until [NEWS-91](https://informedcrew.atlassian.net/browse/NEWS-91) retires the review flow.
-
-Before NEWS-88, Brief showed **Accepted** clusters only (membership in `mvp/data/brief-membership.json`). Accept/Unaccept via session APIs (`POST /api/brief/accept`, `POST /api/brief/unaccept`; see [MVP_API_COMPAT.md](MVP_API_COMPAT.md)). Cluster keys match Radar and enrich: real `clusterId`, or `solo:{articleId}` when unclustered.
-
-- **Accepted multi-member cluster:** all current and future articles sharing that `clusterId` appear on Brief without re-Accept.
-- **Accepted solo key:** only that article appears while it stays unclustered (`solo:{articleId}`). If a later fetch merges it into a shared `clusterId`, v1 does **not** remap membership — Accept the new cluster key again (known gap; association = same key only).
-- **Global mute** ([NEWS-60](https://informedcrew.atlassian.net/browse/NEWS-60)): Accepted clusters that match a mute rule are **excluded from Brief** even though membership remains. Unaccept is unchanged; removing the rule restores Brief eligibility.
-- **Manual seed stories** (NEWS-66): Accepted by definition, not on Radar; Unaccept drops from Brief (see below).
-- **Radar** (`/radar`) is the triage lane for fresh CFP + curated RSS before Accept. Ingest stamps each article `sourceTier` from radar config (CFP/xcancel default `sensor`; conflict primaries are `primary` — [NEWS-73](https://informedcrew.atlassian.net/browse/NEWS-73), [RADAR_SOURCES.md](RADAR_SOURCES.md)); used by claims extract, not Brief membership. See [ROADMAP.md](ROADMAP.md).
-
-### Tracking developing stories (NEWS-59)
-
-**Track ≠ Accept.** They are independent operator flags with separate stores:
-
-| Action | Store | Effect |
-|--------|-------|--------|
-| **Accept** (`POST /api/brief/accept`) | `mvp/data/brief-membership.json` | Cluster appears on Brief (`/`). |
-| **Track** (`POST /api/brief/track`) | `mvp/data/tracked-stories.json` | Operator watches for **new members after ingest**; does **not** put the cluster on Brief by itself. |
-
-Cluster keys match Accept and Radar: real `clusterId`, or `solo:{articleId}` when unclustered. **Untrack** (`POST /api/brief/untrack`) ≠ **Unaccept**; **Unaccept** ≠ **Untrack**. Same solo-merge gap as Accept — if a tracked solo key merges into a shared `clusterId`, v1 does not remap; Track the new key again.
-
-**Default Track on Accept/seed:** `POST /api/brief/accept` and manual seed (`POST /api/brief/seed` / `createManualSeed`) both call `trackCluster` after accept (idempotent). Explicit Untrack is still allowed afterward.
-
-**Alert path (`pendingUpdate` — NEWS-61):** After successful `POST /api/fetch`, `syncTrackedAfterFetch` compares each entry’s member count (articles whose `briefClusterKey` equals the tracked `clusterId`) to `memberCountSnapshot`. When count grows → `pendingUpdate: true` (snapshot is **not** bumped until ack/view). A new Track sets snapshot to the current count and `pendingUpdate: false`. To clear an update, Kite calls `POST /api/brief/tracked/ack` (body `{ clusterId }`) which sets `pendingUpdate: false` and bumps `memberCountSnapshot` to the current member count. UI: Radar **Tracked** rows show an **Update** dot + **Dismiss**, and the Brief footer **Radar** link shows a small dot/count when any tracked entry is pending.
-
-**Radar:** Tracked stories section on `/radar` lists watched clusters; Track / Untrack beside Accept. If a tracked cluster is Accepted, primary action opens Brief `/` (expand lives there). See [ROUTE_MAP.md](ROUTE_MAP.md).
-
-### Brief hybrid — accepted claims lead (NEWS-76)
-
-On `/` (story views only — not onthisday, specialty widgets, or shared-article deep links):
-
-1. **Accepted claims** section loads from public `GET /api/batches/.../claims` (Kite proxy). Cards show code-derived **status** + evidence/confidence chips (humanized labels; never “Verified”).
-2. **Expand** toggles up to **8 linked headlines** per claim (same evidence→article join as Radar) plus optional **Ollama verbiage** when present — always with “AI-assisted — not ground truth.”
-3. **Unaccept** (session) calls `POST /api/claims/unaccept` and refreshes the claims list. **Accept** remains on `/radar` only.
-4. **Your topics** renders **below** claims: the topic Brief sections since [NEWS-88](https://informedcrew.atlassian.net/browse/NEWS-88) ([BRIEF.md](BRIEF.md)); before that, accepted-cluster stories ([NEWS-65](https://informedcrew.atlassian.net/browse/NEWS-65)).
-5. Empty claims: honest copy (“No accepted claims yet. Accept on Radar.”) — **no fixture claims**. Story fixture path unchanged when the article store is empty.
-
-Session `POST /api/claims/enrich` (optional `{ claimIds?, force? }`) generates verbiage for accepted claims into `claim-enrichments.json`. Enrich is optional and does not block Accept.
-
-### Claim membership and tracking (NEWS-75)
-
-Claim desk verbs mirror the story desk on **`claimId`** (not `clusterId`). Operators act on claim cards and the **Tracked claims** section on `/radar`; accepted claims appear on Brief `/` via the hybrid lead ([NEWS-76](https://informedcrew.atlassian.net/browse/NEWS-76)).
-
-| Action | Store | Effect |
-|--------|-------|--------|
-| **Accept** (`POST /api/claims/accept`) | `mvp/data/claim-membership.json` | Claim appears on Brief `/` (minus global mute). |
-| **Track** (`POST /api/claims/track`) | `mvp/data/tracked-claims.json` | Operator watches for **new evidence / stance changes**; does **not** Accept by itself. |
-
-**Track ≠ Accept.** **Untrack** (`POST /api/claims/untrack`) ≠ **Unaccept**; **Unaccept** (`POST /api/claims/unaccept`) ≠ **Untrack** (same mirror as story desk).
-
-**Default Track on Accept:** `POST /api/claims/accept` calls `trackClaim` after `acceptClaim` (idempotent). Explicit Untrack is still allowed afterward.
-
-**Alert path (`pendingUpdate`):** New evidence links or stance changes call `markTrackedClaimPending` in `evidenceLinkStore`. Tracked claim rows on Radar show an **Update** dot + **Dismiss**; ack via `POST /api/claims/tracked/ack` (body `{ claimId }`) clears `pendingUpdate`. Footer badge sums pending claim + story tracked entries.
-
-**Accept / track validation:** Accept, track, and ack return `404` when `claimId` is missing from the claims store. Unaccept and untrack of unknown ids remain idempotent success.
-
-**Mute:** Claims use the **same** global mute rules as stories (`mute-rules.json`, `/api/brief/mutes`). `claimMatchesMute` hides muted claims from the Radar claim inbox (`hiddenMutedCount`) **and** from the Brief claims feed; membership is retained. There is no per-claimId mute store in v1.
-
-See [MVP_API_COMPAT.md](MVP_API_COMPAT.md) and [ROUTE_MAP.md](ROUTE_MAP.md).
-
 ### Global mute (NEWS-60)
 
-**Mute ≠ Untrack.** Mute is a global veto on what the operator sees in the headline lane and on Brief; it does not remove track or accept state.
+**Mute ≠ Untrack.** Mute is a global veto on what the operator sees on the Brief; it does not remove track or accept state.
 
 | Action | Store | Effect |
 |--------|-------|--------|
@@ -124,23 +51,32 @@ See [MVP_API_COMPAT.md](MVP_API_COMPAT.md) and [ROUTE_MAP.md](ROUTE_MAP.md).
 
 **Brief:** the topic Brief re-checks mute rules (and undesired topics) every time it is read, so a new rule hides matching kept stories at once. The fixture path (`filterArticlesForBrief` / owned resolve) skips muted clusters.
 
-**Radar:** Muted story clusters are omitted from the main headline list; muted **claims** are omitted from the claim inbox ([NEWS-75](https://informedcrew.atlassian.net/browse/NEWS-75)). Response includes `hiddenMutedCount` (total muted items in that lane). **Tracked override (stories):** muted clusters that are still tracked appear in the Radar **Tracked stories** section with a muted indicator; alerts / `pendingUpdate` are not cleared by mute alone.
+**Parked desk:** the parked Radar feed and claim feeds still omit muted clusters / claims and report `hiddenMutedCount` ([NEWS-75](https://informedcrew.atlassian.net/browse/NEWS-75)); tracked muted clusters appear on `GET /api/brief/tracked` with `muted: true`.
 
-Session CRUD: `GET /api/brief/mutes`, `POST /api/brief/mutes` `{ keyword, source? }`, `DELETE /api/brief/mutes/:id`. `GET /api/brief/tracked` adds `muted: boolean` per entry. See [MVP_API_COMPAT.md](MVP_API_COMPAT.md).
+Session CRUD: `GET /api/brief/mutes`, `POST /api/brief/mutes` `{ keyword, source? }`, `DELETE /api/brief/mutes/:id`. See [MVP_API_COMPAT.md](MVP_API_COMPAT.md).
 
 ### Manual Brief seed (NEWS-66)
 
-> **Since NEWS-88** manual seeds are stored and Accepted but do **not** appear on `/`: the topic Brief shows triage kept stories only, and triage skips manual seeds. Interim until [NEWS-91](https://informedcrew.atlassian.net/browse/NEWS-91).
+> Manual seeds (**Add story**) and story **Unaccept** are still present but are **not** part of the topic Brief: seeds are stored and Accepted but do not appear on `/`, because the topic Brief shows triage kept stories only and triage skips manual seeds. Their future is owned by [NEWS-98](https://informedcrew.atlassian.net/browse/NEWS-98).
 
-Operators can add a story directly to Brief without going through Radar ingest:
+Operators can add a story by hand:
 
-1. **UI:** Brief header or empty-state **Add story** → modal (title required; note and URLs optional) → `POST /api/brief/seed` via the Kite proxy (`apps/kite/src/routes/api/brief/seed/+server.ts`). Session required (same cookie as Accept).
+1. **UI:** Brief header or empty-state **Add story** → modal (title required; note and URLs optional) → `POST /api/brief/seed` via the Kite proxy (`apps/kite/src/routes/api/brief/seed/+server.ts`). Session required (log in on `/topics`).
 2. **API:** `POST /api/brief/seed` with body `{ title: string; note?: string; urls?: string[] }` → `{ ok: true, articleId, clusterId, acceptedClusterIds }`. Invalid title or non-http(s) URLs → `400`. See [MVP_API_COMPAT.md](MVP_API_COMPAT.md).
 3. **Persistence:** Stored in `mvp/data/articles.json` as `sourceKind: 'manual'`. Identity: `canonicalUrl = manual://seed/{uuid}` → article `id`; `clusterId = id` (membership key is the real id, not `solo:`). Optional URLs become `citations[]`; first URL also sets `publisherUrl`. Operator note → `snippet`; `bodyText` stays null (`bodyStatus: 'not_applicable'`).
-4. **Accepted immediately:** `createManualSeed` upserts the article and calls `acceptCluster(clusterId)` in the same request — no separate Accept step.
-5. **Not on Radar:** `buildRadarFeed` excludes `sourceKind: 'manual'`; triage stays CFP + curated RSS only.
-6. **Honest Brief copy:** Adapter prefers the operator note (`snippet`) for `short_summary`; when empty, fixed copy: `Operator-seeded story — no publisher body yet.` (never title-only silence).
-7. **Unaccept on Brief:** Manual seeds never appear on Radar, so Brief exposes **Unaccept** on story chrome (header/card). `POST /api/brief/unaccept` with the story’s `clusterId` removes Brief membership; the seed row may remain in `articles.json` (no hard-delete in v1).
+4. **Accepted immediately:** `createManualSeed` upserts the article and calls `acceptCluster(clusterId)` in the same request, and tracks the cluster by default.
+5. **Not triaged:** triage skips manual seeds, and the parked Radar feed (`buildRadarFeed`) excludes `sourceKind: 'manual'`.
+6. **Honest Brief copy:** the adapter prefers the operator note (`snippet`) for `short_summary`; when empty, fixed copy: `Operator-seeded story — no publisher body yet.` (never title-only silence).
+7. **Unaccept:** `POST /api/brief/unaccept` with the story's `clusterId` removes Brief membership; the seed row may remain in `articles.json` (no hard-delete in v1).
+
+## Parked: story desk and claims desk
+
+Before Epic L the Brief was a review flow: Radar (`/radar`) triaged fresh CFP + curated RSS, the operator **Accepted** story clusters and claims onto the Brief, **Tracked** developing ones, and the Brief led with an accepted-claims section. [NEWS-88](https://informedcrew.atlassian.net/browse/NEWS-88) stopped membership from gating the Brief, and [NEWS-91](https://informedcrew.atlassian.net/browse/NEWS-91) retired the rest of the flow from the default path:
+
+- **Kite:** `/radar` redirects (`307`) to `/topics`; the footer Radar link and tracked-update badge, the Brief accepted-claims lead, and the Kite proxies for the Radar, claims, and Accept / Track routes are gone. Login hints now say **Log in on Topics**.
+- **Refresh:** a refresh no longer syncs tracked stories, so tracked entries are not flagged `pendingUpdate` automatically. Claims extraction was never part of refresh; it runs only when `POST /api/claims/extract` / `POST /api/claims/enrich` are called by hand ([CLAIMS_DISCERNMENT.md](CLAIMS_DISCERNMENT.md#running-claims-manually)).
+- **Server and data stay:** every `mvp/server` route for Radar, claims, accept, track, membership, and the review queue still exists (session-gated, callable on `:3001`), and the stores remain under `mvp/data/` (`brief-membership.json`, `tracked-stories.json`, `claims.json`, `evidence-links.json`, `claim-membership.json`, `tracked-claims.json`, `claim-review-queue.json`, `claim-enrichments.json`). Nothing is deleted or migrated. Route status is in [MVP_API_COMPAT.md](MVP_API_COMPAT.md).
+- **Honesty invariant (binding if the desk returns):** status + evidence only — Accept ≠ truth; no Verified badges; TypeSafe / Jev = judgment-of-record, Ollama = candidates and verbiage only ([CLAIMS_DISCERNMENT.md](CLAIMS_DISCERNMENT.md)).
 
 ## Regenerate from ingest
 

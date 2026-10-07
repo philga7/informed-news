@@ -5,16 +5,14 @@ import TopicCard from '$lib/components/topics/TopicCard.svelte';
 import TopicForm from '$lib/components/topics/TopicForm.svelte';
 import { FILTERED_TOPICS_LINK } from '$lib/filteredOut';
 import {
-	RADAR_MUTES_ADD_LABEL,
-	RADAR_MUTES_DELETE_ERROR,
-	RADAR_MUTES_DELETE_LABEL,
-	RADAR_MUTES_EMPTY_COPY,
-	RADAR_MUTES_KEYWORD_LABEL,
-	RADAR_MUTES_LOAD_ERROR,
-	RADAR_MUTES_SAVE_ERROR,
-	RADAR_MUTES_SOURCE_LABEL,
-} from '$lib/radar';
-import {
+	MUTES_ADD_LABEL,
+	MUTES_DELETE_ERROR,
+	MUTES_DELETE_LABEL,
+	MUTES_EMPTY_COPY,
+	MUTES_KEYWORD_LABEL,
+	MUTES_LOAD_ERROR,
+	MUTES_SAVE_ERROR,
+	MUTES_SOURCE_LABEL,
 	TOPICS_ADD_LABEL,
 	TOPICS_ADD_TITLE,
 	TOPICS_BACK_TO_BRIEF,
@@ -148,7 +146,7 @@ async function loadAll(): Promise<void> {
 			muteRules = mutesBody.rules;
 		} else {
 			muteRules = [];
-			muteLoadError = mutesBody?.error || RADAR_MUTES_LOAD_ERROR;
+			muteLoadError = mutesBody?.error || MUTES_LOAD_ERROR;
 		}
 	} catch (err) {
 		console.error('Error loading topics', err);
@@ -267,11 +265,11 @@ async function addMuteRule(event: SubmitEvent): Promise<void> {
 
 	muteActionError = null;
 	pendingMute = true;
-	const result = await mutate('/api/brief/mutes', 'POST', RADAR_MUTES_SAVE_ERROR, {
+	const result = await mutate('/api/brief/mutes', 'POST', MUTES_SAVE_ERROR, {
 		keyword: nextKeyword,
 		...(nextSource ? { source: nextSource } : {}),
 	});
-	if (await applyMuteResult(result, RADAR_MUTES_SAVE_ERROR)) {
+	if (await applyMuteResult(result, MUTES_SAVE_ERROR)) {
 		keyword = '';
 		source = '';
 	}
@@ -285,9 +283,9 @@ async function deleteMuteRule(id: string): Promise<void> {
 	const result = await mutate(
 		`/api/brief/mutes/${encodeURIComponent(id)}`,
 		'DELETE',
-		RADAR_MUTES_DELETE_ERROR,
+		MUTES_DELETE_ERROR,
 	);
-	await applyMuteResult(result, RADAR_MUTES_DELETE_ERROR);
+	await applyMuteResult(result, MUTES_DELETE_ERROR);
 	pendingDeleteMuteId = null;
 }
 
@@ -472,7 +470,7 @@ onMount(() => {
 
 				<form class="flex flex-col gap-3 sm:flex-row sm:items-end" onsubmit={addMuteRule}>
 					<label class="block text-xs font-medium text-gray-700 dark:text-gray-300 sm:flex-1">
-						{RADAR_MUTES_KEYWORD_LABEL}
+						{MUTES_KEYWORD_LABEL}
 						<input
 							type="text"
 							class={inputClass}
@@ -482,7 +480,7 @@ onMount(() => {
 						/>
 					</label>
 					<label class="block text-xs font-medium text-gray-700 dark:text-gray-300 sm:flex-1">
-						{RADAR_MUTES_SOURCE_LABEL}
+						{MUTES_SOURCE_LABEL}
 						<input
 							type="text"
 							class={inputClass}
@@ -496,12 +494,12 @@ onMount(() => {
 						class={primaryButtonClass}
 						disabled={pendingMute || !keyword.trim()}
 					>
-						{RADAR_MUTES_ADD_LABEL}
+						{MUTES_ADD_LABEL}
 					</button>
 				</form>
 
 				{#if muteRules.length === 0}
-					<p class="text-xs text-gray-600 dark:text-gray-400">{RADAR_MUTES_EMPTY_COPY}</p>
+					<p class="text-xs text-gray-600 dark:text-gray-400">{MUTES_EMPTY_COPY}</p>
 				{:else}
 					<ul class="space-y-2">
 						{#each muteRules as rule (rule.id)}
@@ -520,7 +518,7 @@ onMount(() => {
 									disabled={pendingDeleteMuteId === rule.id}
 									onclick={() => deleteMuteRule(rule.id)}
 								>
-									{RADAR_MUTES_DELETE_LABEL}
+									{MUTES_DELETE_LABEL}
 								</button>
 							</li>
 						{/each}

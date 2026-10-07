@@ -4,7 +4,6 @@ import { browser } from '$app/environment';
 import { page } from '$app/state';
 import { s } from '$lib/client/localization.svelte';
 import BackToTop from '$lib/components/BackToTop.svelte';
-import BriefClaimsLead from '$lib/components/brief/BriefClaimsLead.svelte';
 import CategoryNavigation from '$lib/components/CategoryNavigation.svelte';
 import CryptoGrid from '$lib/components/crypto/CryptoGrid.svelte';
 import CryptoPrice from '$lib/components/crypto/CryptoPrice.svelte';
@@ -34,9 +33,8 @@ import { briefSeedModalState } from '$lib/briefSeedUi.svelte';
 import Toast from '$lib/components/Toast.svelte';
 import WikipediaPopup from '$lib/components/WikipediaPopup.svelte';
 import Weather from '$lib/components/weather/Weather.svelte';
-import { BRIEF_STORIES_SECTION_TITLE } from '$lib/briefClaims';
 import TopicBrief from '$lib/components/brief/TopicBrief.svelte';
-import { TOPIC_BRIEF_CATEGORY_ID } from '$lib/topicBrief';
+import { BRIEF_STORIES_SECTION_TITLE, TOPIC_BRIEF_CATEGORY_ID } from '$lib/topicBrief';
 import {
 	displaySettings,
 	languageSettings,
@@ -775,7 +773,6 @@ if (browser && typeof window !== 'undefined') {
           </div>
         {:else if derived.isSinglePageMode}
           {#if !state.isSharedArticleView}
-            <BriefClaimsLead batchId={state.currentBatchId} isLatestBatch={state.isLatestBatch} />
             <section class="mt-8 mb-4 space-y-1" aria-label={BRIEF_STORIES_SECTION_TITLE}>
               <h2 class="text-sm font-semibold tracking-tight text-gray-900 dark:text-gray-100">
                 {BRIEF_STORIES_SECTION_TITLE}
@@ -814,7 +811,6 @@ if (browser && typeof window !== 'undefined') {
           />
         {:else}
           {#if !state.isSharedArticleView && isBriefStoryViewCategory(state.currentCategory)}
-            <BriefClaimsLead batchId={state.currentBatchId} isLatestBatch={state.isLatestBatch} />
             <section class="mt-8 mb-4 space-y-1" aria-label={BRIEF_STORIES_SECTION_TITLE}>
               <h2 class="text-sm font-semibold tracking-tight text-gray-900 dark:text-gray-100">
                 {BRIEF_STORIES_SECTION_TITLE}

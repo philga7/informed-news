@@ -6,7 +6,7 @@ Triage decides which new stories are worth a reader's attention. Kept stories ar
 
 ## When it runs
 
-In every refresh — the auto-refresh timer, the startup catch-up, the Kite **Refresh** button, or `POST /api/fetch` ([BRIEF.md](BRIEF.md#refresh)): CFP → curated RSS → xcancel → topic search → clustering → **triage** → tracked-stories sync → Brief summaries. It runs inline (4 story groups in flight at once).
+In every refresh — the auto-refresh timer, the startup catch-up, the Kite **Refresh** button, or `POST /api/fetch` ([BRIEF.md](BRIEF.md#refresh)): CFP → curated RSS → xcancel → topic search → clustering → **triage** → Brief summaries. It runs inline (4 story groups in flight at once).
 
 **Candidates** are articles that:
 
@@ -21,7 +21,7 @@ Older articles that were never triaged are left alone and get no record.
 Cheapest step first. A story only moves on if it passes the step before, so off-topic, muted, and trash stories never reach scraping. Nothing in this path calls Ollama, and claims extraction is not part of it.
 
 1. **Mute and keyword pass (free).**
-   - Shared mute rules (`/api/brief/mutes`, same matching as Radar) are checked first, then **undesired** topics. An undesired topic matches when its name or a keyword appears in the headline, publisher headline, or snippet. A keyword with a dot and no spaces (e.g. `dailymail.co.uk`) also blocks that outlet and its subdomains; a leading `www.` is ignored. Match → `muted:<ruleOrTopicId>`. **Mute always wins** over desired topics.
+   - Shared mute rules (`/api/brief/mutes`) are checked first, then **undesired** topics. An undesired topic matches when its name or a keyword appears in the headline, publisher headline, or snippet. A keyword with a dot and no spaces (e.g. `dailymail.co.uk`) also blocks that outlet and its subdomains; a leading `www.` is ignored. Match → `muted:<ruleOrTopicId>`. **Mute always wins** over desired topics.
    - Then **desired** topics: a topic is a candidate when its name or a keyword appears in the same text. Topic search rows also keep the desired topics that found them. Other sources need a keyword hit — no hit → `off_topic`. At most 6 candidate topics per story.
    - Mute rules match as substrings; undesired-topic keywords match on word boundaries with plural endings only (`raid` mutes "raids", but `Ira` doesn't mute "Iran"); desired-topic keywords also accept inflections and demonyms.
    - Topic keywords match whole words. A keyword with no lowercase letters (`ICE`, `DOGE`, `F-250`) is case-sensitive, so `ICE` doesn't hit "ice cream"; others are case-insensitive. A keyword ending in a letter also matches endings: undesired topics only `s` / `es`; desired topics `s`, `es`, `n`, `an`, `ian`, `i`, each optionally followed by `s` (`tariff` matches "tariffs", `Israel` matches "Israeli" and "Israelis", `Iran` matches "Iranians").
@@ -164,8 +164,8 @@ curl -s -b /tmp/mvp-cookies 'http://127.0.0.1:3001/api/triage/filtered?scope=win
 - A Jev headline failure (an error result or a thrown call) marks that story and its untried group members `not_scored_error`; a body failure keeps the headline verdict with `bodyChecked: false`. Both count in `jev.errors`; other groups continue.
 - Store write failures (triage, articles, meta) are caught into `errors`.
 
-## Interim limits
+## Limits
 
 - **Kept stories are shown in the Brief** by topic ([BRIEF.md](BRIEF.md)); dropped stories are on the [Filtered out view](#filtered-out-view); `GET /api/triage` still lists every record.
 - **Topic edits don't re-triage final records** while they are in the window. A new or changed topic only affects stories triaged after the edit. The Brief does re-check mute rules and undesired topics when it is read, and drops a kept story whose topics are all deleted or undesired.
-- The NEWS-86 guards on topic search rows stay in place (not clustered, not on Radar, skipped by Ollama batch endpoints) — see [TOPIC_SEARCH.md](TOPIC_SEARCH.md).
+- The NEWS-86 guards on topic search rows stay in place (not clustered, skipped by Ollama batch endpoints) — see [TOPIC_SEARCH.md](TOPIC_SEARCH.md).

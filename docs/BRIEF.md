@@ -2,7 +2,7 @@
 
 Part of Epic **L** ([NEWS-84](https://informedcrew.atlassian.net/browse/NEWS-84)) — topics → search → triage → Brief. Ticket: [NEWS-88](https://informedcrew.atlassian.net/browse/NEWS-88). Inputs: your topics ([NEWS-85](https://informedcrew.atlassian.net/browse/NEWS-85), `/topics`), topic search ([TOPIC_SEARCH.md](TOPIC_SEARCH.md)), and triage's kept stories ([TRIAGE.md](TRIAGE.md)).
 
-Opening the app (`/`) shows a finished Brief grouped by your topics. There is no Accept step: every story triage kept, for a topic you still want, is a candidate. The server refreshes on a timer, and the Brief has a **Refresh** button.
+Opening the app (`/`) shows a finished Brief grouped by your topics. The flow is topics (`/topics`) → search → triage → Brief → full stories (tap to expand), with dropped stories on `/filtered`. There is no review queue and no Accept / Track step: every story triage kept, for a topic you still want, is a candidate. The server refreshes on a timer, and the Brief has a **Refresh** button.
 
 ## How the Brief is built
 
@@ -19,7 +19,7 @@ The Brief is composed each time it is read, from triage's kept records (`mvp/dat
 
 Each card shows the headline, a summary line (below), `+N outlets` when more than one outlet ran the story (N = outlets − 1), an `Official statement` badge when triage labelled it official, and up to 8 article links: the kept article first, then its duplicates, one per outlet domain.
 
-The Kite category is still slug `world`, now named **Brief**, and the topic sections sit under a "Your topics" heading. The accepted-claims lead still renders above it until NEWS-91.
+The Kite category is still slug `world`, now named **Brief**, and the topic sections sit under a "Your topics" heading.
 
 ## Summaries
 
@@ -72,7 +72,7 @@ A story counts as **seen** when you open it or mark it read in the Brief (includ
 
 ## Refresh
 
-A refresh runs the whole pipeline: CFP → curated RSS → xcancel → topic search → clustering → triage → tracked-stories sync → Brief summaries → qualifying full stories. The timer, the startup catch-up, and the Refresh button share one runner: a refresh requested while one is running joins it instead of starting another.
+A refresh runs the whole pipeline: CFP → curated RSS → xcancel → topic search → clustering → triage → Brief summaries → qualifying full stories. There is no tracked-stories step and no claims extraction. The timer, the startup catch-up, and the Refresh button share one runner: a refresh requested while one is running joins it instead of starting another.
 
 **Timer.** The server checks once at startup and then every 5 minutes. A refresh starts when the last successful one finished at least `REFRESH_INTERVAL_HOURS` ago (default 3), or there has never been one (a store from before NEWS-88 uses its last fetch time instead). After a failed refresh it waits 30 minutes before trying again. A stored time that is unreadable or in the future (e.g. after a clock change) counts as missing, so a refresh runs and the 30-minute wait is skipped. A laptop that slept catches up on the first check after it wakes; an always-on host behaves the same. The server log says at startup whether auto-refresh is on and at what interval.
 
@@ -142,7 +142,8 @@ Shapes and status codes: [MVP_API_COMPAT.md](MVP_API_COMPAT.md). Kite proxies th
 - Auto-refresh errors are logged and never stop the server; it starts and serves even if the startup catch-up fails.
 - An unreadable `brief-seen.json` or `brief-summaries.json` doesn't break the Brief: it is read as empty and the refresh bar shows "Read history unavailable (brief-seen.json unreadable)" or "Saved summaries unavailable (brief-summaries.json unreadable)". Any other unreadable store (articles, triage, topics, mutes, meta) still fails the Brief request (500).
 
-## Still interim
+## Known limits
 
-- **Accept / claims lead.** The accepted-claims lead still renders above the topic sections, and Accept / Unaccept endpoints still exist, but Accept no longer decides what is in the Brief. Manual seeds (Add story) are not triaged, so they don't appear in the topic Brief; the Add story form says so. Retiring the review flow is [NEWS-91](https://informedcrew.atlassian.net/browse/NEWS-91).
+- **Add story.** Manual seeds (Add story) are not triaged, so they don't appear in the topic Brief; the Add story form says so. Their future is [NEWS-98](https://informedcrew.atlassian.net/browse/NEWS-98).
 - The NEWS-86 guards on topic search rows stay ([TOPIC_SEARCH.md](TOPIC_SEARCH.md)); kept search rows get Brief summaries only through this path.
+- The Accept / Track story desk and the claims desk are parked, not part of the Brief or refresh ([OWNED_BRIEF.md](OWNED_BRIEF.md#parked-story-desk-and-claims-desk)).

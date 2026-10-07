@@ -28,7 +28,6 @@ import {
   briefClusterKey,
   clusterMatchesMute,
   createRefreshRunner,
-  createTrackedStoriesSync,
   generateRefreshSummaries,
   generateFullStory,
   getRefreshRunner,
@@ -62,7 +61,6 @@ import {
   readTriage,
   removeMuteRule,
   removeTopic,
-  syncTrackedAfterFetch,
   TopicConflictError,
   trackClaim,
   trackCluster,
@@ -87,7 +85,6 @@ export type CreateAppDeps = {
    * instead): any left out fall back to the real stores (mvp/data) and Ollama.
    */
   fetchAllSources?: typeof fetchAllSources;
-  syncTrackedAfterFetch?: typeof syncTrackedAfterFetch;
   generateRefreshSummaries?: typeof generateRefreshSummaries;
   updateMeta?: typeof updateMeta;
   readArticles?: typeof readArticles;
@@ -244,10 +241,6 @@ export function createApp(deps: CreateAppDeps = {}): Express {
     (deps.fetchAllSources
       ? createRefreshRunner({
           fetchAll: deps.fetchAllSources,
-          syncTracked: createTrackedStoriesSync({
-            readArticles: readAllArticles,
-            syncTrackedAfterFetch: deps.syncTrackedAfterFetch ?? syncTrackedAfterFetch,
-          }),
           generateSummaries: deps.generateRefreshSummaries ?? generateRefreshSummaries,
           readMeta: readServerMeta,
           updateMeta: deps.updateMeta ?? updateMeta,

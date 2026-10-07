@@ -81,6 +81,30 @@ describe('NEWS-43 MVP API compat surface', () => {
 		assert.match(doc, /NEWS-46/);
 	});
 
+	it('marks the Radar / claims / accept / track rows parked and refresh as tracked-sync free (NEWS-91)', () => {
+		const doc = readFileSync(join(root, 'docs/MVP_API_COMPAT.md'), 'utf8');
+		const rowFor = (method, path) => {
+			const row = doc.split('\n').find((line) => line.startsWith(`| ${method} | \`${path}\``));
+			assert.ok(row, `expected a ${method} ${path} row`);
+			return row;
+		};
+		for (const [method, path] of [
+			['GET', '/api/claims/radar'],
+			['GET', '/api/radar'],
+			['POST', '/api/claims/accept'],
+			['POST', '/api/claims/review/dismiss'],
+			['GET', '/api/claims/tracked'],
+			['GET', '/api/brief/membership'],
+			['POST', '/api/brief/accept'],
+			['POST', '/api/brief/track'],
+			['GET', '/api/brief/tracked'],
+			['POST', '/api/claims/enrich'],
+		]) {
+			assert.match(rowFor(method, path), /Parked/, `${method} ${path} should be marked Parked`);
+		}
+		assert.match(rowFor('POST', '/api/fetch'), /no longer syncs tracked stories/);
+	});
+
 	it('README points operators at the compat doc', () => {
 		const readme = readFileSync(join(root, 'README.md'), 'utf8');
 		assert.match(readme, /docs\/MVP_API_COMPAT\.md/);

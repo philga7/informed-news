@@ -2,6 +2,8 @@
 
 Verify the greenfield path: **login → Refresh → classify → dual citations + depth honesty + framing + clusters / selection signal** (CFP always; curated RSS when `radar-sources.json` is present; xcancel when configured).
 
+There is no review step: a refresh runs the whole pipeline (sources → topic search → triage → Brief summaries → full stories) and the Brief at `/` shows triage's kept stories by topic ([docs/BRIEF.md](../docs/BRIEF.md)). Claims extraction is not part of Refresh.
+
 ## Prerequisites
 
 1. Copy env and set a local password:
@@ -40,7 +42,8 @@ Use curl + session cookie (see Optional API-only checks below). Interactive Reac
 | 9. Framing | Inspect `classification` | Dimension scores present; treat as AI-assisted |
 | 10. Verify this | Inspect classified item | `openQuestions` / selection-risk notes when present |
 | 11. Re-fetch | `POST /api/fetch` again | Unchanged items keep framing; newly body-ok items clear framing for re-classify |
-| 11b. Manual seed (optional) | `POST /api/brief/seed` with `{ "title": "Smoke test seed" }` | `ok: true`, `articleId` + `clusterId`; story appears on Brief (not Radar); Unaccept removes from Brief |
+| 11a. Topic Brief | `GET /api/brief/overview` (public) after a refresh | `ok: true`, `sections` per desired topic with kept stories, `refresh.lastSuccess` set (kept stories need topics + triage; Jev / Ollama keys optional) |
+| 11b. Manual seed (optional) | `POST /api/brief/seed` with `{ "title": "Smoke test seed" }` | `ok: true`, `articleId` + `clusterId`; seed is stored and Accepted but is not triaged, so it does not appear on the topic Brief (Add story / Unaccept are still present; future in NEWS-98) |
 
 ## Checklist (curated RSS)
 

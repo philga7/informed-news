@@ -1,12 +1,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import type { Article, StoreMeta } from '../types/article.js';
+import type { StoreMeta } from '../types/article.js';
 import type { BriefRunMeta, FullStoriesRunMeta, RefreshRun } from '../types/brief.js';
 import type { FetchAllResult } from './fetchAllSources.js';
 import {
-  countByClusterIdFromArticles,
   createRefreshRunner,
-  createTrackedStoriesSync,
   type RefreshRunnerDeps,
 } from './refreshRunner.js';
 
@@ -60,7 +58,6 @@ function harness(overrides: Partial<RefreshRunnerDeps> = {}, meta?: StoreMeta): 
   };
   h.deps = {
     fetchAll: async () => fetchResult(),
-    syncTracked: async () => {},
     generateSummaries: async (options) => {
       h.summaryCalls.push(options);
       return BRIEF;
@@ -82,15 +79,12 @@ function harness(overrides: Partial<RefreshRunnerDeps> = {}, meta?: StoreMeta): 
   return h;
 }
 
-test('run: success → fetch, sync, summaries with boundaryAt = startedAt, meta last + lastSuccess', async () => {
+test('run: success → fetch, summaries, full stories with boundaryAt = startedAt, meta last + lastSuccess', async () => {
   const order: string[] = [];
   const h = harness({
     fetchAll: async (options) => {
       order.push(`fetch:${JSON.stringify(options)}`);
       return fetchResult(4);
-    },
-    syncTracked: async () => {
-      order.push('sync');
     },
   });
   const baseSummaries = h.deps.generateSummaries!;
@@ -107,7 +101,7 @@ test('run: success → fetch, sync, summaries with boundaryAt = startedAt, meta 
 
   const result = await runner.run('manual', { limit: 4 });
 
-  assert.deepEqual(order, ['fetch:{"limit":4}', 'sync', 'summaries', 'full-stories']);
+  assert.deepEqual(order, ['fetch:{"limit":4}', 'summaries', 'full-stories']);
   assert.equal(result.trigger, 'manual');
   assert.equal(result.joined, false);
   assert.equal(result.fetch.fetched, 4);
@@ -220,19 +214,30 @@ test('run: lastSuccess only moves on success', async () => {
   assert.equal(h.meta.refresh!.last!.ok, false);
 });
 
-test('run: syncTracked failure is logged and does not fail the run', async () => {
-  const h = harness({
-    syncTracked: async () => {
-      throw new Error('tracked boom');
+test('run: one run calls fetchAll → generateSummaries → generateFullStories in order, once each', async () => {
+  const order: string[] = [];
+  const runner = createRefreshRunner({
+    fetchAll: async () => {
+      order.push('fetchAll');
+      return fetchResult();
     },
+    generateSummaries: async () => {
+      order.push('generateSummaries');
+      return BRIEF;
+    },
+    generateFullStories: async () => {
+      order.push('generateFullStories');
+      return FULL_STORIES;
+    },
+    readMeta: async () => ({ lastFetchAt: null, lastError: null }),
+    updateMeta: async () => ({ lastFetchAt: null, lastError: null }),
+    now: tickingClock(),
+    log: () => {},
   });
-  const runner = createRefreshRunner(h.deps);
 
-  const result = await runner.run('manual');
-  assert.equal(result.joined, false);
-  assert.equal(h.summaryCalls.length, 1);
-  assert.equal(h.meta.refresh!.last!.ok, true);
-  assert.ok(h.logs.some((l) => l.includes('tracked boom')));
+  await runner.run('manual');
+
+  assert.deepEqual(order, ['fetchAll', 'generateSummaries', 'generateFullStories']);
 });
 
 test('run: meta write failure is logged and does not fail a successful run', async () => {
@@ -296,22 +301,4 @@ test('run: a throwing full-story generator is captured after summaries', async (
   });
   assert.deepEqual(h.meta.brief, result.brief);
   assert.equal(h.meta.refresh!.last!.ok, true);
-});
-
-test('createTrackedStoriesSync counts the full store by briefClusterKey', async () => {
-  const articles = [
-    { id: 'a1', clusterId: 'c1' },
-    { id: 'a2', clusterId: 'c1' },
-    { id: 'solo-1', clusterId: null },
-  ] as Article[];
-  let seen: Readonly<Record<string, number>> | null = null;
-  const sync = createTrackedStoriesSync({
-    readArticles: async () => articles,
-    syncTrackedAfterFetch: async (counts) => {
-      seen = counts;
-    },
-  });
-  await sync();
-  assert.deepEqual(seen, { c1: 2, 'solo:solo-1': 1 });
-  assert.deepEqual(countByClusterIdFromArticles(articles), seen);
 });

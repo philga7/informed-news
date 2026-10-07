@@ -54,6 +54,23 @@ export const TOPICS_MUTES_TITLE = 'Keyword & outlet mutes';
 export const TOPICS_MUTES_HELP =
 	'Stories matching a keyword (optionally only from one outlet) are always filtered out, even when they match a desired topic.';
 
+/** Mute-rule copy for the Topics page (NEWS-91). */
+export const MUTES_KEYWORD_LABEL = 'Keyword';
+
+export const MUTES_SOURCE_LABEL = 'Source (optional)';
+
+export const MUTES_ADD_LABEL = 'Mute';
+
+export const MUTES_DELETE_LABEL = 'Delete';
+
+export const MUTES_EMPTY_COPY = 'No mute rules yet.';
+
+export const MUTES_LOAD_ERROR = 'Could not load mute rules. Try again.';
+
+export const MUTES_SAVE_ERROR = 'Could not save mute rule. Try again.';
+
+export const MUTES_DELETE_ERROR = 'Could not delete mute rule. Try again.';
+
 export const TOPICS_EMPTY_DESIRED = 'No topics at this level yet.';
 
 export const TOPICS_EMPTY_UNDESIRED = 'No undesired topics yet.';
