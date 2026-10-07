@@ -23,14 +23,14 @@ New stories are upserted as articles with `sourceKind: 'search'`, `sourceTier: '
 | `searchProviders` | `('google_news' \| 'searxng')[]` that returned it |
 | `googleNewsUrl` | Google News article link (`?oc=…` stripped) or `null` |
 
-## Interim behavior
+## Behavior after ingest
 
 Search rows are **triaged** at the end of every refresh ([NEWS-87](https://informedcrew.atlassian.net/browse/NEWS-87), [TRIAGE.md](TRIAGE.md)): each gets a kept or dropped record in `mvp/data/triage.json`.
 
 - **Kept search rows are shown in the Brief** under their topic ([NEWS-88](https://informedcrew.atlassian.net/browse/NEWS-88), [BRIEF.md](BRIEF.md)) and get their Brief summary through that path only.
 - **Survivors only get resolved and scraped:** a search row that passes the triage headline check has its Google link resolved to the publisher URL, its body scraped, and (if undated) its date read from page metadata — still undated → dropped `undated`. Rows that fail triage stay `bodyStatus: 'pending'` with no live resolution.
-- **Stored and listed, not on Radar:** search rows are in the shared article store and returned by `GET /api/articles` and `POST /api/fetch` (top-level `articles`), but hidden from Radar (Radar shows `cfp` / `rss` only).
-- **Not clustered:** search rows always get `clusterId: null` and are never grouped with other articles, so they cannot re-key an existing Brief or tracked story or bridge two Radar clusters. (Triage does its own duplicate grouping; it does not set `clusterId`.)
+- **Stored and listed:** search rows are in the shared article store and returned by `GET /api/articles` and `POST /api/fetch` (top-level `articles`). The parked `GET /api/radar` feed shows only `cfp` / `rss` rows.
+- **Not clustered:** search rows always get `clusterId: null` and are never grouped with other articles, so they cannot re-key an existing story or bridge two clusters. (Triage does its own duplicate grouping; it does not set `clusterId`.)
 - **Skipped by Ollama batches:** the batch endpoints `POST /api/classify`, `POST /api/enrich`, and `POST /api/claims/extract` (without `articleIds`) skip search rows. Explicit per-id calls (`POST /api/classify/:id`, `POST /api/claims/extract` with `articleIds`) are unchanged.
 - **No body scrape and no live Google link resolution at ingest** — both happen in triage, for survivors only.
 

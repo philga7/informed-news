@@ -19,20 +19,20 @@ Claims spine plan: [`.cursor/plans/claims_evidence_spine_8f4cde15.plan.md`](../.
 | 4 | [NEWS-88](https://informedcrew.atlassian.net/browse/NEWS-88) | Brief by topic: top 3 per topic, summaries for shown stories only, scheduled + manual refresh — **Done** ([docs/BRIEF.md](BRIEF.md)) |
 | 5 | [NEWS-89](https://informedcrew.atlassian.net/browse/NEWS-89) | Full stories: tap-to-expand, automatic worth-it bar, topic sections, living updates — **Done** ([docs/BRIEF.md](BRIEF.md)) |
 | 6 | [NEWS-90](https://informedcrew.atlassian.net/browse/NEWS-90) | Filtered out view (`/filtered`) + "Less like this" feedback — **Done** ([docs/TRIAGE.md](TRIAGE.md), [docs/BRIEF.md](BRIEF.md)) |
-| **7** | [NEWS-91](https://informedcrew.atlassian.net/browse/NEWS-91) | Retire review flow from default path; park claims desk; update docs *(next)* |
-| 8 | [NEWS-99](https://informedcrew.atlassian.net/browse/NEWS-99) | Prune the Brief summaries store (grows without bound today) |
+| 7 | [NEWS-91](https://informedcrew.atlassian.net/browse/NEWS-91) | Retire review flow from default path; park claims desk; update docs — **Done** ([docs/OWNED_BRIEF.md](OWNED_BRIEF.md#parked-story-desk-and-claims-desk)) |
+| **8** | [NEWS-99](https://informedcrew.atlassian.net/browse/NEWS-99) | Prune the Brief summaries store (grows without bound today) *(next)* |
 | 9 | [NEWS-100](https://informedcrew.atlassian.net/browse/NEWS-100) | Prune the Brief full-stories store (sibling of NEWS-99; ship together if practical) |
 | 10 | [NEWS-102](https://informedcrew.atlassian.net/browse/NEWS-102) | Share significant-update helper between Brief seen gate and full-story auto bar |
-| 11 | [NEWS-98](https://informedcrew.atlassian.net/browse/NEWS-98) | Manual seeds (Add story) on the topic Brief — grill first; decide alongside NEWS-91 |
+| 11 | [NEWS-98](https://informedcrew.atlassian.net/browse/NEWS-98) | Manual seeds (Add story) and story Unaccept on the topic Brief — grill first; both still present, not retired by NEWS-91 |
 | 12 | [NEWS-104](https://informedcrew.atlassian.net/browse/NEWS-104) | Less like this + Filtered out polish (NEWS-90 follow-ups: keyboard/focus, 409 after collapse, mute-store fallback, 5xx copy) |
 | Later | [NEWS-92](https://informedcrew.atlassian.net/browse/NEWS-92) | USAspending contract awards source for company Watch topics |
 | Later | [NEWS-93](https://informedcrew.atlassian.net/browse/NEWS-93) | Always-on hosting decision |
 
-**First milestone:** NEWS-85 → 86 → 87 → 88 → 89 (all Done) — open the app and get a filtered, topic-grouped Brief with tap-to-expand full stories and no review step.
+**First milestone:** NEWS-85 → 86 → 87 → 88 → 89 (all Done) — open the app and get a filtered, topic-grouped Brief with tap-to-expand full stories and no review step. NEWS-91 then retired the review flow: `/radar` redirects to `/topics`, refresh no longer syncs tracked stories, and the claims desk is parked.
 
 Epic **K** ([NEWS-83](https://informedcrew.atlassian.net/browse/NEWS-83)) stays open as the bug intake from the operator walkthrough: open [NEWS-94](https://informedcrew.atlassian.net/browse/NEWS-94) primary-source plumbing, [NEWS-95](https://informedcrew.atlassian.net/browse/NEWS-95) Topics follow-ups, [NEWS-97](https://informedcrew.atlassian.net/browse/NEWS-97) "WORLD" label on topic Brief cards, [NEWS-101](https://informedcrew.atlassian.net/browse/NEWS-101) full-story unavailable UI feedback, [NEWS-103](https://informedcrew.atlassian.net/browse/NEWS-103) require green CI before merge, [NEWS-105](https://informedcrew.atlassian.net/browse/NEWS-105) e2e coverage gaps for Filtered out + Less like this. [NEWS-96](https://informedcrew.atlassian.net/browse/NEWS-96) (svelte-check 0/0, hermetic e2e/integration stack, no skipped tests) shipped with NEWS-88 — **Done**. Still ask before parked Later under [NEWS-57](https://informedcrew.atlassian.net/browse/NEWS-57) or Epic **B** ([NEWS-34](https://informedcrew.atlassian.net/browse/NEWS-34)).
 
-Epic **J** ([NEWS-69](https://informedcrew.atlassian.net/browse/NEWS-69)) is **Done**; its claims desk is **parked** by Epic L (not part of the refresh path).
+Epic **J** ([NEWS-69](https://informedcrew.atlassian.net/browse/NEWS-69)) is **Done**; its claims desk is **parked** by Epic L ([NEWS-91](https://informedcrew.atlassian.net/browse/NEWS-91)): no Radar page, no Brief claims lead, no Accept / Track in the UI. Server APIs and stored claims remain; extraction runs only when called manually ([docs/CLAIMS_DISCERNMENT.md](CLAIMS_DISCERNMENT.md)).
 
 ### Complete: J. Claims / evidence desk
 
@@ -50,7 +50,7 @@ Epic **J** ([NEWS-69](https://informedcrew.atlassian.net/browse/NEWS-69)) is **D
 | — | [NEWS-78](https://informedcrew.atlassian.net/browse/NEWS-78) | Mark reviewed: dequeue Needs review + Accept clears queue — **Done** |
 | — | [NEWS-79](https://informedcrew.atlassian.net/browse/NEWS-79) | Extract gating: skip muted articles in all modes + primary-first batch (low-value gate not shipped) — **Done** |
 
-**Product direction (superseded by Epic L, NEWS-84):** Epic J re-centered on **claims + evidence** with Radar as a claim inbox. Epic L replaces the review-desk model with a topic-driven, no-review Brief; the claims desk is parked. Still binding: TypeSafe / Jev = structured judgments; Ollama = verbiage only; honesty = **status + evidence**, no Verified badges / verdicts. Discernment: [CLAIMS_DISCERNMENT.md](CLAIMS_DISCERNMENT.md).
+**Product direction (superseded by Epic L, NEWS-84):** Epic J re-centered on **claims + evidence** with Radar as a claim inbox. Epic L replaced the review-desk model with a topic-driven, no-review Brief; the claims desk is parked. Still binding: TypeSafe / Jev = structured judgments; Ollama = verbiage only; honesty = **status + evidence**, no Verified badges / verdicts. Discernment: [CLAIMS_DISCERNMENT.md](CLAIMS_DISCERNMENT.md).
 
 ### Prior: Developing desk v1 (Done-demo)
 
@@ -61,20 +61,9 @@ Epic **J** ([NEWS-69](https://informedcrew.atlassian.net/browse/NEWS-69)) is **D
 | Parked | [NEWS-56](https://informedcrew.atlassian.net/browse/NEWS-56), [NEWS-62](https://informedcrew.atlassian.net/browse/NEWS-62), [NEWS-63](https://informedcrew.atlassian.net/browse/NEWS-63), [NEWS-67](https://informedcrew.atlassian.net/browse/NEWS-67) | **[Later][Parked]** pending claims spine |
 | Superseded | [NEWS-64](https://informedcrew.atlassian.net/browse/NEWS-64) | Claims/disagreements on tracked clusters → Epic J |
 
-### Story-desk membership (still live until claim cutover)
+### Retired (NEWS-91)
 
-| Surface | What appears |
-|--------|----------------|
-| **Radar** | Auto triage: fresh CFP + curated RSS clusters (headline lane). No manual seeds in v1. |
-| **Brief** | **Accepted claims** lead ([NEWS-76](https://informedcrew.atlassian.net/browse/NEWS-76)) + linked outlets; **Accepted** story clusters secondary, minus **global mute**. **Manual seeds** ([NEWS-66](https://informedcrew.atlassian.net/browse/NEWS-66)): title / note / optional URL(s), `sourceKind: manual`, Accepted by definition (not on Radar). |
-
-- **Accept** = Brief membership (from Radar). One verb — not a separate “Promote.”
-- **Manual seed** = Accept without ingest parent; **Unaccept** drops from Brief (hard-delete not required in v1).
-- **Mute** = global veto (Radar hide + Brief ineligible).
-- **Track** = alerts only; may default on at Accept / manual seed.
-- No auto live/breaking classifier in v1. Brief is the home / analysis feed (not framed by time of day).
-
-**Radar v1 sources:** CFP + curated RSS starter set ([docs/RADAR_SOURCES.md](RADAR_SOURCES.md)) — 14 curated feeds + CFP. File config only until [NEWS-67](https://informedcrew.atlassian.net/browse/NEWS-67) (parked). Epic J adds **primary vs sensor** tiers ([NEWS-73](https://informedcrew.atlassian.net/browse/NEWS-73)).
+The story-desk flow (Radar triage → **Accept** onto the Brief → **Track** / **Mute**) and the claims desk are off the default path. Epic L's topic Brief decides what shows; there is no Accept step. What stays: the `mvp/server` routes and `mvp/data` stores for Radar, claims, accept, track, and membership (parked, no UI — [docs/MVP_API_COMPAT.md](MVP_API_COMPAT.md)), global **Mute** (shared with triage), manual seeds / **Add story** and story **Unaccept** (owned by [NEWS-98](https://informedcrew.atlassian.net/browse/NEWS-98)), and the curated feeds in [docs/RADAR_SOURCES.md](RADAR_SOURCES.md), which refresh still ingests (CFP + 14 curated feeds). No auto live/breaking classifier. The Brief is the home / analysis feed (not framed by time of day).
 
 Former [NEWS-53](https://informedcrew.atlassian.net/browse/NEWS-53) (Brief source breadth) was **absorbed** into NEWS-57.
 
@@ -85,8 +74,8 @@ Former [NEWS-53](https://informedcrew.atlassian.net/browse/NEWS-53) (Brief sourc
 | Done | A. Kite presentation | [NEWS-33](https://informedcrew.atlassian.net/browse/NEWS-33) | Shell + owned brief path |
 | Done | H. Owned rich brief clusters | [NEWS-48](https://informedcrew.atlassian.net/browse/NEWS-48) | Expand sections (sources → enrich → images) |
 | Superseded | Brief source breadth | [NEWS-53](https://informedcrew.atlassian.net/browse/NEWS-53) | Absorbed into NEWS-57 |
-| Done (v1) | I. Developing desk | [NEWS-57](https://informedcrew.atlassian.net/browse/NEWS-57) | Story Radar → Accept → track/mute; Later parked |
-| Done | J. Claims / evidence desk | [NEWS-69](https://informedcrew.atlassian.net/browse/NEWS-69) | Claims spine shipped (Radar + Brief hybrid) |
+| Done (v1), parked | I. Developing desk | [NEWS-57](https://informedcrew.atlassian.net/browse/NEWS-57) | Story Radar → Accept → track/mute; retired from the default path by NEWS-91; Later parked |
+| Done, parked | J. Claims / evidence desk | [NEWS-69](https://informedcrew.atlassian.net/browse/NEWS-69) | Claims spine shipped; desk parked by NEWS-91 (APIs + data remain) |
 | **Active** | L. Topic-driven brief | [NEWS-84](https://informedcrew.atlassian.net/browse/NEWS-84) | Topics → search (Google News + SearXNG) → triage → Brief → full stories; no review queue |
 | Open | K. Operator review fixes | [NEWS-83](https://informedcrew.atlassian.net/browse/NEWS-83) | Bug intake from operator walkthrough; close when list empty |
 | Parked | B. Crucix raw layer | [NEWS-34](https://informedcrew.atlassian.net/browse/NEWS-34) | Next build-order candidate after L; ask first |

@@ -79,7 +79,7 @@ Do **not** treat `_legacy/` (including `_legacy/mvp-web`) as the primary product
 ### Framing / AI
 
 - Story framing/classify still goes through existing Ollama framing services (legacy path)
-- Epic **J** claims desk: TypeSafe = judgment-of-record; Ollama = propose candidates + verbiage only ([docs/CLAIMS_DISCERNMENT.md](docs/CLAIMS_DISCERNMENT.md))
+- Epic **J** claims desk (parked, NEWS-91): TypeSafe = judgment-of-record; Ollama = propose candidates + verbiage only ([docs/CLAIMS_DISCERNMENT.md](docs/CLAIMS_DISCERNMENT.md))
 - Always treat AI-assisted analysis as not ground truth — status/evidence, not verdicts
 - Do not invent alternate model stacks without an explicit request
 
@@ -112,9 +112,9 @@ Do **not** treat `_legacy/` (including `_legacy/mvp-web`) as the primary product
 
 Informed News work uses the **NEWS** project on Atlassian (`informedcrew.atlassian.net`). Prefer JQL `project = NEWS`.
 
-**Item ordering:** [docs/ROADMAP.md](docs/ROADMAP.md) — **Current next:** Epic **L** [NEWS-84](https://informedcrew.atlassian.net/browse/NEWS-84) topic-driven brief (topics → search → triage → Brief, no review queue): [NEWS-85](https://informedcrew.atlassian.net/browse/NEWS-85)–[NEWS-90](https://informedcrew.atlassian.net/browse/NEWS-90) Done; next [NEWS-91](https://informedcrew.atlassian.net/browse/NEWS-91) retire review flow / park claims desk. Epic **K** [NEWS-83](https://informedcrew.atlassian.net/browse/NEWS-83) stays open as bug intake. Epic **J** Done (claims desk parked by L); [NEWS-78](https://informedcrew.atlassian.net/browse/NEWS-78) Mark reviewed and [NEWS-79](https://informedcrew.atlassian.net/browse/NEWS-79) extract gating Done. Desk v1 (**NEWS-57**) Done-demo complete; Later children parked. Discernment: [docs/CLAIMS_DISCERNMENT.md](docs/CLAIMS_DISCERNMENT.md). Ask before parked Later or Epic **B**. Do not pick parked B–G epics unless the user reorders.
+**Item ordering:** [docs/ROADMAP.md](docs/ROADMAP.md) — **Current next:** Epic **L** [NEWS-84](https://informedcrew.atlassian.net/browse/NEWS-84) topic-driven brief (topics → search → triage → Brief → full stories, no review queue): [NEWS-85](https://informedcrew.atlassian.net/browse/NEWS-85)–[NEWS-91](https://informedcrew.atlassian.net/browse/NEWS-91) Done; next [NEWS-99](https://informedcrew.atlassian.net/browse/NEWS-99) prune the Brief summaries store. Epic **K** [NEWS-83](https://informedcrew.atlassian.net/browse/NEWS-83) stays open as bug intake. Epic **J** Done and the claims desk **parked** by L ([NEWS-91](https://informedcrew.atlassian.net/browse/NEWS-91): no Radar page, no Brief claims lead; server APIs and stored claims remain; extraction runs only when called manually). Desk v1 (**NEWS-57**) Done-demo complete and parked; Later children parked. Discernment: [docs/CLAIMS_DISCERNMENT.md](docs/CLAIMS_DISCERNMENT.md). Ask before parked Later or Epic **B**. Do not pick parked B–G epics unless the user reorders.
 
-**AI split (Epic J):** TypeSafe / Jev = structured judgments (Choice / Score / Noul + confidence). Ollama = claim-candidate proposal + Brief verbiage only — not classifier-of-record for claims. No Verified badges or claim verdicts.
+**AI split (Epic J, parked but binding):** TypeSafe / Jev = structured judgments (Choice / Score / Noul + confidence). Ollama = claim-candidate proposal + Brief verbiage only — not classifier-of-record for claims. No Verified badges or claim verdicts.
 
 ## Agent skill loop
 

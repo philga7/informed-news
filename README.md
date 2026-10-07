@@ -67,7 +67,7 @@ After the sources, each refresh triages new stories against your topics (mute/ke
 
 ### Brief and refresh
 
-The Brief (`/`) shows triage's kept stories grouped by your topics: top 3 per topic with **More**, a "Nothing new: …" line for quiet topics, and short Ollama summaries (labelled AI) written only for stories shown. Stories you open or mark read are hidden after the next refresh unless significantly updated.
+The product flow is topics (`/topics`) → search → triage → Brief → full stories (tap to expand), with dropped stories on `/filtered`; there is no review queue and no Accept / Track step (the Radar page and claims desk are parked — `/radar` redirects to `/topics`). The Brief (`/`) shows triage's kept stories grouped by your topics: top 3 per topic with **More**, a "Nothing new: …" line for quiet topics, and short Ollama summaries (labelled AI) written only for stories shown. Stories you open or mark read are hidden after the next refresh unless significantly updated.
 
 The server refreshes on its own: a check at startup (catch-up) and every 5 minutes, refreshing when the last success is older than `REFRESH_INTERVAL_HOURS` (default 3; `off` disables the timer). The Brief's **Refresh** button (log in on `/topics` first) refreshes now. `TRIAGE_SUMMARY_BUDGET` caps summaries per refresh. A refresh spends API budget; the e2e and integration stacks run with auto-refresh off and no Ollama / TypeSafe keys. Details: [docs/BRIEF.md](docs/BRIEF.md).
 
@@ -110,9 +110,9 @@ Root [`vercel.json`](vercel.json) still deploys the **archived** `_legacy/mvp-we
 
 ## Roadmap (NEWS)
 
-Agent-facing order of work: **[docs/ROADMAP.md](docs/ROADMAP.md)** — **Current next:** Epic L topic-driven brief ([NEWS-84](https://informedcrew.atlassian.net/browse/NEWS-84)); Epic K bug intake ([NEWS-83](https://informedcrew.atlassian.net/browse/NEWS-83)); Epic J claims desk Done and parked; ask before parked Later or Epic [NEWS-34](https://informedcrew.atlassian.net/browse/NEWS-34). Discernment: [docs/CLAIMS_DISCERNMENT.md](docs/CLAIMS_DISCERNMENT.md).
+Agent-facing order of work: **[docs/ROADMAP.md](docs/ROADMAP.md)** — **Current next:** Epic L topic-driven brief ([NEWS-84](https://informedcrew.atlassian.net/browse/NEWS-84)); Epic K bug intake ([NEWS-83](https://informedcrew.atlassian.net/browse/NEWS-83)); Epic J claims desk Done and parked by NEWS-91 (no Radar page; APIs and data remain); next [NEWS-99](https://informedcrew.atlassian.net/browse/NEWS-99) (prune the Brief summaries store); ask before parked Later or Epic [NEWS-34](https://informedcrew.atlassian.net/browse/NEWS-34). Discernment: [docs/CLAIMS_DISCERNMENT.md](docs/CLAIMS_DISCERNMENT.md).
 
-Done so far: Epic A ([NEWS-33](https://informedcrew.atlassian.net/browse/NEWS-33)), Epic H ([NEWS-48](https://informedcrew.atlassian.net/browse/NEWS-48)), desk v1 under NEWS-57. NEWS-53 absorbed into NEWS-57. Plans: [`.cursor/plans/osint_jira_pivot_d6b40f87.plan.md`](.cursor/plans/osint_jira_pivot_d6b40f87.plan.md), [`.cursor/plans/claims_evidence_spine_8f4cde15.plan.md`](.cursor/plans/claims_evidence_spine_8f4cde15.plan.md).
+Done so far: Epic A ([NEWS-33](https://informedcrew.atlassian.net/browse/NEWS-33)), Epic H ([NEWS-48](https://informedcrew.atlassian.net/browse/NEWS-48)), desk v1 under NEWS-57 (parked), Epic L through [NEWS-91](https://informedcrew.atlassian.net/browse/NEWS-91). NEWS-53 absorbed into NEWS-57. Plans: [`.cursor/plans/osint_jira_pivot_d6b40f87.plan.md`](.cursor/plans/osint_jira_pivot_d6b40f87.plan.md), [`.cursor/plans/claims_evidence_spine_8f4cde15.plan.md`](.cursor/plans/claims_evidence_spine_8f4cde15.plan.md).
 
 ## Legacy code
 

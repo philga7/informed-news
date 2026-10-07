@@ -1,15 +1,15 @@
-# Radar sources (Developing desk)
+# Curated RSS sources (`radar-sources.json`)
 
-Locked starter set for [NEWS-54](https://informedcrew.atlassian.net/browse/NEWS-54) / epic [NEWS-57](https://informedcrew.atlassian.net/browse/NEWS-57). These feeds are **radar triage fuel** — they do not put stories on Brief by themselves (that requires Accept / manual seed).
+Locked starter set from [NEWS-54](https://informedcrew.atlassian.net/browse/NEWS-54) / epic [NEWS-57](https://informedcrew.atlassian.net/browse/NEWS-57). The file is still named `radar-sources.json` for historical reasons. Every refresh fetches the enabled feeds with CFP and topic search; their stories then go through triage like any other source and reach the Brief only if triage keeps them for one of your topics ([TRIAGE.md](TRIAGE.md), [BRIEF.md](BRIEF.md)).
 
 Until [NEWS-67](https://informedcrew.atlassian.net/browse/NEWS-67) (Later), change sources by editing in-repo config + restart. No admin CRUD in v1 Done-demo.
 
 ## Source tiers (NEWS-73)
 
-Radar sources have an optional `sourceTier` used by the claims/evidence desk:
+Curated sources have an optional `sourceTier`, stamped on each ingested article:
 
-- **sensor**: claim proposal fuel (default when absent)
-- **primary**: preferred evidence sources for conflict claims
+- **sensor**: default when absent
+- **primary**: official / first-party sources (conflict primaries below). Triage prefers a primary source as a duplicate group's representative; the parked claims desk treated primaries as preferred evidence and sensors as claim-proposal fuel ([CLAIMS_DISCERNMENT.md](CLAIMS_DISCERNMENT.md)).
 
 Notes:
 
@@ -85,4 +85,4 @@ Empty/missing curated file → CFP-only (and optional xcancel if configured) sti
 
 ## Ingest (NEWS-55)
 
-[NEWS-55](https://informedcrew.atlassian.net/browse/NEWS-55): enabled sources from `radar-sources.json` are fetched on `POST /api/fetch` and upserted into the shared article store (`sourceKind: "rss"`). Response fields `curated` (counts and per-source errors) and `tiers` (`sensor` / `primary` fetched+upserted counts for this run — [NEWS-73](https://informedcrew.atlassian.net/browse/NEWS-73)) are documented in [MVP_API_COMPAT.md](MVP_API_COMPAT.md). Ingested items are **not** Brief membership — Accept / manual seed still required ([NEWS-65](https://informedcrew.atlassian.net/browse/NEWS-65), [NEWS-66](https://informedcrew.atlassian.net/browse/NEWS-66)).
+[NEWS-55](https://informedcrew.atlassian.net/browse/NEWS-55): enabled sources from `radar-sources.json` are fetched on every refresh (`POST /api/fetch`, the timer, and the Refresh button) and upserted into the shared article store (`sourceKind: "rss"`). Response fields `curated` (counts and per-source errors) and `tiers` (`sensor` / `primary` fetched+upserted counts for this run — [NEWS-73](https://informedcrew.atlassian.net/browse/NEWS-73)) are documented in [MVP_API_COMPAT.md](MVP_API_COMPAT.md).
