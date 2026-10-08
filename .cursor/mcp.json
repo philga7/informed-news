@@ -21,7 +21,7 @@
     "jev": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@jkudish/jev-mcp@0.10.1"],
+      "args": ["-y", "@jkudish/jev-mcp@0.14.1"],
       "envFile": "${userHome}/.config/jev-mcp/env",
       "env": {
         "JEV_PROVIDER": "typesafe",

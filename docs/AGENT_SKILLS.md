@@ -109,7 +109,7 @@ mkdir -p ~/.config/jev-mcp && chmod 700 ~/.config/jev-mcp
 (umask 177 && grep '^TYPESAFE_API_KEY=' mvp/.env > ~/.config/jev-mcp/env)
 ```
 
-`JEV_PROVIDER=typesafe` blocks provider auto-detection; `JEV_MCP_MODEL` stays pinned to the same Jev version as `mvp/server` (NEWS-71). Verify in Cursor Settings → MCP (`jev` connected, 11 tools); logs under Output → MCP Logs.
+`JEV_PROVIDER=typesafe` blocks provider auto-detection; `JEV_MCP_MODEL` stays pinned to the same Jev version as `mvp/server` (NEWS-71). Verify in Cursor Settings → MCP (`jev` connected, 12 tools including `jev_audit`); logs under Output → MCP Logs.
 
 Dev tooling only: the product pipeline keeps calling TypeSafe via `@typesafe-ai/sdk` in `mvp/server`.
 
