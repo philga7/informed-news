@@ -82,7 +82,9 @@ Normalize the `image-to-code` directory name to match frontmatter `name: image-t
 
 Re-run the same `npx skills add …` commands from the repo root, then re-consolidate into `.cursor/skills/` if needed. Commit the updated `skills-lock.json` (written by the CLI) alongside skill trees so the lockfile matches what’s installed.
 
-For repo-local freshness checks, prefer `/update-skills` as the check-then-ask path. Its checker calls the GitHub API and reads `GITHUB_TOKEN` / `GH_TOKEN` when set; without one, a few runs in an hour hit GitHub's unauthenticated rate limit (`GH_TOKEN="$(gh auth token)"` reuses your `gh` login). The `update-skills` skill itself is copied with this recipe as part of the skill tree, not installed with `npx skills add`.
+For repo-local freshness checks, prefer `/update-skills` as the check-then-ask path. Its checker calls the GitHub API and reads `GITHUB_TOKEN` / `GH_TOKEN` when set; without one, a few runs in an hour hit GitHub's unauthenticated rate limit (`GH_TOKEN="$(gh auth token)"` reuses your `gh` login).
+
+Deliberate repo edits to copied skills live as patches in `skills-overrides/<skill>.patch` (record them with `update-skills/scripts/record-override.mjs`). The checker and apply script keep those edits instead of flagging or overwriting them; see the `update-skills` skill. Current overrides: `subagent-driven-development` (end the turn on background subagents; mirrors `.cursor/rules/no-subagent-timers.mdc`). The `update-skills` skill itself is copied with this recipe as part of the skill tree, not installed with `npx skills add`.
 
 ## Optional: `agent-browser` CLI
 
