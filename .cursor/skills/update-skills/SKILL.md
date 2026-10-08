@@ -9,7 +9,7 @@ Use this skill for the repo-local freshness workflow.
 
 ## Workflow
 
-1. Run the read-only checker first.
+1. Run the read-only checker first. Pass a GitHub token so compares aren't rate-limited (60 unauthenticated requests/hour): `GH_TOKEN="$(gh auth token)" node scripts/check.mjs --repo-root <repo>`.
 2. Present the report, including any repo-local skips and any outdated skills.
 3. Stop and ask the user to choose: update all, pick specific skills, or update none. Never apply changes without explicit approval.
 4. If the user says yes, run `scripts/apply.sh --i-was-approved <skill> ...` for only the chosen skills.
