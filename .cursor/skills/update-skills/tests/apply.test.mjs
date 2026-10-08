@@ -20,10 +20,12 @@ async function createSandboxRepo() {
   await mkdir(path.join(sandboxRepo, 'docs'), { recursive: true });
 
   await copyFile(applyScript, path.join(sandboxRepo, '.cursor', 'skills', 'update-skills', 'scripts', 'apply.sh'));
-  await copyFile(
-    path.join(repoRoot, '.cursor', 'skills', 'update-skills', 'scripts', 'parse-local-skills.mjs'),
-    path.join(sandboxRepo, '.cursor', 'skills', 'update-skills', 'scripts', 'parse-local-skills.mjs')
-  );
+  for (const name of ['parse-local-skills.mjs', 'overrides.mjs']) {
+    await copyFile(
+      path.join(repoRoot, '.cursor', 'skills', 'update-skills', 'scripts', name),
+      path.join(sandboxRepo, '.cursor', 'skills', 'update-skills', 'scripts', name)
+    );
+  }
 
   await writeFile(
     path.join(sandboxRepo, 'skills-lock.json'),

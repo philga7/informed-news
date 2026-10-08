@@ -6,7 +6,9 @@ usage() {
 Usage: apply.sh --i-was-approved <skill> [<skill>...]
 
 Applies approved skill refreshes and consolidates any .agents/skills output
-back into .cursor/skills/.
+back into .cursor/skills/. Skills with a recorded local override
+(skills-overrides/<skill>.patch) get the patch re-applied after the refresh;
+the refresh is refused up front if the patch no longer applies to upstream.
 EOF
 }
 
@@ -66,8 +68,12 @@ const parseLocalSkillsPath = path.join(
   'parse-local-skills.mjs'
 );
 
+const scriptsDir = path.dirname(parseLocalSkillsPath);
 const lockfile = JSON.parse(await readFile(lockfilePath, 'utf8'));
 const { parseLocalSkills } = await import(pathToFileURL(parseLocalSkillsPath).href);
+const { applyPatchToCopy, readOverridePatch, replaceDirContents } = await import(
+  pathToFileURL(path.join(scriptsDir, 'overrides.mjs')).href
+);
 const parsedLocalSkills = parseLocalSkills(await readFile(docsPath, 'utf8'));
 
 if (parsedLocalSkills.length === 0) {
@@ -100,6 +106,32 @@ for (const skillName of requestedSkills) {
   }
 
   groupedBySource.get(source).push(skillName);
+}
+
+const overrides = new Map();
+for (const skillName of requestedSkills) {
+  const patchText = await readOverridePatch(repoRoot, skillName);
+  if (patchText) {
+    overrides.set(skillName, patchText);
+  }
+}
+
+for (const skillName of overrides.keys()) {
+  const checkArgs = [path.join(scriptsDir, 'check.mjs'), '--repo-root', repoRoot, '--skill', skillName, '--json'];
+  if (process.env.UPDATE_SKILLS_FIXTURES) {
+    checkArgs.push('--fixtures', process.env.UPDATE_SKILLS_FIXTURES);
+  }
+  const check = spawnSync('node', checkArgs, { cwd: repoRoot, encoding: 'utf8' });
+  if (check.status !== 0) {
+    throw new Error(`Could not verify the local override for ${skillName}: ${check.stderr.trim()}`);
+  }
+  const [item] = JSON.parse(check.stdout).inventory;
+  if (item.comparison === 'override-conflict' || item.comparison === 'check-failed') {
+    throw new Error(
+      `Refusing to refresh ${skillName}: ${item.reason}\n` +
+        `Merge the upstream change into the local edit by hand, then re-record with record-override.mjs.`
+    );
+  }
 }
 
 for (const [source, skillNames] of groupedBySource) {
@@ -139,6 +171,23 @@ try {
   if (error?.code !== 'ENOENT') {
     throw error;
   }
+}
+
+for (const [skillName, patchText] of overrides) {
+  const skillDir = path.join(cursorSkillsDir, skillName);
+  const applied = await applyPatchToCopy(skillDir, patchText);
+  if (!applied.ok) {
+    throw new Error(
+      `Refreshed ${skillName} but its local override did not re-apply: ${applied.reason}\n` +
+        `The folder now holds plain upstream; restore with git or re-apply the edit and re-record.`
+    );
+  }
+  try {
+    await replaceDirContents(skillDir, applied.dir);
+  } finally {
+    await applied.cleanup();
+  }
+  console.log(`Re-applied local override: skills-overrides/${skillName}.patch`);
 }
 
 console.log(`Applied skills: ${requestedSkills.join(', ')}`);

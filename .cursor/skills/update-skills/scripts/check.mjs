@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { realpathSync } from 'node:fs';
 import { execFile as execFileCallback } from 'node:child_process';
 import { mkdtemp, mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -7,6 +8,7 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { readLocalSkillsFromFile } from './parse-local-skills.mjs';
+import { OVERRIDES_DIRNAME, applyPatchToCopy, readOverridePatch } from './overrides.mjs';
 
 const execFile = promisify(execFileCallback);
 const DEFAULT_USER_AGENT = 'informed-news-update-skills-checker';
@@ -552,7 +554,7 @@ async function compareSkillDirs(localSkillDir, upstreamSkillDir) {
   };
 }
 
-async function resolveUpstreamSkillDir(lockEntry, skillName, options = {}) {
+export async function resolveUpstreamSkillDir(lockEntry, skillName, options = {}) {
   if (options.fixturesRoot) {
     const resolvedDir = path.join(options.fixturesRoot, 'upstream', skillName);
     if (!(await pathExists(resolvedDir))) {
@@ -616,14 +618,33 @@ export async function buildInventory(repoRoot, options = {}) {
 
     const lockEntry = lockfile.skills?.[item.name];
     let upstreamRef = null;
+    let patchedRef = null;
 
     try {
       upstreamRef = await resolveUpstreamSkillDir(lockEntry, item.name, options);
-      Object.assign(item, await compareSkillDirs(path.join(skillsRoot, item.name), upstreamRef.dir));
+      let compareDir = upstreamRef.dir;
+
+      const overridePatch = await readOverridePatch(repoRoot, item.name);
+      if (overridePatch) {
+        item.localOverride = `${OVERRIDES_DIRNAME}/${item.name}.patch`;
+        const applied = await applyPatchToCopy(upstreamRef.dir, overridePatch);
+        if (!applied.ok) {
+          item.comparison = 'override-conflict';
+          item.reason = `Local override no longer applies to upstream: ${applied.reason}`;
+          continue;
+        }
+        patchedRef = applied;
+        compareDir = applied.dir;
+      }
+
+      Object.assign(item, await compareSkillDirs(path.join(skillsRoot, item.name), compareDir));
     } catch (error) {
       item.comparison = 'check-failed';
       item.reason = error instanceof Error ? error.message : String(error);
     } finally {
+      if (patchedRef?.cleanup) {
+        await patchedRef.cleanup();
+      }
       if (upstreamRef?.cleanup) {
         await upstreamRef.cleanup();
       }
@@ -646,9 +667,13 @@ export function formatTextReport(report) {
   lines.push('Inventory:');
 
   for (const item of report.inventory) {
-    lines.push(`- ${item.name}: ${item.status} (${item.comparison})`);
+    const overrideNote = item.localOverride ? `, local override ${item.localOverride}` : '';
+    lines.push(`- ${item.name}: ${item.status} (${item.comparison}${overrideNote})`);
 
     if (item.comparison === 'outdated') {
+      if (item.localOverride) {
+        lines.push('  Diff below is against upstream with the local override applied.');
+      }
       for (const summaryLine of item.skillSummaryLines ?? []) {
         lines.push(`  ${summaryLine}`);
       }
@@ -664,7 +689,9 @@ export function formatTextReport(report) {
     }
 
     if (
-      (item.comparison === 'check-failed' || item.comparison === 'missing-local') &&
+      (item.comparison === 'check-failed' ||
+        item.comparison === 'missing-local' ||
+        item.comparison === 'override-conflict') &&
       item.reason
     ) {
       lines.push(`  Reason: ${item.reason}`);
@@ -708,7 +735,8 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
   }
 }
 
-const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+const isMain =
+  process.argv[1] && realpathSync(path.resolve(process.argv[1])) === realpathSync(fileURLToPath(import.meta.url));
 
 if (isMain) {
   await main();
