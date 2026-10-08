@@ -136,6 +136,10 @@ Repo-local skills live under `.cursor/skills/` (see [docs/AGENT_SKILLS.md](docs/
 | `/prototype` | Throwaway code to answer one design/logic question | Sanity-check state model or UI variants |
 | `/image-to-code` | Generate/analyze design images, then match in code | Vision-led frontend from mocks/refs |
 | `/subagent-driven-development` | Fresh implementer subagent per task + review loop | Executing a **grilled** multi-step plan |
+| `/tdd` | Red → green loop; tests at agreed seams through public interfaces | Building a feature or fixing a bug test-first |
+| `/codebase-design` | Deep-module vocabulary (module, interface, seam, adapter) + design-it-twice | Shaping a module interface or deciding where a seam goes |
+| `/svelte5-best-practices` | Svelte 5 runes, snippets, SvelteKit load/SSR patterns | Writing Kite components (leave upstream legacy-syntax files alone) |
+| `/playwright-best-practices` | Playwright locators, waiting, fixtures, flaky-test fixes | Writing or debugging `test:e2e:kite` specs (keep the hermetic `e2e/stack/`) |
 | `/news-ship-loop` | NEWS Jira In Progress → PR/merge → Done + plan cleanup | Starting/finishing a NEWS-* item or merging its PR |
 | `/update-skills` | Check copied skills for freshness | Refreshing repo-local skills with the portable recipe |
 | `/agent-browser` | Scripted browser CLI (stub skill; install CLI separately) | Inspect/verify pages outside IDE browser |

@@ -37,6 +37,9 @@ Mid-epic: do not re-grill finished work. New discoveries → additional tickets 
 | `prototype` | Shape | mattpocock/skills |
 | `image-to-code` | Shape | [leonxlnx/taste-skill](https://github.com/leonxlnx/taste-skill) |
 | `subagent-driven-development` | Build | [obra/superpowers](https://github.com/obra/superpowers) |
+| `tdd` + `codebase-design` | Build | mattpocock/skills |
+| `svelte5-best-practices` | Build | [ejirocodes/agent-skills](https://github.com/ejirocodes/agent-skills) |
+| `playwright-best-practices` | Build / Verify | [currents-dev/playwright-best-practices-skill](https://github.com/currents-dev/playwright-best-practices-skill) |
 | `news-ship-loop` | Ship | Informed News (repo-local) |
 | `update-skills` | Package / Maintain | Informed News (portable recipe) |
 | `agent-browser` | Verify | [vercel-labs/agent-browser](https://github.com/vercel-labs/agent-browser) |
@@ -51,12 +54,14 @@ Licenses: keep each skill’s `LICENSE` / `LICENSE.txt` (MIT / Apache-2.0 mix).
 
 ```bash
 npx skills add vercel-labs/skills --skill find-skills -a cursor --copy -y
-npx skills add mattpocock/skills --skill grill-me --skill grilling --skill prototype --skill diagnosing-bugs -a cursor --copy -y
+npx skills add mattpocock/skills --skill grill-me --skill grilling --skill prototype --skill diagnosing-bugs --skill tdd --skill codebase-design -a cursor --copy -y
 npx skills add anthropics/skills --skill frontend-design --skill skill-creator --skill mcp-builder -a cursor --copy -y
 npx skills add vercel-labs/agent-browser -a cursor --copy -y
 npx skills add https://github.com/Leonxlnx/taste-skill --skill image-to-code -a cursor --copy -y
 npx skills add obra/superpowers --skill subagent-driven-development -a cursor --copy -y
 npx skills add jkudish/jev-mcp --skill jev -a cursor --copy -y
+npx skills add ejirocodes/agent-skills --skill svelte5-best-practices -a cursor --copy -y
+npx skills add currents-dev/playwright-best-practices-skill --skill playwright-best-practices -a cursor --copy -y
 ```
 
 The `jev` skill ships no in-folder `LICENSE` upstream; its MIT notice lives in [THIRD_PARTY.md](../THIRD_PARTY.md) so the folder stays identical to upstream for `/update-skills`.
