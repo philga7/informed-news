@@ -199,10 +199,15 @@ async function readDirectorySnapshot(rootDir) {
 }
 
 function makeGitHubHeaders() {
-  return {
+  const headers = {
     Accept: 'application/vnd.github+json',
     'User-Agent': process.env.UPDATE_SKILLS_USER_AGENT || DEFAULT_USER_AGENT,
   };
+  const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  return headers;
 }
 
 async function fetchJson(url, fetchImpl = globalThis.fetch) {

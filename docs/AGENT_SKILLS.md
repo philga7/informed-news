@@ -37,6 +37,10 @@ Mid-epic: do not re-grill finished work. New discoveries → additional tickets 
 | `prototype` | Shape | mattpocock/skills |
 | `image-to-code` | Shape | [leonxlnx/taste-skill](https://github.com/leonxlnx/taste-skill) |
 | `subagent-driven-development` | Build | [obra/superpowers](https://github.com/obra/superpowers) |
+| `tdd` + `codebase-design` | Build | mattpocock/skills |
+| `code-review` | Verify | mattpocock/skills (reads [docs/agents/issue-tracker.md](agents/issue-tracker.md)) |
+| `svelte5-best-practices` | Build | [ejirocodes/agent-skills](https://github.com/ejirocodes/agent-skills) |
+| `playwright-best-practices` | Build / Verify | [currents-dev/playwright-best-practices-skill](https://github.com/currents-dev/playwright-best-practices-skill) |
 | `news-ship-loop` | Ship | Informed News (repo-local) |
 | `update-skills` | Package / Maintain | Informed News (portable recipe) |
 | `agent-browser` | Verify | [vercel-labs/agent-browser](https://github.com/vercel-labs/agent-browser) |
@@ -51,12 +55,14 @@ Licenses: keep each skill’s `LICENSE` / `LICENSE.txt` (MIT / Apache-2.0 mix).
 
 ```bash
 npx skills add vercel-labs/skills --skill find-skills -a cursor --copy -y
-npx skills add mattpocock/skills --skill grill-me --skill grilling --skill prototype --skill diagnosing-bugs -a cursor --copy -y
+npx skills add mattpocock/skills --skill grill-me --skill grilling --skill prototype --skill diagnosing-bugs --skill tdd --skill codebase-design --skill code-review -a cursor --copy -y
 npx skills add anthropics/skills --skill frontend-design --skill skill-creator --skill mcp-builder -a cursor --copy -y
 npx skills add vercel-labs/agent-browser -a cursor --copy -y
 npx skills add https://github.com/Leonxlnx/taste-skill --skill image-to-code -a cursor --copy -y
 npx skills add obra/superpowers --skill subagent-driven-development -a cursor --copy -y
 npx skills add jkudish/jev-mcp --skill jev -a cursor --copy -y
+npx skills add ejirocodes/agent-skills --skill svelte5-best-practices -a cursor --copy -y
+npx skills add currents-dev/playwright-best-practices-skill --skill playwright-best-practices -a cursor --copy -y
 ```
 
 The `jev` skill ships no in-folder `LICENSE` upstream; its MIT notice lives in [THIRD_PARTY.md](../THIRD_PARTY.md) so the folder stays identical to upstream for `/update-skills`.
@@ -76,7 +82,7 @@ Normalize the `image-to-code` directory name to match frontmatter `name: image-t
 
 Re-run the same `npx skills add …` commands from the repo root, then re-consolidate into `.cursor/skills/` if needed. Commit the updated `skills-lock.json` (written by the CLI) alongside skill trees so the lockfile matches what’s installed.
 
-For repo-local freshness checks, prefer `/update-skills` as the check-then-ask path. The `update-skills` skill itself is copied with this recipe as part of the skill tree, not installed with `npx skills add`.
+For repo-local freshness checks, prefer `/update-skills` as the check-then-ask path. Its checker calls the GitHub API and reads `GITHUB_TOKEN` / `GH_TOKEN` when set; without one, a few runs in an hour hit GitHub's unauthenticated rate limit (`GH_TOKEN="$(gh auth token)"` reuses your `gh` login). The `update-skills` skill itself is copied with this recipe as part of the skill tree, not installed with `npx skills add`.
 
 ## Optional: `agent-browser` CLI
 
