@@ -8,7 +8,7 @@ import express from 'express';
 
 import type { CreateAppDeps } from './app.js';
 import type { Article, StoreMeta } from './types/article.js';
-import type { BriefRunMeta, BriefSeenStore } from './types/brief.js';
+import type { BriefRunMeta, BriefSeenStore, FullStoriesRunMeta } from './types/brief.js';
 import type { Topic } from './types/topic.js';
 import type { TriageRecord, TriageRunMeta, TriageStore } from './types/triage.js';
 import type { RefreshResult, RefreshRunner } from './services/refreshRunner.js';
@@ -103,10 +103,21 @@ const BRIEF_RUN: BriefRunMeta = {
   summaries: { budget: 60, used: 2, generated: 1, reused: 1, unavailable: 0, errors: ['Ollama: x'] },
 };
 
-/** Keeps refresh-time summaries, store pruning and meta.refresh writes out of mvp/data. */
+const EMPTY_FULL_STORIES_RUN: FullStoriesRunMeta = {
+  budget: 0,
+  used: 0,
+  generated: 0,
+  reused: 0,
+  unavailable: 0,
+  errors: [],
+};
+
+/** Keeps refresh-time summaries, full stories, store pruning and meta writes out of mvp/data and Ollama. */
 const noRefreshSideEffects = {
   generateRefreshSummaries: async () => BRIEF_RUN,
+  generateRefreshFullStories: async () => EMPTY_FULL_STORIES_RUN,
   pruneBriefStores: async () => ({ summaries: 0, fullStories: 0, errors: [] }),
+  readMeta: async () => ({ lastFetchAt: null, lastError: null }),
   updateMeta: async () => ({ lastFetchAt: null, lastError: null }),
 };
 
@@ -552,6 +563,54 @@ test('POST /api/fetch with injected fetchAllSources records a failed refresh and
     assert.equal(refresh.last.trigger, 'manual');
     assert.equal(refresh.last.error, 'CFP down');
     assert.equal(refresh.lastSuccess, null);
+  } finally {
+    await close();
+  }
+});
+
+test('POST /api/fetch with injected fetchAllSources runs the injected full-story step, not the real one', async () => {
+  process.env.SESSION_SECRET = 'test-secret';
+  process.env.MVP_PASSWORD = 'pw';
+  delete process.env.MVP_PASSWORD_HASH;
+
+  const fullStoriesRun: FullStoriesRunMeta = {
+    budget: 3,
+    used: 1,
+    generated: 1,
+    reused: 0,
+    unavailable: 0,
+    errors: [],
+  };
+  const fullStoriesCalls: Array<{ now?: Date; boundaryAt?: string | null } | undefined> = [];
+  const patches: Array<Partial<StoreMeta>> = [];
+  const { createApp } = await import('./app.js');
+  const app = createApp({
+    fetchAllSources: async () => stubFetchResult(),
+    ...noRefreshSideEffects,
+    generateRefreshFullStories: async (options) => {
+      fullStoriesCalls.push(options);
+      return fullStoriesRun;
+    },
+    updateMeta: async (patch) => {
+      patches.push(patch);
+      return { lastFetchAt: null, lastError: null };
+    },
+  });
+
+  const { baseUrl, close } = await startServer(app);
+  try {
+    const cookie = await login(baseUrl);
+    const resp = await fetch(`${baseUrl}/api/fetch`, {
+      method: 'POST',
+      headers: { cookie, 'content-type': 'application/json' },
+      body: '{}',
+    });
+    assert.equal(resp.status, 200);
+    const json = (await resp.json()) as { refresh: { startedAt: string } };
+    assert.equal(fullStoriesCalls.length, 1);
+    assert.equal(fullStoriesCalls[0]?.boundaryAt, json.refresh.startedAt);
+    const briefPatch = patches.find((patch) => patch.brief);
+    assert.deepEqual(briefPatch?.brief?.fullStories, fullStoriesRun);
   } finally {
     await close();
   }
