@@ -225,20 +225,6 @@ function emptyStore(): BriefFullStoriesStore {
 }
 
 /**
- * Drop full-story records whose articleId is not in the kept triage set.
- */
-export function pruneBriefFullStoriesByKeptIds(
-  store: BriefFullStoriesStore,
-  keptArticleIds: ReadonlySet<string>,
-): BriefFullStoriesStore {
-  const fullStories: Record<string, BriefFullStoryRecord> = {};
-  for (const [articleId, record] of Object.entries(store.fullStories)) {
-    if (keptArticleIds.has(articleId)) fullStories[articleId] = record;
-  }
-  return { fullStories, updatedAt: store.updatedAt };
-}
-
-/**
  * Read Brief full stories from disk.
  * Missing or empty file → empty store; malformed records are dropped.
  */
@@ -269,10 +255,10 @@ async function atomicWrite(store: BriefFullStoriesStore, fullStoriesPath: string
   }
 }
 
-/** Per-file write chains: refresh and on-demand puts must not interleave read-modify-write cycles. */
-const writeChains = new Map<string, Promise<void>>();
+/** Per-file write chains: refresh, prune and on-demand writes must not interleave read-modify-write cycles. */
+const writeChains = new Map<string, Promise<unknown>>();
 
-function enqueueWrite(fullStoriesPath: string, work: () => Promise<void>): Promise<void> {
+function enqueueWrite<T>(fullStoriesPath: string, work: () => Promise<T>): Promise<T> {
   const key = path.resolve(fullStoriesPath);
   const previous = writeChains.get(key) ?? Promise.resolve();
   const next = previous.then(work);
@@ -292,30 +278,44 @@ export async function writeBriefFullStories(
   return enqueueWrite(fullStoriesPath, () => atomicWrite(store, fullStoriesPath));
 }
 
-export type PutBriefFullStoriesOptions = {
-  /** When set, records for ids not in this set are removed before write. */
-  keptArticleIds?: ReadonlySet<string>;
-};
-
 async function mergeAndWrite(
   records: BriefFullStoryRecord[],
   fullStoriesPath: string,
-  options?: PutBriefFullStoriesOptions,
 ): Promise<void> {
-  let store = await readBriefFullStories(fullStoriesPath);
+  const store = await readBriefFullStories(fullStoriesPath);
   for (const record of records) store.fullStories[record.articleId] = record;
-  if (options?.keptArticleIds) {
-    store = pruneBriefFullStoriesByKeptIds(store, options.keptArticleIds);
-  }
   store.updatedAt = new Date().toISOString();
   await atomicWrite(store, fullStoriesPath);
 }
 
-/** Upsert records by articleId (read-merge-write, atomic). Optional prune of non-kept ids. */
+/** Upsert records by articleId (read-merge-write, atomic). Retention is `pruneBriefFullStories`. */
 export async function putBriefFullStories(
   records: BriefFullStoryRecord[],
   fullStoriesPath: string = BRIEF_FULL_STORIES_PATH,
-  options?: PutBriefFullStoriesOptions,
 ): Promise<void> {
-  return enqueueWrite(fullStoriesPath, () => mergeAndWrite(records, fullStoriesPath, options));
+  return enqueueWrite(fullStoriesPath, () => mergeAndWrite(records, fullStoriesPath));
+}
+
+async function filterAndWrite(
+  keep: (record: BriefFullStoryRecord) => boolean,
+  fullStoriesPath: string,
+): Promise<number> {
+  const store = await readBriefFullStories(fullStoriesPath);
+  const fullStories: Record<string, BriefFullStoryRecord> = {};
+  for (const [articleId, record] of Object.entries(store.fullStories)) {
+    if (keep(record)) fullStories[articleId] = record;
+  }
+  const removed = Object.keys(store.fullStories).length - Object.keys(fullStories).length;
+  if (removed > 0) {
+    await atomicWrite({ fullStories, updatedAt: new Date().toISOString() }, fullStoriesPath);
+  }
+  return removed;
+}
+
+/** Drop records `keep` rejects (read-filter-write, atomic). Resolves to the number removed. */
+export async function pruneBriefFullStories(
+  keep: (record: BriefFullStoryRecord) => boolean,
+  fullStoriesPath: string = BRIEF_FULL_STORIES_PATH,
+): Promise<number> {
+  return enqueueWrite(fullStoriesPath, () => filterAndWrite(keep, fullStoriesPath));
 }

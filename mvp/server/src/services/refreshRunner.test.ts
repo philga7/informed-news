@@ -45,6 +45,7 @@ type Harness = {
   logs: string[];
   summaryCalls: Array<{ now?: Date; boundaryAt?: string | null }>;
   fullStoryCalls: Array<{ now?: Date; boundaryAt?: string | null }>;
+  pruneCalls: Array<{ now: Date }>;
 };
 
 function harness(overrides: Partial<RefreshRunnerDeps> = {}, meta?: StoreMeta): Harness {
@@ -54,6 +55,7 @@ function harness(overrides: Partial<RefreshRunnerDeps> = {}, meta?: StoreMeta): 
     logs: [],
     summaryCalls: [],
     fullStoryCalls: [],
+    pruneCalls: [],
     deps: {},
   };
   h.deps = {
@@ -65,6 +67,10 @@ function harness(overrides: Partial<RefreshRunnerDeps> = {}, meta?: StoreMeta): 
     generateFullStories: async (options) => {
       h.fullStoryCalls.push(options);
       return FULL_STORIES;
+    },
+    pruneBriefStores: async (options) => {
+      h.pruneCalls.push(options);
+      return { summaries: 0, fullStories: 0, errors: [] };
     },
     readMeta: async () => h.meta,
     updateMeta: async (patch) => {
@@ -178,6 +184,7 @@ test('run: fetch rejection → meta last.ok=false (lastSuccess kept), rethrows, 
   ]);
 
   assert.equal(h.summaryCalls.length, 0);
+  assert.equal(h.pruneCalls.length, 0);
   assert.equal(h.patches.length, 1);
   const refresh = h.patches[0]!.refresh!;
   assert.equal(refresh.last!.ok, false);
@@ -214,8 +221,9 @@ test('run: lastSuccess only moves on success', async () => {
   assert.equal(h.meta.refresh!.last!.ok, false);
 });
 
-test('run: one run calls fetchAll → generateSummaries → generateFullStories in order, once each', async () => {
+test('run: one run calls fetchAll → generateSummaries → generateFullStories → pruneBriefStores in order, once each', async () => {
   const order: string[] = [];
+  const pruneNows: Date[] = [];
   const runner = createRefreshRunner({
     fetchAll: async () => {
       order.push('fetchAll');
@@ -229,6 +237,11 @@ test('run: one run calls fetchAll → generateSummaries → generateFullStories 
       order.push('generateFullStories');
       return FULL_STORIES;
     },
+    pruneBriefStores: async ({ now }) => {
+      order.push('pruneBriefStores');
+      pruneNows.push(now);
+      return { summaries: 0, fullStories: 0, errors: [] };
+    },
     readMeta: async () => ({ lastFetchAt: null, lastError: null }),
     updateMeta: async () => ({ lastFetchAt: null, lastError: null }),
     now: tickingClock(),
@@ -237,7 +250,36 @@ test('run: one run calls fetchAll → generateSummaries → generateFullStories 
 
   await runner.run('manual');
 
-  assert.deepEqual(order, ['fetchAll', 'generateSummaries', 'generateFullStories']);
+  assert.deepEqual(order, ['fetchAll', 'generateSummaries', 'generateFullStories', 'pruneBriefStores']);
+  assert.ok(pruneNows[0] instanceof Date);
+});
+
+test('run: prune errors are logged and do not fail the run or change brief meta', async () => {
+  const h = harness({
+    pruneBriefStores: async () => ({ summaries: 0, fullStories: 3, errors: ['summaries prune: EACCES'] }),
+  });
+  const runner = createRefreshRunner(h.deps);
+
+  const result = await runner.run('manual');
+
+  assert.deepEqual(result.brief, { ...BRIEF, fullStories: FULL_STORIES });
+  assert.equal(h.meta.refresh!.last!.ok, true);
+  assert.ok(h.logs.some((l) => l.includes('summaries prune: EACCES')));
+});
+
+test('run: a throwing prune is logged and does not fail the run', async () => {
+  const h = harness({
+    pruneBriefStores: async () => {
+      throw new Error('prune boom');
+    },
+  });
+  const runner = createRefreshRunner(h.deps);
+
+  const result = await runner.run('manual');
+
+  assert.equal(result.joined, false);
+  assert.equal(h.meta.refresh!.last!.ok, true);
+  assert.ok(h.logs.some((l) => l.includes('prune boom')));
 });
 
 test('run: meta write failure is logged and does not fail a successful run', async () => {

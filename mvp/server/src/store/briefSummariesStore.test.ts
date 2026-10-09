@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 import type { BriefSummaryRecord } from '../types/brief.js';
-import { putBriefSummaries, readBriefSummaries } from './briefSummariesStore.js';
+import { pruneBriefSummaries, putBriefSummaries, readBriefSummaries } from './briefSummariesStore.js';
 
 function tempSummariesPath(): string {
   const dir = mkdtempSync(path.join(tmpdir(), 'brief-summaries-'));
@@ -90,6 +90,59 @@ test('a failed put does not block later puts to the same file', async () => {
   await putBriefSummaries([okRecord('seed')], summariesPath);
   await writeFile(summariesPath, JSON.stringify(['not', 'an', 'object']), 'utf8');
   await assert.rejects(putBriefSummaries([okRecord('bad')], summariesPath));
+
+  await writeFile(summariesPath, JSON.stringify({ summaries: {} }), 'utf8');
+  await putBriefSummaries([okRecord('after')], summariesPath);
+  assert.deepEqual(Object.keys((await readBriefSummaries(summariesPath)).summaries), ['after']);
+});
+
+test('pruneBriefSummaries drops records the predicate rejects and keeps the rest', async () => {
+  const summariesPath = tempSummariesPath();
+  await putBriefSummaries([okRecord('keep'), okRecord('stale'), okRecord('old')], summariesPath);
+
+  const removed = await pruneBriefSummaries(
+    (record) => record.articleId === 'keep',
+    summariesPath,
+  );
+
+  assert.equal(removed, 2);
+  assert.deepEqual((await readBriefSummaries(summariesPath)).summaries, { keep: okRecord('keep') });
+});
+
+test('pruneBriefSummaries leaves the file untouched when nothing is removed', async () => {
+  const summariesPath = tempSummariesPath();
+  await putBriefSummaries([okRecord('a')], summariesPath);
+  const before = await readFile(summariesPath, 'utf8');
+
+  assert.equal(await pruneBriefSummaries(() => true, summariesPath), 0);
+  assert.equal(await readFile(summariesPath, 'utf8'), before);
+});
+
+test('pruneBriefSummaries on a missing file removes nothing and creates no file', async () => {
+  const summariesPath = tempSummariesPath();
+  assert.equal(await pruneBriefSummaries(() => false, summariesPath), 0);
+  await assert.rejects(readFile(summariesPath, 'utf8'), { code: 'ENOENT' });
+});
+
+test('pruneBriefSummaries interleaved with puts never loses a put', async () => {
+  const summariesPath = tempSummariesPath();
+  await putBriefSummaries([okRecord('a'), okRecord('b')], summariesPath);
+
+  await Promise.all([
+    putBriefSummaries([okRecord('c')], summariesPath),
+    pruneBriefSummaries((record) => record.articleId !== 'a', summariesPath),
+    putBriefSummaries([okRecord('d')], summariesPath),
+  ]);
+
+  const { summaries } = await readBriefSummaries(summariesPath);
+  assert.deepEqual(Object.keys(summaries).sort(), ['b', 'c', 'd']);
+});
+
+test('a failed prune does not block later puts to the same file', async () => {
+  const summariesPath = tempSummariesPath();
+  await putBriefSummaries([okRecord('seed')], summariesPath);
+  await writeFile(summariesPath, '{ not json', 'utf8');
+  await assert.rejects(pruneBriefSummaries(() => false, summariesPath), SyntaxError);
 
   await writeFile(summariesPath, JSON.stringify({ summaries: {} }), 'utf8');
   await putBriefSummaries([okRecord('after')], summariesPath);

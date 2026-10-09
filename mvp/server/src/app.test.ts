@@ -103,9 +103,10 @@ const BRIEF_RUN: BriefRunMeta = {
   summaries: { budget: 60, used: 2, generated: 1, reused: 1, unavailable: 0, errors: ['Ollama: x'] },
 };
 
-/** Keeps refresh-time summaries and meta.refresh writes out of mvp/data. */
+/** Keeps refresh-time summaries, store pruning and meta.refresh writes out of mvp/data. */
 const noRefreshSideEffects = {
   generateRefreshSummaries: async () => BRIEF_RUN,
+  pruneBriefStores: async () => ({ summaries: 0, fullStories: 0, errors: [] }),
   updateMeta: async () => ({ lastFetchAt: null, lastError: null }),
 };
 
