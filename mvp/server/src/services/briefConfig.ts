@@ -10,6 +10,8 @@ export const SIGNIFICANT_UPDATE_OUTLET_DELTA = 2;
 /** A seen story re-shows when its significance (0–2) grows by at least this much */
 export const SIGNIFICANT_UPDATE_SIGNIFICANCE_DELTA = 0.5;
 export const BRIEF_SEEN_RETENTION_DAYS = 7;
+/** Saved summaries and full stories are dropped this long after generatedAt (Brief window is 48h) */
+export const BRIEF_CACHE_RETENTION_DAYS = 7;
 
 export const SUMMARY_SOURCE_MAX_CHARS = 3000;
 export const SUMMARY_MIN_CHARS = 20;

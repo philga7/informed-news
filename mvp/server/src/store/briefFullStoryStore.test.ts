@@ -6,7 +6,7 @@ import path from 'node:path';
 import { test } from 'node:test';
 import type { BriefFullStoryRecord } from '../types/briefFullStory.js';
 import {
-  pruneBriefFullStoriesByKeptIds,
+  pruneBriefFullStories,
   putBriefFullStories,
   readBriefFullStories,
   writeBriefFullStories,
@@ -116,25 +116,57 @@ test('concurrent putBriefFullStories calls never lose records and leave no temp 
   assert.deepEqual(leftovers, []);
 });
 
-test('putBriefFullStories prunes non-kept article ids when keptArticleIds is provided', async () => {
+test('pruneBriefFullStories drops records the predicate rejects and keeps the rest', async () => {
   const fullStoriesPath = tempFullStoriesPath();
-  await putBriefFullStories([okRecord('keep'), okRecord('drop')], fullStoriesPath);
-  await putBriefFullStories([okRecord('keep', { changeSummary: 'updated' })], fullStoriesPath, {
-    keptArticleIds: new Set(['keep']),
-  });
+  await putBriefFullStories([okRecord('keep'), okRecord('stale'), okRecord('old')], fullStoriesPath);
 
-  const { fullStories } = await readBriefFullStories(fullStoriesPath);
-  assert.deepEqual(Object.keys(fullStories), ['keep']);
+  const removed = await pruneBriefFullStories(
+    (record) => record.articleId === 'keep',
+    fullStoriesPath,
+  );
+
+  assert.equal(removed, 2);
+  assert.deepEqual((await readBriefFullStories(fullStoriesPath)).fullStories, { keep: okRecord('keep') });
 });
 
-test('pruneBriefFullStoriesByKeptIds drops records not in the kept set', () => {
-  const store = {
-    fullStories: { a: okRecord('a'), b: okRecord('b') },
-    updatedAt: '2026-09-30T12:00:00.000Z',
-  };
-  const pruned = pruneBriefFullStoriesByKeptIds(store, new Set(['b']));
-  assert.deepEqual(Object.keys(pruned.fullStories), ['b']);
-  assert.equal(pruned.updatedAt, store.updatedAt);
+test('pruneBriefFullStories leaves the file untouched when nothing is removed', async () => {
+  const fullStoriesPath = tempFullStoriesPath();
+  await putBriefFullStories([okRecord('a')], fullStoriesPath);
+  const before = await readFile(fullStoriesPath, 'utf8');
+
+  assert.equal(await pruneBriefFullStories(() => true, fullStoriesPath), 0);
+  assert.equal(await readFile(fullStoriesPath, 'utf8'), before);
+});
+
+test('pruneBriefFullStories on a missing file removes nothing and creates no file', async () => {
+  const fullStoriesPath = tempFullStoriesPath();
+  assert.equal(await pruneBriefFullStories(() => false, fullStoriesPath), 0);
+  await assert.rejects(readFile(fullStoriesPath, 'utf8'), { code: 'ENOENT' });
+});
+
+test('pruneBriefFullStories interleaved with puts never loses a put', async () => {
+  const fullStoriesPath = tempFullStoriesPath();
+  await putBriefFullStories([okRecord('a'), okRecord('b')], fullStoriesPath);
+
+  await Promise.all([
+    putBriefFullStories([okRecord('c')], fullStoriesPath),
+    pruneBriefFullStories((record) => record.articleId !== 'a', fullStoriesPath),
+    putBriefFullStories([okRecord('d')], fullStoriesPath),
+  ]);
+
+  const { fullStories } = await readBriefFullStories(fullStoriesPath);
+  assert.deepEqual(Object.keys(fullStories).sort(), ['b', 'c', 'd']);
+});
+
+test('a failed prune does not block later puts to the same file', async () => {
+  const fullStoriesPath = tempFullStoriesPath();
+  await putBriefFullStories([okRecord('seed')], fullStoriesPath);
+  await writeFile(fullStoriesPath, '{ not json', 'utf8');
+  await assert.rejects(pruneBriefFullStories(() => false, fullStoriesPath), SyntaxError);
+
+  await writeFile(fullStoriesPath, JSON.stringify({ fullStories: {} }), 'utf8');
+  await putBriefFullStories([okRecord('after')], fullStoriesPath);
+  assert.deepEqual(Object.keys((await readBriefFullStories(fullStoriesPath)).fullStories), ['after']);
 });
 
 test('writeBriefFullStories replaces the whole store', async () => {

@@ -72,7 +72,7 @@ A story counts as **seen** when you open it or mark it read in the Brief (includ
 
 ## Refresh
 
-A refresh runs the whole pipeline: CFP → curated RSS → xcancel → topic search → clustering → triage → Brief summaries → qualifying full stories. There is no tracked-stories step and no claims extraction. The timer, the startup catch-up, and the Refresh button share one runner: a refresh requested while one is running joins it instead of starting another.
+A refresh runs the whole pipeline: CFP → curated RSS → xcancel → topic search → clustering → triage → Brief summaries → qualifying full stories → prune saved summaries and full stories ([Retention](#retention)). There is no tracked-stories step and no claims extraction. The timer, the startup catch-up, and the Refresh button share one runner: a refresh requested while one is running joins it instead of starting another.
 
 **Timer.** The server checks once at startup and then every 5 minutes. A refresh starts when the last successful one finished at least `REFRESH_INTERVAL_HOURS` ago (default 3), or there has never been one (a store from before NEWS-88 uses its last fetch time instead). After a failed refresh it waits 30 minutes before trying again. A stored time that is unreadable or in the future (e.g. after a clock change) counts as missing, so a refresh runs and the 30-minute wait is skipped. A laptop that slept catches up on the first check after it wakes; an always-on host behaves the same. The server log says at startup whether auto-refresh is on and at what interval.
 
@@ -105,7 +105,7 @@ In `mvp/.env` (see `mvp/.env.example`):
 | `TRIAGE_SUMMARY_BUDGET` | Ollama summary calls per refresh (non-negative integer; unset or invalid → 60). Now enforced. Doesn't limit on-demand summaries. |
 | `OLLAMA_API_KEY` / `OLLAMA_MODEL` | Existing Ollama settings, used for summaries and full-story verbiage. |
 
-Other limits are constants in `mvp/server/src/services/briefConfig.ts` (top 3, 8 links, update thresholds, 7-day seen retention, summary lengths, concurrency, 30/hour on-demand summaries, 20/hour on-demand full stories, refresh check and retry minutes).
+Other limits are constants in `mvp/server/src/services/briefConfig.ts` (top 3, 8 links, update thresholds, 7-day seen retention, 7-day summary / full-story retention, summary lengths, concurrency, 30/hour on-demand summaries, 20/hour on-demand full stories, refresh check and retry minutes).
 
 `npm run test:e2e:kite` and the Kite integration suite (`bun run test:integration` in `apps/kite`) start their own stack via `e2e/stack/start.mjs`: mvp/server + Kite on separate ports (e2e: Kite 5174 / API 3101; integration: 5175 / 3102), a fresh temp data dir seeded with a fixed topic Brief and a last triage run with dropped stories for the Filtered out view (`e2e/stack/scenarios.mjs`), and a generated env file in place of `mvp/.env` (auto-refresh off, no Ollama / TypeSafe keys, test-only password). They never reuse your dev server or read `mvp/data`, so nothing is skipped for lack of local stories and no budget is spent. The server hooks are `MVP_DATA_DIR` (store directory; process env only) and `MVP_ENV_FILE` (env file instead of `mvp/.env`).
 
@@ -116,6 +116,15 @@ All gitignored under `mvp/data/`:
 - **`brief-summaries.json`** — one summary record per kept article id: `status` (`ok` \| `unavailable` \| `error`), `text`, the source article id and a hash of the source text, `model`, `error`, `generatedAt`, `trigger` (`refresh` \| `on_demand`).
 - **`brief-full-stories.json`** — one full-story record per kept article id: `status`, enriched fields, deterministic perspectives / quote, source hash, requested topic sections, model / error, generation metadata, and optional living-update timeline / note.
 - **`brief-seen.json`** — one entry per seen article id: `seenAt` plus the outlet count and significance at that time.
+
+### Retention
+
+Tickets: [NEWS-99](https://informedcrew.atlassian.net/browse/NEWS-99) (summaries), [NEWS-100](https://informedcrew.atlassian.net/browse/NEWS-100) (full stories). After every successful refresh, once full stories are done, the server prunes `brief-summaries.json` and `brief-full-stories.json` with one rule: a record stays only while its article is still a **kept** triage record **and** its `generatedAt` is within the last **7 days** (`BRIEF_CACHE_RETENTION_DAYS`). A story shows in the Brief for 48 hours after its article's time, so anything older can't be on the page. Articles are never deleted, so kept triage records never expire on their own; the age cutoff is what bounds the files. A living full story's `generatedAt` moves forward each time it is regenerated.
+
+- A file with nothing to drop isn't rewritten. Pruning shares each file's write queue with refresh and on-demand writes, so it never loses a concurrent write, and a failed prune doesn't block later writes.
+- If `triage.json` can't be read, nothing is pruned. A failure on one file doesn't stop the other. Prune failures are logged and never fail the refresh; they aren't recorded in `meta.json`.
+- A failed refresh (e.g. CFP down) doesn't prune; triage didn't change, so there's nothing new to drop.
+- A pruned story that reappears (kept again, or opened later) gets a new summary or full story on demand or at the next refresh, as if it had never had one. While a summary is kept, the source-text hash check still reuses it without a call.
 - **`meta.json` → `refresh`** — `{ last, lastSuccess }`, each `{ trigger: 'manual' | 'timer' | 'startup', startedAt, completedAt, ok, error }`.
 - **`meta.json` → `brief`** — the last refresh's summary and full-story runs: `{ at, summaries: { … }, fullStories: { budget, used, generated, reused, unavailable, errors } }`.
 

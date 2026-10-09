@@ -20,9 +20,9 @@ Claims spine plan: [`.cursor/plans/claims_evidence_spine_8f4cde15.plan.md`](../.
 | 5 | [NEWS-89](https://informedcrew.atlassian.net/browse/NEWS-89) | Full stories: tap-to-expand, automatic worth-it bar, topic sections, living updates — **Done** ([docs/BRIEF.md](BRIEF.md)) |
 | 6 | [NEWS-90](https://informedcrew.atlassian.net/browse/NEWS-90) | Filtered out view (`/filtered`) + "Less like this" feedback — **Done** ([docs/TRIAGE.md](TRIAGE.md), [docs/BRIEF.md](BRIEF.md)) |
 | 7 | [NEWS-91](https://informedcrew.atlassian.net/browse/NEWS-91) | Retire review flow from default path; park claims desk; update docs — **Done** ([docs/OWNED_BRIEF.md](OWNED_BRIEF.md#parked-story-desk-and-claims-desk)) |
-| **8** | [NEWS-99](https://informedcrew.atlassian.net/browse/NEWS-99) | Prune the Brief summaries store (grows without bound today) *(next)* |
-| 9 | [NEWS-100](https://informedcrew.atlassian.net/browse/NEWS-100) | Prune the Brief full-stories store (sibling of NEWS-99; ship together if practical) |
-| 10 | [NEWS-102](https://informedcrew.atlassian.net/browse/NEWS-102) | Share significant-update helper between Brief seen gate and full-story auto bar |
+| 8 | [NEWS-99](https://informedcrew.atlassian.net/browse/NEWS-99) | Prune the Brief summaries store — **Done** ([docs/BRIEF.md](BRIEF.md#retention)) |
+| 9 | [NEWS-100](https://informedcrew.atlassian.net/browse/NEWS-100) | Prune the Brief full-stories store (shipped with NEWS-99) — **Done** ([docs/BRIEF.md](BRIEF.md#retention)) |
+| **10** | [NEWS-102](https://informedcrew.atlassian.net/browse/NEWS-102) | Share significant-update helper between Brief seen gate and full-story auto bar *(next)* |
 | 11 | [NEWS-98](https://informedcrew.atlassian.net/browse/NEWS-98) | Manual seeds (Add story) and story Unaccept on the topic Brief — grill first; both still present, not retired by NEWS-91 |
 | 12 | [NEWS-104](https://informedcrew.atlassian.net/browse/NEWS-104) | Less like this + Filtered out polish (NEWS-90 follow-ups: keyboard/focus, 409 after collapse, mute-store fallback, 5xx copy) |
 | Later | [NEWS-92](https://informedcrew.atlassian.net/browse/NEWS-92) | USAspending contract awards source for company Watch topics |

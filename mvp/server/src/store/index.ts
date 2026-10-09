@@ -48,9 +48,9 @@ export type {
   GoogleNewsUrlCacheEntry,
 } from './googleNewsUrlCacheStore.js';
 export { readTriage, writeTriage } from './triageStore.js';
-export { putBriefSummaries, readBriefSummaries } from './briefSummariesStore.js';
+export { pruneBriefSummaries, putBriefSummaries, readBriefSummaries } from './briefSummariesStore.js';
 export {
-  pruneBriefFullStoriesByKeptIds,
+  pruneBriefFullStories,
   putBriefFullStories,
   readBriefFullStories,
   writeBriefFullStories,
