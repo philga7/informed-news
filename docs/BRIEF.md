@@ -116,6 +116,8 @@ All gitignored under `mvp/data/`:
 - **`brief-summaries.json`** — one summary record per kept article id: `status` (`ok` \| `unavailable` \| `error`), `text`, the source article id and a hash of the source text, `model`, `error`, `generatedAt`, `trigger` (`refresh` \| `on_demand`).
 - **`brief-full-stories.json`** — one full-story record per kept article id: `status`, enriched fields, deterministic perspectives / quote, source hash, requested topic sections, model / error, generation metadata, and optional living-update timeline / note.
 - **`brief-seen.json`** — one entry per seen article id: `seenAt` plus the outlet count and significance at that time.
+- **`meta.json` → `refresh`** — `{ last, lastSuccess }`, each `{ trigger: 'manual' | 'timer' | 'startup', startedAt, completedAt, ok, error }`.
+- **`meta.json` → `brief`** — the last refresh's summary and full-story runs: `{ at, summaries: { … }, fullStories: { budget, used, generated, reused, unavailable, errors } }`.
 
 ### Retention
 
@@ -125,8 +127,6 @@ Tickets: [NEWS-99](https://informedcrew.atlassian.net/browse/NEWS-99) (summaries
 - If `triage.json` can't be read, nothing is pruned. A failure on one file doesn't stop the other. Prune failures are logged and never fail the refresh; they aren't recorded in `meta.json`.
 - A failed refresh (e.g. CFP down) doesn't prune; triage didn't change, so there's nothing new to drop.
 - A pruned story that reappears (kept again, or opened later) gets a new summary or full story on demand or at the next refresh, as if it had never had one. While a summary is kept, the source-text hash check still reuses it without a call.
-- **`meta.json` → `refresh`** — `{ last, lastSuccess }`, each `{ trigger: 'manual' | 'timer' | 'startup', startedAt, completedAt, ok, error }`.
-- **`meta.json` → `brief`** — the last refresh's summary and full-story runs: `{ at, summaries: { … }, fullStories: { budget, used, generated, reused, unavailable, errors } }`.
 
 ## Routes
 
