@@ -1,6 +1,8 @@
 /** Triage pipeline (NEWS-87) constants and env readers. */
 
 export const TRIAGE_WINDOW_HOURS = 48;
+/** Triaged articles are pruned this long after last published / fetched (outlives the 7-day Brief caches) */
+export const ARTICLE_RETENTION_DAYS = 14;
 
 export const DEFAULT_TRIAGE_JEV_BUDGET = 300;
 export const DEFAULT_TRIAGE_SUMMARY_BUDGET = 60;

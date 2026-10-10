@@ -119,6 +119,7 @@ const noRefreshSideEffects = {
   generateRefreshSummaries: async () => BRIEF_RUN,
   generateRefreshFullStories: async () => EMPTY_FULL_STORIES_RUN,
   pruneBriefStores: async () => ({ summaries: 0, fullStories: 0, errors: [] }),
+  pruneArticleStore: async () => ({ articles: 0, errors: [] }),
   readMeta: async () => ({ lastFetchAt: null, lastError: null }),
   updateMeta: async () => ({ lastFetchAt: null, lastError: null }),
 };
@@ -748,6 +749,33 @@ test('POST /api/fetch returns topicSearch + triage summaries and the Brief run',
       articles: 1,
     });
     assert.deepEqual((json as { brief?: unknown }).brief, { summaries: BRIEF_RUN.summaries });
+  } finally {
+    await close();
+  }
+});
+
+test('POST /api/fetch with injected fetchAllSources prunes articles through the injected pruneArticleStore', async () => {
+  let articlePrunes = 0;
+  const { createApp } = await import('./app.js');
+  const app = createApp({
+    fetchAllSources: async () => stubFetchResult(),
+    ...noRefreshSideEffects,
+    pruneArticleStore: async () => {
+      articlePrunes += 1;
+      return { articles: 0, errors: [] };
+    },
+  });
+
+  const { baseUrl, close } = await startServer(app);
+  try {
+    const cookie = await login(baseUrl);
+    const resp = await fetch(`${baseUrl}/api/fetch`, {
+      method: 'POST',
+      headers: { cookie, 'content-type': 'application/json' },
+      body: JSON.stringify({ limit: 3 }),
+    });
+    assert.equal(resp.status, 200);
+    assert.equal(articlePrunes, 1);
   } finally {
     await close();
   }

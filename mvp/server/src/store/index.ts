@@ -8,10 +8,11 @@ export {
 export { mergeArticleOnUpsert } from './mergeArticleOnUpsert.js';
 export {
   getArticleById,
+  pruneArticles,
   readArticles,
+  updateArticles,
   upsertArticle,
   upsertArticles,
-  writeArticles,
 } from './articleStore.js';
 export { readMeta, updateMeta, writeMeta } from './metaStore.js';
 export {

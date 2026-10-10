@@ -1,5 +1,5 @@
 import type { Article } from '../types/article.js';
-import { readArticles, writeArticles } from '../store/index.js';
+import { updateArticles } from '../store/index.js';
 
 /** Tiny English stop words so title overlap is not noise. */
 const STOP_WORDS = new Set([
@@ -260,9 +260,7 @@ export function assignClusterIdsInMemory(articles: Article[]): Article[] {
 
 /** Recompute clusterIds for the whole store and persist. */
 export async function assignClusterIds(): Promise<AssignClusterIdsResult> {
-  const articles = await readArticles();
-  const next = assignClusterIdsInMemory(articles);
-  await writeArticles(next);
+  const next = await updateArticles(assignClusterIdsInMemory);
 
   const clustered = next.filter((a) => a.clusterId != null).length;
   const clusters = new Set(

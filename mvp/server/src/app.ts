@@ -37,6 +37,7 @@ import {
   lessLikeThis,
   loadClaimsRadar,
   markBriefSeen,
+  pruneArticleStore,
   pruneBriefStores,
   summarizeBriefStory,
 } from './services/index.js';
@@ -86,13 +87,14 @@ export type CreateAppDeps = {
   /**
    * Injecting this builds a fresh runner from the deps below. Inject
    * `generateRefreshSummaries`, `generateRefreshFullStories`, `pruneBriefStores`,
-   * `readMeta` and `updateMeta` too (or pass a `refreshRunner` instead): any
-   * left out fall back to the real stores (mvp/data) and Ollama.
+   * `pruneArticleStore`, `readMeta` and `updateMeta` too (or pass a `refreshRunner`
+   * instead): any left out fall back to the real stores (mvp/data) and Ollama.
    */
   fetchAllSources?: typeof fetchAllSources;
   generateRefreshSummaries?: typeof generateRefreshSummaries;
   generateRefreshFullStories?: typeof generateRefreshFullStories;
   pruneBriefStores?: typeof pruneBriefStores;
+  pruneArticleStore?: typeof pruneArticleStore;
   updateMeta?: typeof updateMeta;
   readArticles?: typeof readArticles;
   readMeta?: typeof readMeta;
@@ -252,6 +254,7 @@ export function createApp(deps: CreateAppDeps = {}): Express {
           generateSummaries: deps.generateRefreshSummaries ?? generateRefreshSummaries,
           generateFullStories: deps.generateRefreshFullStories ?? generateRefreshFullStories,
           pruneBriefStores: deps.pruneBriefStores ?? pruneBriefStores,
+          pruneArticleStore: deps.pruneArticleStore ?? pruneArticleStore,
           readMeta: readServerMeta,
           updateMeta: deps.updateMeta ?? updateMeta,
         })
