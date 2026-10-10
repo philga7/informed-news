@@ -26,19 +26,19 @@ Claims spine plan: [`.cursor/plans/claims_evidence_spine_8f4cde15.plan.md`](../.
 | 11 | [NEWS-98](https://informedcrew.atlassian.net/browse/NEWS-98) | Manual seeds (Add story) on the topic Brief, pinned first with Remove; Unaccept retired from Kite — **Done** ([docs/BRIEF.md](BRIEF.md#added-stories-seeds)) |
 | 12 | [NEWS-104](https://informedcrew.atlassian.net/browse/NEWS-104) | Less like this + Filtered out polish (NEWS-90 follow-ups: keyboard/focus, 409 after collapse, mute-store fallback, 5xx copy, hostname check) — **Done** ([docs/BRIEF.md](BRIEF.md#less-like-this), [docs/TRIAGE.md](TRIAGE.md#filtered-out-view)) |
 | 13 | [NEWS-115](https://informedcrew.atlassian.net/browse/NEWS-115) | Manual seed triage edge cases (NEWS-98 follow-ups: Remove vs concurrent refresh, orphan seed records, non-atomic save) — **Done** ([docs/TRIAGE.md](TRIAGE.md#seeds-and-concurrent-refreshes)) |
+| **14** | [NEWS-117](https://informedcrew.atlassian.net/browse/NEWS-117) | Article store retention prune: `articles.json` grows without bound, orphan seed articles included; serialize article writes (NEWS-115 follow-up) *(next)* |
 | — | [NEWS-93](https://informedcrew.atlassian.net/browse/NEWS-93) | Always-on hosting decision — **Done** (see [Always-on hosting](#always-on-hosting-news-93)) |
-| **Hosting** | [NEWS-109](https://informedcrew.atlassian.net/browse/NEWS-109) | Dockerfile + Compose for API and Kite with `mvp/data` volume *(next)* |
-| Hosting | [NEWS-110](https://informedcrew.atlassian.net/browse/NEWS-110) | Wire `SEARXNG_URL` / `TOPIC_SEARCH` to the existing Hostinger SearXNG (after NEWS-109) |
-| Hosting | [NEWS-111](https://informedcrew.atlassian.net/browse/NEWS-111) | Expose via Tailscale only (no public bind); keep `MVP_PASSWORD` |
-| Hosting | [NEWS-112](https://informedcrew.atlassian.net/browse/NEWS-112) | Env-file layout + short Hostinger runbook |
-| After hosting | [NEWS-117](https://informedcrew.atlassian.net/browse/NEWS-117) | Article store retention prune: `articles.json` grows without bound, orphan seed articles included; serialize article writes (NEWS-115 follow-up) |
+| Later (hosting) | [NEWS-109](https://informedcrew.atlassian.net/browse/NEWS-109) | Dockerfile + Compose for API and Kite with `mvp/data` volume |
+| Later (hosting) | [NEWS-110](https://informedcrew.atlassian.net/browse/NEWS-110) | Wire `SEARXNG_URL` / `TOPIC_SEARCH` to the existing Hostinger SearXNG (after NEWS-109) |
+| Later (hosting) | [NEWS-111](https://informedcrew.atlassian.net/browse/NEWS-111) | Expose via Tailscale only (no public bind); keep `MVP_PASSWORD` |
+| Later (hosting) | [NEWS-112](https://informedcrew.atlassian.net/browse/NEWS-112) | Env-file layout + short Hostinger runbook |
 | Later | [NEWS-92](https://informedcrew.atlassian.net/browse/NEWS-92) | USAspending contract awards source for company Watch topics |
 
 **First milestone:** NEWS-85 → 86 → 87 → 88 → 89 (all Done) — open the app and get a filtered, topic-grouped Brief with tap-to-expand full stories and no review step. NEWS-91 then retired the review flow: `/radar` redirects to `/topics`, refresh no longer syncs tracked stories, and the claims desk is parked.
 
 ### Always-on hosting (NEWS-93)
 
-Decided 2026-10-09; nothing deployed yet. Today the app runs on the operator laptop, so scheduled refresh only happens while it is up. The decision:
+Decided 2026-10-09; nothing deployed. **Deferred 2026-10-10:** Philip keeps running informed-news locally for testing, so the build waits until the remaining product work is done. Until then the app runs on the operator laptop, and scheduled refresh only happens while it is up. The decision, still standing for when the build resumes:
 
 - **Host:** the Hostinger VPS, in Docker next to Nanobot, as a separate Compose project.
 - **Search:** reuse the SearXNG already running on that VPS; no second instance.
@@ -47,7 +47,7 @@ Decided 2026-10-09; nothing deployed yet. Today the app runs on the operator lap
 - **Backups:** none for v1 beyond the Docker volume holding `mvp/data`.
 - **Not this round:** public URL, multi-user accounts, Render.
 
-The build is the four Hosting rows above, all under Epic L: NEWS-109 first (NEWS-110 depends on it), then NEWS-110, NEWS-111 and NEWS-112. [NEWS-113](https://informedcrew.atlassian.net/browse/NEWS-113) was a duplicate of NEWS-110 and is closed. With NEWS-115 Done, NEWS-109 is *(next)*. [NEWS-117](https://informedcrew.atlassian.net/browse/NEWS-117) (article store prune) follows the hosting rows, because an always-on refresh makes the unbounded `articles.json` grow faster.
+The build is the four Later (hosting) rows above, all still under Epic L and marked `[Later]` in Jira: NEWS-109 first (NEWS-110 depends on it), then NEWS-110, NEWS-111 and NEWS-112. [NEWS-113](https://informedcrew.atlassian.net/browse/NEWS-113) was a duplicate of NEWS-110 and is closed. With hosting deferred, [NEWS-117](https://informedcrew.atlassian.net/browse/NEWS-117) (article store prune) is *(next)*.
 
 Epic **K** ([NEWS-83](https://informedcrew.atlassian.net/browse/NEWS-83)) stays open as the bug intake from the operator walkthrough: open [NEWS-94](https://informedcrew.atlassian.net/browse/NEWS-94) primary-source plumbing, [NEWS-95](https://informedcrew.atlassian.net/browse/NEWS-95) Topics follow-ups, [NEWS-97](https://informedcrew.atlassian.net/browse/NEWS-97) "WORLD" label on topic Brief cards, [NEWS-101](https://informedcrew.atlassian.net/browse/NEWS-101) full-story unavailable UI feedback, [NEWS-103](https://informedcrew.atlassian.net/browse/NEWS-103) require green CI before merge, [NEWS-105](https://informedcrew.atlassian.net/browse/NEWS-105) e2e coverage gaps for Filtered out + Less like this, [NEWS-107](https://informedcrew.atlassian.net/browse/NEWS-107) app test reads the real mvp/data stores (plus a temp `MVP_DATA_DIR` safety net for `npm test`), [NEWS-108](https://informedcrew.atlassian.net/browse/NEWS-108) group refresh-runner deps in `CreateAppDeps`, [NEWS-114](https://informedcrew.atlassian.net/browse/NEWS-114) publisher scrape timeout doesn't cover a stalled body read, [NEWS-116](https://informedcrew.atlassian.net/browse/NEWS-116) Topics page and Add story show raw server error text on 5xx, [NEWS-118](https://informedcrew.atlassian.net/browse/NEWS-118) refresh writes triage records before resolved articles, so a seed's URL duplicate check can miss (NEWS-115 follow-up). [NEWS-96](https://informedcrew.atlassian.net/browse/NEWS-96) (svelte-check 0/0, hermetic e2e/integration stack, no skipped tests) shipped with NEWS-88 — **Done**. [NEWS-106](https://informedcrew.atlassian.net/browse/NEWS-106) (app tests' refresh runner used the real full-story store and Ollama) — **Done**. Still ask before parked Later under [NEWS-57](https://informedcrew.atlassian.net/browse/NEWS-57) or Epic **B** ([NEWS-34](https://informedcrew.atlassian.net/browse/NEWS-34)).
 
