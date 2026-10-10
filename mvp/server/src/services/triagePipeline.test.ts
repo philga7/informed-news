@@ -892,3 +892,43 @@ test('dedupe growth of a seed is kept: an in-window search duplicate joins its m
   assert.equal(state.store.records.dup!.reason, 'duplicate');
   assert.equal(state.store.records.dup!.duplicateOf, 'seed');
 });
+
+function twoHostSeedHarness(dupDomain: string) {
+  const seedUrl = 'https://www.alpha.example/story';
+  return harness({
+    topics: [TARIFFS],
+    articles: [
+      {
+        ...seedArticle('seed', 'Operator tariff seed'),
+        citations: [
+          { label: 'Source', url: seedUrl },
+          { label: 'Source', url: 'https://Beta.example/report' },
+        ],
+        publisherUrl: seedUrl,
+        publisherDomain: 'alpha.example',
+      },
+      article('dup', 'Wire copy on the new tariff schedule', {
+        sourceKind: 'search',
+        citations: [{ label: 'Seed outlet', url: seedUrl }],
+        publisherDomain: dupDomain,
+      }),
+    ],
+    records: { seed: seedRecord('seed', { outletCount: 2 }) },
+  });
+}
+
+test('a seed saved over two hosts gaining coverage from a third outlet counts 3 outlets', async () => {
+  const { deps, state } = twoHostSeedHarness('gamma.example');
+
+  await run(deps);
+
+  assert.deepEqual(state.store.records.seed, seedRecord('seed', { memberIds: ['dup'], outletCount: 3 }));
+});
+
+test('a seed gaining coverage from one of its own save-time hosts keeps 2 outlets', async () => {
+  const { deps, state } = twoHostSeedHarness('www.alpha.example');
+
+  await run(deps);
+
+  assert.deepEqual(state.store.records.seed, seedRecord('seed', { memberIds: ['dup'], outletCount: 2 }));
+});

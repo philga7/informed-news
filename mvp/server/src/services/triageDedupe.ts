@@ -8,7 +8,9 @@ import {
   titleTokens,
   urlSetsLink,
 } from './clusterArticles.js';
+import { publisherDomainFromUrl } from './publisherScrape.js';
 import { normalizeTitleForMatch } from './searchUrl.js';
+import { normalizeOutletDomain } from './triageKeywords.js';
 import {
   SIMILAR_TITLE_JACCARD_MIN,
   SIMILAR_TITLE_MIN_SHARED_TOKENS,
@@ -195,4 +197,20 @@ export function outletCount(members: readonly Article[]): number {
 
   if (parent.size === 0) return 1;
   return new Set([...parent.keys()].map(find)).size;
+}
+
+/**
+ * A manual seed's outlets: distinct hosts of its save-time URLs plus its
+ * members' publisher domains, so folded coverage never drops below the
+ * save-time count. Minimum 1.
+ */
+export function seedOutletCount(seed: Article, members: readonly Article[]): number {
+  const outlets = new Set<string>();
+  const add = (domain: string | null) => {
+    const normalized = normalizeOutletDomain(domain);
+    if (normalized) outlets.add(normalized);
+  };
+  for (const { url } of seed.citations) add(publisherDomainFromUrl(url));
+  for (const member of members) add(member.publisherDomain);
+  return Math.max(1, outlets.size);
 }

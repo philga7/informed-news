@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Attachment } from 'svelte/attachments';
+	import { BRIEF_SEED_LOGIN_HREF } from '$lib/briefSeed';
 	import {
 		BRIEF_REMOVE_LABEL,
 		BRIEF_REMOVE_PENDING,
@@ -54,7 +55,7 @@
 	{#if failure?.login}
 		<p class="mt-1" role="alert">
 			<a
-				href="/topics"
+				href={BRIEF_SEED_LOGIN_HREF}
 				class="font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
 			>
 				{failure.message}

@@ -173,7 +173,7 @@ async function handleSubmit(event: Event): Promise<void> {
 			<p class="text-xs text-gray-600 dark:text-gray-400">
 				{BRIEF_SEED_NO_TOPICS}
 				<a
-					href="/topics"
+					href={BRIEF_SEED_LOGIN_HREF}
 					class="ms-1 font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
 				>
 					{BRIEF_SEED_NO_TOPICS_LINK_LABEL}

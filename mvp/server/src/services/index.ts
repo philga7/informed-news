@@ -291,7 +291,6 @@ export { briefClusterKey, isSoloClusterKey } from './briefClusterKey.js';
 export {
   buildManualSeedArticle,
   createManualSeed,
-  MANUAL_SEED_SCRAPE_TIMEOUT_MS,
   ManualSeedConflictError,
   ManualSeedValidationError,
   parseManualSeedBody,
@@ -300,10 +299,8 @@ export {
 export type {
   CreateManualSeedDeps,
   CreateManualSeedResult,
-  ManualSeedArticleInput,
   ManualSeedConflictBody,
   ManualSeedInput,
-  RemoveManualSeedDeps,
   RemoveManualSeedResult,
 } from './manualBriefSeed.js';
 export {

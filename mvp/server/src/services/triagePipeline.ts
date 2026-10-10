@@ -34,7 +34,13 @@ import {
   TRIAGE_MAX_UNDESIRED_TOPICS,
   TRIAGE_WINDOW_HOURS,
 } from './triageConfig.js';
-import { groupCandidates, outletCount, type DedupeCandidate, type DedupeGroup } from './triageDedupe.js';
+import {
+  groupCandidates,
+  outletCount,
+  seedOutletCount,
+  type DedupeCandidate,
+  type DedupeGroup,
+} from './triageDedupe.js';
 import { judgeTriage, type TriageJevContext, type TriageVerdict } from './triageJev.js';
 import { candidateTopicIds, isOutletOnlyTopic, muteReason } from './triageKeywords.js';
 import { prepareSurvivor } from './triageSurvivor.js';
@@ -521,7 +527,11 @@ export async function runTriage(
       const members = [keptId, ...memberIds]
         .map((id) => articlesById.get(id))
         .filter((a): a is Article => a !== undefined);
-      updatedKept.set(keptId, { ...kept, memberIds, outletCount: outletCount(members) });
+      const folded =
+        kept.stage === 'manual'
+          ? seedOutletCount(articlesById.get(keptId)!, members)
+          : outletCount(members);
+      updatedKept.set(keptId, { ...kept, memberIds, outletCount: folded });
     }
 
     if (fresh.length > 0 && !(deps.jevAvailable ?? (() => getTypeSafeClient() !== null))()) {

@@ -67,7 +67,7 @@ const requestedSummaries = new Set<string>();
 	}
 
 	let {
-		stories = [],
+		stories = $bindable([]),
 		batchId,
 		batchDateSlug = null,
 		categoryId,
@@ -95,12 +95,10 @@ const requestedSummaries = new Set<string>();
 	let openMore = $state<Record<string, boolean>>({});
 	let summaryRequests = $state<Record<string, SummaryRequestState>>({});
 	let fullStoryRequests = $state<Record<string, FullStoryRequestState>>({});
-	let removedKeys = $state<Set<string>>(new Set());
 	let overviewSequence = 0;
 
 	const useSections = $derived(overviewLoaded && overview !== null && !overview.fixture);
-	const shownStories = $derived(stories.filter((story) => !removedKeys.has(storyKey(story))));
-	const sections = $derived(overview ? groupTopicBrief(overview, shownStories) : []);
+	const sections = $derived(overview ? groupTopicBrief(overview, stories) : []);
 	const quiet = $derived(overview ? quietLine(overview.quiet) : null);
 	const storyIndex = $derived(new Map(stories.map((story, index) => [story, index])));
 	const topicStoryIds = $derived(
@@ -263,9 +261,13 @@ const requestedSummaries = new Set<string>();
 		}
 	}
 
+	/**
+	 * Removing from the bound page list also drops the card from keyboard
+	 * navigation; the overview reloads via the `stories` effect.
+	 */
 	function handleSeedRemoved(story: Story): void {
-		removedKeys = new Set([...removedKeys, storyKey(story)]);
-		void loadOverview();
+		const key = storyKey(story);
+		stories = stories.filter((candidate) => storyKey(candidate) !== key);
 	}
 
 	function toggleMore(topicId: string): void {

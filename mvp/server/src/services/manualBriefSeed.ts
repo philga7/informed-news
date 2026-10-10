@@ -15,7 +15,7 @@ import {
 import { scrapePublisherBody, type PublisherBodyResult } from './publisherBodyScrape.js';
 import { publisherDomainFromUrl } from './publisherScrape.js';
 import { TRIAGE_WINDOW_HOURS } from './triageConfig.js';
-import { storiesAreDuplicates } from './triageDedupe.js';
+import { seedOutletCount, storiesAreDuplicates } from './triageDedupe.js';
 import { muteReason } from './triageKeywords.js';
 
 /** Single attempt, shorter than the refresh scrape: the operator is waiting on the save. */
@@ -184,13 +184,24 @@ export function buildManualSeedArticle(
   };
 }
 
-export type CreateManualSeedDeps = {
-  readTopics?: () => Promise<{ topics: Topic[] }>;
-  readMuteRules?: () => Promise<{ rules: MuteRule[] }>;
+type SeedStoreDeps = {
   readArticles?: () => Promise<Article[]>;
   readTriage?: () => Promise<TriageStore>;
+  updateTriage?: typeof updateTriage;
+};
+
+function seedStores(deps: SeedStoreDeps): Required<SeedStoreDeps> {
+  return {
+    readArticles: deps.readArticles ?? readArticles,
+    readTriage: deps.readTriage ?? readTriage,
+    updateTriage: deps.updateTriage ?? updateTriage,
+  };
+}
+
+export type CreateManualSeedDeps = SeedStoreDeps & {
+  readTopics?: () => Promise<{ topics: Topic[] }>;
+  readMuteRules?: () => Promise<{ rules: MuteRule[] }>;
   upsertArticle?: typeof upsertArticle;
-  updateTriage?: (mutate: (store: TriageStore) => TriageStore) => Promise<TriageStore>;
   scrapePublisherBody?: (
     url: string,
     opts: { timeoutMs: number; retries: number },
@@ -202,13 +213,6 @@ export type CreateManualSeedDeps = {
 function inWindow(article: Article, now: number): boolean {
   const time = Date.parse(article.publishedAt ?? article.fetchedAt);
   return !Number.isNaN(time) && now - time <= WINDOW_MS;
-}
-
-function outletCountOf(urls: readonly string[]): number {
-  const hosts = new Set(
-    urls.map((url) => new URL(url).hostname.toLowerCase().replace(/^www\./, '')),
-  );
-  return Math.max(1, hosts.size);
 }
 
 function muteConflict(
@@ -266,8 +270,8 @@ export async function createManualSeed(
   input: ManualSeedInput,
   deps: CreateManualSeedDeps = {},
 ): Promise<CreateManualSeedResult> {
+  const stores = seedStores(deps);
   const upsert = deps.upsertArticle ?? upsertArticle;
-  const update = deps.updateTriage ?? ((mutate) => updateTriage(mutate));
   const scrape = deps.scrapePublisherBody ?? scrapePublisherBody;
   const now = deps.now?.() ?? new Date().toISOString();
   const seedUuid = deps.uuid?.() ?? randomUUID();
@@ -275,8 +279,8 @@ export async function createManualSeed(
   const [{ topics }, { rules }, articles, triage] = await Promise.all([
     (deps.readTopics ?? (() => readTopics()))(),
     (deps.readMuteRules ?? (() => readMuteRules()))(),
-    (deps.readArticles ?? readArticles)(),
-    (deps.readTriage ?? (() => readTriage()))(),
+    stores.readArticles(),
+    stores.readTriage(),
   ]);
 
   const topic = topics.find((t) => t.id === input.topicId);
@@ -332,13 +336,13 @@ export async function createManualSeed(
     labels: [],
     duplicateOf: null,
     memberIds: [],
-    outletCount: outletCountOf(saved.citations.map((c) => c.url)),
+    outletCount: seedOutletCount(saved, []),
     significance: null,
     bodyChecked: false,
     jevCalls: 0,
     triagedAt: now,
   };
-  await update((store) => ({
+  await stores.updateTriage((store) => ({
     records: { ...store.records, [record.articleId]: record },
     updatedAt: now,
   }));
@@ -346,10 +350,7 @@ export async function createManualSeed(
   return { article: saved, topicId: topic.id };
 }
 
-export type RemoveManualSeedDeps = {
-  readArticles?: () => Promise<Article[]>;
-  readTriage?: () => Promise<TriageStore>;
-  updateTriage?: (mutate: (store: TriageStore) => TriageStore) => Promise<TriageStore>;
+export type RemoveManualSeedDeps = SeedStoreDeps & {
   now?: () => string;
 };
 
@@ -367,11 +368,8 @@ export async function removeManualSeed(
   articleId: string,
   deps: RemoveManualSeedDeps = {},
 ): Promise<RemoveManualSeedResult> {
-  const update = deps.updateTriage ?? ((mutate) => updateTriage(mutate));
-  const [articles, triage] = await Promise.all([
-    (deps.readArticles ?? readArticles)(),
-    (deps.readTriage ?? (() => readTriage()))(),
-  ]);
+  const stores = seedStores(deps);
+  const [articles, triage] = await Promise.all([stores.readArticles(), stores.readTriage()]);
 
   const article = articles.find((a) => a.id === articleId);
   if (!article) {
@@ -385,7 +383,7 @@ export async function removeManualSeed(
   }
 
   const now = deps.now?.() ?? new Date().toISOString();
-  await update((store) => ({
+  await stores.updateTriage((store) => ({
     records: Object.fromEntries(
       Object.entries(store.records).filter(
         ([id, record]) => id !== articleId && record.duplicateOf !== articleId,

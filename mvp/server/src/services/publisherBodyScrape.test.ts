@@ -400,14 +400,15 @@ test('scrapePublisherBody carries the page date on success', async () => {
   }
 });
 
-test('scrapePublisherBody honors a timeoutMs override', async () => {
+test('scrapePublisherBody honors a timeoutMs override', async (t) => {
+  t.mock.method(console, 'warn', () => {});
   const server = createServer(() => {});
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   const { port } = server.address() as AddressInfo;
   let guard: NodeJS.Timeout | undefined;
   try {
     const result = await Promise.race([
-      scrapePublisherBody(`http://127.0.0.1:${port}/hangs`, { timeoutMs: 50 }),
+      scrapePublisherBody(`http://127.0.0.1:${port}/hangs`, { timeoutMs: 50, retries: 0 }),
       new Promise<'guard'>((resolve) => {
         guard = setTimeout(() => resolve('guard'), 2_000);
       }),
@@ -421,7 +422,8 @@ test('scrapePublisherBody honors a timeoutMs override', async () => {
   }
 });
 
-test('scrapePublisherBody makes a single attempt with retries: 0', async () => {
+test('scrapePublisherBody makes a single attempt with retries: 0', async (t) => {
+  t.mock.method(console, 'warn', () => {});
   let requests = 0;
   const server = createServer(() => {
     requests += 1;
