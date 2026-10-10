@@ -117,6 +117,14 @@ test('automatic selector skips a fresh record and reselects a significant update
   assert.deepEqual(selectAutoFullStoryTargets(changed, { known: record('known') }), ['known']);
 });
 
+test('automatic selector reselects at a +0.5 significance update despite float error', () => {
+  const existing = { known: record('known', 3, 1.2) };
+  const at = (significance: number) =>
+    brief([{ id: 'topic', level: 'core', stories: [story('known', { significance })] }]);
+  assert.deepEqual(selectAutoFullStoryTargets(at(1.7), existing), ['known']);
+  assert.deepEqual(selectAutoFullStoryTargets(at(1.6), existing), []);
+});
+
 test('automatic selector selects missing and non-ok records', () => {
   const input = brief([{ id: 'topic', level: 'core', stories: [story('candidate')] }]);
   assert.deepEqual(selectAutoFullStoryTargets(input, {}), ['candidate']);

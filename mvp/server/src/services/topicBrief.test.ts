@@ -10,6 +10,7 @@ import type {
   RefreshMeta,
   RefreshRun,
 } from '../types/brief.js';
+import type { BriefFullStoryAutoSnapshot } from '../types/briefFullStory.js';
 import type { Topic } from '../types/topic.js';
 import type { TriageRecord, TriageStore } from '../types/triage.js';
 import { BRIEF_MAX_LINKS, SUMMARY_SOURCE_MAX_CHARS } from './briefConfig.js';
@@ -308,6 +309,23 @@ test('isSignificantlyUpdated thresholds', () => {
     }),
     true,
   );
+});
+
+test('isSignificantlyUpdated accepts a Brief story against a full-story auto snapshot', () => {
+  const snapshot: BriefFullStoryAutoSnapshot = { outletCount: 3, significance: 1.2 };
+  const story = (outletCount: number, significance: number | null) => {
+    const brief = compose({
+      topics: [makeTopic('c1')],
+      articles: [makeArticle('a')],
+      triage: triageOf(kept('a', ['c1'], { outletCount, significance })),
+    });
+    return brief.sections[0]!.stories[0]!;
+  };
+  assert.equal(isSignificantlyUpdated(story(5, 1.2), snapshot), true);
+  assert.equal(isSignificantlyUpdated(story(4, 1.2), snapshot), false);
+  assert.equal(isSignificantlyUpdated(story(3, 1.7), snapshot), true);
+  assert.equal(isSignificantlyUpdated(story(3, 1.6), snapshot), false);
+  assert.equal(isSignificantlyUpdated(story(3, null), snapshot), false);
 });
 
 test('ranking: significance desc (null last), outlets desc (null as 1), newer, then id', () => {
