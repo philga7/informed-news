@@ -345,3 +345,53 @@ export async function createManualSeed(
 
   return { article: saved, topicId: topic.id };
 }
+
+export type RemoveManualSeedDeps = {
+  readArticles?: () => Promise<Article[]>;
+  readTriage?: () => Promise<TriageStore>;
+  updateTriage?: (mutate: (store: TriageStore) => TriageStore) => Promise<TriageStore>;
+  now?: () => string;
+};
+
+export type RemoveManualSeedResult =
+  | { ok: true }
+  | { ok: false; status: 404; error: 'story_not_found' }
+  | { ok: false; status: 409; error: 'not_a_seed' };
+
+/**
+ * Take a seed off the Brief: delete its triage record (no dropped trace) and the
+ * records triage dropped as its duplicates, so those articles are re-triaged on
+ * their own at the next refresh. The article stays for the retention prune.
+ */
+export async function removeManualSeed(
+  articleId: string,
+  deps: RemoveManualSeedDeps = {},
+): Promise<RemoveManualSeedResult> {
+  const update = deps.updateTriage ?? ((mutate) => updateTriage(mutate));
+  const [articles, triage] = await Promise.all([
+    (deps.readArticles ?? readArticles)(),
+    (deps.readTriage ?? (() => readTriage()))(),
+  ]);
+
+  const article = articles.find((a) => a.id === articleId);
+  if (!article) {
+    return { ok: false, status: 404, error: 'story_not_found' };
+  }
+  if (article.sourceKind !== 'manual') {
+    return { ok: false, status: 409, error: 'not_a_seed' };
+  }
+  if (!triage.records[articleId]) {
+    return { ok: false, status: 404, error: 'story_not_found' };
+  }
+
+  const now = deps.now?.() ?? new Date().toISOString();
+  await update((store) => ({
+    records: Object.fromEntries(
+      Object.entries(store.records).filter(
+        ([id, record]) => id !== articleId && record.duplicateOf !== articleId,
+      ),
+    ),
+    updatedAt: now,
+  }));
+  return { ok: true };
+}

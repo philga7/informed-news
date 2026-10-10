@@ -295,6 +295,7 @@ export {
   ManualSeedConflictError,
   ManualSeedValidationError,
   parseManualSeedBody,
+  removeManualSeed,
 } from './manualBriefSeed.js';
 export type {
   CreateManualSeedDeps,
@@ -302,6 +303,8 @@ export type {
   ManualSeedArticleInput,
   ManualSeedConflictBody,
   ManualSeedInput,
+  RemoveManualSeedDeps,
+  RemoveManualSeedResult,
 } from './manualBriefSeed.js';
 export {
   TOPIC_KEYWORD_MAX,

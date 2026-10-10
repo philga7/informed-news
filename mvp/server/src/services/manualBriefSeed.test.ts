@@ -11,6 +11,7 @@ import {
   ManualSeedConflictError,
   ManualSeedValidationError,
   parseManualSeedBody,
+  removeManualSeed,
   type CreateManualSeedDeps,
   type ManualSeedInput,
 } from './manualBriefSeed.js';
@@ -559,5 +560,113 @@ test('a saved seed is pinned first in its topic section of the Brief', async () 
       [SEED_ID, true],
       ['top', false],
     ],
+  );
+});
+
+const REMOVE_NOW = '2026-09-21T13:00:00.000Z';
+
+function seedRecord(): TriageRecord {
+  return kept(SEED_ID, ['t1'], {
+    stage: 'manual',
+    significance: null,
+    jevCalls: 0,
+    triagedAt: FIXED_NOW,
+  });
+}
+
+function removeDeps(h: ReturnType<typeof harness>) {
+  return {
+    readArticles: h.deps.readArticles!,
+    readTriage: h.deps.readTriage!,
+    updateTriage: h.deps.updateTriage!,
+    now: () => REMOVE_NOW,
+  };
+}
+
+test('removeManualSeed 404s an unknown article and writes nothing', async () => {
+  const h = harness();
+  assert.deepEqual(await removeManualSeed('missing', removeDeps(h)), {
+    ok: false,
+    status: 404,
+    error: 'story_not_found',
+  });
+  assert.equal(h.triageWrites.length, 0);
+});
+
+test('removeManualSeed 409s a non-seed article and writes nothing', async () => {
+  const h = harness({ articles: [makeArticle('top')], triage: triageOf(kept('top', ['t1'])) });
+  assert.deepEqual(await removeManualSeed('top', removeDeps(h)), {
+    ok: false,
+    status: 409,
+    error: 'not_a_seed',
+  });
+  assert.equal(h.triageWrites.length, 0);
+  assert.ok(h.triage().records.top);
+});
+
+test('removeManualSeed 404s a seed without a triage record and writes nothing', async () => {
+  const seed = buildManualSeedArticle(
+    { title: 'Port strike', urls: ['https://news.example.com/a'] },
+    FIXED_NOW,
+    FIXED_UUID,
+  );
+  const h = harness({ articles: [seed] });
+  assert.deepEqual(await removeManualSeed(SEED_ID, removeDeps(h)), {
+    ok: false,
+    status: 404,
+    error: 'story_not_found',
+  });
+  assert.equal(h.triageWrites.length, 0);
+});
+
+test('removeManualSeed deletes the seed record and its duplicates, leaving the article', async () => {
+  const seed = buildManualSeedArticle(
+    { title: 'Port strike halts container traffic', urls: ['https://news.example.com/a'] },
+    FIXED_NOW,
+    FIXED_UUID,
+  );
+  const dupOfSeed = kept('dup', ['t1'], {
+    status: 'dropped',
+    reason: 'duplicate',
+    stage: 'dedupe',
+    duplicateOf: SEED_ID,
+  });
+  const unrelatedDrop = kept('other-drop', ['t1'], {
+    status: 'dropped',
+    reason: 'duplicate',
+    stage: 'dedupe',
+    duplicateOf: 'top',
+  });
+  const top = kept('top', ['t1'], { memberIds: ['other-drop'] });
+  const h = harness({
+    articles: [seed, makeArticle('top'), makeArticle('dup'), makeArticle('other-drop')],
+    triage: triageOf(seedRecord(), dupOfSeed, unrelatedDrop, top),
+  });
+
+  assert.deepEqual(await removeManualSeed(SEED_ID, removeDeps(h)), { ok: true });
+
+  assert.equal(h.triageWrites.length, 1);
+  assert.deepEqual(h.triage(), {
+    records: { 'other-drop': unrelatedDrop, top },
+    updatedAt: REMOVE_NOW,
+  });
+  assert.deepEqual(
+    h.articles().map((a) => a.id),
+    [SEED_ID, 'top', 'dup', 'other-drop'],
+  );
+
+  const brief = composeTopicBrief({
+    topics: [makeTopic('t1')],
+    muteRules: [],
+    articles: h.articles(),
+    triage: h.triage(),
+    seen: { seen: {}, updatedAt: null },
+    summaries: { summaries: {}, updatedAt: null },
+    refresh: null,
+    now: new Date(FIXED_NOW),
+  });
+  assert.deepEqual(
+    brief.sections[0]!.stories.map((s) => s.articleId),
+    ['top'],
   );
 });

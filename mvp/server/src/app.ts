@@ -21,6 +21,7 @@ import {
   buildFilteredOut,
   parseFilteredOutScope,
   parseManualSeedBody,
+  removeManualSeed,
   parseTopicCreate,
   parseTopicPatch,
   sortNewestFirst,
@@ -100,6 +101,7 @@ export type CreateAppDeps = {
   readBriefMembership?: typeof readBriefMembership;
   createManualSeed?: typeof createManualSeed;
   parseManualSeedBody?: typeof parseManualSeedBody;
+  removeManualSeed?: typeof removeManualSeed;
   trackCluster?: typeof trackCluster;
   untrackCluster?: typeof untrackCluster;
   ackTrackedUpdate?: typeof ackTrackedUpdate;
@@ -259,6 +261,7 @@ export function createApp(deps: CreateAppDeps = {}): Express {
   const readMembership = deps.readBriefMembership ?? readBriefMembership;
   const seed = deps.createManualSeed ?? createManualSeed;
   const parseSeedBody = deps.parseManualSeedBody ?? parseManualSeedBody;
+  const removeSeed = deps.removeManualSeed ?? removeManualSeed;
   const track = deps.trackCluster ?? trackCluster;
   const untrack = deps.untrackCluster ?? untrackCluster;
   const ackTracked = deps.ackTrackedUpdate ?? ackTrackedUpdate;
@@ -778,6 +781,25 @@ export function createApp(deps: CreateAppDeps = {}): Express {
       }
       const message = err instanceof Error ? err.message : String(err);
       console.error('Brief seed failed:', message);
+      res.status(500).json({ ok: false, error: message });
+    }
+  });
+
+  /**
+   * Remove an operator seed from the Brief (NEWS-98). Deletes its triage record
+   * (no Filtered out trace); 404 story_not_found · 409 not_a_seed.
+   */
+  app.post('/api/brief/stories/:articleId/remove', async (req, res) => {
+    try {
+      const result = await removeSeed(req.params.articleId);
+      if (!result.ok) {
+        res.status(result.status).json({ ok: false, error: result.error });
+        return;
+      }
+      res.json({ ok: true });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('Brief seed remove failed:', message);
       res.status(500).json({ ok: false, error: message });
     }
   });
