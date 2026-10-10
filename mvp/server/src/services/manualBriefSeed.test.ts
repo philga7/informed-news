@@ -1,16 +1,27 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import type { MuteRule } from '../store/muteRulesStore.js';
 import type { Article } from '../types/article.js';
+import type { Topic } from '../types/topic.js';
+import type { TriageRecord, TriageStore } from '../types/triage.js';
 import { articleIdFromCanonicalUrl } from '../store/articleId.js';
 import {
   buildManualSeedArticle,
   createManualSeed,
+  ManualSeedConflictError,
   ManualSeedValidationError,
   parseManualSeedBody,
+  type CreateManualSeedDeps,
+  type ManualSeedInput,
 } from './manualBriefSeed.js';
+import type { PublisherBodyResult } from './publisherBodyScrape.js';
+import { composeTopicBrief } from './topicBrief.js';
 
 const FIXED_NOW = '2026-09-21T12:00:00.000Z';
 const FIXED_UUID = '11111111-2222-4333-8444-555555555555';
+const SEED_ID = articleIdFromCanonicalUrl(`manual://seed/${FIXED_UUID}`);
+const HOURS_BEFORE_NOW = (h: number) =>
+  new Date(Date.parse(FIXED_NOW) - h * 3_600_000).toISOString();
 
 test('buildManualSeedArticle requires non-empty title', () => {
   assert.throws(
@@ -79,56 +90,450 @@ test('buildManualSeedArticle rejects invalid urls', () => {
   );
 });
 
-test('parseManualSeedBody rejects missing title', () => {
+function assertValidation(body: unknown, message: string): void {
   assert.throws(
-    () => parseManualSeedBody({}),
-    (err: unknown) =>
-      err instanceof ManualSeedValidationError && err.message === 'title is required',
+    () => parseManualSeedBody(body),
+    (err: unknown) => err instanceof ManualSeedValidationError && err.message === message,
   );
+}
+
+test('parseManualSeedBody rejects missing title', () => {
+  assertValidation({}, 'title is required');
+});
+
+test('parseManualSeedBody requires a string topicId', () => {
+  assertValidation({ title: 'x', urls: ['https://example.com/a'] }, 'topicId is required');
+  assertValidation(
+    { title: 'x', topicId: 7, urls: ['https://example.com/a'] },
+    'topicId is required',
+  );
+});
+
+test('parseManualSeedBody requires at least one URL', () => {
+  assertValidation({ title: 'x', topicId: 't1' }, 'at least one URL is required');
+  assertValidation({ title: 'x', topicId: 't1', urls: [] }, 'at least one URL is required');
 });
 
 test('parseManualSeedBody rejects non-string urls entries', () => {
-  assert.throws(
-    () =>
-      parseManualSeedBody({
-        title: 'x',
-        urls: ['https://example.com', 123],
-      }),
-    (err: unknown) =>
-      err instanceof ManualSeedValidationError &&
-      err.message === 'urls must be an array of strings',
+  assertValidation(
+    { title: 'x', topicId: 't1', urls: ['https://example.com', 123] },
+    'urls must be an array of strings',
   );
 });
 
-test('createManualSeed upserts article and accepts cluster', async () => {
-  const upserted: Article[] = [];
-  let acceptedClusterId: string | null = null;
-  const tracked: Array<{ clusterId: string; memberCount: number }> = [];
+test('parseManualSeedBody returns title, topicId, urls and note', () => {
+  assert.deepEqual(
+    parseManualSeedBody({
+      title: 'x',
+      topicId: 't1',
+      urls: ['https://example.com/a'],
+      note: 'why',
+    }),
+    { title: 'x', topicId: 't1', urls: ['https://example.com/a'], note: 'why' },
+  );
+});
 
-  const result = await createManualSeed(
-    { title: 'Manual seed', note: 'Note text', urls: ['https://example.com/story'] },
-    {
-      now: () => FIXED_NOW,
-      uuid: () => FIXED_UUID,
-      upsertArticle: async (article) => {
-        upserted.push(article as Article);
-        return article as Article;
+function makeTopic(id: string, overrides: Partial<Topic> = {}): Topic {
+  return {
+    id,
+    name: `Topic ${id}`,
+    kind: 'desired',
+    level: 'core',
+    description: '',
+    keywords: [],
+    searchQuery: id,
+    sections: [],
+    notes: '',
+    createdAt: '2026-09-01T00:00:00.000Z',
+    updatedAt: '2026-09-01T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
+function makeArticle(id: string, overrides: Partial<Article> = {}): Article {
+  return {
+    id,
+    title: `Headline ${id}`,
+    sourceKind: 'search',
+    canonicalUrl: `https://${id}.example.org/story`,
+    citations: [],
+    publisherUrl: `https://${id}.example.org/story`,
+    publisherDomain: `${id}.example.org`,
+    handle: null,
+    publishedAt: HOURS_BEFORE_NOW(3),
+    snippet: '',
+    bodyText: null,
+    bodyStatus: 'unavailable',
+    publisherTitle: null,
+    imageUrl: null,
+    imageCaption: null,
+    imageCredit: null,
+    clusterId: null,
+    fetchedAt: HOURS_BEFORE_NOW(3),
+    classification: null,
+    classifiedAt: null,
+    classifyError: null,
+    ...overrides,
+  };
+}
+
+function kept(id: string, topicIds: string[], overrides: Partial<TriageRecord> = {}): TriageRecord {
+  return {
+    articleId: id,
+    status: 'kept',
+    reason: null,
+    stage: 'headline',
+    final: true,
+    topicIds,
+    labels: [],
+    duplicateOf: null,
+    memberIds: [],
+    outletCount: 1,
+    significance: 2,
+    bodyChecked: false,
+    jevCalls: 1,
+    triagedAt: HOURS_BEFORE_NOW(3),
+    ...overrides,
+  };
+}
+
+function triageOf(...records: TriageRecord[]): TriageStore {
+  return { records: Object.fromEntries(records.map((r) => [r.articleId, r])), updatedAt: null };
+}
+
+const UNAVAILABLE_SCRAPE: PublisherBodyResult = {
+  bodyText: null,
+  bodyStatus: 'unavailable',
+  publisherTitle: null,
+  imageUrl: null,
+  imageCaption: null,
+  imageCredit: null,
+  publishedAt: null,
+};
+
+type HarnessOptions = {
+  topics?: Topic[];
+  rules?: MuteRule[];
+  articles?: Article[];
+  triage?: TriageStore;
+  scrape?: PublisherBodyResult;
+};
+
+/** In-memory stores; records every write and scrape. */
+function harness(options: HarnessOptions = {}) {
+  const articles = [...(options.articles ?? [])];
+  let triage = options.triage ?? triageOf();
+  const upserts: Article[] = [];
+  const triageWrites: TriageStore[] = [];
+  const scrapes: Array<{ url: string; opts: { timeoutMs?: number } | undefined }> = [];
+  const deps: CreateManualSeedDeps = {
+    now: () => FIXED_NOW,
+    uuid: () => FIXED_UUID,
+    readTopics: async () => ({ topics: options.topics ?? [makeTopic('t1')] }),
+    readMuteRules: async () => ({ rules: options.rules ?? [] }),
+    readArticles: async () => articles,
+    readTriage: async () => triage,
+    upsertArticle: async (article) => {
+      upserts.push(article as Article);
+      articles.push(article as Article);
+      return article as Article;
+    },
+    updateTriage: async (mutate) => {
+      triage = mutate(triage);
+      triageWrites.push(triage);
+      return triage;
+    },
+    scrapePublisherBody: async (url, opts) => {
+      scrapes.push({ url: url as string, opts });
+      return options.scrape ?? UNAVAILABLE_SCRAPE;
+    },
+  };
+  return {
+    deps,
+    upserts,
+    triageWrites,
+    scrapes,
+    articles: () => articles,
+    triage: () => triage,
+  };
+}
+
+function seedInput(overrides: Partial<ManualSeedInput> = {}): ManualSeedInput {
+  return {
+    title: 'Port strike halts container traffic',
+    topicId: 't1',
+    urls: ['https://news.example.com/port-strike'],
+    ...overrides,
+  };
+}
+
+async function assertRefused(
+  h: ReturnType<typeof harness>,
+  input: ManualSeedInput,
+  check: (err: unknown) => boolean,
+): Promise<void> {
+  await assert.rejects(createManualSeed(input, h.deps), check);
+  assert.equal(h.upserts.length, 0);
+  assert.equal(h.triageWrites.length, 0);
+  assert.equal(h.scrapes.length, 0);
+}
+
+test('createManualSeed refuses an unknown topic', async () => {
+  const h = harness();
+  await assertRefused(
+    h,
+    seedInput({ topicId: 'nope' }),
+    (err) =>
+      err instanceof ManualSeedValidationError && err.message === 'topic must be a desired topic',
+  );
+});
+
+test('createManualSeed refuses an undesired topic id', async () => {
+  const h = harness({ topics: [makeTopic('t1'), makeTopic('u1', { kind: 'undesired' })] });
+  await assertRefused(
+    h,
+    seedInput({ topicId: 'u1' }),
+    (err) =>
+      err instanceof ManualSeedValidationError && err.message === 'topic must be a desired topic',
+  );
+});
+
+test('createManualSeed refuses a mute rule match with the rule keyword', async () => {
+  const h = harness({
+    rules: [
+      {
+        id: 'rule-1',
+        keyword: 'strike',
+        source: null,
+        createdAt: '2026-09-01T00:00:00.000Z',
       },
-      acceptCluster: async (clusterId) => {
-        acceptedClusterId = clusterId;
-        return { acceptedClusterIds: [clusterId] };
+    ],
+  });
+  await assertRefused(h, seedInput(), (err) => {
+    assert.ok(err instanceof ManualSeedConflictError);
+    assert.deepEqual(err.body, {
+      ok: false,
+      code: 'muted',
+      error: "This matches your mute rule 'strike', so it wouldn't show.",
+    });
+    return true;
+  });
+});
+
+test('createManualSeed refuses an undesired topic match with the topic name', async () => {
+  const h = harness({
+    topics: [
+      makeTopic('t1'),
+      makeTopic('u1', { kind: 'undesired', level: null, name: 'Labor disputes', keywords: ['strike'] }),
+    ],
+  });
+  await assertRefused(h, seedInput(), (err) => {
+    assert.ok(err instanceof ManualSeedConflictError);
+    assert.deepEqual(err.body, {
+      ok: false,
+      code: 'muted',
+      error: "This matches your undesired topic 'Labor disputes', so it wouldn't show.",
+    });
+    return true;
+  });
+});
+
+test('createManualSeed refuses a kept story sharing a URL, even one already seen', async () => {
+  const existing = makeArticle('old', {
+    title: 'Dockworkers walk out at the port',
+    publisherUrl: 'https://news.example.com/port-strike',
+  });
+  const h = harness({
+    topics: [makeTopic('t1'), makeTopic('t2', { name: 'Shipping' })],
+    articles: [existing],
+    triage: triageOf(kept('old', ['t2'])),
+  });
+  await assertRefused(h, seedInput(), (err) => {
+    assert.ok(err instanceof ManualSeedConflictError);
+    assert.deepEqual(err.body, {
+      ok: false,
+      code: 'duplicate',
+      error: "Already in your Brief: 'Dockworkers walk out at the port' under Shipping.",
+      existing: {
+        articleId: 'old',
+        title: 'Dockworkers walk out at the port',
+        topicName: 'Shipping',
       },
-      trackCluster: async (clusterId, memberCount) => {
-        tracked.push({ clusterId, memberCount });
-        return { entries: [] };
-      },
+    });
+    return true;
+  });
+});
+
+test('createManualSeed refuses a similar headline kept in the chosen topic', async () => {
+  const existing = makeArticle('old', { title: 'Senate passes sweeping drone export bill' });
+  const h = harness({
+    topics: [makeTopic('t1', { name: 'Defense' })],
+    articles: [existing],
+    triage: triageOf(kept('old', ['t1'])),
+  });
+  await assertRefused(
+    h,
+    seedInput({ title: 'Senate passes sweeping drone export bill tonight' }),
+    (err) => {
+      assert.ok(err instanceof ManualSeedConflictError);
+      assert.equal(
+        err.body.error,
+        "Already in your Brief: 'Senate passes sweeping drone export bill' under Defense.",
+      );
+      return true;
     },
   );
+});
 
-  assert.equal(upserted.length, 1);
-  assert.equal(upserted[0]?.title, 'Manual seed');
-  assert.equal(acceptedClusterId, result.article.id);
-  assert.deepEqual(result.acceptedClusterIds, [result.article.id]);
-  assert.equal(result.article.clusterId, result.article.id);
-  assert.deepEqual(tracked, [{ clusterId: result.article.id, memberCount: 1 }]);
+test('createManualSeed names a deleted topic as another topic', async () => {
+  const existing = makeArticle('old', {
+    title: 'Dockworkers walk out at the port',
+    publisherUrl: 'https://news.example.com/port-strike',
+  });
+  const h = harness({ articles: [existing], triage: triageOf(kept('old', ['gone'])) });
+  await assertRefused(h, seedInput(), (err) => {
+    assert.ok(err instanceof ManualSeedConflictError);
+    assert.equal(
+      err.body.error,
+      "Already in your Brief: 'Dockworkers walk out at the port' under another topic.",
+    );
+    assert.ok(err.body.code === 'duplicate');
+    assert.equal(err.body.existing.topicName, 'another topic');
+    return true;
+  });
+});
+
+test('createManualSeed allows a similar headline kept only in another topic', async () => {
+  const existing = makeArticle('old', { title: 'Senate passes sweeping drone export bill' });
+  const h = harness({
+    topics: [makeTopic('t1'), makeTopic('t2')],
+    articles: [existing],
+    triage: triageOf(kept('old', ['t2'])),
+  });
+  await createManualSeed(
+    seedInput({ title: 'Senate passes sweeping drone export bill tonight' }),
+    h.deps,
+  );
+  assert.equal(h.upserts.length, 1);
+});
+
+test('createManualSeed ignores out-of-window and dropped stories with the same URL', async () => {
+  const url = 'https://news.example.com/port-strike';
+  const h = harness({
+    articles: [
+      makeArticle('stale', { publisherUrl: url, publishedAt: HOURS_BEFORE_NOW(49) }),
+      makeArticle('dropped', { publisherUrl: url }),
+    ],
+    triage: triageOf(
+      kept('stale', ['t1']),
+      kept('dropped', ['t1'], { status: 'dropped', reason: 'off_topic' }),
+    ),
+  });
+  await createManualSeed(seedInput(), h.deps);
+  assert.equal(h.upserts.length, 1);
+});
+
+test('createManualSeed stores the scraped body when the scrape is ok', async () => {
+  const h = harness({
+    scrape: {
+      bodyText: 'Full publisher body text.',
+      bodyStatus: 'ok',
+      publisherTitle: 'Publisher headline',
+      imageUrl: 'https://news.example.com/img.jpg',
+      imageCaption: 'Caption',
+      imageCredit: 'news.example.com',
+      publishedAt: '2026-09-20T08:00:00.000Z',
+    },
+  });
+  const { article } = await createManualSeed(
+    seedInput({ urls: ['https://news.example.com/port-strike', 'https://other.example.net/x'] }),
+    h.deps,
+  );
+
+  assert.deepEqual(h.scrapes, [
+    { url: 'https://news.example.com/port-strike', opts: { timeoutMs: 8000 } },
+  ]);
+  assert.equal(article.bodyText, 'Full publisher body text.');
+  assert.equal(article.bodyStatus, 'ok');
+  assert.equal(article.publisherTitle, null);
+  assert.equal(article.imageUrl, null);
+  assert.equal(article.publishedAt, null);
+  assert.deepEqual(h.upserts, [article]);
+});
+
+test('createManualSeed keeps the note as the summary source when the scrape fails', async () => {
+  const h = harness();
+  const { article } = await createManualSeed(seedInput({ note: 'Operator note' }), h.deps);
+  assert.equal(article.bodyText, null);
+  assert.equal(article.bodyStatus, 'not_applicable');
+  assert.equal(article.snippet, 'Operator note');
+});
+
+test('createManualSeed writes the seed triage record and returns the article and topic', async () => {
+  const other = kept('other', ['t1']);
+  const h = harness({ articles: [makeArticle('other')], triage: triageOf(other) });
+  const result = await createManualSeed(
+    seedInput({ urls: ['https://news.example.com/a', 'https://WIRE.example.net/b'] }),
+    h.deps,
+  );
+
+  assert.deepEqual(Object.keys(result).sort(), ['article', 'topicId']);
+  assert.equal(result.topicId, 't1');
+  assert.equal(result.article.id, SEED_ID);
+  assert.equal(h.triageWrites.length, 1);
+  assert.deepEqual(h.triage().records, {
+    other,
+    [SEED_ID]: {
+      articleId: SEED_ID,
+      status: 'kept',
+      reason: null,
+      stage: 'manual',
+      final: true,
+      topicIds: ['t1'],
+      labels: [],
+      duplicateOf: null,
+      memberIds: [],
+      outletCount: 2,
+      significance: null,
+      bodyChecked: false,
+      jevCalls: 0,
+      triagedAt: FIXED_NOW,
+    },
+  });
+});
+
+test('createManualSeed counts www. and bare host as one outlet', async () => {
+  const h = harness();
+  await createManualSeed(
+    seedInput({ urls: ['https://www.example.com/a', 'https://example.com/b'] }),
+    h.deps,
+  );
+  assert.equal(h.triage().records[SEED_ID]?.outletCount, 1);
+});
+
+test('a saved seed is pinned first in its topic section of the Brief', async () => {
+  const h = harness({
+    topics: [makeTopic('t1')],
+    articles: [makeArticle('top')],
+    triage: triageOf(kept('top', ['t1'], { significance: 2, outletCount: 9 })),
+  });
+  await createManualSeed(seedInput(), h.deps);
+
+  const brief = composeTopicBrief({
+    topics: [makeTopic('t1')],
+    muteRules: [],
+    articles: h.articles(),
+    triage: h.triage(),
+    seen: { seen: {}, updatedAt: null },
+    summaries: { summaries: {}, updatedAt: null },
+    refresh: null,
+    now: new Date(FIXED_NOW),
+  });
+  assert.deepEqual(
+    brief.sections[0]!.stories.map((s) => [s.articleId, s.manualSeed]),
+    [
+      [SEED_ID, true],
+      ['top', false],
+    ],
+  );
 });

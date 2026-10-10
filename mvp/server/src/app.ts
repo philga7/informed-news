@@ -16,6 +16,7 @@ import {
   extractClaimsFromArticles,
   fetchAllSources,
   listTriageRecords,
+  ManualSeedConflictError,
   ManualSeedValidationError,
   buildFilteredOut,
   parseFilteredOutScope,
@@ -753,8 +754,8 @@ export function createApp(deps: CreateAppDeps = {}): Express {
   });
 
   /**
-   * Create an operator-seeded Brief story (Accepted immediately).
-   * Also default-track it for developing-story alerts (idempotent).
+   * Save an operator seed as a kept story under one desired topic (NEWS-98).
+   * 409 when a mute would hide it or it duplicates a kept story.
    */
   app.post('/api/brief/seed', async (req, res) => {
     try {
@@ -764,11 +765,15 @@ export function createApp(deps: CreateAppDeps = {}): Express {
         ok: true,
         articleId: result.article.id,
         clusterId: result.article.clusterId!,
-        acceptedClusterIds: result.acceptedClusterIds,
+        topicId: result.topicId,
       });
     } catch (err) {
       if (err instanceof ManualSeedValidationError) {
         res.status(400).json({ ok: false, error: err.message });
+        return;
+      }
+      if (err instanceof ManualSeedConflictError) {
+        res.status(409).json(err.body);
         return;
       }
       const message = err instanceof Error ? err.message : String(err);

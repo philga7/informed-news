@@ -291,12 +291,16 @@ export { briefClusterKey, isSoloClusterKey } from './briefClusterKey.js';
 export {
   buildManualSeedArticle,
   createManualSeed,
+  MANUAL_SEED_SCRAPE_TIMEOUT_MS,
+  ManualSeedConflictError,
   ManualSeedValidationError,
   parseManualSeedBody,
 } from './manualBriefSeed.js';
 export type {
   CreateManualSeedDeps,
   CreateManualSeedResult,
+  ManualSeedArticleInput,
+  ManualSeedConflictBody,
   ManualSeedInput,
 } from './manualBriefSeed.js';
 export {
