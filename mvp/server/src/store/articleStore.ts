@@ -100,6 +100,20 @@ export async function pruneArticles(
   });
 }
 
+/** Set `searchSeenAt` on the stored articles with these ids (serialized); unknown ids are ignored. */
+export async function markArticlesSearchSeen(
+  ids: readonly string[],
+  at: string,
+  articlesPath: string = ARTICLES_PATH,
+): Promise<void> {
+  const marked = new Set(ids);
+  await updateArticles(
+    (articles) =>
+      articles.map((article) => (marked.has(article.id) ? { ...article, searchSeenAt: at } : article)),
+    articlesPath,
+  );
+}
+
 /**
  * Read all articles from disk. Creates an empty store file if missing.
  * Legacy CFP records (`cfpUrl` identity) are migrated to canonicalUrl + citations.

@@ -14,7 +14,7 @@ In every refresh — the auto-refresh timer, the startup catch-up, the Kite **Re
 - are within the last **48 hours** (`publishedAt`, or `fetchedAt` when there is no date), and
 - have no triage record yet, or only a non-final one (see drop reasons).
 
-Older articles that were never triaged are left alone and get no record.
+Older articles that were never triaged are left alone and get no record; the article prune drops them 48 hours after they were last seen ([BRIEF.md](BRIEF.md#retention)).
 
 ## Pipeline order
 

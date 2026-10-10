@@ -108,6 +108,7 @@ function harness(
       h.upserts.push(incoming);
       return incoming.map((item, i) => ({ ...item, id: `id-${i}` }) as Article);
     },
+    markArticlesSearchSeen: async () => {},
     updateMeta: async (patch) => {
       h.metaPatches.push(patch);
     },
@@ -352,6 +353,44 @@ test('already-seen canonical, publisher, and Google URLs are skipped and counted
     h.upserts[0]!.map((a) => a.canonicalUrl),
     ['https://fresh.com/story'],
   );
+});
+
+test('stored articles a provider returns again are marked search-seen at the run time', async () => {
+  const stored = [
+    { id: 'by-canonical', canonicalUrl: 'https://seen.com/canonical', publisherUrl: null } as Article,
+    {
+      id: 'by-publisher',
+      canonicalUrl: 'https://cfp.example/item',
+      publisherUrl: 'https://seen.com/publisher?utm_medium=email',
+    } as Article,
+    {
+      id: 'by-google',
+      canonicalUrl: 'https://other.com/x',
+      publisherUrl: null,
+      googleNewsUrl: 'https://news.google.com/rss/articles/CBMiSeen',
+    } as Article,
+    { id: 'not-returned', canonicalUrl: 'https://quiet.com/x', publisherUrl: null } as Article,
+  ];
+  const marks: Array<{ ids: string[]; at: string }> = [];
+  const h = harness({
+    topics: [makeTopic('t1', 'Topic'), makeTopic('t2', 'Other')],
+    articles: stored,
+    google: async () => [googleCandidate('Seen via Google', { id: 'CBMiSeen', domain: 'g.com' })],
+    searx: async () => [
+      searxCandidate('Seen canonical', 'https://seen.com/canonical'),
+      searxCandidate('Seen publisher', 'https://seen.com/publisher'),
+    ],
+  });
+  h.deps.markArticlesSearchSeen = async (ids, at) => {
+    marks.push({ ids: [...ids].sort(), at });
+  };
+
+  await runTopicSearch({ now: NOW, env: ENV }, h.deps);
+
+  assert.deepEqual(marks, [
+    { ids: ['by-canonical', 'by-google', 'by-publisher'], at: NOW.toISOString() },
+  ]);
+  assert.deepEqual(h.upserts, []);
 });
 
 test('buildSeenKeys canonicalizes store URLs', () => {

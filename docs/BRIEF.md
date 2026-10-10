@@ -146,13 +146,14 @@ Tickets: [NEWS-99](https://informedcrew.atlassian.net/browse/NEWS-99) (summaries
 - A failed refresh (e.g. CFP down) doesn't prune; triage didn't change, so there's nothing new to drop.
 - A pruned story that reappears (kept again, or opened later) gets a new summary or full story on demand or at the next refresh, as if it had never had one. While a summary is kept, the source-text hash check still reuses it without a call.
 
-**Articles** ([NEWS-117](https://informedcrew.atlassian.net/browse/NEWS-117)). Right after that, the server prunes `articles.json`. An article's age runs from when it was **last seen**: the later of `publishedAt` and `fetchedAt`, and every source that returns the article again moves `fetchedAt` forward, so nothing a feed or search still returns is pruned (and then re-triaged as new).
+**Articles** ([NEWS-117](https://informedcrew.atlassian.net/browse/NEWS-117)). Right after that, the server prunes `articles.json`. An article's age runs from when it was **last seen**: the latest of `publishedAt`, `fetchedAt`, and `searchSeenAt`. A feed (CFP, curated RSS, xcancel) that returns the article again re-upserts it and moves `fetchedAt` forward; topic search skips stored stories and sets `searchSeenAt` instead ([TOPIC_SEARCH.md](TOPIC_SEARCH.md)). So nothing a source still returns is pruned and then re-triaged as new.
 
 - An article **with a triage record** (kept, dropped, or a seed) stays for **14 days** after it was last seen (`ARTICLE_RETENTION_DAYS` in `triageConfig.ts`), longer than any Brief cache. Its triage record is dropped at the next refresh's triage write, and its summary and full story then go with the rule above.
 - An article **with no triage record** (never a candidate, a removed seed, or a seed whose save failed) stays for **48 hours** after it was last seen; past that, triage can't pick it up.
 - Always kept: the articles a kept-by-age triage record names (`duplicateOf`, `memberIds`), so a duplicate never loses its target while it is still around, and any article a stored evidence link cites (the parked claims desk, [CLAIMS_DISCERNMENT.md](CLAIMS_DISCERNMENT.md)).
 - A date that doesn't parse counts as old. If `triage.json` or `evidence-links.json` can't be read, nothing is pruned. Failures are logged and never fail the refresh.
-- Every article write (ingest, triage, seeds, clustering, classify, and the prune) shares one serialized read-modify-write queue with atomic writes, so none loses another's write. Classify calls the model outside that queue and then writes only its result fields onto the stored articles; one pruned meanwhile isn't brought back.
+- Every article write (ingest, topic search stamps, triage, seeds, clustering, classify, and the prune) goes through one serialized read-modify-write queue with atomic writes, so no write is lost to another landing in the middle of it. Classify calls the model outside that queue and then writes only its result fields onto the stored articles; one pruned meanwhile isn't brought back. Writers that upsert whole articles (ingest, triage's write-back) still replace that article's fields with their copy, as before.
+- Evidence links are read before the prune enters the article queue; a manual claims extraction that cites an article at that same moment could lose it (the claims desk is parked).
 
 ## Routes
 

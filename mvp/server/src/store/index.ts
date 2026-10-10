@@ -8,6 +8,7 @@ export {
 export { mergeArticleOnUpsert } from './mergeArticleOnUpsert.js';
 export {
   getArticleById,
+  markArticlesSearchSeen,
   pruneArticles,
   readArticles,
   updateArticles,

@@ -27,9 +27,9 @@ function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
-/** Latest parseable of publishedAt / fetchedAt (a source re-fetch moves fetchedAt); NaN when neither parses. */
+/** Latest parseable of publishedAt / fetchedAt / searchSeenAt; NaN when none parses. */
 function lastSeenAt(article: Article): number {
-  const times = [article.publishedAt, article.fetchedAt]
+  const times = [article.publishedAt, article.fetchedAt, article.searchSeenAt]
     .map((value) => (value ? Date.parse(value) : Number.NaN))
     .filter((time) => !Number.isNaN(time));
   return times.length > 0 ? Math.max(...times) : Number.NaN;

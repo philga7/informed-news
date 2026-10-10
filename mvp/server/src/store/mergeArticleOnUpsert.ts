@@ -82,6 +82,13 @@ function withTopicSearchProvenance(existing: Article, merged: Article): Article 
   if (typeof merged.googleNewsUrl !== 'string' && existing.googleNewsUrl !== undefined) {
     next.googleNewsUrl = existing.googleNewsUrl;
   }
+  if (
+    existing.searchSeenAt !== undefined &&
+    (merged.searchSeenAt === undefined ||
+      Date.parse(existing.searchSeenAt) > Date.parse(merged.searchSeenAt))
+  ) {
+    next.searchSeenAt = existing.searchSeenAt;
+  }
   return next;
 }
 
@@ -120,7 +127,7 @@ function bodyNewlyUsable(existing: Article, merged: Article): boolean {
  * clusterId: fetch paths send null; keep existing until the cluster pass rewrites.
  *
  * Topic search provenance: topicIds / searchProviders union (existing first);
- * googleNewsUrl from incoming when a string, else existing.
+ * googleNewsUrl from incoming when a string, else existing; searchSeenAt the later of the two.
  */
 export function mergeArticleOnUpsert(
   existing: Article | undefined,

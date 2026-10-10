@@ -66,7 +66,7 @@ export function createRefreshRunner(deps: RefreshRunnerDeps = {}): RefreshRunner
   const generateFullStories =
     deps.generateFullStories ?? ((options) => generateRefreshFullStories(options));
   const pruneStores = deps.pruneBriefStores ?? ((options) => pruneBriefStores(options));
-  const pruneArticles = deps.pruneArticleStore ?? ((options) => pruneArticleStore(options));
+  const pruneOldArticles = deps.pruneArticleStore ?? ((options) => pruneArticleStore(options));
   const readServerMeta = deps.readMeta ?? (() => readMeta());
   const updateServerMeta = deps.updateMeta ?? ((patch: Partial<StoreMeta>) => updateMeta(patch));
   const now = deps.now ?? (() => new Date());
@@ -139,7 +139,7 @@ export function createRefreshRunner(deps: RefreshRunnerDeps = {}): RefreshRunner
       log(`Brief store prune failed: ${errorMessage(err)}`);
     }
     try {
-      const pruned = await pruneArticles({ now: now() });
+      const pruned = await pruneOldArticles({ now: now() });
       for (const error of pruned.errors) log(`Article store prune failed: ${error}`);
     } catch (err) {
       log(`Article store prune failed: ${errorMessage(err)}`);

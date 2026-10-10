@@ -131,8 +131,9 @@ function parseSearchProviders(value: unknown): SearchProvider[] | undefined {
 /** Topic search provenance: keep only keys present and valid on the stored record. */
 function parseTopicSearchFields(
   raw: Record<string, unknown>,
-): Pick<Article, 'topicIds' | 'searchProviders' | 'googleNewsUrl'> {
-  const fields: Pick<Article, 'topicIds' | 'searchProviders' | 'googleNewsUrl'> = {};
+): Pick<Article, 'topicIds' | 'searchProviders' | 'googleNewsUrl' | 'searchSeenAt'> {
+  const fields: Pick<Article, 'topicIds' | 'searchProviders' | 'googleNewsUrl' | 'searchSeenAt'> =
+    {};
   const topicIds = parseTopicIds(raw.topicIds);
   if (topicIds) {
     fields.topicIds = topicIds;
@@ -144,6 +145,9 @@ function parseTopicSearchFields(
   const googleNewsUrl = raw.googleNewsUrl;
   if (googleNewsUrl === null || typeof googleNewsUrl === 'string') {
     fields.googleNewsUrl = googleNewsUrl;
+  }
+  if (typeof raw.searchSeenAt === 'string') {
+    fields.searchSeenAt = raw.searchSeenAt;
   }
   return fields;
 }

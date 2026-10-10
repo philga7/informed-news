@@ -99,6 +99,11 @@ export type Article = {
   searchProviders?: SearchProvider[];
   /** Google News article link (query stripped) when Google returned it; null/absent otherwise */
   googleNewsUrl?: string | null;
+  /**
+   * Last time topic search returned this article after it was stored (search skips stored
+   * stories, so fetchedAt doesn't move); read by article retention only. Absent when never.
+   */
+  searchSeenAt?: string;
 };
 
 export function truncateBodyText(

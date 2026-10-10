@@ -55,12 +55,14 @@ test('migrateArticle round-trips a topic search article', () => {
     topicIds: ['iran', 'nuclear'],
     searchProviders: ['google_news', 'searxng'],
     googleNewsUrl: 'https://news.google.com/rss/articles/CBMiXyz',
+    searchSeenAt: '2026-10-01T12:00:00.000Z',
   });
   assert.equal(article.sourceKind, 'search');
   assert.equal(article.bodyStatus, 'pending');
   assert.deepEqual(article.topicIds, ['iran', 'nuclear']);
   assert.deepEqual(article.searchProviders, ['google_news', 'searxng']);
   assert.equal(article.googleNewsUrl, 'https://news.google.com/rss/articles/CBMiXyz');
+  assert.equal(article.searchSeenAt, '2026-10-01T12:00:00.000Z');
 });
 
 test('migrateArticle filters junk topic search fields', () => {
@@ -90,10 +92,12 @@ test('migrateArticle omits topic search keys when not arrays / wrong types', () 
     topicIds: 'iran',
     searchProviders: { google_news: true },
     googleNewsUrl: 5,
+    searchSeenAt: null,
   });
   assert.equal('topicIds' in article, false);
   assert.equal('searchProviders' in article, false);
   assert.equal('googleNewsUrl' in article, false);
+  assert.equal('searchSeenAt' in article, false);
 });
 
 test('migrateArticle CFP article without topic search fields has no such keys', () => {

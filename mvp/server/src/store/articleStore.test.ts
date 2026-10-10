@@ -7,6 +7,7 @@ import { test } from 'node:test';
 import type { Article } from '../types/article.js';
 import { articleIdFromCanonicalUrl } from './articleId.js';
 import {
+  markArticlesSearchSeen,
   pruneArticles,
   readArticles,
   updateArticles,
@@ -109,6 +110,19 @@ test('pruneArticles never loses an upsert queued alongside it', async () => {
   ]);
 
   assert.deepEqual(titles(await readArticles(articlesPath)), ['Headline new']);
+});
+
+test('markArticlesSearchSeen stamps only the given ids, and a later upsert keeps the stamp', async () => {
+  const articlesPath = tempArticlesPath();
+  const [a, b] = await upsertArticles([article('a'), article('b')], articlesPath);
+
+  await markArticlesSearchSeen([a!.id, 'missing-id'], '2026-10-11T00:00:00.000Z', articlesPath);
+  await upsertArticle({ ...article('a'), snippet: 'Updated' }, articlesPath);
+
+  const stored = await readArticles(articlesPath);
+  assert.equal(stored.find((x) => x.id === a!.id)?.searchSeenAt, '2026-10-11T00:00:00.000Z');
+  assert.equal(stored.find((x) => x.id === a!.id)?.snippet, 'Updated');
+  assert.equal('searchSeenAt' in stored.find((x) => x.id === b!.id)!, false);
 });
 
 test('concurrent upsertArticle and upsertArticles calls keep every write', async () => {

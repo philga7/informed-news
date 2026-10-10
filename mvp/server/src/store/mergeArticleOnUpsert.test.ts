@@ -393,11 +393,30 @@ test('incoming string googleNewsUrl wins; incoming null keeps existing', () => {
   assert.equal(fromSearx.googleNewsUrl, 'https://news.google.com/rss/articles/Old');
 });
 
+test('searchSeenAt keeps the later of existing and incoming', () => {
+  const existing = article({ searchSeenAt: '2026-10-09T00:00:00.000Z' });
+  assert.equal(
+    mergeArticleOnUpsert(existing, article(), existing.id).searchSeenAt,
+    '2026-10-09T00:00:00.000Z',
+  );
+  assert.equal(
+    mergeArticleOnUpsert(existing, article({ searchSeenAt: '2026-10-01T00:00:00.000Z' }), existing.id)
+      .searchSeenAt,
+    '2026-10-09T00:00:00.000Z',
+  );
+  assert.equal(
+    mergeArticleOnUpsert(existing, article({ searchSeenAt: '2026-10-10T00:00:00.000Z' }), existing.id)
+      .searchSeenAt,
+    '2026-10-10T00:00:00.000Z',
+  );
+});
+
 test('merge without provenance on either side adds no topic search keys', () => {
   const merged = mergeArticleOnUpsert(article(), article(), 'abc123');
   assert.equal('topicIds' in merged, false);
   assert.equal('searchProviders' in merged, false);
   assert.equal('googleNewsUrl' in merged, false);
+  assert.equal('searchSeenAt' in merged, false);
 });
 
 test('no existing row keeps incoming topic search fields as-is', () => {

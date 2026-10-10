@@ -211,15 +211,17 @@ test('a failing article prune is reported, not thrown', async () => {
   });
 });
 
-test('last seen is the later of publishedAt and fetchedAt; neither parsing means prune', async () => {
+test('last seen is the latest of publishedAt, fetchedAt and searchSeenAt; none parsing means prune', async () => {
   const h = harness([
     article('refetched', { publishedAt: DAYS_AGO(30), fetchedAt: HOURS_AGO(1) }),
     article('futureDated', { publishedAt: HOURS_AGO(-24), fetchedAt: DAYS_AGO(5) }),
     article('undated', { publishedAt: null, fetchedAt: HOURS_AGO(1) }),
+    { ...article('searchedAgain', { fetchedAt: DAYS_AGO(5) }), searchSeenAt: HOURS_AGO(2) },
+    { ...article('searchedLongAgo', { fetchedAt: DAYS_AGO(5) }), searchSeenAt: DAYS_AGO(4) },
     article('garbage', { publishedAt: 'soon', fetchedAt: 'yesterday' }),
   ]);
 
   await pruneArticleStore({ now: NOW }, h.deps);
 
-  assert.deepEqual(ids(h.articles), ['futureDated', 'refetched', 'undated']);
+  assert.deepEqual(ids(h.articles), ['futureDated', 'refetched', 'searchedAgain', 'undated']);
 });

@@ -73,12 +73,6 @@ export function selectClassifyBatchCandidates(articles: Article[], limit: number
     .slice(0, limit);
 }
 
-/**
- * Classify articles with null classification, newest-first, up to `limit`.
- * Source-agnostic: CFP and xcancel items share FramingAnalysis.
- * Uses body text when present; otherwise title + snippet.
- * Persists each result (success or recoverable error) via a single write cycle.
- */
 export type ClassifyDeps = {
   classifyFraming?: typeof classifyFraming;
   articlesPath?: string;
@@ -93,7 +87,7 @@ type ClassifyFields = ReturnType<typeof articleFieldsFromClassifyResult>;
  */
 async function applyClassifyFields(
   fieldsById: ReadonlyMap<string, ClassifyFields>,
-  articlesPath: string | undefined,
+  articlesPath?: string,
 ): Promise<Article[]> {
   const applied: Article[] = [];
   await updateArticles(
@@ -110,6 +104,12 @@ async function applyClassifyFields(
   return applied;
 }
 
+/**
+ * Classify articles with null classification, newest-first, up to `limit`.
+ * Source-agnostic: CFP and xcancel items share FramingAnalysis.
+ * Uses body text when present; otherwise title + snippet.
+ * Persists each result (success or recoverable error) via a single write cycle.
+ */
 export async function classifyUnclassifiedArticles(
   options: ClassifyBatchOptions = {},
   deps: ClassifyDeps = {},
@@ -173,7 +173,7 @@ export async function classifyArticleById(
     bodyText: framingBodyText(article),
   });
   const fields = articleFieldsFromClassifyResult(result);
-  const [next] = await applyClassifyFields(new Map([[id, fields]]), undefined);
+  const [next] = await applyClassifyFields(new Map([[id, fields]]));
   if (!next) {
     return null;
   }
