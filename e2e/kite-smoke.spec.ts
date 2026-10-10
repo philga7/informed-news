@@ -315,8 +315,10 @@ test.describe('Manual seeds (NEWS-98)', () => {
 		).toBeVisible();
 
 		await firstCard.locator('button[aria-label="Expand story"]').click();
+		const remove = firstCard.getByTestId('seed-remove');
+		await expect(remove).toBeVisible();
 		await expect(page.getByRole('button', { name: /Unaccept/i })).toHaveCount(0);
-		await firstCard.getByTestId('seed-remove').click();
+		await remove.click();
 		await expect(gridSection.getByText(seedTitle)).toHaveCount(0);
 
 		await page.reload();
