@@ -259,7 +259,18 @@ describe('fetchFilteredOut', () => {
 		}
 	});
 
-	it('returns the server error on 4xx, or the fallback', async () => {
+	it('shows generic copy for 4xx other than 400 / 409', async () => {
+		for (const status of [403, 404, 429]) {
+			const withError = vi.fn(async () => jsonResponse(status, { ok: false, error: 'Forbidden' }));
+			expect(await fetchFilteredOut('last', withError as unknown as typeof fetch)).toEqual({
+				ok: false,
+				unauthenticated: false,
+				error: FILTERED_LOAD_ERROR,
+			});
+		}
+	});
+
+	it('returns the server error on 400, or the fallback', async () => {
 		const withError = vi.fn(async () => jsonResponse(400, { ok: false, error: 'bad scope' }));
 		expect(await fetchFilteredOut('last', withError as unknown as typeof fetch)).toEqual({
 			ok: false,

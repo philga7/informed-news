@@ -391,13 +391,18 @@ test('isHostnameLike: dotted hostnames after normalizing, not abbreviations or m
   assert.equal(isHostnameLike(null), false);
 });
 
-test('isHostnameLike: punycode TLDs and fully-qualified trailing-dot hostnames', () => {
+test('isHostnameLike: punycode TLDs count as hostnames', () => {
   assert.equal(isHostnameLike('lenta.xn--p1ai'), true);
   assert.equal(isHostnameLike('news.xn--fiqs8s'), true);
-  assert.equal(isHostnameLike('www.bbc.co.uk.'), true);
   assert.equal(isHostnameLike('example.xn--'), false);
   assert.equal(isHostnameLike('example.xn--p1ai-'), false);
-  assert.equal(isHostnameLike('example.com..'), false);
+});
+
+test('isHostnameLike: a trailing dot reads as an abbreviation until the domain is normalized', () => {
+  assert.equal(isHostnameLike('Co.Ltd.'), false);
+  assert.equal(isHostnameLike('www.bbc.co.uk.'), false);
+  assert.equal(isHostnameLike(normalizeOutletDomain('www.bbc.co.uk.')), true);
+  assert.equal(isHostnameLike(normalizeOutletDomain('example.com..')), false);
 });
 
 test('normalizeOutletDomain + topicBlocksOutlet: a trailing dot is the same outlet', () => {

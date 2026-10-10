@@ -72,8 +72,13 @@ export function isOutletKeyword(keyword: string): boolean {
 const HOSTNAME_PATTERN =
   /^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+(?:[a-z]{2,}|xn--[a-z0-9-]*[a-z0-9])$/;
 
-/** Normalized value is a dotted hostname (`bbc.co.uk`), not a dotted abbreviation (`U.S.`). */
+/**
+ * Normalized value is a dotted hostname (`bbc.co.uk`), not a dotted abbreviation (`U.S.`).
+ * A raw trailing dot reads as an abbreviation (`Co.Ltd.`); pass publisher domains through
+ * `normalizeOutletDomain` first so fully-qualified hostnames still count.
+ */
 export function isHostnameLike(value: string | null | undefined): boolean {
+  if (value?.trim().endsWith('.')) return false;
   const domain = normalizeOutletDomain(value);
   return domain !== null && HOSTNAME_PATTERN.test(domain);
 }

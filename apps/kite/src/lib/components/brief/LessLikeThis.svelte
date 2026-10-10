@@ -13,21 +13,18 @@
 		LESS_LIKE_THIS_CANCEL,
 		LESS_LIKE_THIS_KEYWORDS_LABEL,
 		LESS_LIKE_THIS_LABEL,
-		LESS_LIKE_THIS_LOGIN_HINT,
 		LESS_LIKE_THIS_NAME_LABEL,
 		LESS_LIKE_THIS_NAME_MAX,
 		LESS_LIKE_THIS_OUTLET_HEADING,
 		LESS_LIKE_THIS_SUBJECT_HEADING,
 		LESS_LIKE_THIS_SUBJECT_SUBMIT,
 		LESS_LIKE_THIS_TOPICS_LINK,
-		lessLikeThisAddedCopy,
-		lessLikeThisAlreadyBlockedCopy,
-		lessLikeThisAlreadyTopicCopy,
-		lessLikeThisErrorCopy,
+		lessLikeThisOutcome,
 		lessLikeThisOutletButton,
 		lessLikeThisSubjectDefault,
 		lessLikeThisSubjectRequest,
 		postLessLikeThis,
+		type LessLikeThisOutcome,
 		type LessLikeThisRequest,
 	} from '$lib/topicBrief';
 
@@ -38,7 +35,7 @@
 
 	let { story, articleId }: Props = $props();
 
-	type Failure = { message: string; login: boolean };
+	type Failure = Extract<LessLikeThisOutcome, { ok: false }>;
 
 	const uid = $props.id();
 	const domain = $derived(story.informed_publisher_domain?.trim() || null);
@@ -99,23 +96,13 @@
 		if (pending) return;
 		pending = true;
 		failure = null;
-		const result = await postLessLikeThis(articleId, body);
+		const outcome = lessLikeThisOutcome(body, await postLessLikeThis(articleId, body), domain);
 		pending = false;
-		const conflictName = body.kind === 'subject' ? body.name : domain;
-		if (!result.ok && !(result.status === 409 && conflictName)) {
-			failure = result.unauthenticated
-				? { message: LESS_LIKE_THIS_LOGIN_HINT, login: true }
-				: { message: lessLikeThisErrorCopy(result.error), login: false };
+		if (!outcome.ok) {
+			failure = outcome;
 			return;
 		}
-		savedResults.set(
-			articleId,
-			!result.ok
-				? lessLikeThisAlreadyTopicCopy(conflictName!)
-				: body.kind === 'outlet' && !result.created && domain
-					? lessLikeThisAlreadyBlockedCopy(domain)
-					: lessLikeThisAddedCopy(result.topicName),
-		);
+		savedResults.set(articleId, outcome.message);
 		open = false;
 		await tick();
 		topicsLink?.focus();
@@ -196,9 +183,14 @@
 				</div>
 			{/if}
 
-			{#if failure?.login}
+			{#if failure?.link === 'login'}
 				<p role="alert">
 					<a href="/topics" class={linkClass}>{failure.message}</a>
+				</p>
+			{:else if failure?.link === 'topics'}
+				<p class="text-gray-700 dark:text-gray-300" role="alert">
+					{failure.message}
+					<a href="/topics" class={linkClass}>{LESS_LIKE_THIS_TOPICS_LINK}</a>
 				</p>
 			{:else if failure}
 				<p class="text-red-700 dark:text-red-400" role="alert">{failure.message}</p>

@@ -3,6 +3,7 @@
  * Less like this (NEWS-90).
  */
 
+import { shownServerError } from '$lib/serverError';
 import { parseKeywordsInput } from '$lib/topics';
 import type { Story } from '$lib/types';
 
@@ -569,10 +570,14 @@ export type LessLikeThisRequest =
 	| { kind: 'outlet' }
 	| { kind: 'subject'; name: string; keywords?: string[]; description?: string };
 
-/** `status` 0 = request failed; `error` is blank for 5xx so raw server text never reaches the UI. */
+/** `status` 0 = request failed. `error` is the raw server text; show it via `lessLikeThisOutcome`. */
 export type LessLikeThisResult =
 	| { ok: true; created: boolean; topicName: string }
 	| { ok: false; status: number; unauthenticated: boolean; error: string };
+
+export type LessLikeThisOutcome =
+	| { ok: true; message: string }
+	| { ok: false; message: string; link: 'login' | 'topics' | null };
 
 export function lessLikeThisOutletButton(domain: string): string {
 	return `Block ${domain}`;
@@ -586,15 +591,35 @@ export function lessLikeThisAlreadyBlockedCopy(domain: string): string {
 	return `${domain} is already blocked.`;
 }
 
-/** 409 from the topics store: the name is taken (case-insensitive), possibly by a desired topic. */
-export function lessLikeThisAlreadyTopicCopy(name: string): string {
-	return `"${name}" is already one of your topics.`;
+/** The taken name may belong to a desired topic or a non-blocking one, so this is not a success. */
+export function lessLikeThisNameTakenCopy(name: string): string {
+	return `A topic named "${name}" already exists, so nothing was saved.`;
 }
 
-export function lessLikeThisErrorCopy(code: string | undefined): string {
+export function lessLikeThisErrorCopy(status: number, code: string): string {
 	if (code === 'no_outlet') return LESS_LIKE_THIS_NO_OUTLET;
 	if (code === 'story_not_found') return LESS_LIKE_THIS_NOT_STORED;
-	return code?.trim() || LESS_LIKE_THIS_ERROR;
+	return shownServerError(status, code, LESS_LIKE_THIS_ERROR);
+}
+
+export function lessLikeThisOutcome(
+	body: LessLikeThisRequest,
+	result: LessLikeThisResult,
+	domain: string | null,
+): LessLikeThisOutcome {
+	if (result.ok) {
+		const message =
+			body.kind === 'outlet' && !result.created && domain
+				? lessLikeThisAlreadyBlockedCopy(domain)
+				: lessLikeThisAddedCopy(result.topicName);
+		return { ok: true, message };
+	}
+	if (result.unauthenticated) return { ok: false, message: LESS_LIKE_THIS_LOGIN_HINT, link: 'login' };
+	const name = body.kind === 'subject' ? body.name : domain;
+	if (result.status === 409 && name) {
+		return { ok: false, message: lessLikeThisNameTakenCopy(name), link: 'topics' };
+	}
+	return { ok: false, message: lessLikeThisErrorCopy(result.status, result.error), link: null };
 }
 
 /** Story title as an undesired topic name, cut on a word boundary to fit the name cap. */
@@ -634,7 +659,7 @@ export async function postLessLikeThis(
 	);
 	if (!res) return { ok: false, status: 0, unauthenticated: false, error: '' };
 	const { status } = res;
-	const error = status < 500 && typeof res.body?.error === 'string' ? res.body.error : '';
+	const error = typeof res.body?.error === 'string' ? res.body.error : '';
 	if (status === 401) return { ok: false, status, unauthenticated: true, error };
 	if (status >= 400 || res.body?.ok !== true) {
 		return { ok: false, status, unauthenticated: false, error };

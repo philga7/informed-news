@@ -97,19 +97,26 @@ describe('LessLikeThis', () => {
 		expect(screen.getByRole('button', { name: 'Less like this' })).toBeInTheDocument();
 	});
 
-	it('a 409 on re-submit says the topic is already there instead of showing the raw conflict', async () => {
+	it('a 409 says the name is taken with a View Topics link, keeps the panel open, and saves nothing', async () => {
 		vi.mocked(fetch).mockResolvedValue(
 			jsonResponse(409, { ok: false, error: 'a topic named "royal row deepens" already exists' }),
 		);
-		mount();
+		const first = mount();
 		await openPanel();
 		await fireEvent.click(screen.getByRole('button', { name: 'Add undesired topic' }));
 
-		const success = await screen.findByTestId('less-like-this-success');
-		expect(success).toHaveTextContent('"Royal row deepens" is already one of your topics.');
-		expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-		expect(screen.queryByText(/already exists/)).not.toBeInTheDocument();
-		await vi.waitFor(() => expect(screen.getByRole('link', { name: 'View Topics' })).toHaveFocus());
+		const alert = await screen.findByRole('alert');
+		expect(alert).toHaveTextContent(
+			'A topic named "Royal row deepens" already exists, so nothing was saved.',
+		);
+		expect(alert.querySelector('a[href="/topics"]')).toHaveTextContent('View Topics');
+		expect(screen.queryByText(/royal row deepens" already exists$/)).not.toBeInTheDocument();
+		expect(screen.getByLabelText('Undesired topic name')).toBeInTheDocument();
+		expect(screen.queryByTestId('less-like-this-success')).not.toBeInTheDocument();
+
+		first.unmount();
+		mount();
+		expect(screen.getByRole('button', { name: 'Less like this' })).toBeInTheDocument();
 	});
 
 	it('a 5xx shows the generic retry line, not the server message, and keeps the panel open', async () => {

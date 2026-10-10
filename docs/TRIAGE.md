@@ -151,7 +151,7 @@ Session required. `?scope=last` (default; anything other than `window` means `la
 - `counts` — items per reason group (`muted`, `off_topic`, …); groups with none are absent.
 - `items` — every matching dropped record (no cap), sorted by group order, then newest `publishedAt` (undated last), then article id. Each: `{ articleId, title, url, publisherDomain, publishedAt, sourceKind, reason, group, final, stage, mutedBy, topics, duplicateOf, triagedAt }`. Article fields are `null` when the article is gone; `url` is `publisherUrl ?? canonicalUrl`, or `null` unless it is an `http:` / `https:` URL (same for `duplicateOf.url`). `mutedBy` is `{ kind: 'rule' | 'topic', id, label }` for `muted:<id>` reasons, else `null`. `topics` is `[{ id, name }]` for the record's topics that still exist, in topics-list order. `duplicateOf` is `{ articleId, title, url }` or `null`.
 - Mute rules unreadable → the view still loads with no rules, as triage does; rule-muted items then show "Removed rule or topic" ([NEWS-104](https://informedcrew.atlassian.net/browse/NEWS-104)).
-- Any other store read failure → `500 { ok: false, error }`. The page shows "Filtered stories could not be loaded right now." for every 5xx, never the raw server message.
+- Any other store read failure → `500 { ok: false, error }`. The page shows the server's message only for `400` / `409`; every other failure (5xx included) shows "Filtered stories could not be loaded right now."
 
 ```bash
 curl -s -b /tmp/mvp-cookies 'http://127.0.0.1:3001/api/triage/filtered?scope=window'

@@ -702,7 +702,7 @@ export function createApp(deps: CreateAppDeps = {}): Express {
   /**
    * Filtered out (NEWS-90): dropped records for `scope=last` (default; the last
    * triage run) or `scope=window` (last TRIAGE_WINDOW_HOURS), grouped by reason.
-   * Unreadable mute rules → no rules, as triage does (NEWS-104).
+   * Unreadable mute rules → no rules, as triage does.
    */
   app.get('/api/triage/filtered', async (req, res) => {
     try {
