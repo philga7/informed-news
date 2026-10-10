@@ -310,8 +310,9 @@ export async function createManualSeed(
     throw muteConflict(muted, rules, undesired);
   }
 
-  const duplicate = findKeptDuplicate(article, topic.id, articles, triage, Date.parse(now));
-  if (duplicate) {
+  const refuseDuplicate = (known: readonly Article[], store: TriageStore): void => {
+    const duplicate = findKeptDuplicate(article, topic.id, known, store, Date.parse(now));
+    if (!duplicate) return;
     const topicName =
       duplicate.record.topicIds
         .map((id) => topics.find((t) => t.id === id))
@@ -323,9 +324,11 @@ export async function createManualSeed(
       error: `Already in your Brief: '${title}' under ${topicName}.`,
       existing: { articleId: duplicate.article.id, title, topicName },
     });
-  }
+  };
+  refuseDuplicate(articles, triage);
 
   const saved = await upsert(article);
+  const known = await stores.readArticles();
   const record: TriageRecord = {
     articleId: saved.id,
     status: 'kept',
@@ -342,10 +345,11 @@ export async function createManualSeed(
     jevCalls: 0,
     triagedAt: now,
   };
-  await stores.updateTriage((store) => ({
-    records: { ...store.records, [record.articleId]: record },
-    updatedAt: now,
-  }));
+  // Re-checked under the triage write lock: a refresh may have kept the story since the first read.
+  await stores.updateTriage((store) => {
+    refuseDuplicate(known, store);
+    return { records: { ...store.records, [record.articleId]: record }, updatedAt: now };
+  });
 
   return { article: saved, topicId: topic.id };
 }
@@ -362,7 +366,7 @@ export type RemoveManualSeedResult =
 /**
  * Take a seed off the Brief: delete its triage record (no dropped trace) and the
  * records triage dropped as its duplicates, so those articles are re-triaged on
- * their own at the next refresh. The article stays for the retention prune.
+ * their own at the next refresh. The article stays in the store, which has no retention prune.
  */
 export async function removeManualSeed(
   articleId: string,

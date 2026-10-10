@@ -389,6 +389,23 @@ test('createManualSeed refuses a kept story sharing a URL, even one already seen
   });
 });
 
+test('createManualSeed refuses a duplicate a refresh kept after the seed first read triage', async () => {
+  const existing = makeArticle('old', {
+    title: 'Dockworkers walk out at the port',
+    publisherUrl: 'https://news.example.com/port-strike',
+  });
+  const h = harness({ articles: [existing], triage: triageOf(kept('old', ['t1'])) });
+  h.deps.readTriage = async () => triageOf();
+
+  await assert.rejects(createManualSeed(seedInput(), h.deps), (err) => {
+    assert.ok(err instanceof ManualSeedConflictError);
+    assert.equal(err.body.code, 'duplicate');
+    return true;
+  });
+  assert.equal(h.triageWrites.length, 0);
+  assert.deepEqual(Object.keys(h.triage().records), ['old']);
+});
+
 test('createManualSeed refuses a similar headline kept in the chosen topic', async () => {
   const existing = makeArticle('old', { title: 'Senate passes sweeping drone export bill' });
   const h = harness({

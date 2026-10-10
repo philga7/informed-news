@@ -367,17 +367,26 @@ async function runPool<T>(items: T[], limit: number, fn: (item: T) => Promise<vo
 /**
  * Seeds are saved and removed outside the run: the store on disk at write time
  * decides which seed records exist; the run's copy wins only for its dedupe growth.
+ * Duplicates of a seed that is no longer on disk are dropped, so they are re-triaged
+ * like Remove intends. `isOrphan` must not match a seed saved mid-run, whose article
+ * the run never read.
  */
 function mergeSeedRecords(
   current: Record<string, TriageRecord>,
   computed: Record<string, TriageRecord>,
+  isOrphan: (rec: TriageRecord) => boolean,
 ): Record<string, TriageRecord> {
   const merged: Record<string, TriageRecord> = {};
-  for (const [id, rec] of Object.entries(computed)) {
-    if (rec.stage !== 'manual') merged[id] = rec;
-  }
   for (const [id, rec] of Object.entries(current)) {
-    if (rec.stage === 'manual') merged[id] = computed[id] ?? rec;
+    if (rec.stage !== 'manual') continue;
+    const kept = computed[id] ?? (isOrphan(rec) ? undefined : rec);
+    if (kept) merged[id] = kept;
+  }
+  for (const [id, rec] of Object.entries(computed)) {
+    if (rec.stage === 'manual') continue;
+    const target = rec.duplicateOf;
+    if (target !== null && computed[target]?.stage === 'manual' && !merged[target]) continue;
+    merged[id] = rec;
   }
   return merged;
 }
@@ -478,11 +487,12 @@ export async function runTriage(
     };
     started = run;
 
+    const needsTriage = (rec: TriageRecord | undefined): boolean =>
+      rec === undefined ||
+      rec.final === false ||
+      (rec.duplicateOf !== null && store.records[rec.duplicateOf] === undefined);
     const candidates = articles.filter(
-      (a) =>
-        a.sourceKind !== 'manual' &&
-        inWindow(a, now) &&
-        (store.records[a.id] === undefined || store.records[a.id]!.final === false),
+      (a) => a.sourceKind !== 'manual' && inWindow(a, now) && needsTriage(store.records[a.id]),
     );
 
     const survivors: DedupeCandidate[] = [];
@@ -569,8 +579,10 @@ export async function runTriage(
       if (!articlesById.has(id)) delete records[id];
     }
     try {
+      const isOrphanSeed = (rec: TriageRecord) =>
+        !articlesById.has(rec.articleId) && now.getTime() - Date.parse(rec.triagedAt) > WINDOW_MS;
       await (deps.updateTriage ?? ((mutate) => updateTriage(mutate)))((current) => ({
-        records: mergeSeedRecords(current.records, records),
+        records: mergeSeedRecords(current.records, records, isOrphanSeed),
         updatedAt: meta.at,
       }));
     } catch (err) {

@@ -872,6 +872,88 @@ test('a seed removed during the run stays removed', async () => {
   assert.deepEqual(Object.keys(state.store.records).sort(), ['a']);
 });
 
+test('a seed removed during the run does not bring back its duplicates, old or new', async () => {
+  const seedUrl = 'https://seed.example.com/story';
+  const { deps, state } = harness({
+    topics: [TARIFFS],
+    articles: [
+      article('a', 'Tariff ruling hits steel imports'),
+      seedArticle('seed', 'Operator tariff seed'),
+      article('old', 'Earlier wire copy on the tariff seed', { sourceKind: 'search' }),
+      article('dup', 'Wire copy on the new tariff schedule', {
+        sourceKind: 'search',
+        citations: [{ label: 'Seed outlet', url: seedUrl }],
+      }),
+    ],
+    records: {
+      seed: seedRecord('seed', { memberIds: ['old'] }),
+      old: keptRecord('old', { status: 'dropped', reason: 'duplicate', stage: 'dedupe', duplicateOf: 'seed' }),
+    },
+  });
+  deps.readTriage = async () => {
+    const snapshot = structuredClone(state.store);
+    delete state.store.records.seed;
+    delete state.store.records.old;
+    return snapshot;
+  };
+
+  await run(deps);
+
+  assert.deepEqual(Object.keys(state.store.records).sort(), ['a']);
+});
+
+test('a stored duplicate whose target record is gone is re-triaged on its own', async () => {
+  const { deps, state } = harness({
+    topics: [TARIFFS],
+    articles: [
+      seedArticle('seed', 'Operator tariff seed'),
+      article('old', 'Tariff ruling hits steel imports', { sourceKind: 'search' }),
+    ],
+    records: {
+      old: keptRecord('old', { status: 'dropped', reason: 'duplicate', stage: 'dedupe', duplicateOf: 'seed' }),
+    },
+  });
+
+  const result = await run(deps);
+
+  assert.deepEqual(result.keptIds, ['old']);
+  assert.equal(state.store.records.old!.status, 'kept');
+  assert.equal(state.store.records.old!.duplicateOf, null);
+  assert.deepEqual(state.judgeCalls.map((c) => c.id), ['old']);
+});
+
+test('a seed record whose article is gone is pruned once it is past the triage window', async () => {
+  const { deps, state } = harness({
+    topics: [TARIFFS],
+    articles: [article('a', 'Tariff ruling hits steel imports')],
+    records: {
+      gone: seedRecord('gone', { triagedAt: hoursAgo(60) }),
+      recent: seedRecord('recent', { triagedAt: hoursAgo(1) }),
+    },
+  });
+
+  await run(deps);
+
+  assert.deepEqual(Object.keys(state.store.records).sort(), ['a', 'recent']);
+});
+
+test('a seed saved mid-run whose article the run never read is not pruned', async () => {
+  const seed = seedRecord('seed', { triagedAt: NOW.toISOString() });
+  const { deps, state } = harness({
+    topics: [TARIFFS],
+    articles: [article('a', 'Tariff ruling hits steel imports')],
+  });
+  deps.updateTriage = async (mutate) => {
+    state.store.records.seed = structuredClone(seed);
+    state.store = structuredClone(mutate(structuredClone(state.store)));
+    return structuredClone(state.store);
+  };
+
+  await run(deps);
+
+  assert.deepEqual(state.store.records.seed, seed);
+});
+
 test('dedupe growth of a seed is kept: an in-window search duplicate joins its memberIds', async () => {
   const seedUrl = 'https://seed.example.com/story';
   const { deps, state } = harness({
