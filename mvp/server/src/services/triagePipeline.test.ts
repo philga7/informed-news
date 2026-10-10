@@ -928,6 +928,7 @@ test('a seed record whose article is gone is pruned once it is past the triage w
     articles: [article('a', 'Tariff ruling hits steel imports')],
     records: {
       gone: seedRecord('gone', { triagedAt: hoursAgo(60) }),
+      undated: seedRecord('undated', { triagedAt: 'not a date' }),
       recent: seedRecord('recent', { triagedAt: hoursAgo(1) }),
     },
   });

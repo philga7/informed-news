@@ -129,9 +129,12 @@ function articleTime(article: Article): number {
   return Date.parse(article.publishedAt ?? article.fetchedAt);
 }
 
-function inWindow(article: Article, now: Date): boolean {
-  const time = articleTime(article);
+function timeInWindow(time: number, now: Date): boolean {
   return !Number.isNaN(time) && now.getTime() - time <= WINDOW_MS;
+}
+
+function inWindow(article: Article, now: Date): boolean {
+  return timeInWindow(articleTime(article), now);
 }
 
 function record(run: TriageRun, articleId: string, fields: RecordFields): void {
@@ -367,9 +370,8 @@ async function runPool<T>(items: T[], limit: number, fn: (item: T) => Promise<vo
 /**
  * Seeds are saved and removed outside the run: the store on disk at write time
  * decides which seed records exist; the run's copy wins only for its dedupe growth.
- * Duplicates of a seed that is no longer on disk are dropped, so they are re-triaged
- * like Remove intends. `isOrphan` must not match a seed saved mid-run, whose article
- * the run never read.
+ * Duplicates of a seed that is no longer on disk are dropped. `isOrphan` must not match
+ * a seed saved mid-run, whose article the run never read.
  */
 function mergeSeedRecords(
   current: Record<string, TriageRecord>,
@@ -379,8 +381,8 @@ function mergeSeedRecords(
   const merged: Record<string, TriageRecord> = {};
   for (const [id, rec] of Object.entries(current)) {
     if (rec.stage !== 'manual') continue;
-    const kept = computed[id] ?? (isOrphan(rec) ? undefined : rec);
-    if (kept) merged[id] = kept;
+    const seedRecord = computed[id] ?? (isOrphan(rec) ? undefined : rec);
+    if (seedRecord) merged[id] = seedRecord;
   }
   for (const [id, rec] of Object.entries(computed)) {
     if (rec.stage === 'manual') continue;
@@ -580,7 +582,7 @@ export async function runTriage(
     }
     try {
       const isOrphanSeed = (rec: TriageRecord) =>
-        !articlesById.has(rec.articleId) && now.getTime() - Date.parse(rec.triagedAt) > WINDOW_MS;
+        !articlesById.has(rec.articleId) && !timeInWindow(Date.parse(rec.triagedAt), now);
       await (deps.updateTriage ?? ((mutate) => updateTriage(mutate)))((current) => ({
         records: mergeSeedRecords(current.records, records, isOrphanSeed),
         updatedAt: meta.at,
