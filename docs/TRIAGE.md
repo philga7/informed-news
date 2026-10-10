@@ -10,7 +10,7 @@ In every refresh — the auto-refresh timer, the startup catch-up, the Kite **Re
 
 **Candidates** are articles that:
 
-- come from any source except manual Brief seeds (`sourceKind` `cfp`, `rss`, `xcancel`, or `search`),
+- come from any source except manual Brief seeds (`sourceKind` `cfp`, `rss`, `xcancel`, or `search`; a seed gets its own kept record when saved, [BRIEF.md](BRIEF.md#added-stories-seeds)),
 - are within the last **48 hours** (`publishedAt`, or `fetchedAt` when there is no date), and
 - have no triage record yet, or only a non-final one (see drop reasons).
 
@@ -93,7 +93,7 @@ Other limits are constants in `mvp/server/src/services/triageConfig.ts` (48h win
 
 ## What's stored where
 
-- **`mvp/data/triage.json`** (gitignored) — `{ records, updatedAt }`, one record per article id: `status` (`kept` \| `dropped`), `reason`, `stage` (`keyword` \| `dedupe` \| `headline` \| `survivor` \| `body` \| `budget`), `final`, `topicIds` (kept: the topics Jev confirmed; dropped: the candidate topics considered), `labels`, `duplicateOf`, `memberIds` and `outletCount` (kept only), `significance`, `bodyChecked`, `jevCalls` (total across refreshes), `triagedAt`. Records for articles no longer in the article store are pruned on write.
+- **`mvp/data/triage.json`** (gitignored) — `{ records, updatedAt }`, one record per article id: `status` (`kept` \| `dropped`), `reason`, `stage` (`keyword` \| `dedupe` \| `headline` \| `survivor` \| `body` \| `budget` \| `manual` — an operator seed, written by Add story rather than a run), `final`, `topicIds` (kept: the topics Jev confirmed; dropped: the candidate topics considered), `labels`, `duplicateOf`, `memberIds` and `outletCount` (kept only), `significance`, `bodyChecked`, `jevCalls` (total across refreshes), `triagedAt`. Records for articles no longer in the article store are pruned on write.
 - **Article store** — survivors that were resolved or scraped are written back: `publisherUrl`, `publisherDomain`, an added publisher citation, `bodyText`, `bodyStatus`, `publisherTitle`, image fields, and `publishedAt` when it was empty. `id` and `canonicalUrl` never change.
 - **`mvp/data/meta.json` → `triage`** — the last run summary: `{ at, skipped, candidates, kept, dropped, byReason, jev: { budget, used, errors }, summaryBudget, errors }`. `byReason` counts this run's drops, with every `muted:<id>` counted under `muted`. `errors` holds at most 5 messages, plus any store-write errors (triage, articles, meta), which are always appended.
 

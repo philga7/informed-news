@@ -55,19 +55,19 @@ Batch id is always `owned-latest`. Category slug `world` (named **Brief**) / UUI
 
 Session CRUD: `GET /api/brief/mutes`, `POST /api/brief/mutes` `{ keyword, source? }`, `DELETE /api/brief/mutes/:id`. See [MVP_API_COMPAT.md](MVP_API_COMPAT.md).
 
-### Manual Brief seed (NEWS-66)
+### Manual Brief seed (NEWS-66, NEWS-98)
 
-> Manual seeds (**Add story**) and story **Unaccept** are still present but are **not** part of the topic Brief: seeds are stored and Accepted but do not appear on `/`, because the topic Brief shows triage kept stories only and triage skips manual seeds. Their future is owned by [NEWS-98](https://informedcrew.atlassian.net/browse/NEWS-98).
+Operators can add a story by hand, and it shows on the topic Brief like a triaged story ([NEWS-98](https://informedcrew.atlassian.net/browse/NEWS-98)). Full behavior: [BRIEF.md](BRIEF.md#added-stories-seeds).
 
-Operators can add a story by hand:
+1. **UI:** Brief header or empty-state **Add story** → modal (title, one desired **Topic**, and at least one URL required; note optional) → `POST /api/brief/seed` via the Kite proxy (`apps/kite/src/routes/api/brief/seed/+server.ts`). Session required (log in on `/topics`). The server's `400` / `409` message is shown in the form.
+2. **API:** `POST /api/brief/seed` with body `{ title: string; topicId: string; urls: string[]; note?: string }` → `{ ok: true, articleId, clusterId, topicId }`. `400` on a missing title / topic / URL, a topic that isn't desired, or non-http(s) URLs; `409` when a mute rule or undesired topic would hide it, or it duplicates a story kept in the 48 h window. See [MVP_API_COMPAT.md](MVP_API_COMPAT.md).
+3. **Persistence:** The article is stored in `mvp/data/articles.json` as `sourceKind: 'manual'`. Identity: `canonicalUrl = manual://seed/{uuid}` → article `id`; `clusterId = id`. URLs become `citations[]`; the first also sets `publisherUrl` and is scraped once (8 s timeout) for `bodyText` only; on a failed scrape `bodyText` stays null (`bodyStatus: 'not_applicable'`). Operator note → `snippet`.
+4. **On the topic Brief:** the seed also gets a kept triage record (`stage: 'manual'`, the chosen topic, no significance) in `triage.json`, so compose, summaries, full stories, seen, and retention treat it like any kept story. It is pinned first in its topic section and the Kite story carries `informed_added_by_you: true` (**Added by you** badge). Triage never re-scores it, and the parked Radar feed (`buildRadarFeed`) still excludes `sourceKind: 'manual'`.
+5. **No Accept / Track:** seeding no longer writes `brief-membership.json` or `tracked-stories.json`.
+6. **Remove:** an expanded seed card's **Remove** → `POST /api/brief/stories/:articleId/remove` deletes its triage record (and those of stories triage dropped as its duplicates, which are re-triaged next refresh); the article row stays in `articles.json`.
+7. **Unaccept retired from Kite:** the Unaccept button and the Kite `/api/brief/unaccept` proxy are gone; the server route is parked with the rest of the story desk.
 
-1. **UI:** Brief header or empty-state **Add story** → modal (title required; note and URLs optional) → `POST /api/brief/seed` via the Kite proxy (`apps/kite/src/routes/api/brief/seed/+server.ts`). Session required (log in on `/topics`).
-2. **API:** `POST /api/brief/seed` with body `{ title: string; note?: string; urls?: string[] }` → `{ ok: true, articleId, clusterId, acceptedClusterIds }`. Invalid title or non-http(s) URLs → `400`. See [MVP_API_COMPAT.md](MVP_API_COMPAT.md).
-3. **Persistence:** Stored in `mvp/data/articles.json` as `sourceKind: 'manual'`. Identity: `canonicalUrl = manual://seed/{uuid}` → article `id`; `clusterId = id` (membership key is the real id, not `solo:`). Optional URLs become `citations[]`; first URL also sets `publisherUrl`. Operator note → `snippet`; `bodyText` stays null (`bodyStatus: 'not_applicable'`).
-4. **Accepted immediately:** `createManualSeed` upserts the article and calls `acceptCluster(clusterId)` in the same request, and tracks the cluster by default.
-5. **Not triaged:** triage skips manual seeds, and the parked Radar feed (`buildRadarFeed`) excludes `sourceKind: 'manual'`.
-6. **Honest Brief copy:** the adapter prefers the operator note (`snippet`) for `short_summary`; when empty, fixed copy: `Operator-seeded story — no publisher body yet.` (never title-only silence).
-7. **Unaccept:** `POST /api/brief/unaccept` with the story's `clusterId` removes Brief membership; the seed row may remain in `articles.json` (no hard-delete in v1).
+Seeds saved before NEWS-98 have no topic or triage record and stay out of the topic Brief (no migration).
 
 ## Parked: story desk and claims desk
 

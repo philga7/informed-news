@@ -4,6 +4,8 @@ import {
 	E2E_DATA_DIR,
 	E2E_KITE_PORT,
 	E2E_MVP_PASSWORD,
+	E2E_SEED_ARTICLE_PATH,
+	e2eFixtureUrl,
 } from './stack/config.mjs';
 import { TOPIC_SCENARIO, writeScenario } from './stack/scenarios.mjs';
 
@@ -273,6 +275,56 @@ test.describe('Filtered out + Less like this (NEWS-90)', () => {
 
 		const after = (await loadOwnedStories(page)).map((s) => s.title);
 		expect(after).toContain(title);
+	});
+});
+
+test.describe('Manual seeds (NEWS-98)', () => {
+	test.beforeEach(() => useScenario('topics'));
+
+	test('Add story pins a seed first in its topic; Remove takes it back off', async ({ page }) => {
+		const seedTitle = 'Library extends weekend reading-room hours';
+		const [grid] = TOPIC_SCENARIO.sections;
+		await logIn(page);
+		await page.goto('/');
+		await expect(page).toHaveTitle(/Informed News/i, { timeout: 60_000 });
+
+		const gridSection = page
+			.getByTestId('topic-brief-section')
+			.filter({ has: page.getByRole('heading', { name: grid!.name, exact: true }) });
+		const firstCard = gridSection.locator('article[id^="story-"]').first();
+		await expect(firstCard).toContainText(TOPIC_SCENARIO.lessLikeThis.title, { timeout: 60_000 });
+		await expect(page.getByRole('button', { name: /Unaccept/i })).toHaveCount(0);
+
+		await page.getByRole('button', { name: 'Add story', exact: true }).click();
+		const dialog = page.getByRole('dialog', { name: 'Add story to Brief' });
+		await expect(dialog).toBeVisible();
+		await dialog.getByRole('textbox', { name: 'Title', exact: true }).fill(seedTitle);
+		await dialog
+			.getByRole('combobox', { name: 'Topic', exact: true })
+			.selectOption({ label: grid!.name });
+		await dialog
+			.getByRole('textbox', { name: 'URLs (one per line, at least one)', exact: true })
+			.fill(e2eFixtureUrl(E2E_SEED_ARTICLE_PATH));
+		await dialog.getByRole('button', { name: 'Add to Brief', exact: true }).click();
+		await expect(dialog).toHaveCount(0, { timeout: 30_000 });
+
+		await expect(firstCard).toContainText(seedTitle, { timeout: 30_000 });
+		await expect(firstCard.getByText('Added by you', { exact: true })).toBeVisible();
+		await expect(
+			firstCard.getByText('Summary loads when you open this story', { exact: true }),
+		).toBeVisible();
+
+		await firstCard.locator('button[aria-label="Expand story"]').click();
+		await expect(page.getByRole('button', { name: /Unaccept/i })).toHaveCount(0);
+		await firstCard.getByTestId('seed-remove').click();
+		await expect(gridSection.getByText(seedTitle)).toHaveCount(0);
+
+		await page.reload();
+		await expect(firstCard).toContainText(TOPIC_SCENARIO.lessLikeThis.title, { timeout: 60_000 });
+		await expect(page.getByText(seedTitle)).toHaveCount(0);
+		await expect(
+			gridSection.getByRole('button', { name: `More (${TOPIC_SCENARIO.gridMoreCount})` }),
+		).toBeVisible();
 	});
 });
 
