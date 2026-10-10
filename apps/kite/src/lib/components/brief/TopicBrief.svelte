@@ -13,7 +13,9 @@ const requestedSummaries = new Set<string>();
 	import StoryCardSkeleton from '$lib/components/story/StoryCardSkeleton.svelte';
 	import BriefRefreshBar from './BriefRefreshBar.svelte';
 	import LessLikeThis from './LessLikeThis.svelte';
+	import SeedRemove from './SeedRemove.svelte';
 	import {
+		BRIEF_ADDED_BY_YOU_LABEL,
 		BRIEF_LESS_LABEL,
 		BRIEF_LEVEL_LABEL,
 		BRIEF_OFFICIAL_LABEL,
@@ -27,6 +29,7 @@ const requestedSummaries = new Set<string>();
 		fetchBriefOverview,
 		fullStoryErrorCopy,
 		groupTopicBrief,
+		isManualSeedStory,
 		isOfficialStory,
 		isTopicBriefStory,
 		moreLabel,
@@ -92,10 +95,12 @@ const requestedSummaries = new Set<string>();
 	let openMore = $state<Record<string, boolean>>({});
 	let summaryRequests = $state<Record<string, SummaryRequestState>>({});
 	let fullStoryRequests = $state<Record<string, FullStoryRequestState>>({});
+	let removedKeys = $state<Set<string>>(new Set());
 	let overviewSequence = 0;
 
 	const useSections = $derived(overviewLoaded && overview !== null && !overview.fixture);
-	const sections = $derived(overview ? groupTopicBrief(overview, stories) : []);
+	const shownStories = $derived(stories.filter((story) => !removedKeys.has(storyKey(story))));
+	const sections = $derived(overview ? groupTopicBrief(overview, shownStories) : []);
 	const quiet = $derived(overview ? quietLine(overview.quiet) : null);
 	const storyIndex = $derived(new Map(stories.map((story, index) => [story, index])));
 	const topicStoryIds = $derived(
@@ -258,6 +263,11 @@ const requestedSummaries = new Set<string>();
 		}
 	}
 
+	function handleSeedRemoved(story: Story): void {
+		removedKeys = new Set([...removedKeys, storyKey(story)]);
+		void loadOverview();
+	}
+
 	function toggleMore(topicId: string): void {
 		openMore = { ...openMore, [topicId]: !openMore[topicId] };
 	}
@@ -283,15 +293,21 @@ const requestedSummaries = new Set<string>();
 	{@const key = storyKey(story)}
 	{@const badge = outletBadge(story.informed_outlet_count)}
 	{@const official = isOfficialStory(story)}
+	{@const addedByYou = isManualSeedStory(story)}
 	{@const line = summaryLine(story)}
 	{@const request = story.id ? summaryRequests[story.id] : undefined}
 	{@const fullStoryRequest = story.id ? fullStoryRequests[story.id] : undefined}
 	{@const expanded = Boolean(expandedStories[key])}
-	{@const lessLikeThisId = expanded && isTopicBriefStory(story) ? story.informed_article_id : undefined}
-	{#if badge || official || line || (expanded && fullStoryRequest) || lessLikeThisId}
+	{@const actionId = expanded && isTopicBriefStory(story) ? story.informed_article_id : undefined}
+	{#if badge || official || addedByYou || line || (expanded && fullStoryRequest) || actionId}
 		<div class="mb-2 space-y-1">
-			{#if badge || official}
+			{#if badge || official || addedByYou}
 				<div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-gray-500 dark:text-gray-400">
+					{#if addedByYou}
+						<span class="inline-flex items-center rounded-full border border-gray-300 px-2 py-0.5 text-[10px] font-medium tracking-wide text-gray-700 dark:border-gray-600 dark:text-gray-300">
+							{BRIEF_ADDED_BY_YOU_LABEL}
+						</span>
+					{/if}
 					{#if official}
 						<span class="inline-flex items-center rounded-full border border-gray-300 px-2 py-0.5 text-[10px] font-medium tracking-wide text-gray-700 dark:border-gray-600 dark:text-gray-300">
 							{BRIEF_OFFICIAL_LABEL}
@@ -342,8 +358,10 @@ const requestedSummaries = new Set<string>();
 			{:else if expanded && fullStoryRequest?.phase === 'error'}
 				<p class="text-xs text-gray-500 dark:text-gray-400">{fullStoryRequest.message}</p>
 			{/if}
-			{#if lessLikeThisId}
-				<LessLikeThis {story} articleId={lessLikeThisId} />
+			{#if actionId && addedByYou}
+				<SeedRemove articleId={actionId} onRemoved={() => handleSeedRemoved(story)} />
+			{:else if actionId}
+				<LessLikeThis {story} articleId={actionId} />
 			{/if}
 		</div>
 	{/if}

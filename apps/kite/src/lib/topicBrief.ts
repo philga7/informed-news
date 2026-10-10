@@ -25,6 +25,16 @@ export const BRIEF_OTHER_SECTION_NAME = 'Other stories';
 
 export const BRIEF_OFFICIAL_LABEL = 'Official statement';
 
+export const BRIEF_ADDED_BY_YOU_LABEL = 'Added by you';
+
+export const BRIEF_REMOVE_LABEL = 'Remove';
+
+export const BRIEF_REMOVE_PENDING = 'Removing…';
+
+export const BRIEF_REMOVE_ERROR = 'Could not remove this story. Try again.';
+
+export const BRIEF_REMOVE_LOGIN_HINT = 'Log in on Topics to remove stories';
+
 export const BRIEF_AI_SUMMARY_NOTE = 'AI summary — not ground truth';
 
 export const BRIEF_SUMMARY_UNAVAILABLE = 'Full text unavailable';
@@ -171,6 +181,11 @@ export function outletBadge(outletCount: number | null | undefined): string | nu
 
 export function isOfficialStory(story: Story): boolean {
 	return Array.isArray(story.informed_labels) && story.informed_labels.includes('official');
+}
+
+/** Operator-added seed (NEWS-98). */
+export function isManualSeedStory(story: Story): boolean {
+	return story.informed_added_by_you === true;
 }
 
 /** Card summary line; null when the story carries no summary status (or an empty ok summary). */
@@ -620,6 +635,26 @@ export async function postLessLikeThis(
 		return { ok: false, unauthenticated: false, error: '' };
 	}
 	return { ok: true, created: res.body.created, topicName: topic.name };
+}
+
+export type RemoveSeedResult = { ok: true } | { ok: false; unauthenticated: boolean; error: string };
+
+export async function postRemoveSeed(
+	articleId: string,
+	fetchFn: typeof fetch = fetch,
+): Promise<RemoveSeedResult> {
+	const res = await postJson(
+		fetchFn,
+		`/api/brief/stories/${encodeURIComponent(articleId)}/remove`,
+		{},
+	);
+	if (res?.status === 401) {
+		return { ok: false, unauthenticated: true, error: BRIEF_REMOVE_LOGIN_HINT };
+	}
+	if (!res || res.status >= 400 || res.body?.ok !== true) {
+		return { ok: false, unauthenticated: false, error: BRIEF_REMOVE_ERROR };
+	}
+	return { ok: true };
 }
 
 /** Manual refresh (session); may take minutes. */
