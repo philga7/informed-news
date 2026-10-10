@@ -874,7 +874,7 @@ if (browser && typeof window !== 'undefined') {
             <!-- Informed News topic Brief (NEWS-88); falls back to the plain list for the fixture -->
             <TopicBrief
               bind:this={state.storyList}
-              stories={state.stories}
+              bind:stories={state.stories}
               categoryId={state.currentCategory}
               categoryUuid={state.categoryMap[state.currentCategory]}
               batchId={state.currentBatchId}

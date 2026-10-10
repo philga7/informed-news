@@ -16,10 +16,12 @@ import {
   extractClaimsFromArticles,
   fetchAllSources,
   listTriageRecords,
+  ManualSeedConflictError,
   ManualSeedValidationError,
   buildFilteredOut,
   parseFilteredOutScope,
   parseManualSeedBody,
+  removeManualSeed,
   parseTopicCreate,
   parseTopicPatch,
   sortNewestFirst,
@@ -99,6 +101,7 @@ export type CreateAppDeps = {
   readBriefMembership?: typeof readBriefMembership;
   createManualSeed?: typeof createManualSeed;
   parseManualSeedBody?: typeof parseManualSeedBody;
+  removeManualSeed?: typeof removeManualSeed;
   trackCluster?: typeof trackCluster;
   untrackCluster?: typeof untrackCluster;
   ackTrackedUpdate?: typeof ackTrackedUpdate;
@@ -258,6 +261,7 @@ export function createApp(deps: CreateAppDeps = {}): Express {
   const readMembership = deps.readBriefMembership ?? readBriefMembership;
   const seed = deps.createManualSeed ?? createManualSeed;
   const parseSeedBody = deps.parseManualSeedBody ?? parseManualSeedBody;
+  const removeSeed = deps.removeManualSeed ?? removeManualSeed;
   const track = deps.trackCluster ?? trackCluster;
   const untrack = deps.untrackCluster ?? untrackCluster;
   const ackTracked = deps.ackTrackedUpdate ?? ackTrackedUpdate;
@@ -753,8 +757,8 @@ export function createApp(deps: CreateAppDeps = {}): Express {
   });
 
   /**
-   * Create an operator-seeded Brief story (Accepted immediately).
-   * Also default-track it for developing-story alerts (idempotent).
+   * Save an operator seed as a kept story under one desired topic (NEWS-98).
+   * 409 when a mute would hide it or it duplicates a kept story.
    */
   app.post('/api/brief/seed', async (req, res) => {
     try {
@@ -764,15 +768,38 @@ export function createApp(deps: CreateAppDeps = {}): Express {
         ok: true,
         articleId: result.article.id,
         clusterId: result.article.clusterId!,
-        acceptedClusterIds: result.acceptedClusterIds,
+        topicId: result.topicId,
       });
     } catch (err) {
       if (err instanceof ManualSeedValidationError) {
         res.status(400).json({ ok: false, error: err.message });
         return;
       }
+      if (err instanceof ManualSeedConflictError) {
+        res.status(409).json(err.body);
+        return;
+      }
       const message = err instanceof Error ? err.message : String(err);
       console.error('Brief seed failed:', message);
+      res.status(500).json({ ok: false, error: message });
+    }
+  });
+
+  /**
+   * Remove an operator seed from the Brief (NEWS-98). Deletes its triage record
+   * (no Filtered out trace); 404 story_not_found · 409 not_a_seed.
+   */
+  app.post('/api/brief/stories/:articleId/remove', async (req, res) => {
+    try {
+      const result = await removeSeed(req.params.articleId);
+      if (!result.ok) {
+        res.status(result.status).json({ ok: false, error: result.error });
+        return;
+      }
+      res.json({ ok: true });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('Brief seed remove failed:', message);
       res.status(500).json({ ok: false, error: message });
     }
   });

@@ -1,12 +1,21 @@
 #!/usr/bin/env node
 // Start the hermetic test stack: mvp/server + Kite on the E2E ports, a fresh data dir
 // seeded with E2E_SCENARIO (default "topics"), and a generated env file in place of
-// mvp/.env (no Ollama / TypeSafe keys, auto-refresh off, test-only password).
+// mvp/.env (no Ollama / TypeSafe keys, auto-refresh off, test-only password), plus a
+// local fixture page server for manual-seed scrapes (never the internet).
 import { spawn } from 'node:child_process';
 import { rmSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { E2E_API_PORT, E2E_DATA_DIR, E2E_KITE_PORT, E2E_MVP_PASSWORD } from './config.mjs';
+import {
+	E2E_API_PORT,
+	E2E_DATA_DIR,
+	E2E_FIXTURE_PORT,
+	E2E_KITE_PORT,
+	E2E_MVP_PASSWORD,
+	E2E_SEED_ARTICLE_PATH,
+} from './config.mjs';
 import { writeScenario } from './scenarios.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -31,6 +40,35 @@ writeFileSync(
 	].join('\n'),
 );
 
+// Subject unrelated to every scenario headline, so the seed duplicate check never fires.
+const SEED_ARTICLE_HTML = `<!doctype html>
+<html lang="en">
+<head><title>Library extends weekend reading-room hours</title></head>
+<body>
+<article>
+<h1>Library extends weekend reading-room hours</h1>
+<p>The city library will keep its main reading room open until nine in the evening on Saturdays and Sundays starting next month.</p>
+<p>The library board approved the change after a survey of cardholders asked for more weekend study space. Staffing for the extra hours comes from the existing volunteer program, and the children's wing keeps its current schedule.</p>
+</article>
+</body>
+</html>
+`;
+
+const fixtures = createServer((req, res) => {
+	if (req.method === 'GET' && req.url === E2E_SEED_ARTICLE_PATH) {
+		res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+		res.end(SEED_ARTICLE_HTML);
+		return;
+	}
+	res.writeHead(404, { 'Content-Type': 'text/plain' });
+	res.end('Not found');
+});
+fixtures.on('error', (err) => {
+	console.error(`e2e fixture server failed on :${E2E_FIXTURE_PORT}: ${err.message}`);
+	stop(1);
+});
+fixtures.listen(E2E_FIXTURE_PORT, '127.0.0.1');
+
 const children = [
 	spawn(path.join(root, 'mvp/server/node_modules/.bin/tsx'), ['src/index.ts'], {
 		cwd: path.join(root, 'mvp/server'),
@@ -52,6 +90,7 @@ let stopping = false;
 function stop(code) {
 	if (stopping) return;
 	stopping = true;
+	fixtures.close();
 	for (const child of children) {
 		if (child.exitCode === null) child.kill('SIGTERM');
 	}

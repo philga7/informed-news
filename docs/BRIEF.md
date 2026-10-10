@@ -2,7 +2,7 @@
 
 Part of Epic **L** ([NEWS-84](https://informedcrew.atlassian.net/browse/NEWS-84)) — topics → search → triage → Brief. Ticket: [NEWS-88](https://informedcrew.atlassian.net/browse/NEWS-88). Inputs: your topics ([NEWS-85](https://informedcrew.atlassian.net/browse/NEWS-85), `/topics`), topic search ([TOPIC_SEARCH.md](TOPIC_SEARCH.md)), and triage's kept stories ([TRIAGE.md](TRIAGE.md)).
 
-Opening the app (`/`) shows a finished Brief grouped by your topics. The flow is topics (`/topics`) → search → triage → Brief → full stories (tap to expand), with dropped stories on `/filtered`. There is no review queue and no Accept / Track step: every story triage kept, for a topic you still want, is a candidate. The server refreshes on a timer, and the Brief has a **Refresh** button.
+Opening the app (`/`) shows a finished Brief grouped by your topics. The flow is topics (`/topics`) → search → triage → Brief → full stories (tap to expand), with dropped stories on `/filtered`. There is no review queue and no Accept / Track step: every story triage kept, for a topic you still want, is a candidate, plus any story you [add yourself](#added-stories-seeds). The server refreshes on a timer, and the Brief has a **Refresh** button.
 
 ## How the Brief is built
 
@@ -11,7 +11,7 @@ The Brief is composed each time it is read, from triage's kept records (`mvp/dat
 - **Sections.** One section per **desired** topic that has at least one story: all Core topics first, then all Watch topics, each in your topics-list order. A desired topic with no level counts as Core. Undesired topics never get a section.
 - **One section per story.** A kept story can match several topics; it appears once, under the first of its topics in section order that is still desired. A story whose topics have all been deleted or made undesired is not shown.
 - **Which stories show.** A kept story shows when its article is still in the store, it is from the last 48 hours (`publishedAt`, or `fetchedAt` when undated), it doesn't match a mute rule or undesired topic *now* (mute edits apply immediately — mute always wins), and it isn't hidden as seen (see below).
-- **Ranking within a section.** Significance (0–2, from triage) high to low, unscored last; then more outlets first; then newer first.
+- **Ranking within a section.** [Stories you added](#added-stories-seeds) come first, newest first; then significance (0–2, from triage) high to low, unscored last; then more outlets first; then newer first.
 - **Top 3 and More.** Each section shows its top 3 cards. A **More (N)** toggle under the section reveals the rest (**Show fewer** hides them again).
 - **Quiet topics.** Desired topics with nothing to show are listed on one line at the bottom: `Nothing new: A, B, C` (Core first, then Watch).
 - **Empty states.** No desired topics at all → "No topics yet. Add topics to build your Brief." Topics but no stories → "No new stories for your topics." plus the quiet line.
@@ -60,6 +60,22 @@ Both kinds get the note `Added with Less like this on: <headline>`. On success t
 
 It needs a login: otherwise the panel shows "Log in on Topics to use Less like this" linking to `/topics`. A topic name that already exists shows the server's message (`a topic named "…" already exists`); validation errors show the server's message too.
 
+## Added stories (seeds)
+
+Ticket: [NEWS-98](https://informedcrew.atlassian.net/browse/NEWS-98). **Add story** (in the header, and in the plain list's empty state) puts a story you found yourself into the Brief. It needs a login: otherwise the form says "Log in to add stories." with a link to Topics.
+
+- **Form.** **Title**, **Topic** (required: one desired topic, Core then Watch in topics-list order, no default), an optional **Note**, and **URLs** (one per line, at least one, `http` / `https`). With no desired topics the form says "Add a desired topic first." and links to `/topics`. **Add to Brief** saves and reloads the Brief. Errors from the server are shown as written.
+- **Scrape.** The server fetches the first URL once, with an 8-second timeout, for the article body only: the headline stays your title, and no image, caption, or publisher title is taken. If the scrape fails the story still saves, and a note of at least 120 characters becomes its text for summaries. No Jev or Ollama call is made at save.
+- **Refusals.** Nothing is saved, and the server answers `409`, when the story:
+  - matches a mute rule or an undesired topic now, the same check the Brief applies at read (mute rules also see the scraped body): "This matches your mute rule '`<keyword>`', so it wouldn't show." or "This matches your undesired topic '`<name>`', so it wouldn't show."
+  - duplicates a story kept in the last 48 hours, even one hidden as seen, by the triage [duplicate rule](TRIAGE.md#pipeline-order): a shared URL or one linking to the other, the same headline (3+ words) under any topic, or a similar headline in the chosen topic: "Already in your Brief: '`<headline>`' under `<topic>`."
+- **Saved as a kept story.** The seed is stored as an article (`sourceKind: 'manual'`) plus a kept triage record (stage `manual`) under the chosen topic, with an outlet count of its distinct URL hosts and no significance. Triage never re-scores it; later coverage of the same story folds into it through normal dedupe (`+N outlets`). Seeding no longer Accepts or Tracks anything.
+- **Pinned first.** Seeds sit at the top of their topic section, newest first, ahead of triaged stories whatever their significance, and count toward the top 3 (so they get a refresh-time summary). Seed cards carry an **Added by you** badge.
+- **Same rules otherwise.** The 48-hour window (from when you saved it), mute at read, [seen hiding](#seen-stories), [summaries](#summaries) ("Summary loads when you open this story" until one exists), and [full stories](#full-stories) all work as for triaged stories. Full stories for seeds are mostly on demand: a seed has no significance, so a seed under a Core topic never clears the automatic bar, and one under a Watch topic clears it only with 3 or more outlets (distinct URL hosts at save, plus any later dedupe).
+- **Remove.** An expanded seed card has **Remove** in place of **Less like this**. It deletes the seed's triage record; the article stays in the store, and its saved summary and full story go with the normal [retention](#retention) prune. Stories triage had dropped as its duplicates are triaged again on their own at the next refresh. A removed seed leaves no trace in Filtered out. The card disappears right away. Remove needs a login ("Log in on Topics to remove stories").
+
+Seeds saved before NEWS-98 have no topic and stay out of the topic Brief. The old Unaccept button is gone from Kite; its server route is parked ([MVP_API_COMPAT.md](MVP_API_COMPAT.md)).
+
 ## Seen stories
 
 A story counts as **seen** when you open it or mark it read in the Brief (including **Mark all as read**). Kite sends seen marks to the server in batches about a second later, and right away when you leave the tab. Seen marks need a login; without one they are silently skipped.
@@ -107,7 +123,7 @@ In `mvp/.env` (see `mvp/.env.example`):
 
 Other limits are constants in `mvp/server/src/services/briefConfig.ts` (top 3, 8 links, update thresholds, 7-day seen retention, 7-day summary / full-story retention, summary lengths, concurrency, 30/hour on-demand summaries, 20/hour on-demand full stories, refresh check and retry minutes).
 
-`npm run test:e2e:kite` and the Kite integration suite (`bun run test:integration` in `apps/kite`) start their own stack via `e2e/stack/start.mjs`: mvp/server + Kite on separate ports (e2e: Kite 5174 / API 3101; integration: 5175 / 3102), a fresh temp data dir seeded with a fixed topic Brief and a last triage run with dropped stories for the Filtered out view (`e2e/stack/scenarios.mjs`), and a generated env file in place of `mvp/.env` (auto-refresh off, no Ollama / TypeSafe keys, test-only password). They never reuse your dev server or read `mvp/data`, so nothing is skipped for lack of local stories and no budget is spent. The server hooks are `MVP_DATA_DIR` (store directory; process env only) and `MVP_ENV_FILE` (env file instead of `mvp/.env`).
+`npm run test:e2e:kite` and the Kite integration suite (`bun run test:integration` in `apps/kite`) start their own stack via `e2e/stack/start.mjs`: mvp/server + Kite on separate ports (e2e: Kite 5174 / API 3101; integration: 5175 / 3102), a fresh temp data dir seeded with a fixed topic Brief and a last triage run with dropped stories for the Filtered out view (`e2e/stack/scenarios.mjs`), a local fixture page for the Add story scrape (API port + 100: 3201 / 3202), and a generated env file in place of `mvp/.env` (auto-refresh off, no Ollama / TypeSafe keys, test-only password). They never reuse your dev server or read `mvp/data`, so nothing is skipped for lack of local stories and no budget is spent. The server hooks are `MVP_DATA_DIR` (store directory; process env only) and `MVP_ENV_FILE` (env file instead of `mvp/.env`).
 
 ## What's stored where
 
@@ -138,6 +154,8 @@ Tickets: [NEWS-99](https://informedcrew.atlassian.net/browse/NEWS-99) (summaries
 | POST | `/api/brief/stories/:articleId/summary` | Session | On-demand summary for one visible story |
 | POST | `/api/brief/stories/:articleId/full` | Session | Generate or return the visible story's cached full story |
 | POST | `/api/brief/stories/:articleId/less-like-this` | Session | Less like this: undesired topic for the subject, or outlet block |
+| POST | `/api/brief/seed` | Session | Add story: save a seed as a kept story under one desired topic |
+| POST | `/api/brief/stories/:articleId/remove` | Session | Remove a seed from the Brief |
 | GET | `/api/triage/filtered` | Session | Filtered out view: dropped stories and why (`scope=last` \| `window`) |
 | POST | `/api/fetch` | Session | Manual refresh (also returns `refresh` and `brief`) |
 
@@ -153,6 +171,5 @@ Shapes and status codes: [MVP_API_COMPAT.md](MVP_API_COMPAT.md). Kite proxies th
 
 ## Known limits
 
-- **Add story.** Manual seeds (Add story) are not triaged, so they don't appear in the topic Brief; the Add story form says so. Their future is [NEWS-98](https://informedcrew.atlassian.net/browse/NEWS-98).
 - The NEWS-86 guards on topic search rows stay ([TOPIC_SEARCH.md](TOPIC_SEARCH.md)); kept search rows get Brief summaries only through this path.
 - The Accept / Track story desk and the claims desk are parked, not part of the Brief or refresh ([OWNED_BRIEF.md](OWNED_BRIEF.md#parked-story-desk-and-claims-desk)).

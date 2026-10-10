@@ -12,14 +12,7 @@ import { type FilteredStory, filterStories } from '$lib/utils/contentFilter';
 import type { StoryWithCategory } from '$lib/utils/storyOrdering';
 import ClusteringExplainerModal from './ClusteringExplainerModal.svelte';
 import StoryCard from './story/StoryCard.svelte';
-import {
-	BRIEF_SEED_ADD_LABEL,
-	BRIEF_SEED_LOGIN_HINT,
-	BRIEF_SEED_LOGIN_HREF,
-	BRIEF_SEED_LOGIN_LINK_LABEL,
-	BRIEF_UNACCEPT_ERROR,
-	postBriefUnaccept,
-} from '$lib/briefSeed';
+import { BRIEF_SEED_ADD_LABEL } from '$lib/briefSeed';
 import { openBriefSeedModal } from '$lib/briefSeedUi.svelte';
 
 // Props
@@ -71,33 +64,6 @@ let {
 
 // Modal state
 let showClusteringModal = $state(false);
-
-// Stories removed via Brief Unaccept (optimistic hide)
-let unacceptedIds = $state<Set<string>>(new Set());
-let pendingUnacceptId = $state<string | null>(null);
-let unacceptError = $state<string | null>(null);
-let unacceptLoginHint = $state(false);
-
-async function handleUnaccept(story: Story): Promise<void> {
-	const clusterId =
-		story.membership_key?.trim() || story.id?.trim();
-	if (!clusterId || pendingUnacceptId) return;
-
-	pendingUnacceptId = clusterId;
-	unacceptError = null;
-	unacceptLoginHint = false;
-
-	const result = await postBriefUnaccept(clusterId);
-	pendingUnacceptId = null;
-
-	if (!result.ok) {
-		unacceptError = result.error || BRIEF_UNACCEPT_ERROR;
-		unacceptLoginHint = Boolean(result.unauthenticated);
-		return;
-	}
-
-	unacceptedIds = new Set([...unacceptedIds, clusterId]);
-}
 
 // Whether the current category is community (not core)
 const isCommunityCategory = $derived.by(() => {
@@ -204,13 +170,6 @@ export function toggleReadStatus(index: number) {
 
 // Apply content filtering and story count limit
 const { displayedStories, filteredCount, hiddenStories } = $derived.by(() => {
-	const activeStories = stories.filter(
-		(story) => {
-			const key = story.membership_key?.trim() || story.id?.trim();
-			return !key || !unacceptedIds.has(key);
-		},
-	);
-
 	// If in shared view mode, only show the specific shared article
 	if (isSharedView) {
 		let sharedStory: Story | undefined;
@@ -218,16 +177,16 @@ const { displayedStories, filteredCount, hiddenStories } = $derived.by(() => {
 		console.log('🔍 [StoryList] Shared view mode - finding story:', {
 			sharedArticleIndex,
 			sharedClusterId,
-			storiesCount: activeStories.length,
+			storiesCount: stories.length,
 			expandedStories,
-			firstStory: activeStories[0]?.title,
-			firstCluster: activeStories[0]?.cluster_number,
+			firstStory: stories[0]?.title,
+			firstCluster: stories[0]?.cluster_number,
 		});
 
 		// First try to find by UUID from expandedStories (most reliable)
 		const expandedStoryId = Object.keys(expandedStories).find((id) => expandedStories[id]);
 		if (expandedStoryId) {
-			sharedStory = activeStories.find(
+			sharedStory = stories.find(
 				(s) =>
 					s.id === expandedStoryId ||
 					s.cluster_number?.toString() === expandedStoryId ||
@@ -241,13 +200,13 @@ const { displayedStories, filteredCount, hiddenStories } = $derived.by(() => {
 			);
 		}
 		// Fall back to index (legacy format)
-		else if (sharedArticleIndex !== null && activeStories[sharedArticleIndex]) {
-			sharedStory = activeStories[sharedArticleIndex];
+		else if (sharedArticleIndex !== null && stories[sharedArticleIndex]) {
+			sharedStory = stories[sharedArticleIndex];
 			console.log('🔍 [StoryList] Found by index:', sharedStory?.title);
 		}
 		// Fall back to clusterId (old format, unreliable in single page mode)
 		else if (sharedClusterId !== null) {
-			sharedStory = activeStories.find((s) => s.cluster_number === sharedClusterId);
+			sharedStory = stories.find((s) => s.cluster_number === sharedClusterId);
 			console.log('🔍 [StoryList] Found by clusterId:', sharedClusterId, '->', sharedStory?.title);
 		}
 
@@ -256,7 +215,7 @@ const { displayedStories, filteredCount, hiddenStories } = $derived.by(() => {
 			return {
 				displayedStories: [sharedStory] as FilteredStory[],
 				filteredCount: 0,
-				hiddenStories: activeStories.filter((s) => s !== sharedStory),
+				hiddenStories: stories.filter((s) => s !== sharedStory),
 			};
 		} else {
 			console.warn('❌ [StoryList] Shared story not found!');
@@ -268,7 +227,7 @@ const { displayedStories, filteredCount, hiddenStories } = $derived.by(() => {
 	// So we skip the limit here to show all stories from all categories
 	// Use override if provided (e.g., from URL navigation), otherwise use user setting
 	const effectiveLimit = storyCountOverride ?? displaySettings.storyCount;
-	const limitedStories = skipStoryCountLimit ? activeStories : activeStories.slice(0, effectiveLimit);
+	const limitedStories = skipStoryCountLimit ? stories : stories.slice(0, effectiveLimit);
 
 	// Then apply content filtering if active (has keywords)
 	if (contentFilter.isActive) {
@@ -399,20 +358,6 @@ const allStoriesExpanded = $derived(
       {/if}
     </div>
   {:else}
-    {#if unacceptError}
-      <p class="mb-3 text-xs text-red-600 dark:text-red-400" role="alert">
-        {unacceptError}
-        {#if unacceptLoginHint}
-          <a
-            href={BRIEF_SEED_LOGIN_HREF}
-            class="ms-1 font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
-          >
-            {BRIEF_SEED_LOGIN_LINK_LABEL}
-          </a>
-          <span class="ms-1 text-gray-500 dark:text-gray-400">({BRIEF_SEED_LOGIN_HINT})</span>
-        {/if}
-      </p>
-    {/if}
     {#each displayedStories as story, index (story.id || story.cluster_number || story.title)}
       {@const isFiltered =
         contentFilter.filterMode === "blur" && story._filtered}
@@ -447,17 +392,6 @@ const allStoriesExpanded = $derived(
         shouldAutoScroll={!allStoriesExpanded}
         onToggle={() => handleStoryToggle(story)}
         onReadToggle={() => handleReadToggle(story)}
-        onUnaccept={
-          (story.membership_key || story.id) &&
-          !isSharedView &&
-          !timeTravelBatch.isHistoricalBatch
-            ? () => handleUnaccept(story)
-            : undefined
-        }
-        unacceptPending={
-          pendingUnacceptId ===
-          (story.membership_key?.trim() || story.id?.trim())
-        }
         priority={index < 3}
         {isFiltered}
         filterKeywords={story._matchedKeywords}

@@ -380,6 +380,59 @@ test('`more` is set after the top 3; ranks are 1-based', () => {
   );
 });
 
+function seed(id: string, savedHoursAgo: number): Article {
+  return makeArticle(id, {
+    sourceKind: 'manual',
+    publishedAt: null,
+    fetchedAt: HOURS_AGO(savedHoursAgo),
+  });
+}
+
+const seedRecord = (id: string, topicIds: string[]) =>
+  kept(id, topicIds, { stage: 'manual', significance: null, jevCalls: 0 });
+
+test('seeds pin first in their section, newest first; only seeds are manualSeed', () => {
+  const brief = compose({
+    topics: [makeTopic('c1')],
+    articles: [makeArticle('top'), seed('seed-old', 5), seed('seed-new', 2)],
+    triage: triageOf(
+      kept('top', ['c1'], { significance: 2.0, outletCount: 5 }),
+      seedRecord('seed-old', ['c1']),
+      seedRecord('seed-new', ['c1']),
+    ),
+  });
+  const stories = brief.sections[0]!.stories;
+  assert.deepEqual(
+    stories.map((s) => [s.articleId, s.manualSeed]),
+    [
+      ['seed-new', true],
+      ['seed-old', true],
+      ['top', false],
+    ],
+  );
+});
+
+test('seeds count toward BRIEF_TOP_N: `more` shifts down', () => {
+  const ids = ['a', 'b', 'c'];
+  const brief = compose({
+    topics: [makeTopic('c1')],
+    articles: [...ids.map((id) => makeArticle(id)), seed('s', 1)],
+    triage: triageOf(
+      ...ids.map((id, i) => kept(id, ['c1'], { significance: 2 - i * 0.1 })),
+      seedRecord('s', ['c1']),
+    ),
+  });
+  assert.deepEqual(
+    brief.sections[0]!.stories.map((s) => [s.articleId, s.rank, s.more]),
+    [
+      ['s', 1, false],
+      ['a', 2, false],
+      ['b', 3, false],
+      ['c', 4, true],
+    ],
+  );
+});
+
 test('quiet line: desired topics with no visible story, Core first then Watch', () => {
   const topics = [
     makeTopic('w1', { level: 'watch' }),

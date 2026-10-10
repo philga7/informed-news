@@ -291,13 +291,17 @@ export { briefClusterKey, isSoloClusterKey } from './briefClusterKey.js';
 export {
   buildManualSeedArticle,
   createManualSeed,
+  ManualSeedConflictError,
   ManualSeedValidationError,
   parseManualSeedBody,
+  removeManualSeed,
 } from './manualBriefSeed.js';
 export type {
   CreateManualSeedDeps,
   CreateManualSeedResult,
+  ManualSeedConflictBody,
   ManualSeedInput,
+  RemoveManualSeedResult,
 } from './manualBriefSeed.js';
 export {
   TOPIC_KEYWORD_MAX,

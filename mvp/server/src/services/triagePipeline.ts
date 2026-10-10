@@ -10,8 +10,8 @@ import {
   readTopics,
   readTriage,
   updateMeta,
+  updateTriage,
   upsertArticles,
-  writeTriage,
 } from '../store/index.js';
 import type { MuteRule } from '../store/muteRulesStore.js';
 import type { Article, SourceKind, StoreMeta } from '../types/article.js';
@@ -34,7 +34,13 @@ import {
   TRIAGE_MAX_UNDESIRED_TOPICS,
   TRIAGE_WINDOW_HOURS,
 } from './triageConfig.js';
-import { groupCandidates, outletCount, type DedupeCandidate, type DedupeGroup } from './triageDedupe.js';
+import {
+  groupCandidates,
+  outletCount,
+  seedOutletCount,
+  type DedupeCandidate,
+  type DedupeGroup,
+} from './triageDedupe.js';
 import { judgeTriage, type TriageJevContext, type TriageVerdict } from './triageJev.js';
 import { candidateTopicIds, isOutletOnlyTopic, muteReason } from './triageKeywords.js';
 import { prepareSurvivor } from './triageSurvivor.js';
@@ -48,7 +54,7 @@ export type TriageDeps = {
   readArticles?: () => Promise<Article[]>;
   upsertArticles?: typeof upsertArticles;
   readTriage?: () => Promise<TriageStore>;
-  writeTriage?: (store: TriageStore) => Promise<void>;
+  updateTriage?: typeof updateTriage;
   updateMeta?: (patch: Partial<StoreMeta>) => Promise<unknown>;
   judge?: typeof judgeTriage;
   jevAvailable?: () => boolean;
@@ -358,6 +364,24 @@ async function runPool<T>(items: T[], limit: number, fn: (item: T) => Promise<vo
   await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
 }
 
+/**
+ * Seeds are saved and removed outside the run: the store on disk at write time
+ * decides which seed records exist; the run's copy wins only for its dedupe growth.
+ */
+function mergeSeedRecords(
+  current: Record<string, TriageRecord>,
+  computed: Record<string, TriageRecord>,
+): Record<string, TriageRecord> {
+  const merged: Record<string, TriageRecord> = {};
+  for (const [id, rec] of Object.entries(computed)) {
+    if (rec.stage !== 'manual') merged[id] = rec;
+  }
+  for (const [id, rec] of Object.entries(current)) {
+    if (rec.stage === 'manual') merged[id] = computed[id] ?? rec;
+  }
+  return merged;
+}
+
 function reasonKey(reason: TriageReason): string {
   return reason.startsWith('muted:') ? 'muted' : reason;
 }
@@ -503,7 +527,11 @@ export async function runTriage(
       const members = [keptId, ...memberIds]
         .map((id) => articlesById.get(id))
         .filter((a): a is Article => a !== undefined);
-      updatedKept.set(keptId, { ...kept, memberIds, outletCount: outletCount(members) });
+      const folded =
+        kept.stage === 'manual'
+          ? seedOutletCount(articlesById.get(keptId)!, members)
+          : outletCount(members);
+      updatedKept.set(keptId, { ...kept, memberIds, outletCount: folded });
     }
 
     if (fresh.length > 0 && !(deps.jevAvailable ?? (() => getTypeSafeClient() !== null))()) {
@@ -541,10 +569,10 @@ export async function runTriage(
       if (!articlesById.has(id)) delete records[id];
     }
     try {
-      await (deps.writeTriage ?? ((s: TriageStore) => writeTriage(s)))({
-        records,
+      await (deps.updateTriage ?? ((mutate) => updateTriage(mutate)))((current) => ({
+        records: mergeSeedRecords(current.records, records),
         updatedAt: meta.at,
-      });
+      }));
     } catch (err) {
       addStoreError(meta.errors, `triage write: ${errorMessage(err)}`);
     }

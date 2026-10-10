@@ -1,9 +1,12 @@
 import assert from 'node:assert/strict';
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { test } from 'node:test';
 import {
   extractPublisherBodyFromHtml,
   isBlockedPublisherHost,
   scrapePublisherBody,
+  type PublisherBodyResult,
 } from './publisherBodyScrape.js';
 
 const ARTICLE_HTML = `<!doctype html>
@@ -394,6 +397,49 @@ test('scrapePublisherBody carries the page date on success', async () => {
     assert.equal(result.publishedAt, '2026-09-30T09:00:00.000Z');
   } finally {
     globalThis.fetch = prev;
+  }
+});
+
+test('scrapePublisherBody honors a timeoutMs override', async (t) => {
+  t.mock.method(console, 'warn', () => {});
+  const server = createServer(() => {});
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const { port } = server.address() as AddressInfo;
+  let guard: NodeJS.Timeout | undefined;
+  try {
+    const result = await Promise.race([
+      scrapePublisherBody(`http://127.0.0.1:${port}/hangs`, { timeoutMs: 50, retries: 0 }),
+      new Promise<'guard'>((resolve) => {
+        guard = setTimeout(() => resolve('guard'), 2_000);
+      }),
+    ]);
+    assert.notEqual(result, 'guard');
+    assert.equal((result as PublisherBodyResult).bodyStatus, 'unavailable');
+  } finally {
+    clearTimeout(guard);
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+});
+
+test('scrapePublisherBody makes a single attempt with retries: 0', async (t) => {
+  t.mock.method(console, 'warn', () => {});
+  let requests = 0;
+  const server = createServer(() => {
+    requests += 1;
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const { port } = server.address() as AddressInfo;
+  try {
+    const result = await scrapePublisherBody(`http://127.0.0.1:${port}/hangs`, {
+      timeoutMs: 50,
+      retries: 0,
+    });
+    assert.equal(result.bodyStatus, 'unavailable');
+    assert.equal(requests, 1);
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
   }
 });
 

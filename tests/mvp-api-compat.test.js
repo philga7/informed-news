@@ -6,6 +6,12 @@ import { fileURLToPath } from 'node:url';
 
 const root = join(fileURLToPath(new URL('.', import.meta.url)), '..');
 
+function compatRow(doc, method, path) {
+	const row = doc.split('\n').find((line) => line.startsWith(`| ${method} | \`${path}\``));
+	assert.ok(row, `expected a ${method} ${path} row`);
+	return row;
+}
+
 describe('NEWS-43 MVP API compat surface', () => {
 	it('keeps health and session-gated article/fetch/classify routes in the server', () => {
 		const src = readFileSync(join(root, 'mvp/server/src/app.ts'), 'utf8');
@@ -35,6 +41,7 @@ describe('NEWS-43 MVP API compat surface', () => {
 		assert.match(src, /app\.delete\('\/api\/topics\/:id'/);
 		assert.match(src, /app\.get\('\/api\/triage\/filtered'/);
 		assert.match(src, /app\.post\('\/api\/brief\/stories\/:articleId\/less-like-this'/);
+		assert.match(src, /app\.post\('\/api\/brief\/stories\/:articleId\/remove'/);
 		assert.match(src, /hiddenMutedCount/);
 		assert.match(src, /requireApiSession/);
 		assert.match(src, /createKiteBriefRouter/);
@@ -71,6 +78,7 @@ describe('NEWS-43 MVP API compat surface', () => {
 		assert.match(doc, /DELETE \| `\/api\/topics\/:id`/);
 		assert.match(doc, /GET \| `\/api\/triage\/filtered`/);
 		assert.match(doc, /POST \| `\/api\/brief\/stories\/:articleId\/less-like-this`/);
+		assert.match(doc, /POST \| `\/api\/brief\/stories\/:articleId\/remove`/);
 		assert.match(doc, /filteredOut/);
 		assert.match(doc, /hiddenMutedCount/);
 		assert.match(doc, /muted/);
@@ -83,11 +91,7 @@ describe('NEWS-43 MVP API compat surface', () => {
 
 	it('marks the Radar / claims / accept / track rows parked and refresh as tracked-sync free (NEWS-91)', () => {
 		const doc = readFileSync(join(root, 'docs/MVP_API_COMPAT.md'), 'utf8');
-		const rowFor = (method, path) => {
-			const row = doc.split('\n').find((line) => line.startsWith(`| ${method} | \`${path}\``));
-			assert.ok(row, `expected a ${method} ${path} row`);
-			return row;
-		};
+		const rowFor = (method, path) => compatRow(doc, method, path);
 		for (const [method, path] of [
 			['GET', '/api/claims/radar'],
 			['GET', '/api/radar'],
@@ -103,6 +107,16 @@ describe('NEWS-43 MVP API compat surface', () => {
 			assert.match(rowFor(method, path), /Parked/, `${method} ${path} should be marked Parked`);
 		}
 		assert.match(rowFor('POST', '/api/fetch'), /no longer syncs tracked stories/);
+	});
+
+	it('parks story Unaccept and documents seeds on the topic Brief (NEWS-98)', () => {
+		const doc = readFileSync(join(root, 'docs/MVP_API_COMPAT.md'), 'utf8');
+		const rowFor = (method, path) => compatRow(doc, method, path);
+		assert.match(rowFor('POST', '/api/brief/unaccept'), /\*\*Parked \(no UI, NEWS-98\)\.\*\* Server-only: no Kite proxy/);
+		assert.match(rowFor('POST', '/api/brief/seed'), /topicId/);
+		assert.doesNotMatch(rowFor('POST', '/api/brief/seed'), /acceptedClusterIds/);
+		assert.match(rowFor('POST', '/api/brief/stories/:articleId/remove'), /not_a_seed/);
+		assert.doesNotMatch(doc, /Kite still proxies[^\n]*\/api\/brief\/unaccept/);
 	});
 
 	it('README points operators at the compat doc', () => {

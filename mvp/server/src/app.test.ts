@@ -61,7 +61,9 @@ import {
 import { loadBriefClaims } from './services/briefClaims.js';
 import { enrichAcceptedClaims } from './services/enrichClaims.js';
 import { createKiteBriefRouter, type CreateKiteBriefRouterDeps } from './services/kiteBriefRoutes.js';
-import { createManualSeed } from './services/manualBriefSeed.js';
+import { createManualSeed, removeManualSeed } from './services/manualBriefSeed.js';
+import { composeTopicBrief } from './services/topicBrief.js';
+import { articleIdFromCanonicalUrl } from './store/articleId.js';
 
 function tempMembershipPath(): string {
   const dir = mkdtempSync(path.join(tmpdir(), 'brief-membership-'));
@@ -222,55 +224,406 @@ test('POST /api/brief/accept default-tracks with computed memberCount', async ()
   }
 });
 
-test('POST /api/brief/seed default-tracks with count 1', async () => {
+const SEED_NOW = '2026-09-21T12:00:00.000Z';
+const SEED_UUID = '11111111-2222-4333-8444-555555555555';
+const SEED_ARTICLE_ID = articleIdFromCanonicalUrl(`manual://seed/${SEED_UUID}`);
+
+function seedTopic(id: string, overrides: Partial<Topic> = {}): Topic {
+  return {
+    id,
+    name: `Topic ${id}`,
+    kind: 'desired',
+    level: 'core',
+    description: '',
+    keywords: [],
+    searchQuery: id,
+    sections: [],
+    notes: '',
+    createdAt: '2026-09-01T00:00:00.000Z',
+    updatedAt: '2026-09-01T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
+/** Seed route over in-memory stores; accept/track spies must stay untouched. */
+async function startSeedApp(
+  options: {
+    topics?: Topic[];
+    rules?: MuteRule[];
+    articles?: Article[];
+    triage?: TriageStore;
+  } = {},
+) {
   process.env.SESSION_SECRET = 'test-secret';
   process.env.MVP_PASSWORD = 'pw';
   delete process.env.MVP_PASSWORD_HASH;
 
-  const membershipPath = tempMembershipPath();
-  const trackedPath = tempTrackedPath();
+  const articles = [...(options.articles ?? [])];
+  let triage: TriageStore = options.triage ?? { records: {}, updatedAt: null };
+  const acceptOrTrackCalls: string[] = [];
 
   const { createApp } = await import('./app.js');
   const app = createApp({
     createManualSeed: async (input) =>
       await createManualSeed(input, {
-        now: () => '2026-09-21T12:00:00.000Z',
-        uuid: () => '11111111-2222-4333-8444-555555555555',
-        upsertArticle: async (article) => article as Article,
-        acceptCluster: async (clusterId) => await acceptCluster(clusterId, membershipPath),
-        trackCluster: async (clusterId, memberCount) =>
-          await trackCluster(clusterId, memberCount, trackedPath),
+        now: () => SEED_NOW,
+        uuid: () => SEED_UUID,
+        readTopics: async () => ({ topics: options.topics ?? [seedTopic('t1')] }),
+        readMuteRules: async () => ({ rules: options.rules ?? [] }),
+        readArticles: async () => articles,
+        readTriage: async () => triage,
+        upsertArticle: async (article) => {
+          articles.push(article as Article);
+          return article as Article;
+        },
+        updateTriage: async (mutate) => (triage = mutate(triage)),
+        scrapePublisherBody: async () => ({
+          bodyText: null,
+          bodyStatus: 'unavailable',
+          publisherTitle: null,
+          imageUrl: null,
+          imageCaption: null,
+          imageCredit: null,
+          publishedAt: null,
+        }),
       }),
-    readTrackedStories: async () => await readTrackedStories(trackedPath),
+    removeManualSeed: async (articleId) =>
+      await removeManualSeed(articleId, {
+        now: () => SEED_NOW,
+        readArticles: async () => articles,
+        readTriage: async () => triage,
+        updateTriage: async (mutate) => (triage = mutate(triage)),
+      }),
+    acceptCluster: async (clusterId) => {
+      acceptOrTrackCalls.push(`accept:${clusterId}`);
+      return { acceptedClusterIds: [] };
+    },
+    trackCluster: async (clusterId) => {
+      acceptOrTrackCalls.push(`track:${clusterId}`);
+      return { entries: [] };
+    },
   });
 
+  const server = await startServer(app);
+  const cookie = await login(server.baseUrl);
+  const post = async (body: unknown) => {
+    const resp = await fetch(`${server.baseUrl}/api/brief/seed`, {
+      method: 'POST',
+      headers: { cookie, 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    return { status: resp.status, json: (await resp.json()) as unknown };
+  };
+  const remove = async (articleId: string, opts: { session?: boolean } = {}) => {
+    const resp = await fetch(
+      `${server.baseUrl}/api/brief/stories/${encodeURIComponent(articleId)}/remove`,
+      {
+        method: 'POST',
+        headers: opts.session === false ? {} : { cookie },
+      },
+    );
+    return { status: resp.status, json: (await resp.json()) as unknown };
+  };
+  return {
+    post,
+    remove,
+    close: server.close,
+    articles: () => articles,
+    triage: () => triage,
+    acceptOrTrackCalls,
+  };
+}
+
+test('POST /api/brief/seed saves a kept seed under its topic without accept or track', async () => {
+  const seedApp = await startSeedApp();
+  try {
+    const resp = await seedApp.post({
+      title: 'Port strike halts container traffic',
+      topicId: 't1',
+      urls: ['https://news.example.com/port-strike'],
+    });
+    assert.equal(resp.status, 200);
+    assert.deepEqual(resp.json, {
+      ok: true,
+      articleId: SEED_ARTICLE_ID,
+      clusterId: SEED_ARTICLE_ID,
+      topicId: 't1',
+    });
+    assert.deepEqual(
+      seedApp.articles().map((a) => a.id),
+      [SEED_ARTICLE_ID],
+    );
+    assert.equal(seedApp.triage().records[SEED_ARTICLE_ID]?.stage, 'manual');
+    assert.deepEqual(seedApp.acceptOrTrackCalls, []);
+  } finally {
+    await seedApp.close();
+  }
+});
+
+test('POST /api/brief/seed returns 400 for each validation error', async () => {
+  const seedApp = await startSeedApp({
+    topics: [seedTopic('t1'), seedTopic('u1', { kind: 'undesired', level: null })],
+  });
+  const url = 'https://news.example.com/a';
+  const rows: Array<[unknown, string]> = [
+    [{ topicId: 't1', urls: [url] }, 'title is required'],
+    [{ title: '  ', topicId: 't1', urls: [url] }, 'title is required'],
+    [{ title: 'x', urls: [url] }, 'topicId is required'],
+    [{ title: 'x', topicId: 3, urls: [url] }, 'topicId is required'],
+    [{ title: 'x', topicId: 'missing', urls: [url] }, 'topic must be a desired topic'],
+    [{ title: 'x', topicId: 'u1', urls: [url] }, 'topic must be a desired topic'],
+    [{ title: 'x', topicId: 't1' }, 'at least one URL is required'],
+    [{ title: 'x', topicId: 't1', urls: [] }, 'at least one URL is required'],
+    [{ title: 'x', topicId: 't1', urls: ['ftp://x.example.com/a'] }, 'urls must be valid http or https URLs'],
+  ];
+  try {
+    for (const [body, error] of rows) {
+      const resp = await seedApp.post(body);
+      assert.equal(resp.status, 400, error);
+      assert.deepEqual(resp.json, { ok: false, error });
+    }
+    assert.deepEqual(seedApp.articles(), []);
+    assert.deepEqual(seedApp.triage().records, {});
+  } finally {
+    await seedApp.close();
+  }
+});
+
+test('POST /api/brief/seed returns 409 for muted seeds and writes nothing', async () => {
+  const seedApp = await startSeedApp({
+    topics: [
+      seedTopic('t1'),
+      seedTopic('u1', { kind: 'undesired', level: null, name: 'Celebrity', keywords: ['gossip'] }),
+    ],
+    rules: [{ id: 'r1', keyword: 'strike', source: null, createdAt: SEED_NOW }],
+  });
+  try {
+    const rule = await seedApp.post({
+      title: 'Port strike halts container traffic',
+      topicId: 't1',
+      urls: ['https://news.example.com/a'],
+    });
+    assert.equal(rule.status, 409);
+    assert.deepEqual(rule.json, {
+      ok: false,
+      code: 'muted',
+      error: "This matches your mute rule 'strike', so it wouldn't show.",
+    });
+
+    const topic = await seedApp.post({
+      title: 'Weekend gossip roundup',
+      topicId: 't1',
+      urls: ['https://news.example.com/b'],
+    });
+    assert.equal(topic.status, 409);
+    assert.deepEqual(topic.json, {
+      ok: false,
+      code: 'muted',
+      error: "This matches your undesired topic 'Celebrity', so it wouldn't show.",
+    });
+    assert.deepEqual(seedApp.articles(), []);
+    assert.deepEqual(seedApp.triage().records, {});
+  } finally {
+    await seedApp.close();
+  }
+});
+
+test('POST /api/brief/seed returns 409 for a duplicate of a kept story', async () => {
+  const existing = {
+    id: 'old',
+    title: 'Dockworkers walk out at the port',
+    sourceKind: 'search',
+    canonicalUrl: 'https://news.example.com/port-strike',
+    citations: [],
+    publisherUrl: 'https://news.example.com/port-strike',
+    publisherDomain: 'news.example.com',
+    publishedAt: '2026-09-21T09:00:00.000Z',
+    fetchedAt: '2026-09-21T09:00:00.000Z',
+    snippet: '',
+    bodyText: null,
+  } as unknown as Article;
+  const keptRecord: TriageRecord = {
+    articleId: 'old',
+    status: 'kept',
+    reason: null,
+    stage: 'headline',
+    final: true,
+    topicIds: ['t2'],
+    labels: [],
+    duplicateOf: null,
+    memberIds: [],
+    outletCount: 1,
+    significance: 2,
+    bodyChecked: false,
+    jevCalls: 1,
+    triagedAt: '2026-09-21T09:00:00.000Z',
+  };
+  const seedApp = await startSeedApp({
+    topics: [seedTopic('t1'), seedTopic('t2', { name: 'Shipping' })],
+    articles: [existing],
+    triage: { records: { old: keptRecord }, updatedAt: null },
+  });
+  try {
+    const resp = await seedApp.post({
+      title: 'Port strike halts container traffic',
+      topicId: 't1',
+      urls: ['https://news.example.com/port-strike'],
+    });
+    assert.equal(resp.status, 409);
+    assert.deepEqual(resp.json, {
+      ok: false,
+      code: 'duplicate',
+      error: "Already in your Brief: 'Dockworkers walk out at the port' under Shipping.",
+      existing: {
+        articleId: 'old',
+        title: 'Dockworkers walk out at the port',
+        topicName: 'Shipping',
+      },
+    });
+    assert.deepEqual(
+      seedApp.articles().map((a) => a.id),
+      ['old'],
+    );
+    assert.deepEqual(Object.keys(seedApp.triage().records), ['old']);
+  } finally {
+    await seedApp.close();
+  }
+});
+
+test('POST /api/brief/seed returns 500 on unexpected errors', async () => {
+  process.env.SESSION_SECRET = 'test-secret';
+  process.env.MVP_PASSWORD = 'pw';
+  delete process.env.MVP_PASSWORD_HASH;
+
+  const { createApp } = await import('./app.js');
+  const app = createApp({
+    createManualSeed: async () => {
+      throw new Error('disk full');
+    },
+  });
   const { baseUrl, close } = await startServer(app);
   try {
     const cookie = await login(baseUrl);
-    const seedResp = await fetch(`${baseUrl}/api/brief/seed`, {
+    const resp = await fetch(`${baseUrl}/api/brief/seed`, {
       method: 'POST',
       headers: { cookie, 'content-type': 'application/json' },
-      body: JSON.stringify({ title: 'Manual seed' }),
+      body: JSON.stringify({ title: 'x', topicId: 't1', urls: ['https://news.example.com/a'] }),
     });
-    assert.equal(seedResp.status, 200);
-    const seedJson = (await seedResp.json()) as {
-      ok: true;
-      clusterId: string;
-    };
-    assert.equal(seedJson.ok, true);
-    assert.equal(typeof seedJson.clusterId, 'string');
-    assert.ok(seedJson.clusterId.length > 0);
+    assert.equal(resp.status, 500);
+    assert.deepEqual(await resp.json(), { ok: false, error: 'disk full' });
+  } finally {
+    await close();
+  }
+});
 
-    const trackedResp = await fetch(`${baseUrl}/api/brief/tracked`, {
+const SEED_BODY = {
+  title: 'Port strike halts container traffic',
+  topicId: 't1',
+  urls: ['https://news.example.com/port-strike'],
+};
+
+test('POST /api/brief/stories/:articleId/remove requires session', async () => {
+  const seedApp = await startSeedApp();
+  try {
+    assert.equal((await seedApp.post(SEED_BODY)).status, 200);
+    const resp = await seedApp.remove(SEED_ARTICLE_ID, { session: false });
+    assert.equal(resp.status, 401);
+    assert.ok(seedApp.triage().records[SEED_ARTICLE_ID]);
+  } finally {
+    await seedApp.close();
+  }
+});
+
+test('POST /api/brief/stories/:articleId/remove 404s unknown or untriaged stories and 409s non-seeds', async () => {
+  const searchArticle = { id: 'found', sourceKind: 'search' } as Article;
+  const untriagedSeed = { id: 'lonely-seed', sourceKind: 'manual' } as Article;
+  const foundRecord: TriageRecord = {
+    articleId: 'found',
+    status: 'kept',
+    reason: null,
+    stage: 'headline',
+    final: true,
+    topicIds: ['t1'],
+    labels: [],
+    duplicateOf: null,
+    memberIds: [],
+    outletCount: 1,
+    significance: 2,
+    bodyChecked: false,
+    jevCalls: 1,
+    triagedAt: '2026-09-21T09:00:00.000Z',
+  };
+  const triage: TriageStore = { records: { found: foundRecord }, updatedAt: null };
+  const seedApp = await startSeedApp({ articles: [searchArticle, untriagedSeed], triage });
+  try {
+    assert.deepEqual(await seedApp.remove('missing'), {
+      status: 404,
+      json: { ok: false, error: 'story_not_found' },
+    });
+    assert.deepEqual(await seedApp.remove('found'), {
+      status: 409,
+      json: { ok: false, error: 'not_a_seed' },
+    });
+    assert.deepEqual(await seedApp.remove('lonely-seed'), {
+      status: 404,
+      json: { ok: false, error: 'story_not_found' },
+    });
+    assert.equal(seedApp.triage(), triage);
+  } finally {
+    await seedApp.close();
+  }
+});
+
+test('POST /api/brief/stories/:articleId/remove takes a saved seed off the Brief without a dropped trace', async () => {
+  const seedApp = await startSeedApp();
+  try {
+    assert.equal((await seedApp.post(SEED_BODY)).status, 200);
+
+    assert.deepEqual(await seedApp.remove(SEED_ARTICLE_ID), { status: 200, json: { ok: true } });
+    assert.deepEqual(seedApp.triage(), { records: {}, updatedAt: SEED_NOW });
+    assert.deepEqual(
+      seedApp.articles().map((a) => a.id),
+      [SEED_ARTICLE_ID],
+    );
+    const brief = composeTopicBrief({
+      topics: [seedTopic('t1')],
+      muteRules: [],
+      articles: seedApp.articles(),
+      triage: seedApp.triage(),
+      seen: { seen: {}, updatedAt: null },
+      summaries: { summaries: {}, updatedAt: null },
+      refresh: null,
+      now: new Date(SEED_NOW),
+    });
+    assert.deepEqual(
+      brief.sections.flatMap((s) => s.stories.map((story) => story.articleId)),
+      [],
+    );
+  } finally {
+    await seedApp.close();
+  }
+});
+
+test('POST /api/brief/stories/:articleId/remove returns 500 on unexpected errors', async () => {
+  process.env.SESSION_SECRET = 'test-secret';
+  process.env.MVP_PASSWORD = 'pw';
+  delete process.env.MVP_PASSWORD_HASH;
+
+  const { createApp } = await import('./app.js');
+  const app = createApp({
+    removeManualSeed: async () => {
+      throw new Error('disk full');
+    },
+  });
+  const { baseUrl, close } = await startServer(app);
+  try {
+    const cookie = await login(baseUrl);
+    const resp = await fetch(`${baseUrl}/api/brief/stories/x/remove`, {
+      method: 'POST',
       headers: { cookie },
     });
-    const tracked = (await trackedResp.json()) as {
-      ok: true;
-      entries: Array<{ clusterId: string; memberCountSnapshot: number }>;
-    };
-    const entry = tracked.entries.find((e) => e.clusterId === seedJson.clusterId);
-    assert.ok(entry);
-    assert.equal(entry.memberCountSnapshot, 1);
+    assert.equal(resp.status, 500);
+    assert.deepEqual(await resp.json(), { ok: false, error: 'disk full' });
   } finally {
     await close();
   }

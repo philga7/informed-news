@@ -48,7 +48,7 @@ export interface OnThisDayData {
 
 export interface Story {
 	id?: string;
-	/** Brief membership / Unaccept key; may differ from id for solo clusters. */
+	/** Brief membership key; may differ from id for solo clusters. */
 	membership_key?: string;
 	cluster_number: number;
 	unique_domains?: number;
@@ -116,6 +116,8 @@ export interface Story {
 	/** Normalized publisher domain (lowercase, no `www.`) for outlet blocks (NEWS-90). */
 	informed_publisher_domain?: string;
 	informed_labels?: 'official'[];
+	/** Operator-added seed (NEWS-98). */
+	informed_added_by_you?: boolean;
 	informed_summary_status?: 'ok' | 'missing' | 'unavailable';
 	/** Topic Brief rich-story cache state (NEWS-89). */
 	informed_full_story_status?: 'missing' | 'ok' | 'unavailable' | 'error';

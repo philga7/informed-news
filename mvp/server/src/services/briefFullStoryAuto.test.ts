@@ -21,6 +21,7 @@ function story(id: string, overrides: Partial<BriefStory> = {}): BriefStory {
     outletCount: 3,
     labels: [],
     significance: 1,
+    manualSeed: false,
     links: [],
     summary: { status: 'ok', text: 'Summary' },
     imageUrl: null,

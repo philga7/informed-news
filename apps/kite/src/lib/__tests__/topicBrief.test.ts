@@ -1,7 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Story } from '$lib/types';
 import {
+	BRIEF_ADDED_BY_YOU_LABEL,
 	BRIEF_AI_SUMMARY_NOTE,
+	BRIEF_REMOVE_ERROR,
+	BRIEF_REMOVE_LABEL,
+	BRIEF_REMOVE_LOGIN_HINT,
+	BRIEF_REMOVE_PENDING,
 	BRIEF_STORIES_SECTION_TITLE,
 	BRIEF_FULL_STORY_ERROR,
 	BRIEF_FULL_STORY_NOT_IN_BRIEF,
@@ -28,6 +33,7 @@ import {
 	formatTimeAgoShort,
 	fullStoryErrorCopy,
 	groupTopicBrief,
+	isManualSeedStory,
 	isOfficialStory,
 	isRecoverableRefreshFailure,
 	lastSuccessAt,
@@ -45,6 +51,7 @@ import {
 	postBriefSeen,
 	postFullStory,
 	postLessLikeThis,
+	postRemoveSeed,
 	postStorySummary,
 	quietLine,
 	refreshPollOutcome,
@@ -694,5 +701,54 @@ describe('Less like this', () => {
 		expect(lessLikeThisAddedCopy('Tariffs')).toBe(
 			'Added "Tariffs" to undesired topics. Matching stories are hidden the next time the Brief loads, and filtered out from the next refresh.',
 		);
+	});
+});
+
+describe('Added by you (manual seeds)', () => {
+	it('labels seeds and their Remove control', () => {
+		expect(BRIEF_ADDED_BY_YOU_LABEL).toBe('Added by you');
+		expect(BRIEF_REMOVE_LABEL).toBe('Remove');
+		expect(BRIEF_REMOVE_PENDING).toBe('Removing…');
+		expect(BRIEF_REMOVE_ERROR).toBe('Could not remove this story. Try again.');
+		expect(BRIEF_REMOVE_LOGIN_HINT).toBe('Log in on Topics to remove stories');
+	});
+
+	it('isManualSeedStory is true only for stories flagged added by you', () => {
+		expect(isManualSeedStory(makeStory('a', { informed_added_by_you: true }))).toBe(true);
+		expect(isManualSeedStory(makeStory('a', { informed_added_by_you: false }))).toBe(false);
+		expect(isManualSeedStory(makeStory('a'))).toBe(false);
+	});
+
+	it('postRemoveSeed posts to the encoded story remove route and maps 200', async () => {
+		const fetchFn = vi.fn(async () => jsonResponse(200, { ok: true }));
+		expect(await postRemoveSeed('a/b', fetchFn as unknown as typeof fetch)).toEqual({ ok: true });
+		const [url, init] = fetchFn.mock.calls[0] as unknown as [string, RequestInit];
+		expect(url).toBe('/api/brief/stories/a%2Fb/remove');
+		expect(init.method).toBe('POST');
+		expect(init.credentials).toBe('include');
+	});
+
+	it('postRemoveSeed maps 401 to the login hint', async () => {
+		const fetchFn = vi.fn(async () => jsonResponse(401, { error: 'Unauthorized' }));
+		expect(await postRemoveSeed('a', fetchFn as unknown as typeof fetch)).toEqual({
+			ok: false,
+			unauthenticated: true,
+			error: 'Log in on Topics to remove stories',
+		});
+	});
+
+	it('postRemoveSeed maps 404 / 409 / network failures to the retry copy', async () => {
+		const notFound = vi.fn(async () => jsonResponse(404, { ok: false, error: 'story_not_found' }));
+		const notSeed = vi.fn(async () => jsonResponse(409, { ok: false, error: 'not_a_seed' }));
+		const offline = vi.fn(async () => {
+			throw new Error('offline');
+		});
+		for (const fetchFn of [notFound, notSeed, offline]) {
+			expect(await postRemoveSeed('a', fetchFn as unknown as typeof fetch)).toEqual({
+				ok: false,
+				unauthenticated: false,
+				error: 'Could not remove this story. Try again.',
+			});
+		}
 	});
 });

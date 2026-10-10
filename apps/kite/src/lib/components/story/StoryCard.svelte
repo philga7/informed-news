@@ -28,8 +28,6 @@ interface Props {
 	fullStoryAvailable?: boolean;
 	fullStoryUpdated?: string;
 	onReadToggle?: () => void;
-	onUnaccept?: () => void;
-	unacceptPending?: boolean;
 	showSourceOverlay?: boolean;
 	currentSource?: any;
 	sourceArticles?: any[];
@@ -59,8 +57,6 @@ let {
 	fullStoryAvailable = false,
 	fullStoryUpdated,
 	onReadToggle,
-	onUnaccept,
-	unacceptPending = false,
 	showSourceOverlay = $bindable(false),
 	currentSource = $bindable(null),
 	sourceArticles = $bindable([]),
@@ -263,8 +259,6 @@ $effect(() => {
       isExporting={flashcards.isExporting}
       exportedCSV={flashcards.exportedCSV}
       selectedWordsCount={flashcards.selectedCount}
-      onUnacceptClick={onUnaccept}
-      {unacceptPending}
     />
 
     {@render belowHeader?.()}

@@ -575,6 +575,7 @@ function briefStory(
     outletCount: 1,
     labels: [],
     significance: 1,
+    manualSeed: false,
     links: [
       {
         title: `Headline ${articleId}`,
@@ -742,6 +743,22 @@ test('topicBriefToKiteStories omits informed_publisher_domain when the domain is
   assert.equal('informed_publisher_domain' in dotless!, false);
   assert.equal('informed_publisher_domain' in abbrev!, false);
   assert.equal(bbc!.informed_publisher_domain, 'bbc.co.uk');
+});
+
+test('topicBriefToKiteStories flags seeds informed_added_by_you and omits it otherwise', () => {
+  const brief: TopicBrief = {
+    boundaryAt: null,
+    sections: [
+      {
+        topic: CORE,
+        stories: [briefStory('seed', { manualSeed: true }), briefStory('found', { rank: 2 })],
+      },
+    ],
+    quiet: [],
+  };
+  const [seed, found] = topicBriefToKiteStories(brief);
+  assert.equal(seed!.informed_added_by_you, true);
+  assert.equal('informed_added_by_you' in found!, false);
 });
 
 test('topicBriefToKiteStories hydrates cached full stories and reports cache states', () => {
