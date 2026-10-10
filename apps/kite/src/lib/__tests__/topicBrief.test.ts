@@ -613,7 +613,7 @@ describe('Less like this', () => {
 		).toEqual({ ok: true, created: false, topicName: 'example.com' });
 	});
 
-	it('postLessLikeThis passes 400 / 404 / 409 error codes through', async () => {
+	it('postLessLikeThis passes 400 / 404 / 409 status and error codes through', async () => {
 		for (const [status, error] of [
 			[400, 'no_outlet'],
 			[404, 'story_not_found'],
@@ -622,7 +622,18 @@ describe('Less like this', () => {
 			const fetchFn = vi.fn(async () => jsonResponse(status, { ok: false, error }));
 			expect(
 				await postLessLikeThis('a', { kind: 'outlet' }, fetchFn as unknown as typeof fetch),
-			).toEqual({ ok: false, unauthenticated: false, error });
+			).toEqual({ ok: false, status, unauthenticated: false, error });
+		}
+	});
+
+	it('postLessLikeThis drops the raw server message on 5xx', async () => {
+		for (const status of [500, 503]) {
+			const fetchFn = vi.fn(async () =>
+				jsonResponse(status, { ok: false, error: 'EACCES: /data/topics.json' }),
+			);
+			expect(
+				await postLessLikeThis('a', { kind: 'outlet' }, fetchFn as unknown as typeof fetch),
+			).toEqual({ ok: false, status, unauthenticated: false, error: '' });
 		}
 	});
 
@@ -630,19 +641,19 @@ describe('Less like this', () => {
 		const unauth = vi.fn(async () => jsonResponse(401, { error: 'Unauthorized' }));
 		expect(
 			await postLessLikeThis('a', { kind: 'outlet' }, unauth as unknown as typeof fetch),
-		).toMatchObject({ ok: false, unauthenticated: true });
+		).toMatchObject({ ok: false, status: 401, unauthenticated: true });
 
 		const offline = vi.fn(async () => {
 			throw new Error('offline');
 		});
 		expect(
 			await postLessLikeThis('a', { kind: 'outlet' }, offline as unknown as typeof fetch),
-		).toEqual({ ok: false, unauthenticated: false, error: '' });
+		).toEqual({ ok: false, status: 0, unauthenticated: false, error: '' });
 
 		const malformed = vi.fn(async () => jsonResponse(201, { ok: true }));
 		expect(
 			await postLessLikeThis('a', { kind: 'outlet' }, malformed as unknown as typeof fetch),
-		).toEqual({ ok: false, unauthenticated: false, error: '' });
+		).toEqual({ ok: false, status: 201, unauthenticated: false, error: '' });
 	});
 
 	it('lessLikeThisErrorCopy maps known codes, else the server message, else a generic retry', () => {

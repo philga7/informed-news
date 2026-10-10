@@ -391,6 +391,21 @@ test('isHostnameLike: dotted hostnames after normalizing, not abbreviations or m
   assert.equal(isHostnameLike(null), false);
 });
 
+test('isHostnameLike: punycode TLDs and fully-qualified trailing-dot hostnames', () => {
+  assert.equal(isHostnameLike('lenta.xn--p1ai'), true);
+  assert.equal(isHostnameLike('news.xn--fiqs8s'), true);
+  assert.equal(isHostnameLike('www.bbc.co.uk.'), true);
+  assert.equal(isHostnameLike('example.xn--'), false);
+  assert.equal(isHostnameLike('example.xn--p1ai-'), false);
+  assert.equal(isHostnameLike('example.com..'), false);
+});
+
+test('normalizeOutletDomain + topicBlocksOutlet: a trailing dot is the same outlet', () => {
+  assert.equal(normalizeOutletDomain('www.Example.com.'), 'example.com');
+  const block = makeTopic('b', 'B', { kind: 'undesired', level: null, keywords: ['example.com'] });
+  assert.equal(topicBlocksOutlet(block, 'news.example.com.'), true);
+});
+
 test('isOutletOnlyTopic: undesired, ≥1 keyword, every keyword hostname-like', () => {
   const undesired = (keywords: string[]) =>
     makeTopic('x', 'X', { kind: 'undesired', level: null, keywords });

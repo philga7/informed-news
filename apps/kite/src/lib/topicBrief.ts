@@ -569,9 +569,10 @@ export type LessLikeThisRequest =
 	| { kind: 'outlet' }
 	| { kind: 'subject'; name: string; keywords?: string[]; description?: string };
 
+/** `status` 0 = request failed; `error` is blank for 5xx so raw server text never reaches the UI. */
 export type LessLikeThisResult =
 	| { ok: true; created: boolean; topicName: string }
-	| { ok: false; unauthenticated: boolean; error: string };
+	| { ok: false; status: number; unauthenticated: boolean; error: string };
 
 export function lessLikeThisOutletButton(domain: string): string {
 	return `Block ${domain}`;
@@ -583,6 +584,11 @@ export function lessLikeThisAddedCopy(name: string): string {
 
 export function lessLikeThisAlreadyBlockedCopy(domain: string): string {
 	return `${domain} is already blocked.`;
+}
+
+/** 409 from the topics store: the name is taken (case-insensitive), possibly by a desired topic. */
+export function lessLikeThisAlreadyTopicCopy(name: string): string {
+	return `"${name}" is already one of your topics.`;
 }
 
 export function lessLikeThisErrorCopy(code: string | undefined): string {
@@ -626,13 +632,16 @@ export async function postLessLikeThis(
 		`/api/brief/stories/${encodeURIComponent(articleId)}/less-like-this`,
 		body,
 	);
-	if (!res) return { ok: false, unauthenticated: false, error: '' };
-	const error = typeof res.body?.error === 'string' ? res.body.error : '';
-	if (res.status === 401) return { ok: false, unauthenticated: true, error };
-	if (res.status >= 400 || res.body?.ok !== true) return { ok: false, unauthenticated: false, error };
+	if (!res) return { ok: false, status: 0, unauthenticated: false, error: '' };
+	const { status } = res;
+	const error = status < 500 && typeof res.body?.error === 'string' ? res.body.error : '';
+	if (status === 401) return { ok: false, status, unauthenticated: true, error };
+	if (status >= 400 || res.body?.ok !== true) {
+		return { ok: false, status, unauthenticated: false, error };
+	}
 	const topic = res.body.topic as { name?: unknown } | undefined;
 	if (typeof res.body.created !== 'boolean' || typeof topic?.name !== 'string') {
-		return { ok: false, unauthenticated: false, error: '' };
+		return { ok: false, status, unauthenticated: false, error: '' };
 	}
 	return { ok: true, created: res.body.created, topicName: topic.name };
 }

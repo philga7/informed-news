@@ -236,7 +236,7 @@ export async function fetchFilteredOut(
 			return { ok: true, data: { scope: s, run, counts, items } };
 		}
 		const error =
-			body && typeof (body as { error?: unknown }).error === 'string'
+			response.status < 500 && body && typeof (body as { error?: unknown }).error === 'string'
 				? (body as { error: string }).error
 				: FILTERED_LOAD_ERROR;
 		return { ok: false, unauthenticated: false, error };
