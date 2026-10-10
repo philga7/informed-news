@@ -54,9 +54,13 @@ function topicMatchesText(topic: Topic, text: string, options: KeywordMatchOptio
   );
 }
 
-/** Trimmed, lowercased, leading `www.` stripped; empty → null. */
+/** Trimmed, lowercased, leading `www.` and one trailing `.` stripped; empty → null. */
 export function normalizeOutletDomain(raw: string | null | undefined): string | null {
-  const domain = raw?.trim().toLowerCase().replace(/^www\./, '');
+  const domain = raw
+    ?.trim()
+    .toLowerCase()
+    .replace(/^www\./, '')
+    .replace(/\.$/, '');
   return domain ? domain : null;
 }
 
@@ -65,10 +69,16 @@ export function isOutletKeyword(keyword: string): boolean {
   return keyword.includes('.') && !/\s/.test(keyword);
 }
 
-const HOSTNAME_PATTERN = /^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$/;
+const HOSTNAME_PATTERN =
+  /^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+(?:[a-z]{2,}|xn--[a-z0-9-]*[a-z0-9])$/;
 
-/** Normalized value is a dotted hostname (`bbc.co.uk`), not a dotted abbreviation (`U.S.`). */
+/**
+ * Normalized value is a dotted hostname (`bbc.co.uk`), not a dotted abbreviation (`U.S.`).
+ * A raw trailing dot reads as an abbreviation (`Co.Ltd.`); pass publisher domains through
+ * `normalizeOutletDomain` first so fully-qualified hostnames still count.
+ */
 export function isHostnameLike(value: string | null | undefined): boolean {
+  if (value?.trim().endsWith('.')) return false;
   const domain = normalizeOutletDomain(value);
   return domain !== null && HOSTNAME_PATTERN.test(domain);
 }

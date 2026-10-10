@@ -21,7 +21,7 @@ Older articles that were never triaged are left alone and get no record.
 Cheapest step first. A story only moves on if it passes the step before, so off-topic, muted, and trash stories never reach scraping. Nothing in this path calls Ollama, and claims extraction is not part of it.
 
 1. **Mute and keyword pass (free).**
-   - Shared mute rules (`/api/brief/mutes`) are checked first, then **undesired** topics. An undesired topic matches when its name or a keyword appears in the headline, publisher headline, or snippet. A keyword with a dot and no spaces (e.g. `dailymail.co.uk`) also blocks that outlet and its subdomains; a leading `www.` is ignored. Match → `muted:<ruleOrTopicId>`. **Mute always wins** over desired topics.
+   - Shared mute rules (`/api/brief/mutes`) are checked first, then **undesired** topics. An undesired topic matches when its name or a keyword appears in the headline, publisher headline, or snippet. A keyword with a dot and no spaces (e.g. `dailymail.co.uk`) also blocks that outlet and its subdomains; a leading `www.` and a trailing `.` are ignored, and punycode TLDs (`xn--…`) count as hostnames. Match → `muted:<ruleOrTopicId>`. **Mute always wins** over desired topics.
    - Then **desired** topics: a topic is a candidate when its name or a keyword appears in the same text. Topic search rows also keep the desired topics that found them. Other sources need a keyword hit — no hit → `off_topic`. At most 6 candidate topics per story.
    - Mute rules match as substrings; undesired-topic keywords match on word boundaries with plural endings only (`raid` mutes "raids", but `Ira` doesn't mute "Iran"); desired-topic keywords also accept inflections and demonyms.
    - Topic keywords match whole words. A keyword with no lowercase letters (`ICE`, `DOGE`, `F-250`) is case-sensitive, so `ICE` doesn't hit "ice cream"; others are case-insensitive. A keyword ending in a letter also matches endings: undesired topics only `s` / `es`; desired topics `s`, `es`, `n`, `an`, `ian`, `i`, each optionally followed by `s` (`tariff` matches "tariffs", `Israel` matches "Israeli" and "Israelis", `Iran` matches "Iranians").
@@ -150,7 +150,8 @@ Session required. `?scope=last` (default; anything other than `window` means `la
 - `run` — `meta.json` → `triage`, or `null` before the first run.
 - `counts` — items per reason group (`muted`, `off_topic`, …); groups with none are absent.
 - `items` — every matching dropped record (no cap), sorted by group order, then newest `publishedAt` (undated last), then article id. Each: `{ articleId, title, url, publisherDomain, publishedAt, sourceKind, reason, group, final, stage, mutedBy, topics, duplicateOf, triagedAt }`. Article fields are `null` when the article is gone; `url` is `publisherUrl ?? canonicalUrl`, or `null` unless it is an `http:` / `https:` URL (same for `duplicateOf.url`). `mutedBy` is `{ kind: 'rule' | 'topic', id, label }` for `muted:<id>` reasons, else `null`. `topics` is `[{ id, name }]` for the record's topics that still exist, in topics-list order. `duplicateOf` is `{ articleId, title, url }` or `null`.
-- A store read failure → `500 { ok: false, error }`.
+- Mute rules unreadable → the view still loads with no rules, as triage does; rule-muted items then show "Removed rule or topic" ([NEWS-104](https://informedcrew.atlassian.net/browse/NEWS-104)).
+- Any other store read failure → `500 { ok: false, error }`. The page shows the server's message only for `400` / `409`; every other failure (5xx included) shows "Filtered stories could not be loaded right now."
 
 ```bash
 curl -s -b /tmp/mvp-cookies 'http://127.0.0.1:3001/api/triage/filtered?scope=window'

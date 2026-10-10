@@ -1,6 +1,7 @@
 /** Filtered out (NEWS-90): what triage dropped and why, for spot checks only. */
 
 import { PRODUCT_NAME } from '$lib/brand';
+import { shownServerError } from '$lib/serverError';
 
 /** Display order: `muted` covers every `muted:<id>` reason (mirrors mvp/server). */
 export const FILTERED_REASON_GROUPS = [
@@ -235,10 +236,11 @@ export async function fetchFilteredOut(
 			const { scope: s, run, counts, items } = body;
 			return { ok: true, data: { scope: s, run, counts, items } };
 		}
-		const error =
-			body && typeof (body as { error?: unknown }).error === 'string'
-				? (body as { error: string }).error
-				: FILTERED_LOAD_ERROR;
+		const error = shownServerError(
+			response.status,
+			(body as { error?: unknown } | null)?.error,
+			FILTERED_LOAD_ERROR,
+		);
 		return { ok: false, unauthenticated: false, error };
 	} catch {
 		return { ok: false, unauthenticated: false, error: FILTERED_LOAD_ERROR };

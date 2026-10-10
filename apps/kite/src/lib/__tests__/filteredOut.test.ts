@@ -246,14 +246,38 @@ describe('fetchFilteredOut', () => {
 		});
 	});
 
-	it('returns the server error on 500, or the fallback', async () => {
-		const withError = vi.fn(async () => jsonResponse(500, { ok: false, error: 'Store unreadable' }));
+	it('shows generic copy for 5xx, never the raw server message', async () => {
+		for (const status of [500, 502, 503]) {
+			const withError = vi.fn(async () =>
+				jsonResponse(status, { ok: false, error: 'ENOENT: /data/mute-rules.json' }),
+			);
+			expect(await fetchFilteredOut('last', withError as unknown as typeof fetch)).toEqual({
+				ok: false,
+				unauthenticated: false,
+				error: FILTERED_LOAD_ERROR,
+			});
+		}
+	});
+
+	it('shows generic copy for 4xx other than 400 / 409', async () => {
+		for (const status of [403, 404, 429]) {
+			const withError = vi.fn(async () => jsonResponse(status, { ok: false, error: 'Forbidden' }));
+			expect(await fetchFilteredOut('last', withError as unknown as typeof fetch)).toEqual({
+				ok: false,
+				unauthenticated: false,
+				error: FILTERED_LOAD_ERROR,
+			});
+		}
+	});
+
+	it('returns the server error on 400, or the fallback', async () => {
+		const withError = vi.fn(async () => jsonResponse(400, { ok: false, error: 'bad scope' }));
 		expect(await fetchFilteredOut('last', withError as unknown as typeof fetch)).toEqual({
 			ok: false,
 			unauthenticated: false,
-			error: 'Store unreadable',
+			error: 'bad scope',
 		});
-		const bare = vi.fn(async () => new Response('oops', { status: 500 }));
+		const bare = vi.fn(async () => new Response('oops', { status: 400 }));
 		expect(await fetchFilteredOut('last', bare as unknown as typeof fetch)).toEqual({
 			ok: false,
 			unauthenticated: false,

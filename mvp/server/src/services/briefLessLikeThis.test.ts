@@ -115,6 +115,22 @@ test('outlet: creates an undesired outlet block on the normalized domain', async
   assert.equal(result.topics.length, 2);
 });
 
+test('outlet: fully-qualified (trailing-dot) and punycode publisher domains get a clean block', async () => {
+  const { deps, state } = harness([
+    article('fqdn', { publisherDomain: 'www.Example.com.' }),
+    article('idn', { publisherDomain: 'lenta.xn--p1ai' }),
+  ]);
+  for (const id of ['fqdn', 'idn']) {
+    const result = await lessLikeThis(id, { kind: 'outlet' }, deps);
+    assert.ok(result.ok);
+    assert.equal(result.created, true);
+  }
+  assert.deepEqual(
+    state.created.map((t) => t.keywords),
+    [['example.com'], ['lenta.xn--p1ai']],
+  );
+});
+
 test('outlet: an existing undesired block (bare or parent domain) is reused, not duplicated', async () => {
   const existing = topic('tabloids', { keywords: ['Daily Mail', 'www.dailymail.co.uk'] });
   const { deps, state } = harness(

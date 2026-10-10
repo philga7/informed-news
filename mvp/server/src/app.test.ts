@@ -2568,6 +2568,7 @@ async function startTriageServer(opts: {
   muteRules?: MuteRule[];
   now?: Date;
   readTriage?: CreateAppDeps['readTriage'];
+  readMuteRules?: CreateAppDeps['readMuteRules'];
 }): Promise<{ baseUrl: string; close: () => Promise<void> }> {
   process.env.SESSION_SECRET = 'test-secret';
   process.env.MVP_PASSWORD = 'pw';
@@ -2579,7 +2580,8 @@ async function startTriageServer(opts: {
     readArticles: async () => opts.articles,
     readMeta: async () => ({ lastFetchAt: null, lastError: null, triage: opts.run }),
     readTopics: async () => ({ topics: opts.topics ?? [], updatedAt: null }),
-    readMuteRules: async () => ({ rules: opts.muteRules ?? [], updatedAt: null }),
+    readMuteRules:
+      opts.readMuteRules ?? (async () => ({ rules: opts.muteRules ?? [], updatedAt: null })),
     ...(opts.now ? { now: () => opts.now! } : {}),
   });
   return await startServer(app);
@@ -2823,6 +2825,34 @@ test('GET /api/triage/filtered: unreadable triage store → 500', async () => {
     const resp = await fetch(`${baseUrl}/api/triage/filtered`, { headers: { cookie } });
     assert.equal(resp.status, 500);
     assert.deepEqual(await resp.json(), { ok: false, error: 'corrupt triage' });
+  } finally {
+    await close();
+  }
+});
+
+test('GET /api/triage/filtered: unreadable mute rules → still 200, rule-muted items show the removed label', async () => {
+  const { baseUrl, close } = await startTriageServer({
+    ...filteredFixture(),
+    readMuteRules: async () => {
+      throw new Error('corrupt mutes');
+    },
+  });
+  try {
+    const cookie = await login(baseUrl);
+    const resp = await fetch(`${baseUrl}/api/triage/filtered`, { headers: { cookie } });
+    assert.equal(resp.status, 200);
+    const body = (await resp.json()) as {
+      ok: boolean;
+      counts: Record<string, number>;
+      items: Array<{ articleId: string; mutedBy: { kind: string; id: string; label: string } | null }>;
+    };
+    assert.equal(body.ok, true);
+    assert.deepEqual(body.counts, { muted: 1, off_topic: 1 });
+    assert.deepEqual(body.items.find((i) => i.articleId === 'm1')?.mutedBy, {
+      kind: 'topic',
+      id: 'r1',
+      label: 'Removed rule or topic',
+    });
   } finally {
     await close();
   }

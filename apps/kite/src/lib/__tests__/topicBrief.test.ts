@@ -23,6 +23,7 @@ import {
 	BRIEF_SUMMARY_UNAVAILABLE,
 	LESS_LIKE_THIS_DESCRIPTION_MAX,
 	LESS_LIKE_THIS_ERROR,
+	LESS_LIKE_THIS_LOGIN_HINT,
 	LESS_LIKE_THIS_NAME_MAX,
 	LESS_LIKE_THIS_NO_OUTLET,
 	LESS_LIKE_THIS_NOT_STORED,
@@ -39,6 +40,7 @@ import {
 	lastSuccessAt,
 	lessLikeThisAddedCopy,
 	lessLikeThisErrorCopy,
+	lessLikeThisOutcome,
 	lessLikeThisSubjectDefault,
 	lessLikeThisSubjectRequest,
 	moreLabel,
@@ -613,7 +615,7 @@ describe('Less like this', () => {
 		).toEqual({ ok: true, created: false, topicName: 'example.com' });
 	});
 
-	it('postLessLikeThis passes 400 / 404 / 409 error codes through', async () => {
+	it('postLessLikeThis passes 400 / 404 / 409 status and error codes through', async () => {
 		for (const [status, error] of [
 			[400, 'no_outlet'],
 			[404, 'story_not_found'],
@@ -622,7 +624,7 @@ describe('Less like this', () => {
 			const fetchFn = vi.fn(async () => jsonResponse(status, { ok: false, error }));
 			expect(
 				await postLessLikeThis('a', { kind: 'outlet' }, fetchFn as unknown as typeof fetch),
-			).toEqual({ ok: false, unauthenticated: false, error });
+			).toEqual({ ok: false, status, unauthenticated: false, error });
 		}
 	});
 
@@ -630,29 +632,90 @@ describe('Less like this', () => {
 		const unauth = vi.fn(async () => jsonResponse(401, { error: 'Unauthorized' }));
 		expect(
 			await postLessLikeThis('a', { kind: 'outlet' }, unauth as unknown as typeof fetch),
-		).toMatchObject({ ok: false, unauthenticated: true });
+		).toMatchObject({ ok: false, status: 401, unauthenticated: true });
 
 		const offline = vi.fn(async () => {
 			throw new Error('offline');
 		});
 		expect(
 			await postLessLikeThis('a', { kind: 'outlet' }, offline as unknown as typeof fetch),
-		).toEqual({ ok: false, unauthenticated: false, error: '' });
+		).toEqual({ ok: false, status: 0, unauthenticated: false, error: '' });
 
 		const malformed = vi.fn(async () => jsonResponse(201, { ok: true }));
 		expect(
 			await postLessLikeThis('a', { kind: 'outlet' }, malformed as unknown as typeof fetch),
-		).toEqual({ ok: false, unauthenticated: false, error: '' });
+		).toEqual({ ok: false, status: 201, unauthenticated: false, error: '' });
 	});
 
-	it('lessLikeThisErrorCopy maps known codes, else the server message, else a generic retry', () => {
-		expect(lessLikeThisErrorCopy('no_outlet')).toBe(LESS_LIKE_THIS_NO_OUTLET);
-		expect(lessLikeThisErrorCopy('story_not_found')).toBe(LESS_LIKE_THIS_NOT_STORED);
-		expect(lessLikeThisErrorCopy('name must be at most 80 characters')).toBe(
+	it('lessLikeThisErrorCopy maps known codes, shows 400 server text, else a generic retry', () => {
+		expect(lessLikeThisErrorCopy(400, 'no_outlet')).toBe(LESS_LIKE_THIS_NO_OUTLET);
+		expect(lessLikeThisErrorCopy(404, 'story_not_found')).toBe(LESS_LIKE_THIS_NOT_STORED);
+		expect(lessLikeThisErrorCopy(400, 'name must be at most 80 characters')).toBe(
 			'name must be at most 80 characters',
 		);
-		expect(lessLikeThisErrorCopy('')).toBe(LESS_LIKE_THIS_ERROR);
-		expect(lessLikeThisErrorCopy(undefined)).toBe(LESS_LIKE_THIS_ERROR);
+		expect(lessLikeThisErrorCopy(400, '')).toBe(LESS_LIKE_THIS_ERROR);
+		expect(lessLikeThisErrorCopy(0, '')).toBe(LESS_LIKE_THIS_ERROR);
+	});
+
+	it('lessLikeThisErrorCopy never shows raw server text for 5xx or other 4xx', () => {
+		for (const status of [403, 413, 429, 500, 503]) {
+			expect(lessLikeThisErrorCopy(status, 'EACCES: /data/topics.json')).toBe(LESS_LIKE_THIS_ERROR);
+		}
+	});
+
+	describe('lessLikeThisOutcome', () => {
+		const subject = { kind: 'subject' as const, name: 'Royals' };
+		const outlet = { kind: 'outlet' as const };
+		const failure = (status: number, error = '') => ({
+			ok: false as const,
+			status,
+			unauthenticated: status === 401,
+			error,
+		});
+
+		it('saved: added, or already blocked for an existing outlet block', () => {
+			expect(
+				lessLikeThisOutcome(subject, { ok: true, created: true, topicName: 'Royals' }, 'x.com'),
+			).toEqual({ ok: true, message: lessLikeThisAddedCopy('Royals') });
+			expect(
+				lessLikeThisOutcome(outlet, { ok: true, created: false, topicName: 'x.com' }, 'x.com'),
+			).toEqual({ ok: true, message: 'x.com is already blocked.' });
+		});
+
+		it('401 links the login hint to Topics', () => {
+			expect(lessLikeThisOutcome(subject, failure(401), null)).toEqual({
+				ok: false,
+				message: LESS_LIKE_THIS_LOGIN_HINT,
+				link: 'login',
+			});
+		});
+
+		it('409 says the name is taken and nothing was saved, with a View Topics link', () => {
+			const raw = 'a topic named "royals" already exists';
+			expect(lessLikeThisOutcome(subject, failure(409, raw), 'x.com')).toEqual({
+				ok: false,
+				message: 'A topic named "Royals" already exists, so nothing was saved.',
+				link: 'topics',
+			});
+			expect(lessLikeThisOutcome(outlet, failure(409, raw), 'x.com')).toEqual({
+				ok: false,
+				message: 'A topic named "x.com" already exists, so nothing was saved.',
+				link: 'topics',
+			});
+		});
+
+		it('other failures get the error copy and no link', () => {
+			expect(lessLikeThisOutcome(outlet, failure(500, 'disk full'), 'x.com')).toEqual({
+				ok: false,
+				message: LESS_LIKE_THIS_ERROR,
+				link: null,
+			});
+			expect(lessLikeThisOutcome(outlet, failure(400, 'no_outlet'), null)).toEqual({
+				ok: false,
+				message: LESS_LIKE_THIS_NO_OUTLET,
+				link: null,
+			});
+		});
 	});
 
 	it('lessLikeThisSubjectDefault trims and keeps titles up to the name cap', () => {

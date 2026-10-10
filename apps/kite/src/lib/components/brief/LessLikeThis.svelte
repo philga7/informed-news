@@ -1,3 +1,10 @@
+<script module lang="ts">
+	import { SvelteMap } from 'svelte/reactivity';
+
+	/** Saved result per story id for this page load; survives the card collapsing. */
+	const savedResults = new SvelteMap<string, string>();
+</script>
+
 <script lang="ts">
 	import { tick } from 'svelte';
 	import type { Attachment } from 'svelte/attachments';
@@ -6,20 +13,18 @@
 		LESS_LIKE_THIS_CANCEL,
 		LESS_LIKE_THIS_KEYWORDS_LABEL,
 		LESS_LIKE_THIS_LABEL,
-		LESS_LIKE_THIS_LOGIN_HINT,
 		LESS_LIKE_THIS_NAME_LABEL,
 		LESS_LIKE_THIS_NAME_MAX,
 		LESS_LIKE_THIS_OUTLET_HEADING,
 		LESS_LIKE_THIS_SUBJECT_HEADING,
 		LESS_LIKE_THIS_SUBJECT_SUBMIT,
 		LESS_LIKE_THIS_TOPICS_LINK,
-		lessLikeThisAddedCopy,
-		lessLikeThisAlreadyBlockedCopy,
-		lessLikeThisErrorCopy,
+		lessLikeThisOutcome,
 		lessLikeThisOutletButton,
 		lessLikeThisSubjectDefault,
 		lessLikeThisSubjectRequest,
 		postLessLikeThis,
+		type LessLikeThisOutcome,
 		type LessLikeThisRequest,
 	} from '$lib/topicBrief';
 
@@ -30,7 +35,7 @@
 
 	let { story, articleId }: Props = $props();
 
-	type Failure = { message: string; login: boolean };
+	type Failure = Extract<LessLikeThisOutcome, { ok: false }>;
 
 	const uid = $props.id();
 	const domain = $derived(story.informed_publisher_domain?.trim() || null);
@@ -40,9 +45,10 @@
 	let keywordsText = $state('');
 	let pending = $state(false);
 	let failure = $state<Failure | null>(null);
-	let success = $state<string | null>(null);
+	const success = $derived(savedResults.get(articleId) ?? null);
 	let nameInput = $state<HTMLInputElement>();
 	let trigger = $state<HTMLButtonElement>();
+	let topicsLink = $state<HTMLAnchorElement>();
 
 	const linkClass =
 		'font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300';
@@ -53,11 +59,21 @@
 	const secondaryButtonClass =
 		'inline-flex items-center justify-center rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800';
 
-	/** Page shortcuts (Enter / j / k / ? …) listen on window; keep them out of this control. */
+	/**
+	 * Page shortcuts (Enter / j / k / ? …) listen on window; keep them out of this control.
+	 * Escape cancels the open panel; with the panel closed it reaches the page (clears selection).
+	 */
 	const isolateShortcuts: Attachment<HTMLElement> = (node) => {
-		const stop = (event: KeyboardEvent) => event.stopPropagation();
-		node.addEventListener('keydown', stop);
-		return () => node.removeEventListener('keydown', stop);
+		const onKeydown = (event: KeyboardEvent) => {
+			if (event.key === 'Escape') {
+				if (!open) return;
+				event.preventDefault();
+				if (!pending) void cancel();
+			}
+			event.stopPropagation();
+		};
+		node.addEventListener('keydown', onKeydown);
+		return () => node.removeEventListener('keydown', onKeydown);
 	};
 
 	async function openPanel(): Promise<void> {
@@ -80,19 +96,16 @@
 		if (pending) return;
 		pending = true;
 		failure = null;
-		const result = await postLessLikeThis(articleId, body);
+		const outcome = lessLikeThisOutcome(body, await postLessLikeThis(articleId, body), domain);
 		pending = false;
-		if (!result.ok) {
-			failure = result.unauthenticated
-				? { message: LESS_LIKE_THIS_LOGIN_HINT, login: true }
-				: { message: lessLikeThisErrorCopy(result.error), login: false };
+		if (!outcome.ok) {
+			failure = outcome;
 			return;
 		}
-		success =
-			body.kind === 'outlet' && !result.created && domain
-				? lessLikeThisAlreadyBlockedCopy(domain)
-				: lessLikeThisAddedCopy(result.topicName);
+		savedResults.set(articleId, outcome.message);
 		open = false;
+		await tick();
+		topicsLink?.focus();
 	}
 
 	function submitSubject(event: SubmitEvent): void {
@@ -111,7 +124,7 @@
 		{#if success}
 			<p class="text-gray-600 dark:text-gray-300" data-testid="less-like-this-success">
 				{success}
-				<a href="/topics" class={linkClass}>{LESS_LIKE_THIS_TOPICS_LINK}</a>
+				<a bind:this={topicsLink} href="/topics" class={linkClass}>{LESS_LIKE_THIS_TOPICS_LINK}</a>
 			</p>
 		{/if}
 	</div>
@@ -170,9 +183,14 @@
 				</div>
 			{/if}
 
-			{#if failure?.login}
+			{#if failure?.link === 'login'}
 				<p role="alert">
 					<a href="/topics" class={linkClass}>{failure.message}</a>
+				</p>
+			{:else if failure?.link === 'topics'}
+				<p class="text-gray-700 dark:text-gray-300" role="alert">
+					{failure.message}
+					<a href="/topics" class={linkClass}>{LESS_LIKE_THIS_TOPICS_LINK}</a>
 				</p>
 			{:else if failure}
 				<p class="text-red-700 dark:text-red-400" role="alert">{failure.message}</p>
