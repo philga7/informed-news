@@ -93,7 +93,7 @@ Other limits are constants in `mvp/server/src/services/triageConfig.ts` (48h win
 
 ## What's stored where
 
-- **`mvp/data/triage.json`** (gitignored) — `{ records, updatedAt }`, one record per article id: `status` (`kept` \| `dropped`), `reason`, `stage` (`keyword` \| `dedupe` \| `headline` \| `survivor` \| `body` \| `budget` \| `manual` — an operator seed, written by Add story rather than a run), `final`, `topicIds` (kept: the topics Jev confirmed; dropped: the candidate topics considered), `labels`, `duplicateOf`, `memberIds` and `outletCount` (kept only), `significance`, `bodyChecked`, `jevCalls` (total across refreshes), `triagedAt`. Records for articles no longer in the article store are pruned on write.
+- **`mvp/data/triage.json`** (gitignored) — `{ records, updatedAt }`, one record per article id: `status` (`kept` \| `dropped`), `reason`, `stage` (`keyword` \| `dedupe` \| `headline` \| `survivor` \| `body` \| `budget` \| `manual` — an operator seed, written by Add story rather than a run), `final`, `topicIds` (kept: the topics Jev confirmed; dropped: the candidate topics considered), `labels`, `duplicateOf`, `memberIds` and `outletCount` (kept only), `significance`, `bodyChecked`, `jevCalls` (total across refreshes), `triagedAt`. Records for articles no longer in the article store are pruned on write; for seed records, only once they are older than the window ([Seeds and concurrent refreshes](#seeds-and-concurrent-refreshes)).
 - **Article store** — survivors that were resolved or scraped are written back: `publisherUrl`, `publisherDomain`, an added publisher citation, `bodyText`, `bodyStatus`, `publisherTitle`, image fields, and `publishedAt` when it was empty. `id` and `canonicalUrl` never change.
 - **`mvp/data/meta.json` → `triage`** — the last run summary: `{ at, skipped, candidates, kept, dropped, byReason, jev: { budget, used, errors }, summaryBudget, errors }`. `byReason` counts this run's drops, with every `muted:<id>` counted under `muted`. `errors` holds at most 5 messages, plus any store-write errors (triage, articles, meta), which are always appended.
 
@@ -164,6 +164,17 @@ curl -s -b /tmp/mvp-cookies 'http://127.0.0.1:3001/api/triage/filtered?scope=win
 - An unexpected error mid-run is recorded in `errors` and the run is reported `skipped: true` (counts zeroed, Jev calls already spent still reported); the run summary is still written. If triage itself throws out of the refresh, the failure summary is written to `meta.json` → `triage` as well.
 - A Jev headline failure (an error result or a thrown call) marks that story and its untried group members `not_scored_error`; a body failure keeps the headline verdict with `bodyChecked: false`. Both count in `jev.errors`; other groups continue.
 - Store write failures (triage, articles, meta) are caught into `errors`.
+
+### Seeds and concurrent refreshes
+
+Add story and Remove ([BRIEF.md](BRIEF.md#added-stories-seeds)) write `triage.json` outside the refresh run; every triage write shares one serialized read-modify-write queue ([NEWS-115](https://informedcrew.atlassian.net/browse/NEWS-115)):
+
+- **The disk decides which seeds exist.** When a run writes, seed records come from the store on disk at that moment; the run's copy wins only for its dedupe growth (`memberIds`, `outletCount`). A seed saved mid-run survives; a seed removed mid-run stays removed.
+- **Remove during a refresh.** The run's duplicates of a seed that is no longer on disk (ones it already had and ones it found this run) are not written back, so those stories are triaged again on their own next refresh, as Remove intends.
+- **Dangling duplicates.** A stored `duplicate` record whose target has no triage record any more is triaged again at the next refresh (if still in the window) instead of staying final. The Filtered out view already tolerates a missing target ("Article no longer stored" when the article is gone too).
+- **Orphan seed records.** A seed record whose article is no longer in the article store is pruned once it is older than the 48-hour window (or its `triagedAt` doesn't parse). Younger ones are kept, so a seed saved mid-run (whose article the run never read) is never pruned by mistake.
+- **Duplicate check at save.** It runs once on the triage read and again inside the serialized triage write, against the articles read just before that write, so a story a refresh keeps just before the seed is written is still refused when its headline matches, or its URL as stored then. **Accepted:** a refresh writes its triage records before the articles it resolved (publisher URL, body), so a URL-only match resolved in that same moment can be missed; and a refresh that started *before* the seed was saved doesn't dedupe its new stories against it. Either way the same story can show twice (the seed and a triaged card) until one is seen or removed.
+- **Non-atomic save — accepted.** The seed article is written before its triage record. If the triage write fails (or the second duplicate check refuses), the article stays with no record: never triaged (manual), never shown, the same state a removed seed leaves. A retry saves a new article. The article store has no retention prune, so such articles stay until a prune is added.
 
 ## Limits
 
