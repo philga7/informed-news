@@ -4,10 +4,8 @@ import {
   FULL_STORY_AUTO_MAX_PER_TOPIC,
   FULL_STORY_AUTO_MIN_SIGNIFICANCE,
   FULL_STORY_MIN_OUTLETS_AUTO,
-  SIGNIFICANT_UPDATE_OUTLET_DELTA,
-  SIGNIFICANT_UPDATE_SIGNIFICANCE_DELTA,
 } from './briefConfig.js';
-import type { BriefStory, TopicBrief } from './topicBrief.js';
+import { isSignificantlyUpdated, type BriefStory, type TopicBrief } from './topicBrief.js';
 
 export type AutoFullStoryOptions = {
   maxPerRefresh?: number;
@@ -28,17 +26,6 @@ function articleTime(story: BriefStory): number {
   return Number.isNaN(time) ? 0 : time;
 }
 
-function hasSignificantUpdate(story: BriefStory, prior: BriefFullStoryRecord): boolean {
-  const snapshot = prior.autoSnapshot;
-  if (!snapshot) return false;
-  if (story.outletCount >= snapshot.outletCount + SIGNIFICANT_UPDATE_OUTLET_DELTA) return true;
-  return (
-    story.significance !== null &&
-    snapshot.significance !== null &&
-    story.significance - snapshot.significance >= SIGNIFICANT_UPDATE_SIGNIFICANCE_DELTA - 1e-9
-  );
-}
-
 function isAutomaticCandidate(
   candidate: Candidate,
   existing: BriefFullStoryRecord | undefined,
@@ -52,7 +39,7 @@ function isAutomaticCandidate(
   if (story.outletCount < options.minOutlets && !story.labels.includes('official')) return false;
   if (existing?.status !== 'ok') return true;
   if (options.sourceHashChanged?.(story, existing)) return true;
-  return hasSignificantUpdate(story, existing);
+  return existing.autoSnapshot !== undefined && isSignificantlyUpdated(story, existing.autoSnapshot);
 }
 
 function compareCandidates(a: Candidate, b: Candidate): number {

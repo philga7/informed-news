@@ -165,15 +165,21 @@ export function summarySourceFor(
   return null;
 }
 
-/** Outlets +2 or significance +0.5 since the seen snapshot; unknown outlet counts are 1. */
-export function isSignificantlyUpdated(record: TriageRecord, seen: BriefSeenEntry): boolean {
-  if ((record.outletCount ?? 1) >= (seen.outletCount ?? 1) + SIGNIFICANT_UPDATE_OUTLET_DELTA) {
+/** Triage outlet count and significance at one point in time; null = unknown */
+export type SignificanceSnapshot = { outletCount: number | null; significance: number | null };
+
+/** Outlets +2 or significance +0.5 since the prior snapshot; unknown outlet counts are 1. */
+export function isSignificantlyUpdated(
+  current: SignificanceSnapshot,
+  prior: SignificanceSnapshot,
+): boolean {
+  if ((current.outletCount ?? 1) >= (prior.outletCount ?? 1) + SIGNIFICANT_UPDATE_OUTLET_DELTA) {
     return true;
   }
   return (
-    record.significance !== null &&
-    seen.significance !== null &&
-    record.significance - seen.significance >=
+    current.significance !== null &&
+    prior.significance !== null &&
+    current.significance - prior.significance >=
       SIGNIFICANT_UPDATE_SIGNIFICANCE_DELTA - SIGNIFICANCE_EPSILON
   );
 }
