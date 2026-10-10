@@ -366,7 +366,7 @@ export type RemoveManualSeedResult =
 /**
  * Take a seed off the Brief: delete its triage record (no dropped trace) and the
  * records triage dropped as its duplicates, so those articles are re-triaged on
- * their own at the next refresh. The article stays in the store, which has no retention prune.
+ * their own at the next refresh. The article stays in the store until the article prune drops it.
  */
 export async function removeManualSeed(
   articleId: string,

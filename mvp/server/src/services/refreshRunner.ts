@@ -2,12 +2,14 @@
  * Refresh runner (NEWS-88): one pipeline for manual, timer and startup
  * refreshes — fetch all sources (ingest + topic search + triage) →
  * refresh-time Brief summaries → full stories → prune saved summaries and
- * full stories (NEWS-99, NEWS-100) → `meta.refresh`. Single-flight per
- * process: a call while a refresh is running joins it.
+ * full stories (NEWS-99, NEWS-100) → prune articles (NEWS-117) →
+ * `meta.refresh`. Single-flight per process: a call while a refresh is
+ * running joins it.
  */
 import { readMeta, updateMeta } from '../store/index.js';
 import type { StoreMeta } from '../types/article.js';
 import type { BriefRunMeta, FullStoriesRunMeta, RefreshRun, RefreshTrigger } from '../types/brief.js';
+import { pruneArticleStore, type ArticleRetentionResult } from './articleRetention.js';
 import { generateRefreshFullStories } from './briefFullStories.js';
 import { pruneBriefStores, type BriefRetentionResult } from './briefRetention.js';
 import { generateRefreshSummaries } from './briefSummaries.js';
@@ -33,6 +35,7 @@ export type RefreshRunnerDeps = {
     options: { now?: Date; boundaryAt?: string | null },
   ) => Promise<FullStoriesRunMeta>;
   pruneBriefStores?: (options: { now: Date }) => Promise<BriefRetentionResult>;
+  pruneArticleStore?: (options: { now: Date }) => Promise<ArticleRetentionResult>;
   readMeta?: () => Promise<StoreMeta>;
   updateMeta?: (patch: Partial<StoreMeta>) => Promise<unknown>;
   now?: () => Date;
@@ -63,6 +66,7 @@ export function createRefreshRunner(deps: RefreshRunnerDeps = {}): RefreshRunner
   const generateFullStories =
     deps.generateFullStories ?? ((options) => generateRefreshFullStories(options));
   const pruneStores = deps.pruneBriefStores ?? ((options) => pruneBriefStores(options));
+  const pruneOldArticles = deps.pruneArticleStore ?? ((options) => pruneArticleStore(options));
   const readServerMeta = deps.readMeta ?? (() => readMeta());
   const updateServerMeta = deps.updateMeta ?? ((patch: Partial<StoreMeta>) => updateMeta(patch));
   const now = deps.now ?? (() => new Date());
@@ -133,6 +137,12 @@ export function createRefreshRunner(deps: RefreshRunnerDeps = {}): RefreshRunner
       for (const error of pruned.errors) log(`Brief store prune failed: ${error}`);
     } catch (err) {
       log(`Brief store prune failed: ${errorMessage(err)}`);
+    }
+    try {
+      const pruned = await pruneOldArticles({ now: now() });
+      for (const error of pruned.errors) log(`Article store prune failed: ${error}`);
+    } catch (err) {
+      log(`Article store prune failed: ${errorMessage(err)}`);
     }
 
     const completedAt = now().toISOString();

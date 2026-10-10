@@ -137,6 +137,8 @@ export type {
 } from './briefFullStories.js';
 export { pruneBriefStores } from './briefRetention.js';
 export type { BriefRetentionDeps, BriefRetentionResult } from './briefRetention.js';
+export { pruneArticleStore } from './articleRetention.js';
+export type { ArticleRetentionDeps, ArticleRetentionResult } from './articleRetention.js';
 export { selectAutoFullStoryTargets } from './briefFullStoryAuto.js';
 export type { AutoFullStoryOptions } from './briefFullStoryAuto.js';
 export {

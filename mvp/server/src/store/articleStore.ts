@@ -1,56 +1,129 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { randomBytes } from 'node:crypto';
+import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import path from 'node:path';
 import type { Article } from '../types/article.js';
 import { articleIdFromCanonicalUrl } from './articleId.js';
 import { articleNeedsRewrite, migrateArticle } from './migrateArticle.js';
 import { mergeArticleOnUpsert } from './mergeArticleOnUpsert.js';
-import { ARTICLES_PATH, DATA_DIR } from './paths.js';
+import { ARTICLES_PATH } from './paths.js';
 
-async function ensureDataDir(): Promise<void> {
-  await mkdir(DATA_DIR, { recursive: true });
+type LoadedArticles = { articles: Article[]; needsWrite: boolean };
+
+/** Read and migrate without writing. Missing file → empty store that needs a write. */
+async function loadArticles(articlesPath: string): Promise<LoadedArticles> {
+  let raw: string;
+  try {
+    raw = await readFile(articlesPath, 'utf8');
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+      return { articles: [], needsWrite: true };
+    }
+    throw err;
+  }
+  const parsed: unknown = JSON.parse(raw);
+  if (!Array.isArray(parsed)) {
+    throw new Error('articles.json must contain a JSON array');
+  }
+
+  const articles: Article[] = [];
+  let needsWrite = false;
+  for (const entry of parsed) {
+    const migrated = migrateArticle(entry);
+    if (articleNeedsRewrite(entry, migrated)) {
+      needsWrite = true;
+    }
+    articles.push(migrated);
+  }
+  return { articles, needsWrite };
+}
+
+/** Atomic write: temp file in the same directory, then rename. */
+async function atomicWrite(articles: Article[], articlesPath: string): Promise<void> {
+  await mkdir(path.dirname(articlesPath), { recursive: true });
+  const tmpPath = `${articlesPath}.tmp-${process.pid}-${randomBytes(6).toString('hex')}`;
+  try {
+    await writeFile(tmpPath, `${JSON.stringify(articles, null, 2)}\n`, 'utf8');
+    await rename(tmpPath, articlesPath);
+  } catch (err) {
+    await rm(tmpPath, { force: true });
+    throw err;
+  }
+}
+
+/** Per-file write chains: ingest, triage, seeds, classify and prune must not interleave read-modify-write cycles. */
+const writeChains = new Map<string, Promise<unknown>>();
+
+function enqueueWrite<T>(articlesPath: string, work: () => Promise<T>): Promise<T> {
+  const key = path.resolve(articlesPath);
+  const previous = writeChains.get(key) ?? Promise.resolve();
+  const next = previous.then(work);
+  const settled = next.catch(() => undefined);
+  writeChains.set(key, settled);
+  void settled.then(() => {
+    if (writeChains.get(key) === settled) writeChains.delete(key);
+  });
+  return next;
+}
+
+/**
+ * Read, apply `mutate`, write atomically; serialized per path. Resolves to the written articles.
+ * `mutate` must not call other article store writes (they would wait on this one).
+ */
+export async function updateArticles(
+  mutate: (articles: Article[]) => Article[],
+  articlesPath: string = ARTICLES_PATH,
+): Promise<Article[]> {
+  return enqueueWrite(articlesPath, async () => {
+    const { articles } = await loadArticles(articlesPath);
+    const next = mutate(articles);
+    await atomicWrite(next, articlesPath);
+    return next;
+  });
+}
+
+/**
+ * Keep only the subset `selectKept` returns from the articles on disk (serialized, atomic;
+ * no write when nothing is dropped). Resolves to the number removed.
+ */
+export async function pruneArticles(
+  selectKept: (articles: readonly Article[]) => Article[],
+  articlesPath: string = ARTICLES_PATH,
+): Promise<number> {
+  return enqueueWrite(articlesPath, async () => {
+    const { articles, needsWrite } = await loadArticles(articlesPath);
+    const kept = selectKept(articles);
+    const removed = articles.length - kept.length;
+    if (removed > 0 || needsWrite) {
+      await atomicWrite(kept, articlesPath);
+    }
+    return removed;
+  });
+}
+
+/** Set `searchSeenAt` on the stored articles with these ids (serialized); unknown ids are ignored. */
+export async function markArticlesSearchSeen(
+  ids: readonly string[],
+  at: string,
+  articlesPath: string = ARTICLES_PATH,
+): Promise<void> {
+  const marked = new Set(ids);
+  await updateArticles(
+    (articles) =>
+      articles.map((article) => (marked.has(article.id) ? { ...article, searchSeenAt: at } : article)),
+    articlesPath,
+  );
 }
 
 /**
  * Read all articles from disk. Creates an empty store file if missing.
  * Legacy CFP records (`cfpUrl` identity) are migrated to canonicalUrl + citations.
  */
-export async function readArticles(): Promise<Article[]> {
-  await ensureDataDir();
-  try {
-    const raw = await readFile(ARTICLES_PATH, 'utf8');
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) {
-      throw new Error('articles.json must contain a JSON array');
-    }
-
-    const articles: Article[] = [];
-    let needsWrite = false;
-    for (const entry of parsed) {
-      const migrated = migrateArticle(entry);
-      if (articleNeedsRewrite(entry, migrated)) {
-        needsWrite = true;
-      }
-      articles.push(migrated);
-    }
-    if (needsWrite) {
-      await writeArticles(articles);
-    }
-    return articles;
-  } catch (err) {
-    const code = (err as NodeJS.ErrnoException).code;
-    if (code === 'ENOENT') {
-      await writeArticles([]);
-      return [];
-    }
-    throw err;
+export async function readArticles(articlesPath: string = ARTICLES_PATH): Promise<Article[]> {
+  const { articles, needsWrite } = await loadArticles(articlesPath);
+  if (needsWrite) {
+    return updateArticles((current) => current, articlesPath);
   }
-}
-
-/**
- * Replace the entire articles store on disk.
- */
-export async function writeArticles(articles: Article[]): Promise<void> {
-  await ensureDataDir();
-  await writeFile(ARTICLES_PATH, `${JSON.stringify(articles, null, 2)}\n`, 'utf8');
+  return articles;
 }
 
 /**
@@ -67,39 +140,29 @@ export async function getArticleById(id: string): Promise<Article | null> {
  */
 export async function upsertArticle(
   article: Omit<Article, 'id'> & { id?: string },
+  articlesPath: string = ARTICLES_PATH,
 ): Promise<Article> {
-  const id = articleIdFromCanonicalUrl(article.canonicalUrl);
-  const articles = await readArticles();
-  const index = articles.findIndex((a) => a.id === id);
-  const existing = index >= 0 ? articles[index] : undefined;
-  const next = mergeArticleOnUpsert(existing, article, id);
-
-  if (index >= 0) {
-    articles[index] = next;
-  } else {
-    articles.push(next);
-  }
-  await writeArticles(articles);
-  return next;
+  const [next] = await upsertArticles([article], articlesPath);
+  return next!;
 }
 
 /**
- * Upsert many articles in one read/write cycle.
+ * Upsert many articles in one serialized read/write cycle.
  */
 export async function upsertArticles(
   incoming: Array<Omit<Article, 'id'> & { id?: string }>,
+  articlesPath: string = ARTICLES_PATH,
 ): Promise<Article[]> {
-  const articles = await readArticles();
-  const byId = new Map(articles.map((a) => [a.id, a]));
   const results: Article[] = [];
-
-  for (const item of incoming) {
-    const id = articleIdFromCanonicalUrl(item.canonicalUrl);
-    const next = mergeArticleOnUpsert(byId.get(id), item, id);
-    byId.set(id, next);
-    results.push(next);
-  }
-
-  await writeArticles([...byId.values()]);
+  await updateArticles((articles) => {
+    const byId = new Map(articles.map((a) => [a.id, a]));
+    for (const item of incoming) {
+      const id = articleIdFromCanonicalUrl(item.canonicalUrl);
+      const next = mergeArticleOnUpsert(byId.get(id), item, id);
+      byId.set(id, next);
+      results.push(next);
+    }
+    return [...byId.values()];
+  }, articlesPath);
   return results;
 }

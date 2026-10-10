@@ -8,10 +8,12 @@ export {
 export { mergeArticleOnUpsert } from './mergeArticleOnUpsert.js';
 export {
   getArticleById,
+  markArticlesSearchSeen,
+  pruneArticles,
   readArticles,
+  updateArticles,
   upsertArticle,
   upsertArticles,
-  writeArticles,
 } from './articleStore.js';
 export { readMeta, updateMeta, writeMeta } from './metaStore.js';
 export {

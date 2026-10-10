@@ -14,7 +14,7 @@ In every refresh — the auto-refresh timer, the startup catch-up, the Kite **Re
 - are within the last **48 hours** (`publishedAt`, or `fetchedAt` when there is no date), and
 - have no triage record yet, or only a non-final one (see drop reasons).
 
-Older articles that were never triaged are left alone and get no record.
+Older articles that were never triaged are left alone and get no record; the article prune drops them 48 hours after they were last seen ([BRIEF.md](BRIEF.md#retention)).
 
 ## Pipeline order
 
@@ -89,12 +89,12 @@ In `mvp/.env` (see `mvp/.env.example`):
 | `TRIAGE_SUMMARY_BUDGET` | Ollama Brief summary calls per refresh. Non-negative integer; unset or invalid → `60`. Reported here as `summaryBudget` and **enforced by the Brief's refresh-time summaries** ([BRIEF.md](BRIEF.md#summaries)); failed calls count. |
 | `TYPESAFE_API_KEY` / `TYPESAFE_MODEL` | Existing TypeSafe settings. Without a key, no Jev calls are made: stories that would reach Jev get `not_scored_error` and the run error `TypeSafe not configured`. |
 
-Other limits are constants in `mvp/server/src/services/triageConfig.ts` (48h window, concurrency 4, 6 candidate / 10 undesired topics per call, 2 promotions, Jev thresholds, snippet and body lengths, similar-headline thresholds).
+Other limits are constants in `mvp/server/src/services/triageConfig.ts` (48h window, 14-day article retention, concurrency 4, 6 candidate / 10 undesired topics per call, 2 promotions, Jev thresholds, snippet and body lengths, similar-headline thresholds).
 
 ## What's stored where
 
 - **`mvp/data/triage.json`** (gitignored) — `{ records, updatedAt }`, one record per article id: `status` (`kept` \| `dropped`), `reason`, `stage` (`keyword` \| `dedupe` \| `headline` \| `survivor` \| `body` \| `budget` \| `manual` — an operator seed, written by Add story rather than a run), `final`, `topicIds` (kept: the topics Jev confirmed; dropped: the candidate topics considered), `labels`, `duplicateOf`, `memberIds` and `outletCount` (kept only), `significance`, `bodyChecked`, `jevCalls` (total across refreshes), `triagedAt`. Records for articles no longer in the article store are pruned on write; for seed records, only once they are older than the window ([Seeds and concurrent refreshes](#seeds-and-concurrent-refreshes)).
-- **Article store** — survivors that were resolved or scraped are written back: `publisherUrl`, `publisherDomain`, an added publisher citation, `bodyText`, `bodyStatus`, `publisherTitle`, image fields, and `publishedAt` when it was empty. `id` and `canonicalUrl` never change.
+- **Article store** — survivors that were resolved or scraped are written back: `publisherUrl`, `publisherDomain`, an added publisher citation, `bodyText`, `bodyStatus`, `publisherTitle`, image fields, and `publishedAt` when it was empty. `id` and `canonicalUrl` never change. After each successful refresh, articles with a triage record are pruned 14 days after they were last seen and articles without one after the 48-hour window, which in turn drops their triage records at the next triage write ([BRIEF.md](BRIEF.md#retention), [NEWS-117](https://informedcrew.atlassian.net/browse/NEWS-117)).
 - **`mvp/data/meta.json` → `triage`** — the last run summary: `{ at, skipped, candidates, kept, dropped, byReason, jev: { budget, used, errors }, summaryBudget, errors }`. `byReason` counts this run's drops, with every `muted:<id>` counted under `muted`. `errors` holds at most 5 messages, plus any store-write errors (triage, articles, meta), which are always appended.
 
 The same summary (without `at`) is returned by `POST /api/fetch` as `triage` ([MVP_API_COMPAT.md](MVP_API_COMPAT.md)).
@@ -174,7 +174,7 @@ Add story and Remove ([BRIEF.md](BRIEF.md#added-stories-seeds)) write `triage.js
 - **Dangling duplicates.** A stored `duplicate` record whose target has no triage record any more is triaged again at the next refresh (if still in the window) instead of staying final. The Filtered out view already tolerates a missing target ("Article no longer stored" when the article is gone too).
 - **Orphan seed records.** A seed record whose article is no longer in the article store is pruned once it is older than the 48-hour window (or its `triagedAt` doesn't parse). Younger ones are kept, so a seed saved mid-run (whose article the run never read) is never pruned by mistake.
 - **Duplicate check at save.** It runs once on the triage read and again inside the serialized triage write, against the articles read just before that write, so a story a refresh keeps just before the seed is written is still refused when its headline matches, or its URL as stored then. **Accepted:** a refresh writes its triage records before the articles it resolved (publisher URL, body), so a URL-only match resolved in that same moment can be missed; and a refresh that started *before* the seed was saved doesn't dedupe its new stories against it. Either way the same story can show twice (the seed and a triaged card) until one is seen or removed.
-- **Non-atomic save — accepted.** The seed article is written before its triage record. If the triage write fails (or the second duplicate check refuses), the article stays with no record: never triaged (manual), never shown, the same state a removed seed leaves. A retry saves a new article. The article store has no retention prune, so such articles stay until a prune is added.
+- **Non-atomic save — accepted.** The seed article is written before its triage record. If the triage write fails (or the second duplicate check refuses), the article stays with no record: never triaged (manual), never shown, the same state a removed seed leaves. A retry saves a new article. The article prune drops such articles 48 hours after they were saved ([BRIEF.md](BRIEF.md#retention)); a seed saved while the prune runs is younger than that, so it is never pruned before its record is written.
 
 ## Limits
 

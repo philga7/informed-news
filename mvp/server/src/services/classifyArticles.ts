@@ -1,10 +1,5 @@
 import type { Article } from '../types/article.js';
-import {
-  getArticleById,
-  readArticles,
-  upsertArticle,
-  writeArticles,
-} from '../store/index.js';
+import { getArticleById, readArticles, updateArticles } from '../store/index.js';
 import {
   articleFieldsFromClassifyResult,
   classifyFraming,
@@ -78,6 +73,37 @@ export function selectClassifyBatchCandidates(articles: Article[], limit: number
     .slice(0, limit);
 }
 
+export type ClassifyDeps = {
+  classifyFraming?: typeof classifyFraming;
+  articlesPath?: string;
+};
+
+type ClassifyFields = ReturnType<typeof articleFieldsFromClassifyResult>;
+
+/**
+ * Write classify results onto the articles as stored now: the model calls run outside the
+ * article write queue, so other writes may land meanwhile. Articles pruned since are not
+ * written back. Resolves to the updated articles that still exist.
+ */
+async function applyClassifyFields(
+  fieldsById: ReadonlyMap<string, ClassifyFields>,
+  articlesPath?: string,
+): Promise<Article[]> {
+  const applied: Article[] = [];
+  await updateArticles(
+    (articles) =>
+      articles.map((article) => {
+        const fields = fieldsById.get(article.id);
+        if (!fields) return article;
+        const next = { ...article, ...fields };
+        applied.push(next);
+        return next;
+      }),
+    articlesPath,
+  );
+  return applied;
+}
+
 /**
  * Classify articles with null classification, newest-first, up to `limit`.
  * Source-agnostic: CFP and xcancel items share FramingAnalysis.
@@ -86,30 +112,28 @@ export function selectClassifyBatchCandidates(articles: Article[], limit: number
  */
 export async function classifyUnclassifiedArticles(
   options: ClassifyBatchOptions = {},
+  deps: ClassifyDeps = {},
 ): Promise<ClassifyBatchResult> {
+  const classify = deps.classifyFraming ?? classifyFraming;
   const limit = resolveBatchLimit(options.limit);
-  const articles = await readArticles();
-  const byId = new Map(articles.map((a) => [a.id, a]));
+  const articles = await readArticles(deps.articlesPath);
 
   const candidates = selectClassifyBatchCandidates(articles, limit);
 
   let succeeded = 0;
   let failed = 0;
   const bySourceKind = { cfp: 0, xcancel: 0, rss: 0, manual: 0, search: 0 };
-  const updated: Article[] = [];
+  const fieldsById = new Map<string, ClassifyFields>();
 
   for (const article of candidates) {
     bySourceKind[article.sourceKind] += 1;
-    const result = await classifyFraming({
+    const result = await classify({
       title: article.title,
       snippet: article.snippet,
       publisherDomain: article.publisherDomain,
       bodyText: framingBodyText(article),
     });
-    const fields = articleFieldsFromClassifyResult(result);
-    const next: Article = { ...article, ...fields };
-    byId.set(next.id, next);
-    updated.push(next);
+    fieldsById.set(article.id, articleFieldsFromClassifyResult(result));
     if (result.ok) {
       succeeded += 1;
     } else {
@@ -117,13 +141,12 @@ export async function classifyUnclassifiedArticles(
     }
   }
 
-  if (updated.length > 0) {
-    await writeArticles([...byId.values()]);
-  }
+  const updated =
+    fieldsById.size > 0 ? await applyClassifyFields(fieldsById, deps.articlesPath) : [];
 
   return {
     limit,
-    attempted: updated.length,
+    attempted: fieldsById.size,
     succeeded,
     failed,
     bySourceKind,
@@ -133,6 +156,7 @@ export async function classifyUnclassifiedArticles(
 
 /**
  * Reclassify a single article by id (even if already classified).
+ * Null when the article is missing, or was pruned while the model ran.
  */
 export async function classifyArticleById(
   id: string,
@@ -149,7 +173,10 @@ export async function classifyArticleById(
     bodyText: framingBodyText(article),
   });
   const fields = articleFieldsFromClassifyResult(result);
-  const next = await upsertArticle({ ...article, ...fields });
+  const [next] = await applyClassifyFields(new Map([[id, fields]]));
+  if (!next) {
+    return null;
+  }
 
   return {
     article: next,

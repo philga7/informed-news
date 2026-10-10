@@ -11,7 +11,7 @@ On every refresh (timer, startup catch-up, Kite **Refresh** button, or `POST /ap
 - **Merged:** within a topic, a SearXNG result and a Google result are one story when they share the canonicalized publisher URL, **or** the same publisher domain + normalized title. The merged story keeps the direct publisher URL (from SearXNG) as `canonicalUrl` and the Google link as `googleNewsUrl`. Across topics, the same story found by several topics becomes one article carrying all their `topicIds`.
 - **48h window:** dated results older than 48 hours are dropped. Undated SearXNG results are kept with `publishedAt: null` (NEWS-87 dates them from page metadata at scrape time or drops them).
 - **≤20 new per topic:** newest first, undated last.
-- **Skip seen:** a story whose canonical, publisher, or Google URL already exists in the store is skipped — not re-tagged with new topics.
+- **Skip seen:** a story whose canonical, publisher, or Google URL already exists in the store is skipped — not re-tagged with new topics. The stored article only gets `searchSeenAt` set to the run time, so the article prune counts it as still seen ([BRIEF.md](BRIEF.md#retention), [NEWS-117](https://informedcrew.atlassian.net/browse/NEWS-117)).
 
 Constants live in `mvp/server/src/services/topicSearchConfig.ts` (window, per-topic cap, concurrency, timeouts: Google News 15s, SearXNG 20s).
 

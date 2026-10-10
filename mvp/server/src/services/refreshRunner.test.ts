@@ -72,6 +72,7 @@ function harness(overrides: Partial<RefreshRunnerDeps> = {}, meta?: StoreMeta): 
       h.pruneCalls.push(options);
       return { summaries: 0, fullStories: 0, errors: [] };
     },
+    pruneArticleStore: async () => ({ articles: 0, errors: [] }),
     readMeta: async () => h.meta,
     updateMeta: async (patch) => {
       h.patches.push(patch);
@@ -221,9 +222,10 @@ test('run: lastSuccess only moves on success', async () => {
   assert.equal(h.meta.refresh!.last!.ok, false);
 });
 
-test('run: one run calls fetchAll → generateSummaries → generateFullStories → pruneBriefStores in order, once each', async () => {
+test('run: one run calls fetchAll → generateSummaries → generateFullStories → pruneBriefStores → pruneArticleStore in order, once each', async () => {
   const order: string[] = [];
   const pruneNows: Date[] = [];
+  const articlePruneNows: Date[] = [];
   const runner = createRefreshRunner({
     fetchAll: async () => {
       order.push('fetchAll');
@@ -242,6 +244,11 @@ test('run: one run calls fetchAll → generateSummaries → generateFullStories 
       pruneNows.push(now);
       return { summaries: 0, fullStories: 0, errors: [] };
     },
+    pruneArticleStore: async ({ now }) => {
+      order.push('pruneArticleStore');
+      articlePruneNows.push(now);
+      return { articles: 0, errors: [] };
+    },
     readMeta: async () => ({ lastFetchAt: null, lastError: null }),
     updateMeta: async () => ({ lastFetchAt: null, lastError: null }),
     now: tickingClock(),
@@ -250,8 +257,48 @@ test('run: one run calls fetchAll → generateSummaries → generateFullStories 
 
   await runner.run('manual');
 
-  assert.deepEqual(order, ['fetchAll', 'generateSummaries', 'generateFullStories', 'pruneBriefStores']);
+  assert.deepEqual(order, [
+    'fetchAll',
+    'generateSummaries',
+    'generateFullStories',
+    'pruneBriefStores',
+    'pruneArticleStore',
+  ]);
   assert.ok(pruneNows[0] instanceof Date);
+  assert.ok(articlePruneNows[0] instanceof Date, 'article prune gets a Date');
+});
+
+test('run: article prune errors are logged and do not fail the run', async () => {
+  const h = harness({
+    pruneArticleStore: async () => ({ articles: 0, errors: ['triage: EACCES'] }),
+  });
+  const runner = createRefreshRunner(h.deps);
+
+  const result = await runner.run('manual');
+
+  assert.deepEqual(result.brief, { ...BRIEF, fullStories: FULL_STORIES });
+  assert.equal(h.meta.refresh!.last!.ok, true);
+  assert.ok(h.logs.includes('Article store prune failed: triage: EACCES'), h.logs.join('\n'));
+});
+
+test('run: a throwing Brief prune still runs the article prune; a throwing article prune does not fail the run', async () => {
+  let articlePrunes = 0;
+  const h = harness({
+    pruneBriefStores: async () => {
+      throw new Error('brief prune boom');
+    },
+    pruneArticleStore: async () => {
+      articlePrunes += 1;
+      throw new Error('article prune boom');
+    },
+  });
+  const runner = createRefreshRunner(h.deps);
+
+  await runner.run('manual');
+
+  assert.equal(articlePrunes, 1);
+  assert.equal(h.meta.refresh!.last!.ok, true);
+  assert.ok(h.logs.includes('Article store prune failed: article prune boom'), h.logs.join('\n'));
 });
 
 test('run: prune errors are logged and do not fail the run or change brief meta', async () => {

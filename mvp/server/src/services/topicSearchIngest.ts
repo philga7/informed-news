@@ -8,6 +8,7 @@ import {
 } from '../types/topicSearch.js';
 import {
   getCachedGoogleNewsUrl,
+  markArticlesSearchSeen,
   readArticles,
   readTopics,
   updateMeta,
@@ -45,6 +46,7 @@ export type TopicSearchDeps = {
   readTopics?: () => Promise<{ topics: Topic[] }>;
   readArticles?: () => Promise<Article[]>;
   upsertArticles?: typeof upsertArticles;
+  markArticlesSearchSeen?: (ids: string[], at: string) => Promise<unknown>;
   updateMeta?: (patch: Partial<StoreMeta>) => Promise<unknown>;
   searchGoogleNews?: (query: string, options: { now: Date }) => Promise<SearchCandidate[]>;
   searchSearxng?: (
@@ -144,15 +146,35 @@ function seenKey(url: string): string {
   return canonicalizeSearchUrl(url) ?? url;
 }
 
-/** Canonicalized canonical / publisher / Google URLs of every stored article. */
-export function buildSeenKeys(articles: Article[]): Set<string> {
-  const seen = new Set<string>();
+/** Canonicalized canonical / publisher / Google URLs of every stored article → its id. */
+function storedIdsBySeenKey(articles: Article[]): Map<string, string> {
+  const ids = new Map<string, string>();
   for (const article of articles) {
     for (const url of [article.canonicalUrl, article.publisherUrl, article.googleNewsUrl]) {
-      if (url) seen.add(seenKey(url));
+      if (url) ids.set(seenKey(url), article.id);
     }
   }
-  return seen;
+  return ids;
+}
+
+/** Canonicalized canonical / publisher / Google URLs of every stored article. */
+export function buildSeenKeys(articles: Article[]): Set<string> {
+  return new Set(storedIdsBySeenKey(articles).keys());
+}
+
+/** Ids of stored articles that any merged candidate matches by URL. */
+function storedIdsReturned(
+  mergedByTopic: MergedCandidate[][],
+  idsBySeenKey: ReadonlyMap<string, string>,
+): string[] {
+  const ids = new Set<string>();
+  for (const merged of mergedByTopic.flat()) {
+    for (const url of [merged.canonicalUrl, merged.publisherUrl, merged.googleNewsUrl]) {
+      const id = url ? idsBySeenKey.get(seenKey(url)) : undefined;
+      if (id) ids.add(id);
+    }
+  }
+  return [...ids];
 }
 
 /** Drop already-stored stories, then keep the newest `max` (undated last). */
@@ -444,7 +466,8 @@ export async function runTopicSearch(
   for (const status of Object.values(result.providers)) finalizeState(status);
 
   try {
-    const seen = buildSeenKeys(await (deps.readArticles ?? readArticles)());
+    const idsBySeenKey = storedIdsBySeenKey(await (deps.readArticles ?? readArticles)());
+    const seen = new Set(idsBySeenKey.keys());
     const selectedByTopic = mergedByTopic.map((merged, i) => {
       const topic = topics[i]!;
       const { selected, skippedSeen } = selectNewForTopic(
@@ -466,6 +489,10 @@ export async function runTopicSearch(
     );
 
     const fetchedAt = now.toISOString();
+    const returnedIds = storedIdsReturned(mergedByTopic, idsBySeenKey);
+    if (returnedIds.length > 0) {
+      await (deps.markArticlesSearchSeen ?? markArticlesSearchSeen)(returnedIds, fetchedAt);
+    }
     const inputs = combined.map(({ merged, topicIds }) =>
       toArticleInput(merged, topicIds, fetchedAt),
     );
