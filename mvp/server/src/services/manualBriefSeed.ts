@@ -18,7 +18,7 @@ import { TRIAGE_WINDOW_HOURS } from './triageConfig.js';
 import { storiesAreDuplicates } from './triageDedupe.js';
 import { muteReason } from './triageKeywords.js';
 
-/** Shorter than the refresh scrape: the operator is waiting on the save. */
+/** Single attempt, shorter than the refresh scrape: the operator is waiting on the save. */
 export const MANUAL_SEED_SCRAPE_TIMEOUT_MS = 8000;
 
 const WINDOW_MS = TRIAGE_WINDOW_HOURS * 60 * 60 * 1000;
@@ -193,7 +193,7 @@ export type CreateManualSeedDeps = {
   updateTriage?: (mutate: (store: TriageStore) => TriageStore) => Promise<TriageStore>;
   scrapePublisherBody?: (
     url: string,
-    opts: { timeoutMs: number },
+    opts: { timeoutMs: number; retries: number },
   ) => Promise<PublisherBodyResult>;
   now?: () => string;
   uuid?: () => string;
@@ -290,6 +290,16 @@ export async function createManualSeed(
     throw new ManualSeedValidationError('at least one URL is required');
   }
 
+  const body = await scrape(scrapeUrl, {
+    timeoutMs: MANUAL_SEED_SCRAPE_TIMEOUT_MS,
+    retries: 0,
+  });
+  if (body.bodyStatus === 'ok') {
+    article.bodyText = body.bodyText;
+    article.bodyStatus = 'ok';
+  }
+
+  // After the scrape: the Brief's mute check also reads bodyText.
   const undesired = topics.filter((t) => t.kind === 'undesired');
   const muted = muteReason(article, rules, undesired);
   if (muted) {
@@ -309,12 +319,6 @@ export async function createManualSeed(
       error: `Already in your Brief: '${title}' under ${topicName}.`,
       existing: { articleId: duplicate.article.id, title, topicName },
     });
-  }
-
-  const body = await scrape(scrapeUrl, { timeoutMs: MANUAL_SEED_SCRAPE_TIMEOUT_MS });
-  if (body.bodyStatus === 'ok') {
-    article.bodyText = body.bodyText;
-    article.bodyStatus = 'ok';
   }
 
   const saved = await upsert(article);

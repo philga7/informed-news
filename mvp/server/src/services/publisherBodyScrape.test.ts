@@ -421,6 +421,26 @@ test('scrapePublisherBody honors a timeoutMs override', async () => {
   }
 });
 
+test('scrapePublisherBody makes a single attempt with retries: 0', async () => {
+  let requests = 0;
+  const server = createServer(() => {
+    requests += 1;
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const { port } = server.address() as AddressInfo;
+  try {
+    const result = await scrapePublisherBody(`http://127.0.0.1:${port}/hangs`, {
+      timeoutMs: 50,
+      retries: 0,
+    });
+    assert.equal(result.bodyStatus, 'unavailable');
+    assert.equal(requests, 1);
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+});
+
 test('blocks x.com and twitter hosts', () => {
   assert.equal(isBlockedPublisherHost('https://x.com/user/status/1'), true);
   assert.equal(isBlockedPublisherHost('https://twitter.com/user/status/1'), true);

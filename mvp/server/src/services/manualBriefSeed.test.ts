@@ -225,7 +225,10 @@ function harness(options: HarnessOptions = {}) {
   let triage = options.triage ?? triageOf();
   const upserts: Article[] = [];
   const triageWrites: TriageStore[] = [];
-  const scrapes: Array<{ url: string; opts: { timeoutMs?: number } | undefined }> = [];
+  const scrapes: Array<{
+    url: string;
+    opts: { timeoutMs?: number; retries?: number } | undefined;
+  }> = [];
   const deps: CreateManualSeedDeps = {
     now: () => FIXED_NOW,
     uuid: () => FIXED_UUID,
@@ -275,10 +278,9 @@ async function assertRefused(
   await assert.rejects(createManualSeed(input, h.deps), check);
   assert.equal(h.upserts.length, 0);
   assert.equal(h.triageWrites.length, 0);
-  assert.equal(h.scrapes.length, 0);
 }
 
-test('createManualSeed refuses an unknown topic', async () => {
+test('createManualSeed refuses an unknown topic before scraping', async () => {
   const h = harness();
   await assertRefused(
     h,
@@ -286,6 +288,28 @@ test('createManualSeed refuses an unknown topic', async () => {
     (err) =>
       err instanceof ManualSeedValidationError && err.message === 'topic must be a desired topic',
   );
+  assert.equal(h.scrapes.length, 0);
+});
+
+test('createManualSeed refuses a mute rule keyword found only in the scraped body', async () => {
+  const h = harness({
+    rules: [{ id: 'rule-1', keyword: 'ice', source: null, createdAt: '2026-09-01T00:00:00.000Z' }],
+    scrape: {
+      ...UNAVAILABLE_SCRAPE,
+      bodyText: 'Local police closed the terminal gates overnight.',
+      bodyStatus: 'ok',
+    },
+  });
+  await assertRefused(h, seedInput({ note: 'Operator note' }), (err) => {
+    assert.ok(err instanceof ManualSeedConflictError);
+    assert.deepEqual(err.body, {
+      ok: false,
+      code: 'muted',
+      error: "This matches your mute rule 'ice', so it wouldn't show.",
+    });
+    return true;
+  });
+  assert.equal(h.scrapes.length, 1);
 });
 
 test('createManualSeed refuses an undesired topic id', async () => {
@@ -451,7 +475,7 @@ test('createManualSeed stores the scraped body when the scrape is ok', async () 
   );
 
   assert.deepEqual(h.scrapes, [
-    { url: 'https://news.example.com/port-strike', opts: { timeoutMs: 8000 } },
+    { url: 'https://news.example.com/port-strike', opts: { timeoutMs: 8000, retries: 0 } },
   ]);
   assert.equal(article.bodyText, 'Full publisher body text.');
   assert.equal(article.bodyStatus, 'ok');

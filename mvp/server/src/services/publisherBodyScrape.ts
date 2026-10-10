@@ -293,7 +293,12 @@ export function extractPublisherBodyFromHtml(
   return { bodyText, bodyStatus: 'ok', ...meta };
 }
 
-async function fetchHtml(url: string, retryCount: number, timeoutMs: number): Promise<Response> {
+async function fetchHtml(
+  url: string,
+  retryCount: number,
+  timeoutMs: number,
+  maxRetries: number,
+): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -303,11 +308,11 @@ async function fetchHtml(url: string, retryCount: number, timeoutMs: number): Pr
       redirect: 'follow',
     });
   } catch (err) {
-    if (isRetryableNetworkError(err) && retryCount < MAX_RETRIES) {
+    if (isRetryableNetworkError(err) && retryCount < maxRetries) {
       console.warn(
-        `Network error fetching body ${url}, retrying (${retryCount + 1}/${MAX_RETRIES})...`,
+        `Network error fetching body ${url}, retrying (${retryCount + 1}/${maxRetries})...`,
       );
-      return fetchHtml(url, retryCount + 1, timeoutMs);
+      return fetchHtml(url, retryCount + 1, timeoutMs, maxRetries);
     }
     throw err;
   } finally {
@@ -321,14 +326,19 @@ async function fetchHtml(url: string, retryCount: number, timeoutMs: number): Pr
  */
 export async function scrapePublisherBody(
   publisherUrl: string | null | undefined,
-  opts: { timeoutMs?: number } = {},
+  opts: { timeoutMs?: number; retries?: number } = {},
 ): Promise<PublisherBodyResult> {
   if (!publisherUrl || isBlockedPublisherHost(publisherUrl)) {
     return emptyResult('unavailable');
   }
 
   try {
-    const response = await fetchHtml(publisherUrl, 0, opts.timeoutMs ?? FETCH_TIMEOUT_MS);
+    const response = await fetchHtml(
+      publisherUrl,
+      0,
+      opts.timeoutMs ?? FETCH_TIMEOUT_MS,
+      opts.retries ?? MAX_RETRIES,
+    );
 
     if (BLOCKED_HTTP.has(response.status)) {
       try {
