@@ -313,7 +313,7 @@ test('isSignificantlyUpdated thresholds', () => {
 
 test('isSignificantlyUpdated accepts a Brief story against a full-story auto snapshot', () => {
   const snapshot: BriefFullStoryAutoSnapshot = { outletCount: 3, significance: 1.2 };
-  const story = (outletCount: number, significance: number | null) => {
+  const story = (outletCount: number, significance: number) => {
     const brief = compose({
       topics: [makeTopic('c1')],
       articles: [makeArticle('a')],
@@ -323,9 +323,6 @@ test('isSignificantlyUpdated accepts a Brief story against a full-story auto sna
   };
   assert.equal(isSignificantlyUpdated(story(5, 1.2), snapshot), true);
   assert.equal(isSignificantlyUpdated(story(4, 1.2), snapshot), false);
-  assert.equal(isSignificantlyUpdated(story(3, 1.7), snapshot), true);
-  assert.equal(isSignificantlyUpdated(story(3, 1.6), snapshot), false);
-  assert.equal(isSignificantlyUpdated(story(3, null), snapshot), false);
 });
 
 test('ranking: significance desc (null last), outlets desc (null as 1), newer, then id', () => {

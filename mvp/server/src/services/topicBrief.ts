@@ -165,7 +165,7 @@ export function summarySourceFor(
   return null;
 }
 
-/** Triage values compared by the Brief seen gate and the full-story auto bar */
+/** Triage outlet count and significance at one point in time; null = unknown */
 export type SignificanceSnapshot = { outletCount: number | null; significance: number | null };
 
 /** Outlets +2 or significance +0.5 since the prior snapshot; unknown outlet counts are 1. */
