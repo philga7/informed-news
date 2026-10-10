@@ -19,6 +19,7 @@ const STAGES: ReadonlySet<string> = new Set<TriageStage>([
   'survivor',
   'body',
   'budget',
+  'manual',
 ]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -121,4 +122,31 @@ export async function writeTriage(
     await rm(tmpPath, { force: true });
     throw err;
   }
+}
+
+/** Per-file update chains: the refresh run and seed save/remove must not interleave read-modify-write cycles. */
+const updateChains = new Map<string, Promise<unknown>>();
+
+function enqueueUpdate<T>(triagePath: string, work: () => Promise<T>): Promise<T> {
+  const key = path.resolve(triagePath);
+  const previous = updateChains.get(key) ?? Promise.resolve();
+  const next = previous.then(work);
+  const settled = next.catch(() => undefined);
+  updateChains.set(key, settled);
+  void settled.then(() => {
+    if (updateChains.get(key) === settled) updateChains.delete(key);
+  });
+  return next;
+}
+
+/** Read, apply `mutate`, write atomically; serialized per path. Resolves to the written store. */
+export async function updateTriage(
+  mutate: (store: TriageStore) => TriageStore,
+  triagePath: string = TRIAGE_PATH,
+): Promise<TriageStore> {
+  return enqueueUpdate(triagePath, async () => {
+    const next = mutate(await readTriage(triagePath));
+    await writeTriage(next, triagePath);
+    return next;
+  });
 }

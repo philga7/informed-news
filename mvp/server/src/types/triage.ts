@@ -24,7 +24,15 @@ export const NON_FINAL_REASONS: ReadonlySet<TriageReason> = new Set<TriageReason
 ]);
 
 export type TriageStatus = 'kept' | 'dropped';
-export type TriageStage = 'keyword' | 'dedupe' | 'headline' | 'survivor' | 'body' | 'budget';
+export type TriageStage =
+  | 'keyword'
+  | 'dedupe'
+  | 'headline'
+  | 'survivor'
+  | 'body'
+  | 'budget'
+  /** Operator-added seed (NEWS-98); never re-triaged */
+  | 'manual';
 export type TriageLabel = 'official';
 
 export type TriageRecord = {

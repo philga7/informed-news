@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 import type { TriageRecord, TriageStore } from '../types/triage.js';
-import { readTriage, writeTriage } from './triageStore.js';
+import { readTriage, updateTriage, writeTriage } from './triageStore.js';
 
 function tempTriagePath(): string {
   const dir = mkdtempSync(path.join(tmpdir(), 'triage-store-'));
@@ -128,6 +128,72 @@ test('readTriage treats missing records / bad updatedAt as empty defaults', asyn
   const triagePath = tempTriagePath();
   await writeRaw(triagePath, { records: ['x'], updatedAt: 12 });
   assert.deepEqual(await readTriage(triagePath), { records: {}, updatedAt: null });
+});
+
+test('a manual-stage seed record round-trips', async () => {
+  const triagePath = tempTriagePath();
+  const seed: TriageRecord = {
+    articleId: 'seed-1',
+    status: 'kept',
+    reason: null,
+    stage: 'manual',
+    final: true,
+    topicIds: ['topic-a'],
+    labels: [],
+    duplicateOf: null,
+    memberIds: [],
+    outletCount: 1,
+    significance: null,
+    bodyChecked: false,
+    jevCalls: 0,
+    triagedAt: '2026-09-30T12:00:00.000Z',
+  };
+  await writeTriage({ records: { 'seed-1': seed }, updatedAt: null }, triagePath);
+  assert.deepEqual(await readTriage(triagePath), { records: { 'seed-1': seed }, updatedAt: null });
+});
+
+test('updateTriage applies concurrent updates one after another; neither is lost', async () => {
+  const triagePath = tempTriagePath();
+  await writeTriage({ records: { a1: keptRecord('a1') }, updatedAt: null }, triagePath);
+
+  const [first, second] = await Promise.all([
+    updateTriage(
+      (store) => ({ ...store, records: { ...store.records, a2: droppedRecord('a2') } }),
+      triagePath,
+    ),
+    updateTriage(
+      (store) => ({
+        records: { ...store.records, a3: keptRecord('a3') },
+        updatedAt: '2026-09-30T13:00:00.000Z',
+      }),
+      triagePath,
+    ),
+  ]);
+
+  assert.deepEqual(Object.keys(first.records).sort(), ['a1', 'a2']);
+  const expected: TriageStore = {
+    records: { a1: keptRecord('a1'), a2: droppedRecord('a2'), a3: keptRecord('a3') },
+    updatedAt: '2026-09-30T13:00:00.000Z',
+  };
+  assert.deepEqual(second, expected);
+  assert.deepEqual(await readTriage(triagePath), expected);
+});
+
+test('updateTriage: a throwing mutator rejects that call only and writes nothing', async () => {
+  const triagePath = tempTriagePath();
+  await writeTriage({ records: { a1: keptRecord('a1') }, updatedAt: null }, triagePath);
+
+  const failing = updateTriage(() => {
+    throw new Error('mutator boom');
+  }, triagePath);
+  const following = updateTriage(
+    (store) => ({ ...store, records: { ...store.records, a2: droppedRecord('a2') } }),
+    triagePath,
+  );
+
+  await assert.rejects(failing, { message: 'mutator boom' });
+  assert.deepEqual(Object.keys((await following).records).sort(), ['a1', 'a2']);
+  assert.deepEqual(Object.keys((await readTriage(triagePath)).records).sort(), ['a1', 'a2']);
 });
 
 test('readTriage throws when the file is not a JSON object', async () => {

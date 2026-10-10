@@ -1,8 +1,9 @@
 /**
  * Topic Brief (NEWS-88): composes the Brief from triage's kept records — one
- * section per desired topic (Core then Watch, topics-store order), stories
- * ranked by significance then outlet breadth, seen stories hidden after the
- * next successful refresh. Pure: no store reads, no network, no clock.
+ * section per desired topic (Core then Watch, topics-store order), operator
+ * seeds pinned first, then stories ranked by significance then outlet breadth,
+ * seen stories hidden after the next successful refresh. Pure: no store reads,
+ * no network, no clock.
  */
 import { createHash } from 'node:crypto';
 import type { MuteRule } from '../store/muteRulesStore.js';
@@ -54,6 +55,8 @@ export type BriefStory = {
   outletCount: number;
   labels: TriageLabel[];
   significance: number | null;
+  /** Operator-added seed (kept article `sourceKind: 'manual'`); pinned first in its section */
+  manualSeed: boolean;
   /** Kept article first, then duplicate members; distinct domains, ≤ BRIEF_MAX_LINKS */
   links: BriefLink[];
   summary: { status: BriefSummaryStatus; text: string | null };
@@ -282,7 +285,24 @@ function summaryFor(
 
 type Candidate = { record: TriageRecord; article: Article };
 
+function isSeed(article: Article): boolean {
+  return article.sourceKind === 'manual';
+}
+
+function compareNewestThenId(a: Candidate, b: Candidate): number {
+  const timeA = articleTime(a.article);
+  const timeB = articleTime(b.article);
+  const time = (Number.isNaN(timeB) ? 0 : timeB) - (Number.isNaN(timeA) ? 0 : timeA);
+  if (time !== 0) return time;
+  return a.article.id < b.article.id ? -1 : a.article.id > b.article.id ? 1 : 0;
+}
+
+/** Seeds first (newest first), then significance desc (null last), outlets desc, newest, id. */
 function compareCandidates(a: Candidate, b: Candidate): number {
+  const seedA = isSeed(a.article);
+  const seedB = isSeed(b.article);
+  if (seedA !== seedB) return seedA ? -1 : 1;
+  if (seedA) return compareNewestThenId(a, b);
   const sigA = a.record.significance;
   const sigB = b.record.significance;
   if (sigA !== sigB) {
@@ -292,11 +312,7 @@ function compareCandidates(a: Candidate, b: Candidate): number {
   }
   const outlets = (b.record.outletCount ?? 1) - (a.record.outletCount ?? 1);
   if (outlets !== 0) return outlets;
-  const timeA = articleTime(a.article);
-  const timeB = articleTime(b.article);
-  const time = (Number.isNaN(timeB) ? 0 : timeB) - (Number.isNaN(timeA) ? 0 : timeA);
-  if (time !== 0) return time;
-  return a.article.id < b.article.id ? -1 : a.article.id > b.article.id ? 1 : 0;
+  return compareNewestThenId(a, b);
 }
 
 export function composeTopicBrief(input: ComposeTopicBriefInput): TopicBrief {
@@ -354,6 +370,7 @@ export function composeTopicBrief(input: ComposeTopicBriefInput): TopicBrief {
         outletCount: record.outletCount ?? 1,
         labels: [...record.labels],
         significance: record.significance,
+        manualSeed: isSeed(article),
         links: buildLinks(record, article, articles, input.triage),
         summary: summaryFor(record, articles, input.triage, input.summaries),
         imageUrl: article.imageUrl,

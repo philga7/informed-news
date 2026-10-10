@@ -126,8 +126,9 @@ function harness(opts: HarnessOptions) {
     readMuteRules: async () => ({ rules: opts.rules ?? [] }),
     readArticles: async () => opts.articles,
     readTriage: async () => structuredClone(state.store),
-    writeTriage: async (store) => {
-      state.store = structuredClone(store);
+    updateTriage: async (mutate) => {
+      state.store = structuredClone(mutate(structuredClone(state.store)));
+      return structuredClone(state.store);
     },
     upsertArticles: async (rows) => {
       state.upserts.push(rows as Article[]);
@@ -643,8 +644,9 @@ test('unreadable triage store skips the run: no Jev, no survivor prep, no writes
       readTriage: async () => {
         throw new Error('triage.json corrupt');
       },
-      writeTriage: async () => {
+      updateTriage: async () => {
         triageWrites += 1;
+        return { records: {}, updatedAt: null };
       },
     },
   });
@@ -671,8 +673,9 @@ test('an unexpected error after the reads is recorded, the run is skipped, and m
       jevAvailable: () => {
         throw new Error('client lookup exploded');
       },
-      writeTriage: async () => {
+      updateTriage: async () => {
         triageWrites += 1;
+        return { records: {}, updatedAt: null };
       },
     },
   });
@@ -728,7 +731,7 @@ test('store-write errors are appended past the 5-error cap', async () => {
     articles: titles.map((t, i) => article(`t${i}`, t)),
     overrides: {
       judge: async (_stage, a) => ({ ok: false, error: `down ${a.id}` }),
-      writeTriage: async () => {
+      updateTriage: async () => {
         throw new Error('disk full');
       },
       updateMeta: async () => {
@@ -795,7 +798,7 @@ test('store write failures are caught into errors and never throw', async () => 
     articles: [article('a', 'Tariff ruling hits steel imports')],
     prepare: (a) => ({ article: a, changed: true, dateIssue: null }),
     overrides: {
-      writeTriage: async () => {
+      updateTriage: async () => {
         throw new Error('disk full');
       },
       upsertArticles: async () => {
@@ -815,4 +818,77 @@ test('store write failures are caught into errors and never throw', async () => 
   assert.ok(result.errors.includes('triage write: disk full'));
   assert.ok(result.errors.includes('article write: articles locked'));
   assert.equal(state.meta.length, 1);
+});
+
+function seedRecord(articleId: string, over: Partial<TriageRecord> = {}): TriageRecord {
+  return keptRecord(articleId, {
+    stage: 'manual',
+    significance: null,
+    jevCalls: 0,
+    triagedAt: hoursAgo(1),
+    ...over,
+  });
+}
+
+const seedArticle = (id: string, title: string) =>
+  article(id, title, { sourceKind: 'manual', publishedAt: null, fetchedAt: hoursAgo(1) });
+
+test('a seed added between the run read and its write survives the write', async () => {
+  const seed = seedRecord('seed');
+  const { deps, state } = harness({
+    topics: [TARIFFS],
+    articles: [article('a', 'Tariff ruling hits steel imports')],
+  });
+  deps.readTriage = async () => {
+    const snapshot = structuredClone(state.store);
+    state.store.records.seed = structuredClone(seed);
+    return snapshot;
+  };
+
+  await run(deps);
+
+  assert.deepEqual(Object.keys(state.store.records).sort(), ['a', 'seed']);
+  assert.deepEqual(state.store.records.seed, seed);
+  assert.equal(state.store.records.a!.status, 'kept');
+});
+
+test('a seed removed during the run stays removed', async () => {
+  const { deps, state } = harness({
+    topics: [TARIFFS],
+    articles: [
+      article('a', 'Tariff ruling hits steel imports'),
+      seedArticle('seed', 'Operator tariff seed'),
+    ],
+    records: { seed: seedRecord('seed') },
+  });
+  deps.readTriage = async () => {
+    const snapshot = structuredClone(state.store);
+    delete state.store.records.seed;
+    return snapshot;
+  };
+
+  await run(deps);
+
+  assert.deepEqual(Object.keys(state.store.records).sort(), ['a']);
+});
+
+test('dedupe growth of a seed is kept: an in-window search duplicate joins its memberIds', async () => {
+  const seedUrl = 'https://seed.example.com/story';
+  const { deps, state } = harness({
+    topics: [TARIFFS],
+    articles: [
+      seedArticle('seed', 'Operator tariff seed'),
+      article('dup', 'Wire copy on the new tariff schedule', {
+        sourceKind: 'search',
+        citations: [{ label: 'Seed outlet', url: seedUrl }],
+      }),
+    ],
+    records: { seed: seedRecord('seed') },
+  });
+
+  await run(deps);
+
+  assert.deepEqual(state.store.records.seed, seedRecord('seed', { memberIds: ['dup'], outletCount: 2 }));
+  assert.equal(state.store.records.dup!.reason, 'duplicate');
+  assert.equal(state.store.records.dup!.duplicateOf, 'seed');
 });

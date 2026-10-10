@@ -89,6 +89,8 @@ export type KiteBriefStory = {
   informed_full_story_updated?: string;
   /** Kept article's normalized publisher domain ("Less like this" outlet block, NEWS-90). */
   informed_publisher_domain?: string;
+  /** Operator-added seed (NEWS-98); omitted for found stories. */
+  informed_added_by_you?: true;
 };
 
 export type KiteBatchInfo = {
@@ -721,6 +723,9 @@ function topicStoryToKite(
   const publisherDomain = normalizeOutletDomain(story.publisherDomain);
   if (publisherDomain && isHostnameLike(publisherDomain)) {
     kite.informed_publisher_domain = publisherDomain;
+  }
+  if (story.manualSeed) {
+    kite.informed_added_by_you = true;
   }
   const imageUrl = story.imageUrl?.trim();
   if (imageUrl) {
