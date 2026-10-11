@@ -243,7 +243,7 @@ function harness(options: HarnessOptions = {}) {
       return article as Article;
     },
     updateTriage: async (mutate) => {
-      triage = mutate(triage);
+      triage = await mutate(triage);
       triageWrites.push(triage);
       return triage;
     },
@@ -404,6 +404,38 @@ test('createManualSeed refuses a duplicate a refresh kept after the seed first r
   });
   assert.equal(h.triageWrites.length, 0);
   assert.deepEqual(Object.keys(h.triage().records), ['old']);
+});
+
+test('createManualSeed refuses a URL-only duplicate a refresh resolves and keeps just before the seed is written', async () => {
+  const unresolved = makeArticle('old', {
+    title: 'Dockworkers walk out at the port',
+    canonicalUrl: 'https://news.google.com/rss/articles/old',
+    citations: [],
+    publisherUrl: null,
+    publisherDomain: null,
+  });
+  const h = harness({ articles: [unresolved] });
+  const store = h.articles();
+  h.deps.readArticles = async () => [...store];
+  const seedWrite = h.deps.updateTriage!;
+  h.deps.updateTriage = async (mutate) => {
+    // A refresh queued ahead of the seed: resolved articles first, then its kept record.
+    store[0] = {
+      ...unresolved,
+      publisherUrl: 'https://news.example.com/port-strike',
+      publisherDomain: 'news.example.com',
+    };
+    const refreshed = triageOf(kept('old', ['t1']));
+    return seedWrite((current) => mutate({ ...current, records: { ...current.records, ...refreshed.records } }));
+  };
+
+  await assert.rejects(createManualSeed(seedInput(), h.deps), (err) => {
+    assert.ok(err instanceof ManualSeedConflictError, 'refused as a conflict');
+    assert.equal(err.body.code, 'duplicate');
+    assert.equal(err.body.existing.articleId, 'old');
+    return true;
+  });
+  assert.equal(h.triageWrites.length, 0);
 });
 
 test('createManualSeed refuses a similar headline kept in the chosen topic', async () => {

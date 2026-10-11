@@ -127,7 +127,7 @@ function harness(opts: HarnessOptions) {
     readArticles: async () => opts.articles,
     readTriage: async () => structuredClone(state.store),
     updateTriage: async (mutate) => {
-      state.store = structuredClone(mutate(structuredClone(state.store)));
+      state.store = structuredClone(await mutate(structuredClone(state.store)));
       return structuredClone(state.store);
     },
     upsertArticles: async (rows) => {
@@ -814,9 +814,76 @@ test('store write failures are caught into errors and never throw', async () => 
 
   assert.equal(result.skipped, false);
   assert.deepEqual(result.keptIds, ['a']);
-  assert.ok(result.errors.includes('mute rules: mute rules corrupt'));
-  assert.ok(result.errors.includes('triage write: disk full'));
-  assert.ok(result.errors.includes('article write: articles locked'));
+  assert.deepEqual(result.errors, [
+    'mute rules: mute rules corrupt',
+    'article write: articles locked',
+    'triage write: skipped because the article write failed',
+  ]);
+  assert.equal(state.meta.length, 1);
+});
+
+test('a failed triage write after a good article write is reported and never throws', async () => {
+  const { deps, state } = harness({
+    topics: [TARIFFS],
+    articles: [article('a', 'Tariff ruling hits steel imports')],
+    prepare: (a) => ({ article: a, changed: true, dateIssue: null }),
+    overrides: {
+      updateTriage: async () => {
+        throw new Error('disk full');
+      },
+    },
+  });
+
+  const result = await run(deps);
+
+  assert.deepEqual(result.errors, ['triage write: disk full']);
+  assert.equal(state.upserts.length, 1);
+  assert.equal(state.meta.length, 1);
+});
+
+test('resolved articles are written before triage records, so a kept record never points at an unresolved article', async () => {
+  const writes: string[] = [];
+  const { deps } = harness({
+    topics: [TARIFFS],
+    articles: [article('a', 'Tariff ruling hits steel imports')],
+    prepare: (a) => ({ article: { ...a, bodyStatus: 'ok', bodyText: 'Full text.' }, changed: true, dateIssue: null }),
+  });
+  const upsert = deps.upsertArticles!;
+  const update = deps.updateTriage!;
+  deps.upsertArticles = async (rows) => {
+    writes.push('articles');
+    return upsert(rows);
+  };
+  deps.updateTriage = async (mutate) => {
+    writes.push('triage');
+    return update(mutate);
+  };
+
+  await run(deps);
+
+  assert.deepEqual(writes, ['articles', 'triage']);
+});
+
+test('a failed article write skips the triage write, so the stories are triaged again next refresh', async () => {
+  const { deps, state } = harness({
+    topics: [TARIFFS],
+    articles: [article('a', 'Tariff ruling hits steel imports')],
+    records: { old: keptRecord('old') },
+    prepare: (a) => ({ article: a, changed: true, dateIssue: null }),
+    overrides: {
+      upsertArticles: async () => {
+        throw new Error('articles locked');
+      },
+    },
+  });
+
+  const result = await run(deps);
+
+  assert.deepEqual(state.store.records, { old: keptRecord('old') });
+  assert.deepEqual(result.errors, [
+    'article write: articles locked',
+    'triage write: skipped because the article write failed',
+  ]);
   assert.equal(state.meta.length, 1);
 });
 
@@ -946,7 +1013,7 @@ test('a seed saved mid-run whose article the run never read is not pruned', asyn
   });
   deps.updateTriage = async (mutate) => {
     state.store.records.seed = structuredClone(seed);
-    state.store = structuredClone(mutate(structuredClone(state.store)));
+    state.store = structuredClone(await mutate(structuredClone(state.store)));
     return structuredClone(state.store);
   };
 
