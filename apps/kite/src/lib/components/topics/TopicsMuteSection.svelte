@@ -9,14 +9,8 @@ import {
 	MUTES_SOURCE_PLACEHOLDER,
 	TOPICS_MUTES_HELP,
 	TOPICS_MUTES_TITLE,
+	type MuteRule,
 } from '$lib/topics';
-
-export type MuteRule = {
-	id: string;
-	keyword: string;
-	source: string | null;
-	createdAt: string;
-};
 
 interface Props {
 	rules: MuteRule[];

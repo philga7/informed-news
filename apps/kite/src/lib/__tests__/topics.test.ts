@@ -12,8 +12,10 @@ import {
 	MUTES_SOURCE_PLACEHOLDER,
 	emptyTopicForm,
 	formToPayload,
+	formatKeywordLines,
 	formatKeywordsInput,
 	groupTopics,
+	parseKeywordLines,
 	parseKeywordsInput,
 	removeConfirmMessage,
 	topicToForm,
@@ -38,8 +40,30 @@ function makeTopic(overrides: Partial<Topic> = {}): Topic {
 }
 
 describe('parseKeywordsInput', () => {
-	it('splits on newlines, trims, drops blanks, keeps commas inside a keyword', () => {
-		expect(parseKeywordsInput(' tariffs\ntrade war\n\n  steel \nSmith, John\n')).toEqual([
+	it('splits on commas and newlines, trims, drops blanks', () => {
+		expect(parseKeywordsInput(' tariffs, trade war\n\n  steel ,, \n')).toEqual([
+			'tariffs',
+			'trade war',
+			'steel',
+		]);
+	});
+
+	it('dedupes case-insensitively keeping first spelling and order', () => {
+		expect(parseKeywordsInput('NATO, nato\nUkraine,ukraine, EU')).toEqual([
+			'NATO',
+			'Ukraine',
+			'EU',
+		]);
+	});
+
+	it('returns empty for blank input', () => {
+		expect(parseKeywordsInput('  ,\n , ')).toEqual([]);
+	});
+});
+
+describe('parseKeywordLines', () => {
+	it('splits on newlines only so commas inside a keyword survive', () => {
+		expect(parseKeywordLines(' tariffs\ntrade war\n\n  steel \nSmith, John\n')).toEqual([
 			'tariffs',
 			'trade war',
 			'steel',
@@ -48,27 +72,21 @@ describe('parseKeywordsInput', () => {
 	});
 
 	it('does not split on commas alone', () => {
-		expect(parseKeywordsInput('NATO, Ukraine, EU')).toEqual(['NATO, Ukraine, EU']);
-	});
-
-	it('dedupes case-insensitively keeping first spelling and order', () => {
-		expect(parseKeywordsInput('NATO\nnato\nUkraine\nukraine\nEU')).toEqual([
-			'NATO',
-			'Ukraine',
-			'EU',
-		]);
-	});
-
-	it('returns empty for blank input', () => {
-		expect(parseKeywordsInput('  \n \n ')).toEqual([]);
+		expect(parseKeywordLines('NATO, Ukraine, EU')).toEqual(['NATO, Ukraine, EU']);
 	});
 });
 
 describe('formatKeywordsInput', () => {
-	it('joins with newlines', () => {
-		expect(formatKeywordsInput(['a', 'b c'])).toBe('a\nb c');
+	it('joins with comma and space', () => {
+		expect(formatKeywordsInput(['a', 'b c'])).toBe('a, b c');
 		expect(formatKeywordsInput([])).toBe('');
-		expect(formatKeywordsInput(['Smith, John', 'NATO'])).toBe('Smith, John\nNATO');
+	});
+});
+
+describe('formatKeywordLines', () => {
+	it('joins with newlines', () => {
+		expect(formatKeywordLines(['a', 'b c'])).toBe('a\nb c');
+		expect(formatKeywordLines(['Smith, John', 'NATO'])).toBe('Smith, John\nNATO');
 	});
 });
 

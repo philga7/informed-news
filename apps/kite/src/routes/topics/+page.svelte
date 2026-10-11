@@ -9,6 +9,7 @@ import {
 	MUTES_DELETE_ERROR,
 	MUTES_LOAD_ERROR,
 	MUTES_SAVE_ERROR,
+	type MuteRule,
 	TOPICS_ADD_LABEL,
 	TOPICS_ADD_TITLE,
 	TOPICS_BACK_TO_BRIEF,
@@ -41,13 +42,6 @@ import {
 	type TopicLevel,
 	type TopicPayload,
 } from '$lib/topics';
-
-type MuteRule = {
-	id: string;
-	keyword: string;
-	source: string | null;
-	createdAt: string;
-};
 
 type ApiBody = {
 	ok?: boolean;

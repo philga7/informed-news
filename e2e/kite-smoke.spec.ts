@@ -485,6 +485,17 @@ test.describe('Nav shell (NEWS-42)', () => {
 		page.once('dialog', (dialog) => dialog.accept());
 		await core.getByRole('article', { name: renamed }).getByRole('button', { name: 'Remove' }).click();
 		await expect(core.getByRole('article', { name: renamed })).toHaveCount(0, { timeout: 60_000 });
+
+		const muteKeyword = `e2e-mute-${Date.now()}`;
+		const mutes = page.locator('section[aria-labelledby="topics-mutes-title"]');
+		await mutes.getByLabel('Keyword', { exact: true }).fill(muteKeyword);
+		await mutes.getByRole('button', { name: 'Mute', exact: true }).click();
+		const muteRow = mutes.locator('li', { hasText: muteKeyword });
+		await expect(muteRow).toBeVisible({ timeout: 60_000 });
+		await muteRow.getByRole('button', { name: 'Delete', exact: true }).click();
+		await expect(mutes.locator('li', { hasText: muteKeyword })).toHaveCount(0, {
+			timeout: 60_000,
+		});
 	});
 
 	test('dated batch/category deep links and /contribute render', async ({ page }) => {

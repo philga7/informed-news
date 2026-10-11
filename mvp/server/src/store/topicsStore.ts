@@ -155,7 +155,7 @@ export async function createTopic(
 
     const key = nameKey(fields.name);
     if (store.topics.some((t) => nameKey(t.name) === key)) {
-      throw new TopicConflictError(fields.name);
+      throw new TopicConflictError(fields.name.trim());
     }
 
     const now = new Date().toISOString();

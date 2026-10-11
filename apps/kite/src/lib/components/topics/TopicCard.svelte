@@ -129,8 +129,8 @@ async function handleSave(payload: TopicPayload): Promise<void> {
 		{/if}
 	{/if}
 
-	<div class="mt-3 flex flex-wrap items-center gap-4" class:hidden={editing}>
-		{#if desired && onMoveLevel}
+	<div class="mt-3 flex flex-wrap items-center gap-4">
+		{#if !editing && desired && onMoveLevel}
 			<button
 				type="button"
 				class={linkButtonClass}
@@ -143,20 +143,22 @@ async function handleSave(payload: TopicPayload): Promise<void> {
 		<button
 			bind:this={editButton}
 			type="button"
-			class={linkButtonClass}
-			disabled={pending}
+			class={editing ? 'sr-only' : linkButtonClass}
+			disabled={pending || editing}
 			aria-expanded={editing}
 			onclick={openEditor}
 		>
 			{TOPICS_EDIT_LABEL}
 		</button>
-		<button
-			type="button"
-			class="text-xs font-medium text-red-600 underline underline-offset-2 hover:text-red-700 disabled:opacity-50 dark:text-red-400 dark:hover:text-red-300"
-			disabled={pending}
-			onclick={onRemove}
-		>
-			{TOPICS_REMOVE_LABEL}
-		</button>
+		{#if !editing}
+			<button
+				type="button"
+				class="text-xs font-medium text-red-600 underline underline-offset-2 hover:text-red-700 disabled:opacity-50 dark:text-red-400 dark:hover:text-red-300"
+				disabled={pending}
+				onclick={onRemove}
+			>
+				{TOPICS_REMOVE_LABEL}
+			</button>
+		{/if}
 	</div>
 </article>
