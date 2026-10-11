@@ -328,7 +328,6 @@ export async function createManualSeed(
   refuseDuplicate(articles, triage);
 
   const saved = await upsert(article);
-  const articlesAfterSave = await stores.readArticles();
   const record: TriageRecord = {
     articleId: saved.id,
     status: 'kept',
@@ -345,9 +344,10 @@ export async function createManualSeed(
     jevCalls: 0,
     triagedAt: now,
   };
-  // Re-checked under the triage write lock against records kept since the first read.
-  await stores.updateTriage((store) => {
-    refuseDuplicate(articlesAfterSave, store);
+  // Re-checked under the triage write lock, against records kept since the first read and
+  // articles read under that same lock.
+  await stores.updateTriage(async (store) => {
+    refuseDuplicate(await stores.readArticles(), store);
     return { records: { ...store.records, [record.articleId]: record }, updatedAt: now };
   });
 

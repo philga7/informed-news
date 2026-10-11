@@ -580,22 +580,30 @@ export async function runTriage(
     for (const id of Object.keys(records)) {
       if (!articlesById.has(id)) delete records[id];
     }
-    try {
-      const isOrphanSeed = (rec: TriageRecord) =>
-        !articlesById.has(rec.articleId) && !timeInWindow(Date.parse(rec.triagedAt), now);
-      await (deps.updateTriage ?? ((mutate) => updateTriage(mutate)))((current) => ({
-        records: mergeSeedRecords(current.records, records, isOrphanSeed),
-        updatedAt: meta.at,
-      }));
-    } catch (err) {
-      addStoreError(meta.errors, `triage write: ${errorMessage(err)}`);
-    }
-
+    // Articles first: a kept record must never point at an article whose resolved
+    // publisher URL is not stored yet.
+    let articleWriteFailed = false;
     if (run.changed.size > 0) {
       try {
         await (deps.upsertArticles ?? upsertArticles)([...run.changed.values()]);
       } catch (err) {
+        articleWriteFailed = true;
         addStoreError(meta.errors, `article write: ${errorMessage(err)}`);
+      }
+    }
+
+    if (articleWriteFailed) {
+      addStoreError(meta.errors, 'triage write: skipped because the article write failed');
+    } else {
+      try {
+        const isOrphanSeed = (rec: TriageRecord) =>
+          !articlesById.has(rec.articleId) && !timeInWindow(Date.parse(rec.triagedAt), now);
+        await (deps.updateTriage ?? ((mutate) => updateTriage(mutate)))((current) => ({
+          records: mergeSeedRecords(current.records, records, isOrphanSeed),
+          updatedAt: meta.at,
+        }));
+      } catch (err) {
+        addStoreError(meta.errors, `triage write: ${errorMessage(err)}`);
       }
     }
 

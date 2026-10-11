@@ -196,6 +196,42 @@ test('updateTriage: a throwing mutator rejects that call only and writes nothing
   assert.deepEqual(Object.keys((await readTriage(triagePath)).records).sort(), ['a1', 'a2']);
 });
 
+test('updateTriage: an async mutator holds the queue until it resolves', async () => {
+  const triagePath = tempTriagePath();
+  await writeTriage({ records: { a1: keptRecord('a1') }, updatedAt: null }, triagePath);
+
+  const slow = updateTriage(async (store) => {
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    return { ...store, records: { ...store.records, a2: droppedRecord('a2') } };
+  }, triagePath);
+  const queued = updateTriage(
+    (store) => ({ ...store, records: { ...store.records, a3: keptRecord('a3') } }),
+    triagePath,
+  );
+
+  assert.deepEqual(Object.keys((await slow).records).sort(), ['a1', 'a2']);
+  assert.deepEqual(Object.keys((await queued).records).sort(), ['a1', 'a2', 'a3']);
+  assert.deepEqual(Object.keys((await readTriage(triagePath)).records).sort(), ['a1', 'a2', 'a3']);
+});
+
+test('updateTriage: a rejecting async mutator writes nothing and does not block the next update', async () => {
+  const triagePath = tempTriagePath();
+  await writeTriage({ records: { a1: keptRecord('a1') }, updatedAt: null }, triagePath);
+
+  const failing = updateTriage(async () => {
+    await Promise.resolve();
+    throw new Error('async boom');
+  }, triagePath);
+  const following = updateTriage(
+    (store) => ({ ...store, records: { ...store.records, a2: droppedRecord('a2') } }),
+    triagePath,
+  );
+
+  await assert.rejects(failing, { message: 'async boom' });
+  assert.deepEqual(Object.keys((await following).records).sort(), ['a1', 'a2']);
+  assert.deepEqual(Object.keys((await readTriage(triagePath)).records).sort(), ['a1', 'a2']);
+});
+
 test('readTriage throws when the file is not a JSON object', async () => {
   const triagePath = tempTriagePath();
   await writeRaw(triagePath, ['not', 'an', 'object']);

@@ -277,7 +277,7 @@ async function startSeedApp(
           articles.push(article as Article);
           return article as Article;
         },
-        updateTriage: async (mutate) => (triage = mutate(triage)),
+        updateTriage: async (mutate) => (triage = await mutate(triage)),
         scrapePublisherBody: async () => ({
           bodyText: null,
           bodyStatus: 'unavailable',
@@ -293,7 +293,7 @@ async function startSeedApp(
         now: () => SEED_NOW,
         readArticles: async () => articles,
         readTriage: async () => triage,
-        updateTriage: async (mutate) => (triage = mutate(triage)),
+        updateTriage: async (mutate) => (triage = await mutate(triage)),
       }),
     acceptCluster: async (clusterId) => {
       acceptOrTrackCalls.push(`accept:${clusterId}`);

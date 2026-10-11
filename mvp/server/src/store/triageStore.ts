@@ -139,13 +139,17 @@ function enqueueUpdate<T>(triagePath: string, work: () => Promise<T>): Promise<T
   return next;
 }
 
-/** Read, apply `mutate`, write atomically; serialized per path. Resolves to the written store. */
+/**
+ * Read, apply `mutate`, write atomically; serialized per path. Resolves to the written store.
+ * An async `mutate` holds the queue until it settles; it must not call `updateTriage` itself
+ * or await any write that waits on this queue.
+ */
 export async function updateTriage(
-  mutate: (store: TriageStore) => TriageStore,
+  mutate: (store: TriageStore) => TriageStore | Promise<TriageStore>,
   triagePath: string = TRIAGE_PATH,
 ): Promise<TriageStore> {
   return enqueueUpdate(triagePath, async () => {
-    const next = mutate(await readTriage(triagePath));
+    const next = await mutate(await readTriage(triagePath));
     await writeTriage(next, triagePath);
     return next;
   });
