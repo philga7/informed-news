@@ -704,7 +704,8 @@ function topicStoryToKite(
     id: story.articleId,
     membership_key: story.articleId,
     cluster_number: clusterNumber,
-    category: OWNED_CATEGORY_SLUG,
+    // Card label: topic name (NEWS-97). Category route slug stays OWNED_CATEGORY_SLUG (`world`).
+    category: topic.name,
     title: story.title,
     short_summary: story.summary.status === 'ok' ? (story.summary.text ?? '') : '',
     articles,

@@ -665,7 +665,9 @@ test('topicBriefToKiteStories maps Brief order, cluster numbers, fields and glue
 
   const a1 = stories[0]!;
   assert.equal(a1.membership_key, 'a1');
-  assert.equal(a1.category, 'world');
+  // NEWS-97: card label is the topic name, never the owned-category slug "world"/"WORLD".
+  assert.equal(a1.category, 'Iran');
+  assert.notEqual(a1.category.toLowerCase(), OWNED_CATEGORY_SLUG);
   assert.equal(a1.title, 'Headline a1');
   assert.equal(a1.short_summary, 'Officials said talks resumed.');
   assert.deepEqual(a1.articles, [
@@ -691,6 +693,7 @@ test('topicBriefToKiteStories maps Brief order, cluster numbers, fields and glue
   });
   assert.equal(a1.informed_article_id, 'a1');
   assert.equal(a1.informed_topic_name, 'Iran');
+  assert.equal(a1.category, a1.informed_topic_name);
   assert.equal(a1.informed_more, false);
   assert.equal(a1.informed_outlet_count, 3);
   assert.deepEqual(a1.informed_labels, ['official']);
@@ -705,7 +708,9 @@ test('topicBriefToKiteStories maps Brief order, cluster numbers, fields and glue
   assert.equal(a3!.primary_image, undefined);
   assert.equal(a4!.informed_more, true);
   assert.equal(b1!.informed_topic_name, 'Gas prices');
+  assert.equal(b1!.category, 'Gas prices');
   for (const story of stories) {
+    assert.notEqual(story.category.toLowerCase(), 'world');
     assert.equal(story.talking_points, undefined);
     assert.equal(story.timeline, undefined);
     assert.equal(story.perspectives, undefined);

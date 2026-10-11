@@ -25,6 +25,11 @@ export const TOPIC_SCENARIO = {
 		{ id: 'e2e-topic-ports', name: 'Ports & shipping', level: 'core' },
 	],
 	quiet: [{ id: 'e2e-topic-space', name: 'Space launches', level: 'watch' }],
+	/**
+	 * NEWS-97: story card category labels use topic names (never upstream "WORLD").
+	 * Owned category route slug stays `world` so Kite's default-enabled categories still match.
+	 */
+	forbiddenCardCategoryLabel: 'WORLD',
 	/** Energy grid: 3 top stories + 1 behind "More" */
 	gridMoreCount: 1,
 	summaryText:

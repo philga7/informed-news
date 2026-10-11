@@ -3148,7 +3148,9 @@ test('Kite brief via createApp: kept stories only (accepted-but-not-kept gone), 
       body.stories.map((s) => s.id),
       ['k1', 'k2'],
     );
-    assert.equal(body.stories[0]!.category, 'world');
+    assert.equal(body.stories[0]!.category, 'T1');
+    assert.equal(body.stories[0]!.informed_topic_name, 'T1');
+    assert.notEqual(body.stories[0]!.category.toLowerCase(), 'world');
     assert.equal(body.stories[0]!.informed_topic_id, 't1');
     assert.equal(body.timestamp, Date.parse(lastSuccess.completedAt) / 1000);
 

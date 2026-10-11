@@ -20,6 +20,7 @@ type BriefOverview = {
 type KiteStory = {
 	id?: string;
 	title?: string;
+	category?: string;
 	cluster_number?: number;
 	primary_image?: { url?: string; caption?: string };
 	articles?: Array<{ image?: string }>;
@@ -29,6 +30,7 @@ type KiteStory = {
 	timeline?: unknown[];
 	suggested_qna?: unknown[];
 	informed_article_id?: string;
+	informed_topic_name?: string;
 	informed_summary_status?: string;
 	informed_full_story_status?: string;
 };
@@ -130,6 +132,10 @@ test.describe('Topic Brief (NEWS-88)', () => {
 		}
 		for (const story of stories) {
 			expect(story.informed_article_id).toBe(story.id);
+			// NEWS-97: card category label is the topic name; never upstream "WORLD".
+			expect(story.category?.toUpperCase()).not.toBe(TOPIC_SCENARIO.forbiddenCardCategoryLabel);
+			expect(story.category).toBe(story.informed_topic_name);
+			expect(TOPIC_SCENARIO.sections.map((s) => s.name)).toContain(story.category);
 		}
 		expect(stories.map((s) => s.informed_summary_status).sort()).toEqual([
 			'missing',
@@ -157,6 +163,17 @@ test.describe('Topic Brief (NEWS-88)', () => {
 		await expect(grid.getByText('Regulator opens review of overnight tariffs')).toHaveCount(0);
 		await more.click();
 		await expect(grid.getByText('Regulator opens review of overnight tariffs')).toBeVisible();
+
+		// NEWS-97: card labels show topic names; "WORLD" must not appear on cards.
+		const gridCardLabels = grid.locator('article[id^="story-"] .category-label');
+		await expect(gridCardLabels.first()).toHaveText(TOPIC_SCENARIO.sections[0]!.name, {
+			ignoreCase: true,
+		});
+		expect(await gridCardLabels.count()).toBeGreaterThan(0);
+		for (const label of await gridCardLabels.all()) {
+			await expect(label).not.toHaveText(TOPIC_SCENARIO.forbiddenCardCategoryLabel);
+			await expect(label).toHaveText(TOPIC_SCENARIO.sections[0]!.name, { ignoreCase: true });
+		}
 
 		await expect(sections.nth(1).getByText(TOPIC_SCENARIO.duplicateOutletBadge)).toBeVisible();
 		await expect(page.getByTestId('topic-brief-quiet')).toContainText(
