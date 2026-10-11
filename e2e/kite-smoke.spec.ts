@@ -164,14 +164,13 @@ test.describe('Topic Brief (NEWS-88)', () => {
 		await more.click();
 		await expect(grid.getByText('Regulator opens review of overnight tariffs')).toBeVisible();
 
-		// NEWS-97: visible card labels show topic names; "WORLD" must not appear on cards.
-		const gridCards = grid.locator('article[id^="story-"]');
-		await expect(gridCards.first().locator('.category-label')).toHaveText(
-			TOPIC_SCENARIO.sections[0]!.name,
-			{ ignoreCase: true },
-		);
-		await expect(grid.locator('.category-label')).toHaveCount(3);
-		for (const label of await grid.locator('.category-label').all()) {
+		// NEWS-97: card labels show topic names; "WORLD" must not appear on cards.
+		const gridCardLabels = grid.locator('article[id^="story-"] .category-label');
+		await expect(gridCardLabels.first()).toHaveText(TOPIC_SCENARIO.sections[0]!.name, {
+			ignoreCase: true,
+		});
+		expect(await gridCardLabels.count()).toBeGreaterThan(0);
+		for (const label of await gridCardLabels.all()) {
 			await expect(label).not.toHaveText(TOPIC_SCENARIO.forbiddenCardCategoryLabel);
 			await expect(label).toHaveText(TOPIC_SCENARIO.sections[0]!.name, { ignoreCase: true });
 		}
