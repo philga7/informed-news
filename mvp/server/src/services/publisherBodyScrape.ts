@@ -296,33 +296,30 @@ export function extractPublisherBodyFromHtml(
 async function fetchHtml(
   url: string,
   retryCount: number,
-  timeoutMs: number,
+  signal: AbortSignal,
   maxRetries: number,
 ): Promise<Response> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     return await fetch(url, {
       headers: { 'User-Agent': USER_AGENT },
-      signal: controller.signal,
+      signal,
       redirect: 'follow',
     });
   } catch (err) {
-    if (isRetryableNetworkError(err) && retryCount < maxRetries) {
+    if (!signal.aborted && isRetryableNetworkError(err) && retryCount < maxRetries) {
       console.warn(
         `Network error fetching body ${url}, retrying (${retryCount + 1}/${maxRetries})...`,
       );
-      return fetchHtml(url, retryCount + 1, timeoutMs, maxRetries);
+      return fetchHtml(url, retryCount + 1, signal, maxRetries);
     }
     throw err;
-  } finally {
-    clearTimeout(timer);
   }
 }
 
 /**
  * Best-effort publisher body scrape. Never throws for caller convenience —
  * failures become unavailable/blocked. Does not bypass paywalls.
+ * `timeoutMs` bounds the whole call: headers, body, and any retry.
  */
 export async function scrapePublisherBody(
   publisherUrl: string | null | undefined,
@@ -332,11 +329,13 @@ export async function scrapePublisherBody(
     return emptyResult('unavailable');
   }
 
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), opts.timeoutMs ?? FETCH_TIMEOUT_MS);
   try {
     const response = await fetchHtml(
       publisherUrl,
       0,
-      opts.timeoutMs ?? FETCH_TIMEOUT_MS,
+      controller.signal,
       opts.retries ?? MAX_RETRIES,
     );
 
@@ -363,5 +362,9 @@ export async function scrapePublisherBody(
       err instanceof Error ? err.message : err,
     );
     return emptyResult('unavailable');
+  } finally {
+    clearTimeout(timer);
+    // Releases the socket of an error response whose body was never read.
+    controller.abort();
   }
 }

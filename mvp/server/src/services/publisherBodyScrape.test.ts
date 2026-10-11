@@ -443,6 +443,70 @@ test('scrapePublisherBody makes a single attempt with retries: 0', async (t) => 
   }
 });
 
+/** Sends headers and a first chunk, then never finishes the body. */
+async function stalledBodyServer(status: number) {
+  let requests = 0;
+  const server = createServer((_req, res) => {
+    requests += 1;
+    res.writeHead(status, { 'Content-Type': 'text/html' });
+    res.write('<html><body><p>Partial');
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const { port } = server.address() as AddressInfo;
+  return {
+    url: `http://127.0.0.1:${port}/stalls`,
+    requests: () => requests,
+    close: async () => {
+      server.closeAllConnections();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    },
+  };
+}
+
+async function scrapeWithGuard(url: string, timeoutMs: number) {
+  let guard: NodeJS.Timeout | undefined;
+  const started = Date.now();
+  try {
+    const result = await Promise.race([
+      scrapePublisherBody(url, { timeoutMs }),
+      new Promise<'guard'>((resolve) => {
+        guard = setTimeout(() => resolve('guard'), 2_000);
+      }),
+    ]);
+    return { result, elapsed: Date.now() - started };
+  } finally {
+    clearTimeout(guard);
+  }
+}
+
+test('scrapePublisherBody: a body that stalls after the headers fails within timeoutMs, without a retry', async (t) => {
+  t.mock.method(console, 'warn', () => {});
+  const server = await stalledBodyServer(200);
+  try {
+    const { result, elapsed } = await scrapeWithGuard(server.url, 150);
+    assert.notEqual(result, 'guard', 'scrape hung past the 2 s guard');
+    assert.equal((result as PublisherBodyResult).bodyStatus, 'unavailable');
+    assert.ok(elapsed < 1_000, `settled in ${elapsed} ms`);
+    assert.equal(server.requests(), 1);
+  } finally {
+    await server.close();
+  }
+});
+
+test('scrapePublisherBody: a 403 page whose body stalls is blocked within timeoutMs', async (t) => {
+  t.mock.method(console, 'warn', () => {});
+  const server = await stalledBodyServer(403);
+  try {
+    const { result, elapsed } = await scrapeWithGuard(server.url, 150);
+    assert.notEqual(result, 'guard', 'scrape hung past the 2 s guard');
+    assert.equal((result as PublisherBodyResult).bodyStatus, 'blocked');
+    assert.ok(elapsed < 1_000, `settled in ${elapsed} ms`);
+    assert.equal(server.requests(), 1);
+  } finally {
+    await server.close();
+  }
+});
+
 test('blocks x.com and twitter hosts', () => {
   assert.equal(isBlockedPublisherHost('https://x.com/user/status/1'), true);
   assert.equal(isBlockedPublisherHost('https://twitter.com/user/status/1'), true);
