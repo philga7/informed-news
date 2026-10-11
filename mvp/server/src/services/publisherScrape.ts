@@ -1,8 +1,10 @@
 import * as cheerio from 'cheerio';
+import { isRetryableNetworkError } from './isRetryableNetworkError.js';
 
 const DEFAULT_SOURCE_DOMAIN = 'citizenfreepress.com';
 const FETCH_TIMEOUT_MS = 15_000;
 const MAX_RETRIES = 1;
+const USER_AGENT = 'Informed News MVP';
 
 const CONTENT_SELECTORS = [
   'article',
@@ -12,18 +14,6 @@ const CONTENT_SELECTORS = [
   'main',
   '#content',
 ];
-
-function isRetryableNetworkError(err: unknown): boolean {
-  if (!(err instanceof Error)) return false;
-  const msg = err.message.toLowerCase();
-  return (
-    msg.includes('timeout') ||
-    msg.includes('aborted') ||
-    msg.includes('econnreset') ||
-    msg.includes('etimedout') ||
-    msg.includes('fetch failed')
-  );
-}
 
 function hostnameOf(url: string): string | null {
   try {
@@ -79,46 +69,73 @@ function firstExternalLink(
   return found;
 }
 
+function extractPublisherUrl(
+  html: string,
+  pageUrl: string,
+  sourceDomain: string,
+): string | null {
+  const $ = cheerio.load(html);
+
+  for (const selector of CONTENT_SELECTORS) {
+    if ($(selector).length === 0) continue;
+    const found = firstExternalLink($, pageUrl, sourceDomain, selector);
+    if (found) return found;
+  }
+
+  return firstExternalLink($, pageUrl, sourceDomain, null);
+}
+
+async function fetchPublisherPage(
+  pageUrl: string,
+  retryCount: number,
+  signal: AbortSignal,
+  maxRetries: number,
+): Promise<Response> {
+  try {
+    return await fetch(pageUrl, {
+      headers: { 'User-Agent': USER_AGENT },
+      signal,
+    });
+  } catch (err) {
+    if (!signal.aborted && isRetryableNetworkError(err) && retryCount < maxRetries) {
+      console.warn(
+        `Network error scraping ${pageUrl}, retrying (${retryCount + 1}/${maxRetries})...`,
+      );
+      return fetchPublisherPage(pageUrl, retryCount + 1, signal, maxRetries);
+    }
+    throw err;
+  }
+}
+
 /**
  * Scrape a CFP (aggregator) article page for the original publisher URL.
  * Prefers links inside common content containers; falls back to first page-wide external link.
  * Returns null when no external publisher link is found (caller keeps canonicalUrl).
+ * `timeoutMs` bounds the whole call: headers, body, and any retry. A timeout is never retried.
  */
 export async function scrapePublisherUrl(
   pageUrl: string,
   sourceDomain: string = DEFAULT_SOURCE_DOMAIN,
-  retryCount = 0,
+  opts: { timeoutMs?: number; retries?: number } = {},
 ): Promise<string | null> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), opts.timeoutMs ?? FETCH_TIMEOUT_MS);
 
   try {
-    const response = await fetch(pageUrl, {
-      headers: { 'User-Agent': 'Informed News MVP' },
-      signal: controller.signal,
-    });
+    const response = await fetchPublisherPage(
+      pageUrl,
+      0,
+      controller.signal,
+      opts.retries ?? MAX_RETRIES,
+    );
     if (!response.ok) {
       console.warn(`Publisher scrape HTTP ${response.status} for ${pageUrl}`);
       return null;
     }
 
     const html = await response.text();
-    const $ = cheerio.load(html);
-
-    for (const selector of CONTENT_SELECTORS) {
-      if ($(selector).length === 0) continue;
-      const found = firstExternalLink($, pageUrl, sourceDomain, selector);
-      if (found) return found;
-    }
-
-    return firstExternalLink($, pageUrl, sourceDomain, null);
+    return extractPublisherUrl(html, pageUrl, sourceDomain);
   } catch (err) {
-    if (isRetryableNetworkError(err) && retryCount < MAX_RETRIES) {
-      console.warn(
-        `Network error scraping ${pageUrl}, retrying (${retryCount + 1}/${MAX_RETRIES})...`,
-      );
-      return scrapePublisherUrl(pageUrl, sourceDomain, retryCount + 1);
-    }
     console.warn(
       `Publisher scrape failed for ${pageUrl}:`,
       err instanceof Error ? err.message : err,
@@ -126,6 +143,8 @@ export async function scrapePublisherUrl(
     return null;
   } finally {
     clearTimeout(timer);
+    // Releases the socket of an error response whose body was never read.
+    controller.abort();
   }
 }
 

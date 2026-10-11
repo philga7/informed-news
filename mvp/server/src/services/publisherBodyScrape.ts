@@ -1,6 +1,7 @@
 import * as cheerio from 'cheerio';
 import type { BodyStatus } from '../types/article.js';
 import { truncateBodyText } from '../types/article.js';
+import { isRetryableNetworkError } from './isRetryableNetworkError.js';
 
 const FETCH_TIMEOUT_MS = 15_000;
 const MAX_RETRIES = 1;
@@ -78,18 +79,6 @@ function emptyResult(bodyStatus: 'unavailable' | 'blocked'): PublisherBodyResult
     imageCredit: null,
     publishedAt: null,
   };
-}
-
-function isRetryableNetworkError(err: unknown): boolean {
-  if (!(err instanceof Error)) return false;
-  const msg = err.message.toLowerCase();
-  return (
-    msg.includes('timeout') ||
-    msg.includes('aborted') ||
-    msg.includes('econnreset') ||
-    msg.includes('etimedout') ||
-    msg.includes('fetch failed')
-  );
 }
 
 function hostnameOf(url: string): string | null {
