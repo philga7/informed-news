@@ -1196,6 +1196,7 @@ type TopicBody = {
   kind: string;
   level: string | null;
   sections: string[];
+  searchQuery?: string;
 };
 
 async function startTopicsServer(): Promise<{
@@ -1307,6 +1308,7 @@ test('POST /api/topics creates desired and undesired topics', async () => {
       name: 'Celebrity gossip',
       kind: 'undesired',
       level: 'core',
+      searchQuery: 'celebrity news',
       sections: ['business'],
     });
     assert.equal(undesiredResp.status, 201);
@@ -1314,6 +1316,7 @@ test('POST /api/topics creates desired and undesired topics', async () => {
     assert.equal(undesired.topic.kind, 'undesired');
     assert.equal(undesired.topic.level, null);
     assert.deepEqual(undesired.topic.sections, []);
+    assert.equal(undesired.topic.searchQuery, '');
   } finally {
     await close();
   }
@@ -1368,6 +1371,35 @@ test('POST /api/topics returns 409 on duplicate name', async () => {
     const body = (await dup.json()) as { ok: false; error: string };
     assert.equal(body.ok, false);
     assert.match(body.error, /already exists/);
+  } finally {
+    await close();
+  }
+});
+
+test('POST /api/topics requires session', async () => {
+  const { baseUrl, close } = await startTopicsServer();
+  try {
+    const resp = await postTopic(baseUrl, '', {
+      name: 'No session',
+      kind: 'desired',
+      level: 'watch',
+    });
+    assert.equal(resp.status, 401);
+  } finally {
+    await close();
+  }
+});
+
+test('PATCH /api/topics/:id returns 409 when renaming onto another topic', async () => {
+  const { baseUrl, close } = await startTopicsServer();
+  try {
+    const cookie = await login(baseUrl);
+    const resp = await patchTopic(baseUrl, cookie, 'iran', { name: 'Israel' });
+    assert.equal(resp.status, 409);
+    const body = (await resp.json()) as { ok: false; error: string };
+    assert.equal(body.ok, false);
+    assert.match(body.error, /already exists/);
+    assert.match(body.error, /Israel/);
   } finally {
     await close();
   }

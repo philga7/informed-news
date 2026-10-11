@@ -3,16 +3,13 @@ import { onMount } from 'svelte';
 import { PRODUCT_NAME } from '$lib/brand';
 import TopicCard from '$lib/components/topics/TopicCard.svelte';
 import TopicForm from '$lib/components/topics/TopicForm.svelte';
+import TopicsMuteSection from '$lib/components/topics/TopicsMuteSection.svelte';
 import { FILTERED_TOPICS_LINK } from '$lib/filteredOut';
 import {
-	MUTES_ADD_LABEL,
 	MUTES_DELETE_ERROR,
-	MUTES_DELETE_LABEL,
-	MUTES_EMPTY_COPY,
-	MUTES_KEYWORD_LABEL,
 	MUTES_LOAD_ERROR,
 	MUTES_SAVE_ERROR,
-	MUTES_SOURCE_LABEL,
+	type MuteRule,
 	TOPICS_ADD_LABEL,
 	TOPICS_ADD_TITLE,
 	TOPICS_BACK_TO_BRIEF,
@@ -30,9 +27,7 @@ import {
 	TOPICS_LOGIN_SUBMIT_LABEL,
 	TOPICS_LOGIN_TITLE,
 	TOPICS_LOGOUT_LABEL,
-	TOPICS_MUTES_HELP,
 	TOPICS_MUTES_KEYWORD_REQUIRED,
-	TOPICS_MUTES_TITLE,
 	TOPICS_NETWORK_ERROR,
 	TOPICS_PAGE_DESCRIPTION,
 	TOPICS_PAGE_TITLE,
@@ -48,13 +43,6 @@ import {
 	type TopicPayload,
 } from '$lib/topics';
 
-type MuteRule = {
-	id: string;
-	keyword: string;
-	source: string | null;
-	createdAt: string;
-};
-
 type ApiBody = {
 	ok?: boolean;
 	error?: string;
@@ -62,7 +50,9 @@ type ApiBody = {
 	rules?: MuteRule[];
 } | null;
 
-type MutationResult = { ok: true; body: ApiBody } | { ok: false; error: string | null };
+type MutationResult =
+	| { ok: true; body: ApiBody; seq: number | null }
+	| { ok: false; error: string | null };
 
 let loading = $state(true);
 let unauthenticated = $state(false);
@@ -84,7 +74,11 @@ let muteActionError = $state<string | null>(null);
 let keyword = $state('');
 let source = $state('');
 let pendingMute = $state(false);
-let pendingDeleteMuteId = $state<string | null>(null);
+let pendingDeleteMute = $state(false);
+
+/** Monotonic seq so overlapping write responses cannot apply an older list. */
+let topicsRequestSeq = 0;
+let topicsAppliedSeq = 0;
 
 const grouped = $derived(groupTopics(topics));
 
@@ -104,12 +98,20 @@ function clearSessionState(): void {
 	muteActionError = null;
 	cardPending = {};
 	cardErrors = {};
-	pendingDeleteMuteId = null;
+	pendingDeleteMute = false;
+	topicsRequestSeq = 0;
+	topicsAppliedSeq = 0;
 }
 
 function enterLoginShell(): void {
 	unauthenticated = true;
 	clearSessionState();
+}
+
+function applyTopics(next: Topic[], seq: number): void {
+	if (seq <= topicsAppliedSeq) return;
+	topicsAppliedSeq = seq;
+	topics = next;
 }
 
 async function readBody(response: Response): Promise<ApiBody> {
@@ -135,7 +137,8 @@ async function loadAll(): Promise<void> {
 
 		const topicsBody = await readBody(topicsResponse);
 		if (topicsResponse.ok && topicsBody?.ok && Array.isArray(topicsBody.topics)) {
-			topics = topicsBody.topics;
+			const seq = ++topicsRequestSeq;
+			applyTopics(topicsBody.topics, seq);
 		} else {
 			topics = [];
 			loadError = topicsBody?.error || TOPICS_LOAD_ERROR;
@@ -161,7 +164,9 @@ async function mutate(
 	method: 'POST' | 'PATCH' | 'DELETE',
 	fallbackError: string,
 	payload?: unknown,
+	options?: { trackTopicsSeq?: boolean },
 ): Promise<MutationResult> {
+	const seq = options?.trackTopicsSeq ? ++topicsRequestSeq : null;
 	try {
 		const response = await fetch(path, {
 			method,
@@ -180,7 +185,7 @@ async function mutate(
 		if (!response.ok || !body || body.ok === false) {
 			return { ok: false, error: body?.error || fallbackError };
 		}
-		return { ok: true, body };
+		return { ok: true, body, seq };
 	} catch (err) {
 		console.error(`Error calling ${method} ${path}`, err);
 		return { ok: false, error: TOPICS_NETWORK_ERROR };
@@ -192,14 +197,18 @@ async function addTopic(payload: TopicPayload): Promise<void> {
 	addPending = true;
 	addError = null;
 
-	const result = await mutate('/api/topics', 'POST', TOPICS_SAVE_ERROR, payload);
+	const result = await mutate('/api/topics', 'POST', TOPICS_SAVE_ERROR, payload, {
+		trackTopicsSeq: true,
+	});
 	addPending = false;
 
 	if (!result.ok) {
 		addError = result.error;
 		return;
 	}
-	if (Array.isArray(result.body?.topics)) topics = result.body.topics;
+	if (Array.isArray(result.body?.topics) && result.seq !== null) {
+		applyTopics(result.body.topics, result.seq);
+	}
 	addFormKey += 1;
 }
 
@@ -208,8 +217,8 @@ async function runCardAction(
 	method: 'PATCH' | 'DELETE',
 	fallbackError: string,
 	payload?: Partial<TopicPayload>,
-): Promise<void> {
-	if (cardPending[id]) return;
+): Promise<boolean> {
+	if (cardPending[id]) return false;
 	cardPending[id] = true;
 	cardErrors[id] = null;
 
@@ -218,23 +227,31 @@ async function runCardAction(
 		method,
 		fallbackError,
 		payload,
+		{ trackTopicsSeq: true },
 	);
 	delete cardPending[id];
 
 	if (!result.ok) {
 		if (!unauthenticated) cardErrors[id] = result.error;
-		return;
+		return false;
 	}
 	delete cardErrors[id];
-	if (Array.isArray(result.body?.topics)) topics = result.body.topics;
+	if (Array.isArray(result.body?.topics) && result.seq !== null) {
+		applyTopics(result.body.topics, result.seq);
+	}
+	return true;
 }
 
 function moveLevel(topic: Topic, level: TopicLevel): void {
 	void runCardAction(topic.id, 'PATCH', TOPICS_SAVE_ERROR, { level });
 }
 
-function saveTopic(topic: Topic, payload: TopicPayload): void {
-	void runCardAction(topic.id, 'PATCH', TOPICS_SAVE_ERROR, payload);
+function saveTopic(topic: Topic, payload: TopicPayload): Promise<boolean> {
+	return runCardAction(topic.id, 'PATCH', TOPICS_SAVE_ERROR, payload);
+}
+
+function clearCardError(id: string): void {
+	delete cardErrors[id];
 }
 
 function removeTopic(topic: Topic): void {
@@ -242,14 +259,18 @@ function removeTopic(topic: Topic): void {
 	void runCardAction(topic.id, 'DELETE', TOPICS_REMOVE_ERROR);
 }
 
-async function applyMuteResult(result: MutationResult, fallbackError: string): Promise<boolean> {
+function applyMuteResult(result: MutationResult, fallbackError: string): boolean {
 	if (!result.ok) {
 		if (!unauthenticated) muteActionError = result.error || fallbackError;
 		return false;
 	}
-	if (Array.isArray(result.body?.rules)) muteRules = result.body.rules;
-	else await loadAll();
-	return true;
+	if (Array.isArray(result.body?.rules)) {
+		muteRules = result.body.rules;
+		return true;
+	}
+	// API always returns rules; avoid a destructive reload that would wipe in-progress forms.
+	muteActionError = fallbackError;
+	return false;
 }
 
 async function addMuteRule(event: SubmitEvent): Promise<void> {
@@ -269,7 +290,7 @@ async function addMuteRule(event: SubmitEvent): Promise<void> {
 		keyword: nextKeyword,
 		...(nextSource ? { source: nextSource } : {}),
 	});
-	if (await applyMuteResult(result, MUTES_SAVE_ERROR)) {
+	if (applyMuteResult(result, MUTES_SAVE_ERROR)) {
 		keyword = '';
 		source = '';
 	}
@@ -277,16 +298,16 @@ async function addMuteRule(event: SubmitEvent): Promise<void> {
 }
 
 async function deleteMuteRule(id: string): Promise<void> {
-	if (pendingDeleteMuteId || loading) return;
-	pendingDeleteMuteId = id;
+	if (pendingDeleteMute || loading) return;
+	pendingDeleteMute = true;
 	muteActionError = null;
 	const result = await mutate(
 		`/api/brief/mutes/${encodeURIComponent(id)}`,
 		'DELETE',
 		MUTES_DELETE_ERROR,
 	);
-	await applyMuteResult(result, MUTES_DELETE_ERROR);
-	pendingDeleteMuteId = null;
+	applyMuteResult(result, MUTES_DELETE_ERROR);
+	pendingDeleteMute = false;
 }
 
 async function handleLogin(event: SubmitEvent): Promise<void> {
@@ -346,9 +367,9 @@ onMount(() => {
 			{title}
 			<span class="ml-1 text-xs font-medium text-gray-500 dark:text-gray-400">({list.length})</span>
 		</h2>
-		{#if list.length === 0}
+		{#if list.length === 0 && !loadError}
 			<p class="text-xs text-gray-600 dark:text-gray-400">{emptyCopy}</p>
-		{:else}
+		{:else if list.length > 0}
 			<ul class="space-y-3">
 				{#each list as topic (topic.id)}
 					<li>
@@ -361,6 +382,7 @@ onMount(() => {
 								: undefined}
 							onSave={(payload: TopicPayload) => saveTopic(topic, payload)}
 							onRemove={() => removeTopic(topic)}
+							onClearError={() => clearCardError(topic.id)}
 						/>
 					</li>
 				{/each}
@@ -448,83 +470,20 @@ onMount(() => {
 				TOPICS_EMPTY_UNDESIRED,
 			)}
 
-			<section class="mt-8 space-y-4" aria-labelledby="topics-mutes-title">
-				<header class="space-y-1">
-					<h2
-						id="topics-mutes-title"
-						class="text-sm font-semibold tracking-tight text-gray-900 dark:text-gray-100"
-					>
-						{TOPICS_MUTES_TITLE}
-					</h2>
-					<p class="text-xs leading-relaxed text-gray-600 dark:text-gray-400">
-						{TOPICS_MUTES_HELP}
-					</p>
-				</header>
-
-				{#if muteLoadError}
-					<p class="text-xs text-red-600 dark:text-red-400" role="alert">{muteLoadError}</p>
-				{/if}
-				{#if muteActionError}
-					<p class="text-xs text-red-600 dark:text-red-400" role="alert">{muteActionError}</p>
-				{/if}
-
-				<form class="flex flex-col gap-3 sm:flex-row sm:items-end" onsubmit={addMuteRule}>
-					<label class="block text-xs font-medium text-gray-700 dark:text-gray-300 sm:flex-1">
-						{MUTES_KEYWORD_LABEL}
-						<input
-							type="text"
-							class={inputClass}
-							placeholder="keyword"
-							autocomplete="off"
-							bind:value={keyword}
-						/>
-					</label>
-					<label class="block text-xs font-medium text-gray-700 dark:text-gray-300 sm:flex-1">
-						{MUTES_SOURCE_LABEL}
-						<input
-							type="text"
-							class={inputClass}
-							placeholder="domain or source"
-							autocomplete="off"
-							bind:value={source}
-						/>
-					</label>
-					<button
-						type="submit"
-						class={primaryButtonClass}
-						disabled={pendingMute || !keyword.trim()}
-					>
-						{MUTES_ADD_LABEL}
-					</button>
-				</form>
-
-				{#if muteRules.length === 0}
-					<p class="text-xs text-gray-600 dark:text-gray-400">{MUTES_EMPTY_COPY}</p>
-				{:else}
-					<ul class="space-y-2">
-						{#each muteRules as rule (rule.id)}
-							<li
-								class="flex items-center justify-between gap-3 rounded-md border border-gray-200 bg-white/70 px-3 py-2 text-xs shadow-sm backdrop-blur dark:border-gray-700 dark:bg-gray-900/60"
-							>
-								<div class="min-w-0">
-									<span class="font-medium text-gray-900 dark:text-gray-100">{rule.keyword}</span>
-									{#if rule.source}
-										<span class="ml-2 text-gray-500 dark:text-gray-400">({rule.source})</span>
-									{/if}
-								</div>
-								<button
-									type="button"
-									class="shrink-0 text-xs font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700 disabled:opacity-50 dark:text-blue-400 dark:hover:text-blue-300"
-									disabled={pendingDeleteMuteId === rule.id}
-									onclick={() => deleteMuteRule(rule.id)}
-								>
-									{MUTES_DELETE_LABEL}
-								</button>
-							</li>
-						{/each}
-					</ul>
-				{/if}
-			</section>
+			<TopicsMuteSection
+				rules={muteRules}
+				{keyword}
+				{source}
+				{pendingMute}
+				pendingDelete={pendingDeleteMute}
+				loadError={muteLoadError}
+				actionError={muteActionError}
+				showEmpty={!loadError}
+				onKeywordChange={(value) => (keyword = value)}
+				onSourceChange={(value) => (source = value)}
+				onAdd={addMuteRule}
+				onDelete={deleteMuteRule}
+			/>
 
 			<div class="mt-8 flex items-center justify-between gap-4">
 				<p class="text-xs text-gray-500 dark:text-gray-400">

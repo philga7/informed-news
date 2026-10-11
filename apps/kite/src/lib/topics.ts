@@ -71,6 +71,17 @@ export const MUTES_SAVE_ERROR = 'Could not save mute rule. Try again.';
 
 export const MUTES_DELETE_ERROR = 'Could not delete mute rule. Try again.';
 
+export const MUTES_KEYWORD_PLACEHOLDER = 'keyword';
+
+export const MUTES_SOURCE_PLACEHOLDER = 'domain or source';
+
+export type MuteRule = {
+	id: string;
+	keyword: string;
+	source: string | null;
+	createdAt: string;
+};
+
 export const TOPICS_EMPTY_DESIRED = 'No topics at this level yet.';
 
 export const TOPICS_EMPTY_UNDESIRED = 'No undesired topics yet.';
@@ -105,7 +116,7 @@ export const TOPICS_FIELD_NAME = 'Name';
 
 export const TOPICS_FIELD_DESCRIPTION = 'Description';
 
-export const TOPICS_FIELD_KEYWORDS = 'Keywords (comma or newline separated)';
+export const TOPICS_FIELD_KEYWORDS = 'Keywords (one per line)';
 
 export const TOPICS_FIELD_QUERY = 'Search query';
 
@@ -157,10 +168,10 @@ export type TopicFormState = {
 	notes: string;
 };
 
-export function parseKeywordsInput(text: string): string[] {
+function collectKeywords(parts: Iterable<string>): string[] {
 	const seen = new Set<string>();
 	const keywords: string[] = [];
-	for (const part of text.split(/[,\r\n]+/)) {
+	for (const part of parts) {
 		const keyword = part.trim();
 		if (!keyword) continue;
 		const key = keyword.toLowerCase();
@@ -171,8 +182,25 @@ export function parseKeywordsInput(text: string): string[] {
 	return keywords;
 }
 
+/**
+ * Comma or newline separated (Less like this single-line field).
+ * Prefer {@link parseKeywordLines} on the Topics form so commas inside a keyword survive.
+ */
+export function parseKeywordsInput(text: string): string[] {
+	return collectKeywords(text.split(/[,\r\n]+/));
+}
+
+/** One keyword per line for the Topics form (commas inside a keyword are kept). */
+export function parseKeywordLines(text: string): string[] {
+	return collectKeywords(text.split(/\r?\n/));
+}
+
 export function formatKeywordsInput(keywords: readonly string[]): string {
 	return keywords.join(', ');
+}
+
+export function formatKeywordLines(keywords: readonly string[]): string {
+	return keywords.join('\n');
 }
 
 function byName(a: Topic, b: Topic): number {
@@ -214,7 +242,7 @@ export function topicToForm(topic: Topic): TopicFormState {
 		kind: topic.kind,
 		level: topic.level ?? 'watch',
 		description: topic.description,
-		keywordsText: formatKeywordsInput(topic.keywords),
+		keywordsText: formatKeywordLines(topic.keywords),
 		searchQuery: topic.searchQuery,
 		sections: [...topic.sections],
 		notes: topic.notes,
@@ -228,7 +256,7 @@ export function formToPayload(form: TopicFormState): TopicPayload {
 		kind: form.kind,
 		level: undesired ? null : form.level,
 		description: form.description.trim(),
-		keywords: parseKeywordsInput(form.keywordsText),
+		keywords: parseKeywordLines(form.keywordsText),
 		searchQuery: undesired ? '' : form.searchQuery.trim(),
 		sections: undesired
 			? []

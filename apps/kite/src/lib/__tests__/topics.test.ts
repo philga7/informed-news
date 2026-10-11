@@ -5,13 +5,17 @@ import {
 	MUTES_DELETE_LABEL,
 	MUTES_EMPTY_COPY,
 	MUTES_KEYWORD_LABEL,
+	MUTES_KEYWORD_PLACEHOLDER,
 	MUTES_LOAD_ERROR,
 	MUTES_SAVE_ERROR,
 	MUTES_SOURCE_LABEL,
+	MUTES_SOURCE_PLACEHOLDER,
 	emptyTopicForm,
 	formToPayload,
+	formatKeywordLines,
 	formatKeywordsInput,
 	groupTopics,
+	parseKeywordLines,
 	parseKeywordsInput,
 	removeConfirmMessage,
 	topicToForm,
@@ -57,10 +61,32 @@ describe('parseKeywordsInput', () => {
 	});
 });
 
+describe('parseKeywordLines', () => {
+	it('splits on newlines only so commas inside a keyword survive', () => {
+		expect(parseKeywordLines(' tariffs\ntrade war\n\n  steel \nSmith, John\n')).toEqual([
+			'tariffs',
+			'trade war',
+			'steel',
+			'Smith, John',
+		]);
+	});
+
+	it('does not split on commas alone', () => {
+		expect(parseKeywordLines('NATO, Ukraine, EU')).toEqual(['NATO, Ukraine, EU']);
+	});
+});
+
 describe('formatKeywordsInput', () => {
 	it('joins with comma and space', () => {
 		expect(formatKeywordsInput(['a', 'b c'])).toBe('a, b c');
 		expect(formatKeywordsInput([])).toBe('');
+	});
+});
+
+describe('formatKeywordLines', () => {
+	it('joins with newlines', () => {
+		expect(formatKeywordLines(['a', 'b c'])).toBe('a\nb c');
+		expect(formatKeywordLines(['Smith, John', 'NATO'])).toBe('Smith, John\nNATO');
 	});
 });
 
@@ -82,6 +108,15 @@ describe('groupTopics', () => {
 		expect(grouped.watch.map((t) => t.name)).toEqual(['Aardvark', 'beta']);
 		expect(grouped.undesired.map((t) => t.name)).toEqual(['celebrity', 'Crypto']);
 		expect(topics.map((t) => t.id)).toEqual(snapshot);
+	});
+
+	it('puts desired topics without a level into Watch', () => {
+		const grouped = groupTopics([
+			makeTopic({ id: '1', name: 'No level', kind: 'desired', level: null }),
+			makeTopic({ id: '2', name: 'Core', level: 'core' }),
+		]);
+		expect(grouped.core.map((t) => t.id)).toEqual(['2']);
+		expect(grouped.watch.map((t) => t.id)).toEqual(['1']);
 	});
 
 	it('returns empty groups for no topics', () => {
@@ -114,7 +149,7 @@ describe('formToPayload', () => {
 				kind: 'desired',
 				level: 'core',
 				description: ' Trucks ',
-				keywordsText: 'F-250, f-250\nF-350',
+				keywordsText: 'F-250\nf-250\nF-350',
 				searchQuery: ' "Super Duty" ',
 				sections: ['history', 'business', 'map', 'business'],
 				notes: ' skip ads ',
@@ -134,30 +169,40 @@ describe('formToPayload', () => {
 	it('forces level null, no sections, and empty search query for undesired topics', () => {
 		const payload = formToPayload({
 			...emptyTopicForm('undesired'),
-			name: 'Celebrity gossip',
+			name: '  Celebrity gossip  ',
 			level: 'core',
+			keywordsText: '  celeb  \n\n gossip, column  ',
 			searchQuery: 'celebrity news',
 			sections: ['business', 'technical'],
+			notes: '  skip  ',
 		});
-		expect(payload.kind).toBe('undesired');
-		expect(payload.level).toBeNull();
-		expect(payload.searchQuery).toBe('');
-		expect(payload.sections).toEqual([]);
+		expect(payload).toEqual({
+			name: 'Celebrity gossip',
+			kind: 'undesired',
+			level: null,
+			description: '',
+			keywords: ['celeb', 'gossip, column'],
+			searchQuery: '',
+			sections: [],
+			notes: 'skip',
+		});
 	});
 });
 
 describe('topicToForm', () => {
-	it('round-trips through formToPayload preserving writable fields', () => {
+	it('round-trips through formToPayload preserving writable fields including comma keywords', () => {
 		const topic = makeTopic({
 			name: 'Semiconductors',
 			level: 'core',
 			description: 'Chip supply chain',
-			keywords: ['TSMC', 'Nvidia', 'export controls'],
+			keywords: ['TSMC', 'Smith, John', 'export controls'],
 			searchQuery: 'semiconductor export controls',
 			sections: ['business', 'technical'],
 			notes: 'Ignore stock tips',
 		});
-		expect(formToPayload(topicToForm(topic))).toEqual({
+		const form = topicToForm(topic);
+		expect(form.keywordsText).toBe('TSMC\nSmith, John\nexport controls');
+		expect(formToPayload(form)).toEqual({
 			name: topic.name,
 			kind: topic.kind,
 			level: topic.level,
@@ -188,6 +233,8 @@ describe('mute-rule copy (NEWS-91)', () => {
 		expect({
 			MUTES_KEYWORD_LABEL,
 			MUTES_SOURCE_LABEL,
+			MUTES_KEYWORD_PLACEHOLDER,
+			MUTES_SOURCE_PLACEHOLDER,
 			MUTES_ADD_LABEL,
 			MUTES_DELETE_LABEL,
 			MUTES_EMPTY_COPY,
@@ -197,6 +244,8 @@ describe('mute-rule copy (NEWS-91)', () => {
 		}).toEqual({
 			MUTES_KEYWORD_LABEL: 'Keyword',
 			MUTES_SOURCE_LABEL: 'Source (optional)',
+			MUTES_KEYWORD_PLACEHOLDER: 'keyword',
+			MUTES_SOURCE_PLACEHOLDER: 'domain or source',
 			MUTES_ADD_LABEL: 'Mute',
 			MUTES_DELETE_LABEL: 'Delete',
 			MUTES_EMPTY_COPY: 'No mute rules yet.',

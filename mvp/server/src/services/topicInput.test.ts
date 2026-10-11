@@ -85,7 +85,7 @@ test('parseTopicPatch rejects non-object bodies', () => {
 
 test('parseTopicPatch rejects empty or non-string name', () => {
   assertValidationError(() => parseTopicPatch({ name: '   ' }), 'name is required');
-  assertValidationError(() => parseTopicPatch({ name: 5 }), 'name is required');
+  assertValidationError(() => parseTopicPatch({ name: 5 }), 'name must be a string');
 });
 
 test('parseTopicPatch rejects bad kind', () => {

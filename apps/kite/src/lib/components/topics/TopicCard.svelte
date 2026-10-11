@@ -1,5 +1,5 @@
 <script lang="ts">
-import { untrack } from 'svelte';
+import { tick } from 'svelte';
 import TopicForm from '$lib/components/topics/TopicForm.svelte';
 import {
 	TOPIC_SECTIONS,
@@ -22,21 +22,15 @@ interface Props {
 	pending: boolean;
 	error: string | null;
 	onMoveLevel?: (level: TopicLevel) => void;
-	onSave: (payload: TopicPayload) => void;
+	onSave: (payload: TopicPayload) => Promise<boolean>;
 	onRemove: () => void;
+	onClearError?: () => void;
 }
 
-let { topic, pending, error, onMoveLevel, onSave, onRemove }: Props = $props();
+let { topic, pending, error, onMoveLevel, onSave, onRemove, onClearError }: Props = $props();
 
 let editing = $state(false);
-let seenUpdatedAt = untrack(() => topic.updatedAt);
-
-$effect(() => {
-	if (topic.updatedAt !== seenUpdatedAt) {
-		seenUpdatedAt = topic.updatedAt;
-		editing = false;
-	}
-});
+let editButton: HTMLButtonElement | undefined = $state();
 
 const desired = $derived(topic.kind === 'desired');
 const nextLevel = $derived<TopicLevel>(topic.level === 'core' ? 'watch' : 'core');
@@ -48,6 +42,23 @@ const chipClass =
 	'inline-flex items-center rounded-full border border-gray-300 px-2 py-0.5 text-[10px] tracking-wide dark:border-gray-600';
 const linkButtonClass =
 	'text-xs font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700 disabled:opacity-50 dark:text-blue-400 dark:hover:text-blue-300';
+
+function openEditor(): void {
+	onClearError?.();
+	editing = true;
+}
+
+async function closeEditor(): Promise<void> {
+	onClearError?.();
+	editing = false;
+	await tick();
+	editButton?.focus();
+}
+
+async function handleSave(payload: TopicPayload): Promise<void> {
+	const ok = await onSave(payload);
+	if (ok) await closeEditor();
+}
 </script>
 
 <article
@@ -60,8 +71,9 @@ const linkButtonClass =
 			submitLabel={TOPICS_SAVE_LABEL}
 			{pending}
 			{error}
-			onSubmit={onSave}
-			onCancel={() => (editing = false)}
+			autofocusName={true}
+			onSubmit={handleSave}
+			onCancel={() => void closeEditor()}
 		/>
 	{:else}
 		<div class="flex items-start justify-between gap-3">
@@ -115,21 +127,30 @@ const linkButtonClass =
 		{#if error}
 			<p class="mt-2 text-xs text-red-600 dark:text-red-400" role="alert">{error}</p>
 		{/if}
+	{/if}
 
-		<div class="mt-3 flex flex-wrap items-center gap-4">
-			{#if desired && onMoveLevel}
-				<button
-					type="button"
-					class={linkButtonClass}
-					disabled={pending}
-					onclick={() => onMoveLevel(nextLevel)}
-				>
-					{nextLevel === 'core' ? TOPICS_MOVE_TO_CORE_LABEL : TOPICS_MOVE_TO_WATCH_LABEL}
-				</button>
-			{/if}
-			<button type="button" class={linkButtonClass} disabled={pending} onclick={() => (editing = true)}>
-				{TOPICS_EDIT_LABEL}
+	<div class="mt-3 flex flex-wrap items-center gap-4">
+		{#if !editing && desired && onMoveLevel}
+			<button
+				type="button"
+				class={linkButtonClass}
+				disabled={pending}
+				onclick={() => onMoveLevel(nextLevel)}
+			>
+				{nextLevel === 'core' ? TOPICS_MOVE_TO_CORE_LABEL : TOPICS_MOVE_TO_WATCH_LABEL}
 			</button>
+		{/if}
+		<button
+			bind:this={editButton}
+			type="button"
+			class={editing ? 'sr-only' : linkButtonClass}
+			disabled={pending || editing}
+			aria-expanded={editing}
+			onclick={openEditor}
+		>
+			{TOPICS_EDIT_LABEL}
+		</button>
+		{#if !editing}
 			<button
 				type="button"
 				class="text-xs font-medium text-red-600 underline underline-offset-2 hover:text-red-700 disabled:opacity-50 dark:text-red-400 dark:hover:text-red-300"
@@ -138,6 +159,6 @@ const linkButtonClass =
 			>
 				{TOPICS_REMOVE_LABEL}
 			</button>
-		</div>
-	{/if}
+		{/if}
+	</div>
 </article>
