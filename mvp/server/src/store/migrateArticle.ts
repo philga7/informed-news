@@ -6,11 +6,13 @@ import type {
   SourceKind,
 } from '../types/article.js';
 import { truncateBodyText } from '../types/article.js';
+import type { SourceTier } from '../types/claim.js';
 import type { SearchProvider } from '../types/topicSearch.js';
 import { SEARCH_PROVIDERS } from '../types/topicSearch.js';
 import { articleIdFromCanonicalUrl } from './articleId.js';
 
 const SOURCE_KINDS = new Set<SourceKind>(['cfp', 'xcancel', 'rss', 'manual', 'search']);
+const SOURCE_TIERS = new Set<SourceTier>(['primary', 'sensor']);
 const BODY_STATUSES = new Set<BodyStatus>([
   'ok',
   'unavailable',
@@ -152,6 +154,13 @@ function parseTopicSearchFields(
   return fields;
 }
 
+function parseSourceTier(value: unknown): SourceTier | undefined {
+  if (typeof value === 'string' && SOURCE_TIERS.has(value as SourceTier)) {
+    return value as SourceTier;
+  }
+  return undefined;
+}
+
 /**
  * Normalize a stored article to the source-agnostic shape.
  * Legacy records used `cfpUrl` as identity and had no sourceKind / citations / handle.
@@ -189,10 +198,13 @@ export function migrateArticle(raw: unknown): Article {
     (sourceKind === 'xcancel' && snippet ? snippet : null);
   const bodyText = rawBody === null ? null : truncateBodyText(rawBody);
 
+  const sourceTier = parseSourceTier(raw.sourceTier);
+
   return {
     id: articleIdFromCanonicalUrl(canonicalUrl),
     title,
     sourceKind,
+    ...(sourceTier !== undefined ? { sourceTier } : {}),
     canonicalUrl,
     citations,
     publisherUrl,
@@ -245,6 +257,9 @@ export function articleNeedsRewrite(raw: unknown, migrated: Article): boolean {
     return true;
   }
   if (!('clusterId' in raw)) {
+    return true;
+  }
+  if (raw.sourceTier !== migrated.sourceTier) {
     return true;
   }
   return false;

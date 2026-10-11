@@ -3,6 +3,7 @@ import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { test } from 'node:test';
 import { scrapePublisherUrl } from './publisherScrape.js';
+import { USER_AGENT } from './userAgent.js';
 
 const CFP_HTML = `<!doctype html>
 <html>
@@ -25,6 +26,25 @@ test('scrapePublisherUrl returns the first external link in article content', as
   try {
     const found = await scrapePublisherUrl(`http://127.0.0.1:${port}/cfp`, '127.0.0.1');
     assert.equal(found, 'https://publisher.example.com/story');
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+});
+
+test('scrapePublisherUrl sends the shared InformedNews User-Agent', async (t) => {
+  t.mock.method(console, 'warn', () => {});
+  let seenUa: string | null = null;
+  const server = createServer((req, res) => {
+    seenUa = req.headers['user-agent'] ?? null;
+    res.writeHead(200, { 'Content-Type': 'text/html' });
+    res.end(CFP_HTML);
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const { port } = server.address() as AddressInfo;
+  try {
+    await scrapePublisherUrl(`http://127.0.0.1:${port}/cfp`, '127.0.0.1');
+    assert.equal(seenUa, USER_AGENT);
   } finally {
     server.closeAllConnections();
     await new Promise<void>((resolve) => server.close(() => resolve()));

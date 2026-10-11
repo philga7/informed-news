@@ -7,6 +7,7 @@ import {
   searchGoogleNews,
 } from './googleNewsRss.js';
 import { GOOGLE_NEWS_TIMEOUT_MS } from './topicSearchConfig.js';
+import { USER_AGENT } from './userAgent.js';
 
 const NOW = new Date('2026-09-29T12:00:00Z');
 
@@ -130,7 +131,7 @@ test('searchGoogleNews sends UA header and the timeout signal', async (t) => {
   assert.equal(calls.length, 1);
   assert.equal(calls[0]?.url, buildGoogleNewsSearchUrl('iran nuclear'));
   const headers = new Headers(calls[0]?.init?.headers);
-  assert.equal(headers.get('user-agent'), 'Mozilla/5.0 (compatible; InformedNews/1.0)');
+  assert.equal(headers.get('user-agent'), USER_AGENT);
   assert.ok(calls[0]?.init?.signal instanceof AbortSignal);
   assert.equal(timeoutMock.mock.callCount(), 1);
   assert.deepEqual(timeoutMock.mock.calls[0]?.arguments, [GOOGLE_NEWS_TIMEOUT_MS]);

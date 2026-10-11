@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
+  articleNeedsRewrite,
   citationsFromRss,
   migrateArticle,
 } from './migrateArticle.js';
@@ -111,4 +112,111 @@ test('migrateArticle CFP article without topic search fields has no such keys', 
   assert.equal('topicIds' in article, false);
   assert.equal('searchProviders' in article, false);
   assert.equal('googleNewsUrl' in article, false);
+});
+
+test('migrateArticle preserves sourceTier primary through load', () => {
+  const article = migrateArticle({
+    title: 'State Department briefing',
+    sourceKind: 'rss',
+    canonicalUrl: 'https://www.state.gov/briefing/',
+    citations: [{ label: 'State.gov', url: 'https://www.state.gov/briefing/' }],
+    sourceTier: 'primary',
+    snippet: 'Official remarks.',
+    fetchedAt: '2026-09-28T12:00:00.000Z',
+  });
+  assert.equal(article.sourceTier, 'primary');
+});
+
+test('migrateArticle preserves sourceTier sensor through load', () => {
+  const article = migrateArticle({
+    title: 'Local coverage',
+    sourceKind: 'rss',
+    canonicalUrl: 'https://example.com/local',
+    citations: [{ label: 'Local', url: 'https://example.com/local' }],
+    sourceTier: 'sensor',
+    fetchedAt: '2026-09-28T12:00:00.000Z',
+  });
+  assert.equal(article.sourceTier, 'sensor');
+});
+
+test('migrateArticle round-trips sourceTier via JSON serialize', () => {
+  const once = migrateArticle({
+    title: 'UN Security Council',
+    sourceKind: 'rss',
+    canonicalUrl: 'https://news.un.org/en/story/1',
+    citations: [{ label: 'UN News', url: 'https://news.un.org/en/story/1' }],
+    sourceTier: 'primary',
+    fetchedAt: '2026-09-28T12:00:00.000Z',
+  });
+  const again = migrateArticle(JSON.parse(JSON.stringify(once)));
+  assert.equal(again.sourceTier, 'primary');
+});
+
+test('migrateArticle omits invalid sourceTier', () => {
+  const article = migrateArticle({
+    title: 'Mystery tier',
+    sourceKind: 'rss',
+    canonicalUrl: 'https://example.com/a',
+    citations: [],
+    sourceTier: 'official',
+    fetchedAt: '2026-09-28T12:00:00.000Z',
+  });
+  assert.equal('sourceTier' in article, false);
+});
+
+test('migrateArticle omits sourceTier when absent', () => {
+  const article = migrateArticle({
+    title: 'No tier stamped',
+    sourceKind: 'rss',
+    canonicalUrl: 'https://example.com/b',
+    citations: [],
+    fetchedAt: '2026-09-28T12:00:00.000Z',
+  });
+  assert.equal('sourceTier' in article, false);
+});
+
+test('articleNeedsRewrite is true when raw sourceTier does not match migrated', () => {
+  const base = {
+    title: 'State Department briefing',
+    sourceKind: 'rss' as const,
+    canonicalUrl: 'https://www.state.gov/briefing/',
+    citations: [{ label: 'State.gov', url: 'https://www.state.gov/briefing/' }],
+    handle: null,
+    bodyStatus: 'pending' as const,
+    bodyText: null,
+    publisherTitle: null,
+    imageUrl: null,
+    imageCaption: null,
+    imageCredit: null,
+    clusterId: null,
+    fetchedAt: '2026-09-28T12:00:00.000Z',
+  };
+  const migrated = migrateArticle(base);
+  const raw = { ...base, id: migrated.id, sourceTier: 'bogus' };
+  assert.equal('sourceTier' in migrated, false);
+  assert.equal(articleNeedsRewrite(raw, migrated), true);
+});
+
+test('articleNeedsRewrite is false when sourceTier matches migrated', () => {
+  const raw = {
+    title: 'State Department briefing',
+    sourceKind: 'rss',
+    canonicalUrl: 'https://www.state.gov/briefing/',
+    citations: [{ label: 'State.gov', url: 'https://www.state.gov/briefing/' }],
+    handle: null,
+    bodyStatus: 'pending',
+    bodyText: null,
+    publisherTitle: null,
+    imageUrl: null,
+    imageCaption: null,
+    imageCredit: null,
+    clusterId: null,
+    sourceTier: 'primary',
+    fetchedAt: '2026-09-28T12:00:00.000Z',
+  };
+  const migrated = migrateArticle(raw);
+  // id is derived; set it so other rewrite checks pass
+  const rawWithId = { ...raw, id: migrated.id };
+  assert.equal(migrated.sourceTier, 'primary');
+  assert.equal(articleNeedsRewrite(rawWithId, migrated), false);
 });

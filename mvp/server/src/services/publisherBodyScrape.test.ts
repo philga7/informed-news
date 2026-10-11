@@ -8,6 +8,7 @@ import {
   scrapePublisherBody,
   type PublisherBodyResult,
 } from './publisherBodyScrape.js';
+import { USER_AGENT } from './userAgent.js';
 
 const ARTICLE_HTML = `<!doctype html>
 <html>
@@ -175,6 +176,72 @@ test('extracts image meta even when page is paywalled/blocked', () => {
   assert.equal(result.bodyText, null);
   assert.equal(result.imageUrl, 'https://cdn.example.com/paywall.jpg');
   assert.equal(result.imageCredit, 'publisher.example.com');
+});
+
+test('scrapePublisherBody sends the shared InformedNews User-Agent', async () => {
+  const prev = globalThis.fetch;
+  let seenUa: string | null = null;
+  try {
+    globalThis.fetch = (async (_input, init) => {
+      seenUa = new Headers(init?.headers).get('user-agent');
+      return {
+        status: 200,
+        ok: true,
+        text: async () => ARTICLE_HTML,
+      } as unknown as Response;
+    }) as typeof fetch;
+
+    await scrapePublisherBody('https://www.state.gov/briefing/');
+    assert.equal(seenUa, USER_AGENT);
+  } finally {
+    globalThis.fetch = prev;
+  }
+});
+
+test('extracts body text from DotNetNuke pages wrapped in form#Form', () => {
+  const body =
+    'The Department of Defense announced a joint exercise with allied forces in the region. '.repeat(
+      8,
+    );
+  const html = `<!doctype html>
+<html>
+<head><title>DoD Release</title></head>
+<body>
+  <form method="post" id="Form" action="./release">
+    <nav>Home News Media</nav>
+    <div class="article-body">
+      <h1>DoD Release</h1>
+      <p>${body}</p>
+    </div>
+    <footer>U.S. Department of Defense</footer>
+  </form>
+</body>
+</html>`;
+
+  const result = extractPublisherBodyFromHtml(html);
+  assert.equal(result.bodyStatus, 'ok');
+  assert.ok(result.bodyText && result.bodyText.length >= 200);
+  assert.match(result.bodyText!, /joint exercise/);
+  assert.doesNotMatch(result.bodyText!, /Home News Media/);
+});
+
+test('still strips small login/search forms that are not the page shell', () => {
+  const html = `<!doctype html>
+<html>
+<head><title>Story</title></head>
+<body>
+  <form id="login" action="/login"><input name="q" /><button>Go</button></form>
+  <article>
+    <p>${'The committee voted after a long debate about the measure. '.repeat(8)}</p>
+    <p>${'Supporters said the bill would expand access while critics warned of costs. '.repeat(6)}</p>
+  </article>
+</body>
+</html>`;
+
+  const result = extractPublisherBodyFromHtml(html);
+  assert.equal(result.bodyStatus, 'ok');
+  assert.ok(result.bodyText);
+  assert.doesNotMatch(result.bodyText!, /\bGo\b/);
 });
 
 test('scrapePublisherBody extracts image meta on blocked HTTP responses', async () => {

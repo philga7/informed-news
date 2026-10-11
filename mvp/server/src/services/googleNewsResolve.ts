@@ -3,7 +3,8 @@ import {
   getCachedGoogleNewsUrl,
   putCachedGoogleNewsUrl,
 } from '../store/googleNewsUrlCacheStore.js';
-import { USER_AGENT, googleArticleIdFromUrl } from './googleNewsRss.js';
+import { googleArticleIdFromUrl } from './googleNewsRss.js';
+import { USER_AGENT } from './userAgent.js';
 import { GOOGLE_RESOLVE_TIMEOUT_MS } from './topicSearchConfig.js';
 
 const BATCH_EXECUTE_URL = 'https://news.google.com/_/DotsSplashUi/data/batchexecute';

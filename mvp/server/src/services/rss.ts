@@ -1,4 +1,5 @@
 import Parser from 'rss-parser';
+import { USER_AGENT } from './userAgent.js';
 
 const parser = new Parser({
   customFields: {
@@ -72,7 +73,7 @@ export async function parseRssXml(xmlText: string): Promise<RssItem[]> {
  */
 export async function parseRssFeed(url: string): Promise<RssItem[]> {
   const response = await fetch(url, {
-    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; InformedNews/1.0)' },
+    headers: { 'User-Agent': USER_AGENT },
   });
   if (!response.ok) {
     throw new Error(`RSS fetch failed (${response.status}) for ${url}`);

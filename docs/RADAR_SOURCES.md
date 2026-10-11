@@ -14,7 +14,7 @@ Curated sources have an optional `sourceTier`, stamped on each ingested article:
 Notes:
 
 - CFP (and optional xcancel) are treated as **sensor** in code (not configured via `radar-sources.json`).
-- State.gov RSS returns **403** without a browser-like User-Agent; `mvp/server/src/services/rss.ts` must use `Mozilla/5.0 (compatible; InformedNews/1.0)` for RSS fetch.
+- State.gov (and CloudFront-fronted publisher pages) return **403** without a browser-like User-Agent. RSS and publisher scrapes share `Mozilla/5.0 (compatible; InformedNews/1.0)` from `mvp/server/src/services/userAgent.ts` ([NEWS-94](https://informedcrew.atlassian.net/browse/NEWS-94)).
 
 ## CFP (existing path)
 
