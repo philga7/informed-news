@@ -10,6 +10,7 @@ import {
 } from '../store/googleNewsUrlCacheStore.js';
 import { resolveGoogleNewsUrl } from './googleNewsResolve.js';
 import { GOOGLE_RESOLVE_TIMEOUT_MS } from './topicSearchConfig.js';
+import { USER_AGENT } from './userAgent.js';
 
 const ARTICLE_ID = 'CBMiAbc123_def';
 const GOOGLE_URL = `https://news.google.com/rss/articles/${ARTICLE_ID}?oc=5`;
@@ -71,7 +72,7 @@ test('resolveGoogleNewsUrl decodes via article page + batchexecute and caches th
   assert.equal(calls[0]?.url, `https://news.google.com/articles/${ARTICLE_ID}`);
   assert.equal(
     new Headers(calls[0]?.init?.headers).get('user-agent'),
-    'Mozilla/5.0 (compatible; InformedNews/1.0)',
+    USER_AGENT,
   );
 
   assert.equal(calls[1]?.url, 'https://news.google.com/_/DotsSplashUi/data/batchexecute');

@@ -8,6 +8,7 @@ import {
   scrapePublisherBody,
   type PublisherBodyResult,
 } from './publisherBodyScrape.js';
+import { USER_AGENT } from './userAgent.js';
 
 const ARTICLE_HTML = `<!doctype html>
 <html>
@@ -191,7 +192,7 @@ test('scrapePublisherBody sends the shared InformedNews User-Agent', async () =>
     }) as typeof fetch;
 
     await scrapePublisherBody('https://www.state.gov/briefing/');
-    assert.equal(seenUa, 'Mozilla/5.0 (compatible; InformedNews/1.0)');
+    assert.equal(seenUa, USER_AGENT);
   } finally {
     globalThis.fetch = prev;
   }

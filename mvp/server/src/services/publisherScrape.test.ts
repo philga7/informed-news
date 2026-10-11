@@ -3,6 +3,7 @@ import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { test } from 'node:test';
 import { scrapePublisherUrl } from './publisherScrape.js';
+import { USER_AGENT } from './userAgent.js';
 
 const CFP_HTML = `<!doctype html>
 <html>
@@ -43,7 +44,7 @@ test('scrapePublisherUrl sends the shared InformedNews User-Agent', async (t) =>
   const { port } = server.address() as AddressInfo;
   try {
     await scrapePublisherUrl(`http://127.0.0.1:${port}/cfp`, '127.0.0.1');
-    assert.equal(seenUa, 'Mozilla/5.0 (compatible; InformedNews/1.0)');
+    assert.equal(seenUa, USER_AGENT);
   } finally {
     server.closeAllConnections();
     await new Promise<void>((resolve) => server.close(() => resolve()));

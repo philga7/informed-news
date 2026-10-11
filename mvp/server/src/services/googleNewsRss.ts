@@ -4,6 +4,7 @@ import { publisherDomainFromUrl } from './publisherScrape.js';
 import { preprocessXml } from './rss.js';
 import { canonicalizeSearchUrl } from './searchUrl.js';
 import { GOOGLE_NEWS_TIMEOUT_MS, TOPIC_SEARCH_WINDOW_HOURS } from './topicSearchConfig.js';
+import { USER_AGENT } from './userAgent.js';
 
 /** xml2js shape of `<source url="…">Publisher</source>` (keepArray). */
 type GoogleNewsSourceField = Array<string | { _?: string; $?: { url?: string } }>;
@@ -15,10 +16,6 @@ const parser: Parser<Record<string, never>, GoogleNewsItem> = new Parser({
     item: [['source', 'source', { keepArray: true }]],
   },
 });
-
-import { USER_AGENT } from './userAgent.js';
-
-export { USER_AGENT };
 
 export type SearchGoogleNewsOptions = {
   now?: Date;
