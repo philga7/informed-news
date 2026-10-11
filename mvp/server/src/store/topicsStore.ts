@@ -53,13 +53,17 @@ function normalizeTopics(parsed: unknown): TopicsStore {
 
   const record = parsed as Partial<Record<keyof TopicsStore, unknown>>;
   const seenIds = new Set<string>();
+  const seenNames = new Set<string>();
   const topics: Topic[] = [];
 
   if (Array.isArray(record.topics)) {
     for (const raw of record.topics) {
       const topic = normalizeTopic(raw);
       if (!topic || seenIds.has(topic.id)) continue;
+      const key = nameKey(topic.name);
+      if (seenNames.has(key)) continue;
       seenIds.add(topic.id);
+      seenNames.add(key);
       topics.push(topic);
     }
   }
@@ -79,18 +83,32 @@ async function writeTopics(store: TopicsStore, topicsPath: string): Promise<void
   await writeFile(topicsPath, `${JSON.stringify(store, null, 2)}\n`, 'utf8');
 }
 
+/** Per-file write chains so create/update/remove cannot interleave read-modify-write. */
+const writeChains = new Map<string, Promise<unknown>>();
+
+function enqueueWrite<T>(topicsPath: string, work: () => Promise<T>): Promise<T> {
+  const key = path.resolve(topicsPath);
+  const previous = writeChains.get(key) ?? Promise.resolve();
+  const next = previous.then(work);
+  const settled = next.catch(() => undefined);
+  writeChains.set(key, settled);
+  void settled.then(() => {
+    if (writeChains.get(key) === settled) writeChains.delete(key);
+  });
+  return next;
+}
+
 /**
- * Read the operator topic list.
- * Missing file → seeded from the committed seed and written; an emptied list stays empty.
+ * Read or seed without taking the write chain. Callers that mutate must already hold
+ * `enqueueWrite` for this path (or accept a race on first seed).
  */
-export async function readTopics(paths: TopicsStorePaths = {}): Promise<TopicsStore> {
+async function loadTopics(paths: TopicsStorePaths): Promise<TopicsStore> {
   const topicsPath = paths.topicsPath ?? TOPICS_PATH;
   const seedPath = paths.seedPath ?? DEFAULT_TOPICS_SEED_PATH;
-  await mkdir(path.dirname(topicsPath), { recursive: true });
 
-  let raw: string;
   try {
-    raw = await readFile(topicsPath, 'utf8');
+    const raw = await readFile(topicsPath, 'utf8');
+    return normalizeTopics(JSON.parse(raw));
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
       throw err;
@@ -107,8 +125,24 @@ export async function readTopics(paths: TopicsStorePaths = {}): Promise<TopicsSt
     await writeTopics(seeded, topicsPath);
     return seeded;
   }
+}
 
-  return normalizeTopics(JSON.parse(raw));
+/**
+ * Read the operator topic list.
+ * Missing file → seeded from the committed seed and written; an emptied list stays empty.
+ */
+export async function readTopics(paths: TopicsStorePaths = {}): Promise<TopicsStore> {
+  const topicsPath = paths.topicsPath ?? TOPICS_PATH;
+  try {
+    const raw = await readFile(topicsPath, 'utf8');
+    return normalizeTopics(JSON.parse(raw));
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
+      throw err;
+    }
+    // Serialize first-time seed so concurrent readers don't double-write the seed.
+    return enqueueWrite(topicsPath, async () => loadTopics(paths));
+  }
 }
 
 export async function createTopic(
@@ -116,18 +150,20 @@ export async function createTopic(
   paths: TopicsStorePaths = {},
 ): Promise<{ topic: Topic; topics: Topic[] }> {
   const topicsPath = paths.topicsPath ?? TOPICS_PATH;
-  const store = await readTopics(paths);
+  return enqueueWrite(topicsPath, async () => {
+    const store = await loadTopics(paths);
 
-  const key = nameKey(fields.name);
-  if (store.topics.some((t) => nameKey(t.name) === key)) {
-    throw new TopicConflictError(fields.name.trim());
-  }
+    const key = nameKey(fields.name);
+    if (store.topics.some((t) => nameKey(t.name) === key)) {
+      throw new TopicConflictError(fields.name);
+    }
 
-  const now = new Date().toISOString();
-  const topic: Topic = { id: randomUUID(), ...fields, createdAt: now, updatedAt: now };
-  const next: TopicsStore = { topics: [...store.topics, topic], updatedAt: now };
-  await writeTopics(next, topicsPath);
-  return { topic, topics: next.topics };
+    const now = new Date().toISOString();
+    const topic: Topic = { id: randomUUID(), ...fields, createdAt: now, updatedAt: now };
+    const next: TopicsStore = { topics: [...store.topics, topic], updatedAt: now };
+    await writeTopics(next, topicsPath);
+    return { topic, topics: next.topics };
+  });
 }
 
 /** Patch a topic by id. Unknown id → null. */
@@ -137,32 +173,34 @@ export async function updateTopic(
   paths: TopicsStorePaths = {},
 ): Promise<{ topic: Topic; topics: Topic[] } | null> {
   const topicsPath = paths.topicsPath ?? TOPICS_PATH;
-  const trimmed = id.trim();
-  const store = await readTopics(paths);
-  const existing = store.topics.find((t) => t.id === trimmed);
-  if (!existing) {
-    return null;
-  }
+  return enqueueWrite(topicsPath, async () => {
+    const trimmed = id.trim();
+    const store = await loadTopics(paths);
+    const existing = store.topics.find((t) => t.id === trimmed);
+    if (!existing) {
+      return null;
+    }
 
-  const merged = finalizeTopicFields(withoutMeta(existing), patch);
-  const key = nameKey(merged.name);
-  if (store.topics.some((t) => t.id !== existing.id && nameKey(t.name) === key)) {
-    throw new TopicConflictError(merged.name);
-  }
+    const merged = finalizeTopicFields(withoutMeta(existing), patch);
+    const key = nameKey(merged.name);
+    if (store.topics.some((t) => t.id !== existing.id && nameKey(t.name) === key)) {
+      throw new TopicConflictError(merged.name);
+    }
 
-  const now = new Date().toISOString();
-  const topic: Topic = {
-    id: existing.id,
-    ...merged,
-    createdAt: existing.createdAt,
-    updatedAt: now,
-  };
-  const next: TopicsStore = {
-    topics: store.topics.map((t) => (t.id === existing.id ? topic : t)),
-    updatedAt: now,
-  };
-  await writeTopics(next, topicsPath);
-  return { topic, topics: next.topics };
+    const now = new Date().toISOString();
+    const topic: Topic = {
+      id: existing.id,
+      ...merged,
+      createdAt: existing.createdAt,
+      updatedAt: now,
+    };
+    const next: TopicsStore = {
+      topics: store.topics.map((t) => (t.id === existing.id ? topic : t)),
+      updatedAt: now,
+    };
+    await writeTopics(next, topicsPath);
+    return { topic, topics: next.topics };
+  });
 }
 
 /** Remove a topic by id (idempotent). */
@@ -171,16 +209,18 @@ export async function removeTopic(
   paths: TopicsStorePaths = {},
 ): Promise<{ removed: boolean; topics: Topic[] }> {
   const topicsPath = paths.topicsPath ?? TOPICS_PATH;
-  const trimmed = id.trim();
-  const store = await readTopics(paths);
-  if (!store.topics.some((t) => t.id === trimmed)) {
-    return { removed: false, topics: store.topics };
-  }
+  return enqueueWrite(topicsPath, async () => {
+    const trimmed = id.trim();
+    const store = await loadTopics(paths);
+    if (!store.topics.some((t) => t.id === trimmed)) {
+      return { removed: false, topics: store.topics };
+    }
 
-  const next: TopicsStore = {
-    topics: store.topics.filter((t) => t.id !== trimmed),
-    updatedAt: new Date().toISOString(),
-  };
-  await writeTopics(next, topicsPath);
-  return { removed: true, topics: next.topics };
+    const next: TopicsStore = {
+      topics: store.topics.filter((t) => t.id !== trimmed),
+      updatedAt: new Date().toISOString(),
+    };
+    await writeTopics(next, topicsPath);
+    return { removed: true, topics: next.topics };
+  });
 }

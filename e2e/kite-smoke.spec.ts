@@ -451,6 +451,42 @@ test.describe('Nav shell (NEWS-42)', () => {
 		});
 	});
 
+	test('/topics signed-in: add, edit, move, and remove a topic', async ({ page }) => {
+		const name = `E2E Topics ${Date.now()}`;
+		const renamed = `${name} renamed`;
+		await logIn(page);
+		await page.goto('/topics');
+		await expect(page.getByRole('heading', { name: 'Add topic' })).toBeVisible({
+			timeout: 60_000,
+		});
+
+		const addSection = page.locator('section[aria-labelledby="topics-add-title"]');
+		await addSection.getByLabel('Name', { exact: true }).fill(name);
+		await addSection.getByRole('button', { name: 'Add topic', exact: true }).click();
+
+		const watch = page.locator('section[aria-labelledby="topics-watch"]');
+		const card = watch.getByRole('article', { name });
+		await expect(card).toBeVisible({ timeout: 60_000 });
+
+		await card.getByRole('button', { name: 'Move to Core', exact: true }).click();
+		const core = page.locator('section[aria-labelledby="topics-core"]');
+		const coreCard = core.getByRole('article', { name });
+		await expect(coreCard).toBeVisible({ timeout: 60_000 });
+
+		await coreCard.getByRole('button', { name: 'Edit', exact: true }).click();
+		await expect(coreCard.locator('button', { hasText: 'Edit' })).toHaveAttribute(
+			'aria-expanded',
+			'true',
+		);
+		await coreCard.getByLabel('Name', { exact: true }).fill(renamed);
+		await coreCard.getByRole('button', { name: 'Save', exact: true }).click();
+		await expect(core.getByRole('article', { name: renamed })).toBeVisible({ timeout: 60_000 });
+
+		page.once('dialog', (dialog) => dialog.accept());
+		await core.getByRole('article', { name: renamed }).getByRole('button', { name: 'Remove' }).click();
+		await expect(core.getByRole('article', { name: renamed })).toHaveCount(0, { timeout: 60_000 });
+	});
+
 	test('dated batch/category deep links and /contribute render', async ({ page }) => {
 		for (const path of ['/2026-09-30/world', '/contribute']) {
 			const res = await page.goto(path);

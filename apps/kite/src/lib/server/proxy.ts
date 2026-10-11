@@ -24,10 +24,11 @@ export function createProxy(endpoint: string): RequestHandler {
       // Build the target URL
       let targetPath = endpoint;
       
-      // Replace route parameters
+      // Replace route parameters (re-encode: SvelteKit gives decoded params)
       if (params) {
         Object.entries(params).forEach(([key, value]) => {
-          targetPath = targetPath.replace(`[${key}]`, String(value));
+          if (value === undefined) return;
+          targetPath = targetPath.replace(`[${key}]`, encodeURIComponent(String(value)));
         });
       }
       

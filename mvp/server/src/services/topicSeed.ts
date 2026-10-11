@@ -14,8 +14,10 @@ export const DEFAULT_TOPICS_SEED_PATH = path.resolve(
 
 function parseSeedEntry(entry: unknown, index: number): TopicSeedEntry {
   try {
-    const record =
-      entry !== null && typeof entry === 'object' ? (entry as Record<string, unknown>) : {};
+    if (entry === null || typeof entry !== 'object' || Array.isArray(entry)) {
+      throw new Error('must be an object');
+    }
+    const record = entry as Record<string, unknown>;
     if (typeof record.id !== 'string' || !record.id.trim()) {
       throw new Error('id is required');
     }

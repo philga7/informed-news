@@ -72,7 +72,6 @@ test('readTopics twice does not duplicate topics or change createdAt', async () 
   const topicsPath = tempTopicsPath();
 
   const first = await readTopics({ topicsPath });
-  await sleep(5);
   const second = await readTopics({ topicsPath });
 
   assert.equal(second.topics.length, first.topics.length);
@@ -118,7 +117,7 @@ test('createTopic rejects a duplicate name (case/whitespace-insensitive) without
   const before = readFileSync(topicsPath, 'utf8');
 
   await assert.rejects(
-    createTopic({ ...desiredFields, name: '  iRAN  ' }, { topicsPath }),
+    createTopic({ ...desiredFields, name: 'iRAN' }, { topicsPath }),
     (err: unknown) => {
       assert.ok(err instanceof TopicConflictError);
       assert.equal(err.name, 'TopicConflictError');
@@ -128,6 +127,41 @@ test('createTopic rejects a duplicate name (case/whitespace-insensitive) without
   );
 
   assert.equal(readFileSync(topicsPath, 'utf8'), before);
+});
+
+test('createTopic and removeTopic bump store updatedAt', async () => {
+  const topicsPath = tempTopicsPath();
+  const seeded = await readTopics({ topicsPath });
+  const before = seeded.updatedAt;
+  assert.ok(before);
+
+  await sleep(5);
+  const created = await createTopic(desiredFields, { topicsPath });
+  const afterCreate = await readTopics({ topicsPath });
+  assert.equal(afterCreate.updatedAt, created.topic.updatedAt);
+  assert.notEqual(afterCreate.updatedAt, before);
+
+  await sleep(5);
+  const removed = await removeTopic(created.topic.id, { topicsPath });
+  assert.equal(removed.removed, true);
+  const afterRemove = await readTopics({ topicsPath });
+  assert.ok(afterRemove.updatedAt);
+  assert.notEqual(afterRemove.updatedAt, afterCreate.updatedAt);
+  assert.equal(afterRemove.topics.length, 23);
+});
+
+test('updateTopic surfaces validation errors from finalizeTopicFields', async () => {
+  const topicsPath = tempTopicsPath();
+  const { topic } = await createTopic(undesiredFields, { topicsPath });
+
+  await assert.rejects(
+    updateTopic(topic.id, { kind: 'desired' }, { topicsPath }),
+    (err: unknown) => {
+      assert.ok(err instanceof Error);
+      assert.match(err.message, /level is required for desired topics/);
+      return true;
+    },
+  );
 });
 
 test('updateTopic changes level, bumps updatedAt, keeps createdAt', async () => {
@@ -155,7 +189,7 @@ test('updateTopic changes level, bumps updatedAt, keeps createdAt', async () => 
   );
 });
 
-test('updateTopic to undesired clears level and sections', async () => {
+test('updateTopic to undesired clears level, sections, and searchQuery', async () => {
   const topicsPath = tempTopicsPath();
   await readTopics({ topicsPath });
 
@@ -165,11 +199,13 @@ test('updateTopic to undesired clears level and sections', async () => {
   assert.equal(result.topic.kind, 'undesired');
   assert.equal(result.topic.level, null);
   assert.deepEqual(result.topic.sections, []);
+  assert.equal(result.topic.searchQuery, '');
 
   const stored = await readTopics({ topicsPath });
   const iran = stored.topics.find((t) => t.id === 'iran')!;
   assert.equal(iran.level, null);
   assert.deepEqual(iran.sections, []);
+  assert.equal(iran.searchQuery, '');
 });
 
 test('updateTopic rejects renaming onto another topic, allows re-casing its own name', async () => {
@@ -218,12 +254,19 @@ test('removeTopic removes and persists; unknown id is a no-op', async () => {
   assert.equal(readFileSync(topicsPath, 'utf8'), before);
 });
 
-test('readTopics drops malformed entries and duplicate ids from an existing file', async () => {
+test('readTopics drops malformed entries, duplicate ids, and case-duplicate names', async () => {
   const topicsPath = tempTopicsPath();
   const ts = '2026-09-01T00:00:00.000Z';
   const good = {
     id: 'good',
     ...desiredFields,
+    createdAt: ts,
+    updatedAt: ts,
+  };
+  const caseDup = {
+    id: 'good-case',
+    ...desiredFields,
+    name: 'SEMICONDUCTOR SUPPLY',
     createdAt: ts,
     updatedAt: ts,
   };
@@ -233,6 +276,7 @@ test('readTopics drops malformed entries and duplicate ids from an existing file
       topics: [
         good,
         { ...good, id: 'good', name: 'Duplicate id' },
+        caseDup,
         { ...good, id: undefined, name: 'No id' },
         { ...good, id: 'bogus-kind', name: 'Bogus', kind: 'bogus' },
         { ...good, id: 'no-created', name: 'No createdAt', createdAt: '' },

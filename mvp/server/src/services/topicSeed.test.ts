@@ -90,6 +90,18 @@ test('loadTopicSeed throws when topics is not an array', () => {
   assert.throws(() => loadTopicSeed(seedPath), /topics must be an array/);
 });
 
+test('loadTopicSeed rethrows invalid JSON', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'topics-seed-'));
+  const seedPath = path.join(dir, 'topics-seed.json');
+  writeFileSync(seedPath, '{not json', 'utf8');
+  assert.throws(() => loadTopicSeed(seedPath), SyntaxError);
+});
+
+test('loadTopicSeed throws when an entry is not an object', () => {
+  const seedPath = writeTempSeed(['not-an-object']);
+  assert.throws(() => loadTopicSeed(seedPath), /index 0.*must be an object/);
+});
+
 test('loadTopicSeed rethrows missing file errors', () => {
   assert.throws(() => loadTopicSeed('/nonexistent/topics-seed.json'), /ENOENT/);
 });

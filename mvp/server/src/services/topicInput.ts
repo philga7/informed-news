@@ -25,7 +25,7 @@ const SECTIONS_ERROR = `sections must be a list of: ${TOPIC_SECTIONS.join(', ')}
 
 function parseName(value: unknown): string {
   if (typeof value !== 'string') {
-    throw new TopicValidationError('name is required');
+    throw new TopicValidationError('name must be a string');
   }
   const trimmed = value.trim();
   if (!trimmed) {

@@ -1,5 +1,5 @@
 <script lang="ts">
-import { untrack } from 'svelte';
+import { onMount, untrack } from 'svelte';
 import {
 	TOPIC_SECTIONS,
 	TOPICS_CANCEL_LABEL,
@@ -27,16 +27,27 @@ interface Props {
 	submitLabel: string;
 	pending: boolean;
 	error: string | null;
-	onSubmit: (payload: TopicPayload) => void;
+	onSubmit: (payload: TopicPayload) => void | Promise<void>;
 	onCancel?: () => void;
+	/** When true, focus the name field on mount (inline editor). */
+	autofocusName?: boolean;
 }
 
-let { initial, submitLabel, pending, error, onSubmit, onCancel }: Props = $props();
+let {
+	initial,
+	submitLabel,
+	pending,
+	error,
+	onSubmit,
+	onCancel,
+	autofocusName = false,
+}: Props = $props();
 
 let form = $state<TopicFormState>(
 	untrack(() => ({ ...initial, sections: [...initial.sections] })),
 );
 let localError = $state<string | null>(null);
+let nameInput: HTMLInputElement | undefined = $state();
 
 const desired = $derived(form.kind === 'desired');
 const shownError = $derived(localError ?? error);
@@ -46,6 +57,10 @@ const inputClass =
 const labelClass = 'block text-xs font-medium text-gray-700 dark:text-gray-300';
 const choiceClass = 'inline-flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300';
 
+onMount(() => {
+	if (autofocusName) nameInput?.focus();
+});
+
 function handleSubmit(event: SubmitEvent): void {
 	event.preventDefault();
 	if (pending) return;
@@ -54,7 +69,7 @@ function handleSubmit(event: SubmitEvent): void {
 		return;
 	}
 	localError = null;
-	onSubmit(formToPayload(form));
+	void onSubmit(formToPayload(form));
 }
 </script>
 
@@ -87,6 +102,7 @@ function handleSubmit(event: SubmitEvent): void {
 	<label class={labelClass}>
 		{TOPICS_FIELD_NAME}
 		<input
+			bind:this={nameInput}
 			type="text"
 			class={inputClass}
 			maxlength="80"

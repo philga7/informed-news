@@ -71,6 +71,10 @@ export const MUTES_SAVE_ERROR = 'Could not save mute rule. Try again.';
 
 export const MUTES_DELETE_ERROR = 'Could not delete mute rule. Try again.';
 
+export const MUTES_KEYWORD_PLACEHOLDER = 'keyword';
+
+export const MUTES_SOURCE_PLACEHOLDER = 'domain or source';
+
 export const TOPICS_EMPTY_DESIRED = 'No topics at this level yet.';
 
 export const TOPICS_EMPTY_UNDESIRED = 'No undesired topics yet.';
@@ -105,7 +109,7 @@ export const TOPICS_FIELD_NAME = 'Name';
 
 export const TOPICS_FIELD_DESCRIPTION = 'Description';
 
-export const TOPICS_FIELD_KEYWORDS = 'Keywords (comma or newline separated)';
+export const TOPICS_FIELD_KEYWORDS = 'Keywords (one per line)';
 
 export const TOPICS_FIELD_QUERY = 'Search query';
 
@@ -157,10 +161,11 @@ export type TopicFormState = {
 	notes: string;
 };
 
+/** Split keywords on newlines only so commas inside a keyword (e.g. "Smith, John") survive. */
 export function parseKeywordsInput(text: string): string[] {
 	const seen = new Set<string>();
 	const keywords: string[] = [];
-	for (const part of text.split(/[,\r\n]+/)) {
+	for (const part of text.split(/\r?\n/)) {
 		const keyword = part.trim();
 		if (!keyword) continue;
 		const key = keyword.toLowerCase();
@@ -172,7 +177,7 @@ export function parseKeywordsInput(text: string): string[] {
 }
 
 export function formatKeywordsInput(keywords: readonly string[]): string {
-	return keywords.join(', ');
+	return keywords.join('\n');
 }
 
 function byName(a: Topic, b: Topic): number {
