@@ -484,7 +484,7 @@ test('scrapePublisherBody: a body that stalls after the headers fails within tim
   const server = await stalledBodyServer(200);
   try {
     const { result, elapsed } = await scrapeWithGuard(server.url, 150);
-    assert.notEqual(result, 'guard', 'scrape settled before the 2 s guard');
+    assert.notEqual(result, 'guard', 'scrape hung past the 2 s guard');
     assert.equal((result as PublisherBodyResult).bodyStatus, 'unavailable');
     assert.ok(elapsed < 1_000, `settled in ${elapsed} ms`);
     assert.equal(server.requests(), 1);
@@ -498,9 +498,10 @@ test('scrapePublisherBody: a 403 page whose body stalls is blocked within timeou
   const server = await stalledBodyServer(403);
   try {
     const { result, elapsed } = await scrapeWithGuard(server.url, 150);
-    assert.notEqual(result, 'guard', 'scrape settled before the 2 s guard');
+    assert.notEqual(result, 'guard', 'scrape hung past the 2 s guard');
     assert.equal((result as PublisherBodyResult).bodyStatus, 'blocked');
     assert.ok(elapsed < 1_000, `settled in ${elapsed} ms`);
+    assert.equal(server.requests(), 1);
   } finally {
     await server.close();
   }

@@ -364,5 +364,7 @@ export async function scrapePublisherBody(
     return emptyResult('unavailable');
   } finally {
     clearTimeout(timer);
+    // Releases the socket of an error response whose body was never read.
+    controller.abort();
   }
 }
