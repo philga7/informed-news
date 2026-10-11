@@ -345,7 +345,7 @@ export async function createManualSeed(
     triagedAt: now,
   };
   // Re-checked under the triage write lock, against records kept since the first read and
-  // articles read under that lock: a refresh writes its resolved articles before its records.
+  // articles read under that same lock.
   await stores.updateTriage(async (store) => {
     refuseDuplicate(await stores.readArticles(), store);
     return { records: { ...store.records, [record.articleId]: record }, updatedAt: now };

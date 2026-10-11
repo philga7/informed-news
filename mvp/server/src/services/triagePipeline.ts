@@ -581,18 +581,18 @@ export async function runTriage(
       if (!articlesById.has(id)) delete records[id];
     }
     // Articles first: a kept record must never point at an article whose resolved
-    // publisher URL is not stored yet (a seed's URL duplicate check reads both).
-    let articlesWritten = true;
+    // publisher URL is not stored yet.
+    let articleWriteFailed = false;
     if (run.changed.size > 0) {
       try {
         await (deps.upsertArticles ?? upsertArticles)([...run.changed.values()]);
       } catch (err) {
-        articlesWritten = false;
+        articleWriteFailed = true;
         addStoreError(meta.errors, `article write: ${errorMessage(err)}`);
       }
     }
 
-    if (!articlesWritten) {
+    if (articleWriteFailed) {
       addStoreError(meta.errors, 'triage write: skipped because the article write failed');
     } else {
       try {

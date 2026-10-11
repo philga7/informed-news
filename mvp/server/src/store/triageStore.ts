@@ -141,7 +141,8 @@ function enqueueUpdate<T>(triagePath: string, work: () => Promise<T>): Promise<T
 
 /**
  * Read, apply `mutate`, write atomically; serialized per path. Resolves to the written store.
- * An async `mutate` holds the queue until it settles; it must not call `updateTriage` itself.
+ * An async `mutate` holds the queue until it settles; it must not call `updateTriage` itself
+ * or await any write that waits on this queue.
  */
 export async function updateTriage(
   mutate: (store: TriageStore) => TriageStore | Promise<TriageStore>,

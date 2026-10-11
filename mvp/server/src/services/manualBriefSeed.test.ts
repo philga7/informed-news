@@ -419,7 +419,6 @@ test('createManualSeed refuses a URL-only duplicate a refresh resolves and keeps
   h.deps.readArticles = async () => [...store];
   const seedWrite = h.deps.updateTriage!;
   h.deps.updateTriage = async (mutate) => {
-    // A refresh queued ahead of the seed: resolved articles first, then its kept record.
     store[0] = {
       ...unresolved,
       publisherUrl: 'https://news.example.com/port-strike',
