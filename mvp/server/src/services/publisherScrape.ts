@@ -1,10 +1,10 @@
 import * as cheerio from 'cheerio';
 import { isRetryableNetworkError } from './isRetryableNetworkError.js';
+import { USER_AGENT } from './userAgent.js';
 
 const DEFAULT_SOURCE_DOMAIN = 'citizenfreepress.com';
 const FETCH_TIMEOUT_MS = 15_000;
 const MAX_RETRIES = 1;
-const USER_AGENT = 'Informed News MVP';
 
 const CONTENT_SELECTORS = [
   'article',

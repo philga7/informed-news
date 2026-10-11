@@ -2,10 +2,10 @@ import * as cheerio from 'cheerio';
 import type { BodyStatus } from '../types/article.js';
 import { truncateBodyText } from '../types/article.js';
 import { isRetryableNetworkError } from './isRetryableNetworkError.js';
+import { USER_AGENT } from './userAgent.js';
 
 const FETCH_TIMEOUT_MS = 15_000;
 const MAX_RETRIES = 1;
-const USER_AGENT = 'Informed News MVP';
 /** Below this, treat extracted text as empty/boilerplate. */
 const MIN_BODY_CHARS = 200;
 
@@ -31,7 +31,6 @@ const STRIP_SELECTORS = [
   'header',
   'footer',
   'aside',
-  'form',
   'iframe',
   '[role="navigation"]',
   '[role="banner"]',
@@ -229,9 +228,22 @@ function extractPublishedAt($: cheerio.CheerioAPI): string | null {
   return normalizeDate($('time[datetime]').first().attr('datetime'));
 }
 
+function stripSmallForms($: cheerio.CheerioAPI): void {
+  // DotNetNuke (war.gov / defense.gov) wraps the whole page in <form id="Form">.
+  // Keep forms that carry article-length text; drop login/search shells.
+  $('form').each((_i, el) => {
+    const $form = $(el);
+    const text = normalizeWhitespace($form.text());
+    if (text.length < MIN_BODY_CHARS) {
+      $form.remove();
+    }
+  });
+}
+
 function extractMainText($: cheerio.CheerioAPI): string {
   const root = $.root();
   root.find(STRIP_SELECTORS.join(', ')).remove();
+  stripSmallForms($);
 
   for (const selector of CONTENT_SELECTORS) {
     const node = $(selector).first();
