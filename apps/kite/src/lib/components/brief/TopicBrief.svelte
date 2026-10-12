@@ -18,6 +18,7 @@ const requestedSummaries = new Set<string>();
 	import SeedRemove from './SeedRemove.svelte';
 	import {
 		BRIEF_ADDED_BY_YOU_LABEL,
+		BRIEF_ALL_FILTERED,
 		BRIEF_LESS_LABEL,
 		BRIEF_LEVEL_LABEL,
 		BRIEF_OFFICIAL_LABEL,
@@ -32,6 +33,7 @@ const requestedSummaries = new Set<string>();
 		fullStoryErrorCopy,
 		fullStoryLine,
 		groupTopicBrief,
+		filteredCountKey,
 		hideFilteredStories,
 		isManualSeedStory,
 		isOfficialStory,
@@ -105,21 +107,28 @@ const requestedSummaries = new Set<string>();
 	let overviewSequence = 0;
 
 	const useSections = $derived(overviewLoaded && overview !== null && !overview.fixture);
+	/** Kite content filter (Settings → Filters) keywords each matching story hits. */
+	const filterMatches = $derived.by(() => {
+		const matches = new Map<Story, string[]>();
+		if (!contentFilter.isActive) return matches;
+		for (const story of stories) {
+			const { matchedKeywords } = shouldFilterStory(
+				story,
+				contentFilter.keywords,
+				contentFilter.filterScope,
+			);
+			if (matchedKeywords.length > 0) matches.set(story, matchedKeywords);
+		}
+		return matches;
+	});
+	const hideMode = $derived(contentFilter.filterMode === 'hide');
 	const groupedSections = $derived(overview ? groupTopicBrief(overview, stories) : []);
-	const hidden = $derived(
-		contentFilter.isActive && contentFilter.filterMode === 'hide'
-			? hideFilteredStories(groupedSections, (story) => filterKeywordsFor(story).length > 0)
+	const afterHide = $derived(
+		hideMode
+			? hideFilteredStories(groupedSections, (story) => filterMatches.has(story))
 			: { sections: groupedSections, hiddenCount: 0 },
 	);
-	const sections = $derived(hidden.sections);
-	const blurredCount = $derived(
-		contentFilter.isActive && contentFilter.filterMode === 'blur'
-			? sections
-					.flatMap((section) => [...section.top, ...section.more])
-					.filter((story) => filterKeywordsFor(story).length > 0).length
-			: 0,
-	);
-	const filteredCount = $derived(hidden.hiddenCount + blurredCount);
+	const sections = $derived(afterHide.sections);
 	const quiet = $derived(overview ? quietLine(overview.quiet) : null);
 	const storyIndex = $derived(new Map(stories.map((story, index) => [story, index])));
 	const topicStoryIds = $derived(
@@ -139,6 +148,11 @@ const requestedSummaries = new Set<string>();
 						return index === undefined ? [] : [index];
 					})
 				: undefined,
+	);
+	const filteredCount = $derived(
+		hideMode
+			? afterHide.hiddenCount
+			: visibleStories.filter((story) => filterMatches.has(story)).length,
 	);
 	const allVisibleRead = $derived(
 		visibleStories.every((story) => story.id && readStories[story.id]),
@@ -273,13 +287,6 @@ const requestedSummaries = new Set<string>();
 				? { phase: 'error', message: BRIEF_FULL_STORY_LOGIN_HINT, login: true }
 				: { phase: 'error', message: fullStoryErrorCopy(result.error), login: false },
 		};
-	}
-
-	/** Kite content filter keywords (Settings → Filters) this story matches. */
-	function filterKeywordsFor(story: Story): string[] {
-		if (!contentFilter.isActive) return [];
-		return shouldFilterStory(story, contentFilter.keywords, contentFilter.filterScope)
-			.matchedKeywords;
 	}
 
 	function handleToggle(story: Story): void {
@@ -430,7 +437,7 @@ const requestedSummaries = new Set<string>();
 
 {#snippet card(story: Story)}
 	{@const index = storyIndex.get(story) ?? -1}
-	{@const blurKeywords = contentFilter.filterMode === 'blur' ? filterKeywordsFor(story) : []}
+	{@const blurKeywords = hideMode ? [] : (filterMatches.get(story) ?? [])}
 	<StoryCard
 		{story}
 		storyIndex={index}
@@ -477,7 +484,17 @@ const requestedSummaries = new Set<string>();
 			filteredOut={overview.filteredOut}
 		/>
 
-		{#if sections.length === 0 && filteredCount === 0}
+		{#if sections.length === 0 && afterHide.hiddenCount > 0}
+			<p class="py-6 text-sm text-gray-600 dark:text-gray-400">
+				{BRIEF_ALL_FILTERED}
+				<a
+					href="#settings/filters"
+					class="font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+				>
+					{s('contentFilter.adjustFilters') || 'Adjust filters'}
+				</a>
+			</p>
+		{:else if sections.length === 0}
 			<p class="py-6 text-sm text-gray-600 dark:text-gray-400">
 				{#if overview.quiet.length === 0}
 					No topics yet.
@@ -530,16 +547,9 @@ const requestedSummaries = new Set<string>();
 
 		{#if filteredCount > 0 && contentFilter.showFilteredCount}
 			<p class="mt-4 text-center text-sm text-gray-500 dark:text-gray-400">
-				{s(
-					contentFilter.filterMode === 'hide'
-						? filteredCount === 1
-							? 'contentFilter.storyHidden'
-							: 'contentFilter.storiesHidden'
-						: filteredCount === 1
-							? 'contentFilter.storyFiltered'
-							: 'contentFilter.storiesFiltered',
-					{ count: filteredCount.toString() },
-				)}
+				{s(filteredCountKey(contentFilter.filterMode, filteredCount), {
+					count: filteredCount.toString(),
+				})}
 			</p>
 		{/if}
 

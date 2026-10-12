@@ -32,6 +32,7 @@ import {
 	autoFullStoryRequestKeys,
 	createSeenBatcher,
 	fetchBriefOverview,
+	filteredCountKey,
 	formatTimeAgoShort,
 	fullStoryErrorCopy,
 	fullStoryLine,
@@ -200,6 +201,15 @@ describe('hideFilteredStories (NEWS-141)', () => {
 		const result = hideFilteredStories(sections, (s) => s.id !== 'e');
 		expect(result.sections.map((s) => s.topicId)).toEqual(['watch-1']);
 		expect(result.hiddenCount).toBe(4);
+	});
+});
+
+describe('filteredCountKey (NEWS-141)', () => {
+	it('picks the Kite hidden / filtered message for the mode and count', () => {
+		expect(filteredCountKey('hide', 1)).toBe('contentFilter.storyHidden');
+		expect(filteredCountKey('hide', 2)).toBe('contentFilter.storiesHidden');
+		expect(filteredCountKey('blur', 1)).toBe('contentFilter.storyFiltered');
+		expect(filteredCountKey('blur', 3)).toBe('contentFilter.storiesFiltered');
 	});
 });
 
