@@ -4,6 +4,7 @@ import { s } from '$lib/client/localization.svelte';
 import { displaySettings, languageSettings } from '$lib/data/settings.svelte';
 import { kiteDB } from '$lib/db/dexie';
 import { dataReloadService } from '$lib/services/dataService';
+import { navigationHandlerService } from '$lib/services/navigationHandlerService';
 import { timeTravelNavigationService } from '$lib/services/timeTravelNavigationService';
 import { UrlNavigationService } from '$lib/services/urlNavigationService';
 import { timeTravel } from '$lib/stores/timeTravel.svelte';
@@ -100,6 +101,8 @@ export function usePageHelpers(
 		actions.setSharedClusterId(null);
 		actions.setExpandedStories({});
 		actions.setInitiallyExpandedStoryIndex(null);
+		// So re-following the same shared URL re-runs expansion (NEWS-144).
+		navigationHandlerService.clearLastHandled();
 
 		if (!state.isLatestBatch) {
 			timeTravel.reset();

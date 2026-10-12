@@ -816,7 +816,7 @@ test.describe('Shared link to a missing story (NEWS-140)', () => {
 
 		await page.goto(`/latest/world/${stories.length + 50}?shared=1`);
 		await expect(
-			page.getByRole('alert').filter({ hasText: "The shared story couldn't be found" }),
+			page.getByRole('status').filter({ hasText: "The shared story couldn't be found" }),
 		).toBeVisible({ timeout: 60_000 });
 		await expect(sharedBanner(page)).toHaveCount(0);
 		await expect(page).not.toHaveURL(/[?&]shared=1/);
@@ -826,6 +826,71 @@ test.describe('Shared link to a missing story (NEWS-140)', () => {
 		await toggle.click();
 		await expect(toggle).toHaveAttribute('aria-expanded', 'true');
 		await expect(storyContent(page, first)).toBeVisible();
+		await expect(page).not.toHaveURL(/[?&]shared=1/);
+	});
+});
+
+/** Same-origin in-app navigation (client-side), like the NEWS-135 Back test. */
+async function followInAppLink(page: Page, href: string, name: string): Promise<void> {
+	await page.evaluate(
+		({ href, name }) => {
+			const link = document.createElement('a');
+			link.href = href;
+			link.textContent = name;
+			document.body.append(link);
+		},
+		{ href, name },
+	);
+	await page.getByRole('link', { name, exact: true }).click();
+}
+
+test.describe('Re-following a shared link after leaving shared view (NEWS-144)', () => {
+	test.beforeEach(() => useScenario('topics'));
+
+	test('after View latest stories, the same found shared link opens the shared view again', async ({
+		page,
+	}) => {
+		await page.goto('/');
+		await expect(page).toHaveTitle(/Informed News/i, { timeout: 60_000 });
+		const shared = (await loadOwnedStories(page))[1]!;
+		const sharedPath = '/latest/world/1?shared=1';
+
+		await page.goto(sharedPath);
+		await expect(sharedBanner(page)).toBeVisible({ timeout: 60_000 });
+		await expect(storyContent(page, shared)).toBeVisible();
+
+		await page.getByRole('button', { name: 'View latest stories', exact: true }).click();
+		await expect(sharedBanner(page)).toHaveCount(0);
+		await expect(page).not.toHaveURL(/[?&]shared=1/);
+
+		await followInAppLink(page, sharedPath, 'Open the same shared story');
+		await expect(sharedBanner(page)).toBeVisible({ timeout: 60_000 });
+		await expect(storyContent(page, shared)).toBeVisible();
+		await expect(page).toHaveURL(/[?&]shared=1/);
+	});
+
+	test('after a missing-story exit, the same missing shared link runs the not-found exit again', async ({
+		page,
+	}) => {
+		await page.goto('/');
+		await expect(page).toHaveTitle(/Informed News/i, { timeout: 60_000 });
+		const stories = await loadOwnedStories(page);
+		const missingPath = `/latest/world/${stories.length + 50}?shared=1`;
+		const notFound = page
+			.getByRole('status')
+			.filter({ hasText: "The shared story couldn't be found" });
+
+		await page.goto(missingPath);
+		await expect(notFound).toBeVisible({ timeout: 60_000 });
+		await expect(sharedBanner(page)).toHaveCount(0);
+		await expect(page).not.toHaveURL(/[?&]shared=1/);
+
+		await notFound.getByRole('button', { name: 'Close', exact: true }).click();
+		await expect(notFound).toHaveCount(0);
+
+		await followInAppLink(page, missingPath, 'Open the same missing shared link');
+		await expect(notFound).toBeVisible({ timeout: 60_000 });
+		await expect(sharedBanner(page)).toHaveCount(0);
 		await expect(page).not.toHaveURL(/[?&]shared=1/);
 	});
 });
@@ -857,6 +922,16 @@ async function filterTitles(page: Page, titles: string[], filterMode: 'hide' | '
 	);
 }
 
+/** Accessible name of a content-filter-blurred StoryCard (NEWS-148 / NEWS-143). */
+function blurredAccessibleName(keywords: string[]): string {
+	if (keywords.length === 0) return 'filtered';
+	return `filtered (matches ${keywords.map((keyword) => `"${keyword}"`).join(', ')})`;
+}
+
+function blurredCard(page: Page, keywords: string[]): Locator {
+	return page.getByRole('button', { name: blurredAccessibleName(keywords), exact: true });
+}
+
 test.describe('Kite content filter on the topic Brief (NEWS-141)', () => {
 	test.beforeEach(() => useScenario('topics'));
 
@@ -875,7 +950,7 @@ test.describe('Kite content filter on the topic Brief (NEWS-141)', () => {
 		await page.goto('/');
 		await expect(page.getByTestId('topic-brief-section').first()).toBeVisible({ timeout: 60_000 });
 
-		const blurred = page.getByRole('button', { name: `News story: ${STORAGE}`, exact: true });
+		const blurred = blurredCard(page, [STORAGE.toLowerCase()]);
 		await expect(blurred).toBeVisible();
 		await expect(blurred.getByText(/Click to show/)).toBeVisible();
 		await expect(page.getByText(/Click to show/)).toHaveCount(1);
@@ -883,7 +958,7 @@ test.describe('Kite content filter on the topic Brief (NEWS-141)', () => {
 		await expect(storyToggle(card(page, TRANSMISSION), TRANSMISSION)).toBeVisible();
 
 		await page.getByRole('button', { name: 'More (1)' }).click();
-		await expect(page.getByRole('button', { name: `News story: ${TARIFF}`, exact: true })).toBeVisible();
+		await expect(blurredCard(page, [TARIFF.toLowerCase()])).toBeVisible();
 		await expect(page.getByText('2 stories filtered', { exact: true })).toBeVisible();
 
 		await blurred.click();
@@ -1092,8 +1167,8 @@ test.describe('Keyboard selection on blurred cards (NEWS-143)', () => {
 		await expect(page.locator('article[id^="story-"]')).toHaveCount(titles.length, {
 			timeout: 60_000,
 		});
-		const blurredStorage = page.getByRole('button', { name: `News story: ${STORAGE}`, exact: true });
-		const blurredTariff = page.getByRole('button', { name: `News story: ${TARIFF}`, exact: true });
+		const blurredStorage = blurredCard(page, ['battery']);
+		const blurredTariff = blurredCard(page, ['tariffs']);
 		await expect(blurredStorage).toBeVisible();
 		await expect(blurredTariff).toBeVisible();
 
@@ -1115,6 +1190,56 @@ test.describe('Keyboard selection on blurred cards (NEWS-143)', () => {
 		const tariff = page.getByRole('article', { name: `News story: ${TARIFF}`, exact: true });
 		await expect(storyToggle(tariff, TARIFF)).toHaveAttribute('aria-expanded', 'true');
 		await expect(announcer).toHaveText(`Selected story: ${TARIFF}`);
+	});
+});
+
+test.describe('Blurred story cards hide title from assistive tech (NEWS-148)', () => {
+	test.beforeEach(() => useScenario('topics'));
+
+	const STORAGE = 'Operators add battery storage before winter peak';
+
+	test('on the plain list, a blurred card is named by filter keywords and reveals to the normal name', async ({
+		page,
+	}) => {
+		await usePlainList(page);
+		await filterKeywords(page, ['battery'], 'blur');
+		await page.goto('/');
+		await expect(page.locator('article[id^="story-"]').first()).toBeVisible({ timeout: 60_000 });
+
+		const blurred = blurredCard(page, ['battery']);
+		await expect(blurred).toBeVisible();
+		await expect(blurred).toHaveAccessibleName(blurredAccessibleName(['battery']));
+		await expect(page.getByRole('button', { name: new RegExp(STORAGE) })).toHaveCount(0);
+		await expect(page.getByRole('article', { name: `News story: ${STORAGE}`, exact: true })).toHaveCount(
+			0,
+		);
+		await expect(blurred.locator('[aria-hidden="true"]').first()).toBeAttached();
+
+		await blurred.click();
+		await expect(blurred).toHaveCount(0);
+		const revealed = page.getByRole('article', { name: `News story: ${STORAGE}`, exact: true });
+		await expect(revealed).toBeVisible();
+		await expect(storyToggle(revealed, STORAGE)).toHaveAttribute('aria-expanded', 'true');
+	});
+
+	test('on the topic Brief, a blurred card is named by filter keywords and reveals to the normal name', async ({
+		page,
+	}) => {
+		await filterKeywords(page, ['battery'], 'blur');
+		await page.goto('/');
+		await expect(page.getByTestId('topic-brief-section').first()).toBeVisible({ timeout: 60_000 });
+
+		const blurred = blurredCard(page, ['battery']);
+		await expect(blurred).toBeVisible();
+		await expect(blurred).toHaveAccessibleName(blurredAccessibleName(['battery']));
+		await expect(page.getByRole('button', { name: new RegExp(STORAGE) })).toHaveCount(0);
+		await expect(blurred.locator('[aria-hidden="true"]').first()).toBeAttached();
+
+		await blurred.click();
+		await expect(blurred).toHaveCount(0);
+		const revealed = page.getByRole('article', { name: `News story: ${STORAGE}`, exact: true });
+		await expect(revealed).toBeVisible();
+		await expect(storyToggle(revealed, STORAGE)).toHaveAttribute('aria-expanded', 'true');
 	});
 });
 
@@ -1141,6 +1266,36 @@ test.describe('Linked story on the plain story list (NEWS-142)', () => {
 		await expect(linkedCards).toHaveCount(1);
 		await expect(linkedCards).toHaveAttribute('aria-label', `News story: ${linked!.title}`);
 		await expect(storyToggle(linkedCards, linked!.title!)).toHaveAttribute('aria-expanded', 'true');
+	});
+});
+
+test.describe('Plain list Adjust filters opens Settings Filters tab (NEWS-147)', () => {
+	test.beforeEach(() => useScenario('topics'));
+
+	test('when hide mode filters every story, Adjust filters opens Settings on the Filters tab', async ({
+		page,
+	}) => {
+		await page.goto('/');
+		await expect(page).toHaveTitle(/Informed News/i, { timeout: 60_000 });
+		const titles = (await loadOwnedStories(page)).map((story) => story.title!);
+		expect(titles.length).toBeGreaterThan(0);
+
+		await usePlainList(page);
+		await filterTitles(page, titles, 'hide');
+		await page.goto('/');
+		await expect(
+			page.getByText('All stories in this category were filtered', { exact: true }),
+		).toBeVisible({ timeout: 60_000 });
+		await expect(page.locator('article[id^="story-"]')).toHaveCount(0);
+
+		await page.getByRole('button', { name: 'Adjust filters', exact: true }).click();
+		const dialog = page.getByRole('dialog');
+		await expect(dialog).toBeVisible();
+		await expect(dialog.getByRole('tab', { name: 'Filters', exact: true })).toHaveAttribute(
+			'aria-selected',
+			'true',
+		);
+		await expect(dialog.getByText(titles[0]!.toLowerCase(), { exact: true })).toBeVisible();
 	});
 });
 

@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { blurredStories, selectedStoryAnnouncement } from '../blurredStories.svelte';
+import {
+	blurredStories,
+	blurredStoryAccessibleName,
+	selectedStoryAnnouncement,
+} from '../blurredStories.svelte';
 
 describe('selectedStoryAnnouncement (NEWS-143)', () => {
 	it('names an unblurred story by its title', () => {
@@ -16,6 +20,16 @@ describe('selectedStoryAnnouncement (NEWS-143)', () => {
 			'Selected story: filtered (matches "battery", "storage")',
 		);
 		expect(selectedStoryAnnouncement('Battery storage', [])).toBe('Selected story: filtered');
+	});
+});
+
+describe('blurredStoryAccessibleName (NEWS-148)', () => {
+	it('names a blurred card by filter keywords only, never a title', () => {
+		expect(blurredStoryAccessibleName(['battery'])).toBe('filtered (matches "battery")');
+		expect(blurredStoryAccessibleName(['battery', 'storage'])).toBe(
+			'filtered (matches "battery", "storage")',
+		);
+		expect(blurredStoryAccessibleName([])).toBe('filtered');
 	});
 });
 

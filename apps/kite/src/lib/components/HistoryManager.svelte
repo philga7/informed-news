@@ -30,8 +30,20 @@ let {
 	onNavigate,
 }: Props = $props();
 
-// Track the last URL we've fully processed
-let lastProcessedUrl = $state('');
+// Track the last URL we've fully processed. Plain let (not $state): writing it
+// must not re-enter this component's navigation $effect (NEWS-144).
+let lastProcessedUrl = '';
+
+/** Path + query + hash — same shape as buildUrl / replaceState (not url.href). */
+function pathUrl(url: URL): string {
+	return url.pathname + url.search + url.hash;
+}
+
+/** Live address-bar path. replaceState updates this synchronously; SvelteKit's
+ *  page.url can lag by a tick and would otherwise re-process the old shared URL. */
+function livePathUrl(): string {
+	return pathUrl(new URL(window.location.href));
+}
 
 // Build URL based on current state
 // Language settings are stored in localStorage, not in URL
@@ -104,18 +116,29 @@ function preserveOverlayParams(newUrl: string): string {
 export function updateUrl(params?: Partial<NavigationParams>) {
 	if (!browser) return;
 
-	// Update isSharedView immediately if provided in params
+	const newUrl = preserveOverlayParams(buildUrl(params));
+	const currentUrl = livePathUrl();
+
 	if (params?.isShared !== undefined) {
 		isSharedView = params.isShared;
 	}
 
-	const newUrl = preserveOverlayParams(buildUrl(params));
-	const currentUrl = UrlNavigationService.getFullUrl(page.url);
-
-	// Only update if URL actually changed
 	if (newUrl !== currentUrl) {
-		// DON'T update lastProcessedUrl here - let the effect handle it
-		replaceState(newUrl, {});
+		// Props sync can race a client nav into ?shared=1 while isSharedView is
+		// still false. Don't strip that live shared query — leave it for the
+		// navigation effect. Exit paths pass isShared:false and may clear it.
+		const live = new URL(window.location.href);
+		const strippingShared =
+			params?.isShared !== false &&
+			live.searchParams.get('shared') === '1' &&
+			!newUrl.includes('shared=1') &&
+			currentUrl !== lastProcessedUrl;
+		if (!strippingShared) {
+			replaceState(newUrl, {});
+			// Record the rewrite so a later in-app link back to currentUrl is
+			// handled again (NEWS-144). Use livePathUrl shape, not page.url.href.
+			lastProcessedUrl = newUrl;
+		}
 	}
 }
 
@@ -138,22 +161,26 @@ let initialLoadProcessed = $state(false);
 // Handle initial page load and browser navigation
 $effect(() => {
 	if (!browser) return;
-
-	const urlString = UrlNavigationService.getFullUrl(page.url);
-
-	// Build what we EXPECT the URL to be based on current state
+	// Subscribe to SvelteKit navigations; decide from the address bar (sync).
+	page.url;
+	const urlString = livePathUrl();
 	const expectedUrl = buildUrl();
 
-	// If the page URL matches what we expect, we're in sync - nothing to do
-	if (urlString === expectedUrl || urlString === lastProcessedUrl) {
+	// In sync: remember this path so updateUrl's rewrite is not the only way
+	// lastProcessedUrl advances (pathUrl matches buildUrl's relative shape).
+	if (urlString === expectedUrl) {
+		lastProcessedUrl = urlString;
+		return;
+	}
+	if (urlString === lastProcessedUrl) {
 		return;
 	}
 
 	// This is a real navigation (from browser back/forward or external)
 	lastProcessedUrl = urlString;
 
-	// Parse the URL
-	const params = UrlNavigationService.parseUrl(page.url);
+	// Parse the live URL (same source as urlString)
+	const params = UrlNavigationService.parseUrl(new URL(window.location.href));
 
 	// Update shared view state from URL
 	const hasStory =
@@ -165,7 +192,7 @@ $effect(() => {
 	} else if (params.isShared && !hasStory) {
 		// If shared=1 but no story, clean it from URL
 		isSharedView = false;
-		const cleanUrl = new URL(page.url);
+		const cleanUrl = new URL(window.location.href);
 		cleanUrl.searchParams.delete('shared');
 		const cleanedUrlString = cleanUrl.pathname + cleanUrl.search;
 		lastProcessedUrl = cleanedUrlString;
