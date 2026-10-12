@@ -396,7 +396,7 @@ const isCJKStory = $derived(containsCJK(story.title));
     {#if isSharedView}
       <!-- The shared story can't be collapsed, so its title is not a toggle. -->
       <div
-        class="mb-2 flex items-center text-sm font-medium text-blue-600 dark:text-blue-400 text-start w-full"
+        class="mb-2 flex items-center text-sm font-medium text-gray-900 dark:text-gray-100 text-start w-full"
         class:font-semibold={!isRead}
       >
         {@render titleContent()}

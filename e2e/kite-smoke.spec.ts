@@ -553,7 +553,7 @@ test.describe('Shared article view (NEWS-130)', () => {
 		await expect(page.getByText(/Viewing a shared story/)).toBeVisible({ timeout: 60_000 });
 		const card = page.locator(`article#story-${shared.cluster_number}`);
 		await expect(card.getByText(shared.title!, { exact: true })).toBeVisible();
-		await expect(card.getByRole('button', { name: shared.title, exact: true })).toHaveCount(0);
+		await expect(storyToggle(card, shared.title!)).toHaveCount(0);
 		await expect(card.locator('[aria-expanded]')).toHaveCount(0);
 	});
 });
