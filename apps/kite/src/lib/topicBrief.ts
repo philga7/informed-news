@@ -22,6 +22,8 @@ export const BRIEF_LESS_LABEL = 'Show fewer';
 
 export const BRIEF_QUIET_PREFIX = 'Nothing new:';
 
+export const BRIEF_ALL_FILTERED = 'Your keyword filters hide every story in your Brief.';
+
 export const BRIEF_OTHER_SECTION_NAME = 'Other stories';
 
 export const BRIEF_OFFICIAL_LABEL = 'Official statement';
@@ -270,6 +272,36 @@ export function groupTopicBrief(
 	}
 
 	return sections.filter((section) => section.top.length + section.more.length > 0);
+}
+
+/**
+ * Kite content filter in hide mode: hidden stories leave their section, More
+ * stories move up to keep each topic's top count, and emptied topics drop out.
+ */
+export function hideFilteredStories(
+	sections: TopicBriefSection[],
+	isHidden: (story: Story) => boolean,
+): { sections: TopicBriefSection[]; hiddenCount: number } {
+	let hiddenCount = 0;
+	const shown: TopicBriefSection[] = [];
+	for (const section of sections) {
+		const all = [...section.top, ...section.more];
+		const kept = all.filter((story) => !isHidden(story));
+		hiddenCount += all.length - kept.length;
+		if (kept.length === all.length) {
+			shown.push(section);
+		} else if (kept.length > 0) {
+			const topCount = section.top.length;
+			shown.push({ ...section, top: kept.slice(0, topCount), more: kept.slice(topCount) });
+		}
+	}
+	return { sections: shown, hiddenCount };
+}
+
+/** Kite locale key for the "N stories hidden / filtered" line under the sections. */
+export function filteredCountKey(mode: 'hide' | 'blur', count: number): string {
+	if (mode === 'hide') return count === 1 ? 'contentFilter.storyHidden' : 'contentFilter.storiesHidden';
+	return count === 1 ? 'contentFilter.storyFiltered' : 'contentFilter.storiesFiltered';
 }
 
 /** Ids that became read between two read-state snapshots, limited to `candidates`. */
