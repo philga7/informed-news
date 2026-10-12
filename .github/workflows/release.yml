@@ -48,11 +48,13 @@ jobs:
       issues: write
       pull-requests: write
     steps:
+      # The "main requires CI" ruleset rejects pushes to main that lack the CI check;
+      # only deploy keys bypass it, so the release commit and tag go out over SSH.
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
+          ssh-key: ${{ secrets.RELEASE_DEPLOY_KEY }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4

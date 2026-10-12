@@ -59,10 +59,30 @@ Bot commits `chore(release): … [skip ci]` are intentional so Release does not 
 
 ## Why both CI and Release?
 
-- **CI** (`.github/workflows/ci.yml`): every PR into `main` and every push to `main` — install (root, `mvp/server`, `apps/kite`), MVP server typecheck + `npm test`, `npm run test:kite`, Kite `bun run test:unit` + `bun run check`, and product-path `bun run build` in `apps/kite`. No secrets. Fast review feedback; no publish. (GitHub ruleset requiring this check on `main` is NEWS-124.)
+- **CI** (`.github/workflows/ci.yml`): every PR into `main` and every push to `main` — install (root, `mvp/server`, `apps/kite`), MVP server typecheck + `npm test`, `npm run test:kite`, Kite `bun run test:unit` + `bun run check`, and product-path `bun run build` in `apps/kite`. No secrets. Fast review feedback; no publish.
 - **Release** (`.github/workflows/release.yml`): after merge to `main` — re-validate, then `semantic-release`.
 
 Overlap on validation is intentional: a green PR does not skip the final gate before tagging.
+
+## `main` requires CI (ruleset)
+
+The repository ruleset **main requires CI** (Settings → Rules → Rulesets) requires the CI job **MVP build & typecheck**, reported by GitHub Actions, on every update to `main`:
+
+- A PR can't merge until that check passes on its head commit; pending or red blocks the merge button and `gh pr merge`.
+- Direct pushes to `main` are rejected (`push declined due to repository rule violations`), admins included. Land everything, including plan-file cleanups and doc fixes, through a PR.
+- The only bypass is **deploy keys**. The Release job checks out with the write deploy key **semantic-release (NEWS-124)**, whose private half is the Actions secret `RELEASE_DEPLOY_KEY`, so its `chore(release)` commit and tag push over SSH. GitHub does not allow the GitHub Actions app as a ruleset bypass on a personal-account repo, so `GITHUB_TOKEN` can't push the release commit.
+
+Rotate the release key:
+
+```bash
+ssh-keygen -t ed25519 -N '' -C 'semantic-release deploy key' -f release_key
+gh repo deploy-key add release_key.pub --allow-write --title 'semantic-release (NEWS-124)'
+gh secret set RELEASE_DEPLOY_KEY < release_key
+gh repo deploy-key list            # delete the old key: gh repo deploy-key delete <id>
+rm -P release_key release_key.pub
+```
+
+Inspect or change the ruleset with an admin token: `gh api repos/philga7/informed-news/rulesets`. If the CI job is renamed, update the required check's context in the ruleset in the same change, or every merge blocks on a check that never reports.
 
 ## Release ≠ cloud deploy
 

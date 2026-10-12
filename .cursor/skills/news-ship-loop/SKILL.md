@@ -50,10 +50,10 @@ gate ticket ready
   → In Progress
   → plan + feat branch + /subagent-driven-development
   → follow-up Jira gate (propose → user confirms → file or none)
+  → delete SDD plan on the feat branch
   → (user) push + PR
   → (user) squash-merge + delete branch
   → Done
-  → delete SDD plan from main
   → (optional) epic Done when all children Done
 ```
 
@@ -77,7 +77,7 @@ After SDD final review is clean (or a focused build is ready to ship), **before*
    - Infra / process gaps found while shipping (e.g. CI not gating merges)
 2. Present a short list: proposed issue type (Bug / Task / Story), parent epic (prefer Epic **K** [NEWS-83](https://informedcrew.atlassian.net/browse/NEWS-83) for bugs/intake; Epic **L** [NEWS-84](https://informedcrew.atlassian.net/browse/NEWS-84) or the active epic for in-epic follow-ups), one-line summary, and why — or explicitly **None**.
 3. **Do not create issues until the user confirms** which items (all / some / none).
-4. After confirmation: create in **NEWS** only, link **Relates** to the shipped key, update [docs/ROADMAP.md](../../docs/ROADMAP.md) (and `AGENTS.md` / `.cursor/rules/news-roadmap.mdc` when Current next changes). Prefer committing those docs on the feat branch before PR; if discovered after merge, include them in the plan-delete cleanup commit on `main`.
+4. After confirmation: create in **NEWS** only, link **Relates** to the shipped key, update [docs/ROADMAP.md](../../docs/ROADMAP.md) (and `AGENTS.md` / `.cursor/rules/news-roadmap.mdc` when Current next changes). Commit those docs on the feat branch before PR; if discovered after merge, land them in a small `docs(NEWS-N)` PR (direct pushes to `main` are rejected; see § `main` requires CI).
 
 Skipping the *ask* is the defect. “None” after an honest triage is success.
 
@@ -89,16 +89,20 @@ Skipping the *ask* is the defect. “None” after an honest triage is success.
    - Title referencing NEWS-N
    - Body: Summary + Test plan + `Closes NEWS-N` when the PR fully completes the story
 4. When the user asks to **merge**:
-   1. Run `gh pr checks`. Prefer `gh pr checks --required` once a ruleset/branch protection lists required checks (see NEWS-124); until then, treat the CI job **MVP build & typecheck** as blocking anyway.
-   2. **Refuse merge on red/pending** — do not run `gh pr merge` while that CI job (or any required check) is failing, cancelled, or still pending. Tell the user the blocking check names/status and stop.
-   3. **Only merge when required checks are green** (and the CI job above is green when no required list exists yet), then `gh pr merge <n> --squash --delete-branch`.
-   4. Explicit user override: if the user says to merge anyway despite red/pending, document that override in the PR comment or chat reply, then merge. Do not invent an override.
+   1. Run `gh pr checks --required` (the **main requires CI** ruleset lists **MVP build & typecheck**). `gh pr checks --watch` is fine while it is pending.
+   2. **Refuse merge on red/pending** — do not run `gh pr merge` while a required check is failing, cancelled, or still pending. Tell the user the blocking check names/status and stop. GitHub rejects the merge anyway.
+   3. **Only merge when required checks are green**, then `gh pr merge <n> --squash --delete-branch`.
+   4. No override path: nobody can bypass the ruleset except deploy keys (the release job). Merging on red needs the user to change the ruleset themselves; do not do it for them.
 5. `git checkout main && git pull --ff-only origin main`
+
+### `main` requires CI
+
+The repository ruleset rejects any update to `main` without a passing **MVP build & typecheck** check, so there are no direct pushes to `main`, for people or agents. Everything, including plan deletes and roadmap fixes, lands through a PR. Details and key rotation: [CONTRIBUTING.md](../../../CONTRIBUTING.md#main-requires-ci-ruleset).
 
 ### 4. Close the Jira item
 
 1. Transition the story to **Done** (`id=41` or looked-up).
-2. Delete the SDD plan file from `main` (`.cursor/plans/news-….plan.md`), commit + push that cleanup (same pattern as NEWS-51/52).
+2. The SDD plan file (`.cursor/plans/news-….plan.md`) should already be gone: delete it as the last commit on the feat branch before the PR merges. If one slipped onto `main`, remove it in a small `chore(NEWS-N)` PR.
 3. If the user asks to close a **parent epic**: verify children are Done (JQL), then Done the epic.
 
 ### 5. Controllers must not skip
@@ -108,10 +112,10 @@ Skipping the *ask* is the defect. “None” after an honest triage is success.
 | In Progress at start of build | No |
 | Follow-up Jira gate ask (propose or None) | No |
 | Create follow-ups without user confirm | Yes — stop and ask |
-| `gh pr checks` before merge; refuse on red/pending | No (unless explicit user override) |
+| `gh pr checks --required` before merge; refuse on red/pending | No |
 | Done after user-requested merge | No |
 | Push/PR/merge without user ask | Yes — stop and ask |
-| Plan delete after merge | No (unless user says keep it) |
+| Plan delete on the feat branch before merge | No (unless user says keep it) |
 
 ## Examples
 
@@ -119,7 +123,7 @@ Skipping the *ask* is the defect. “None” after an honest triage is success.
 → In Progress → plan/branch → SDD → follow-up Jira gate → stop at finish options (do not merge until asked).
 
 **User:** “Merge the PR to main”  
-→ (if gate not done yet, run it first) → squash-merge → pull main → Done on the NEWS key → remove SDD plan → push cleanup.
+→ (if gate not done yet, run it first) → plan already deleted on the branch → required checks green → squash-merge → pull main → Done on the NEWS key.
 
 **User:** “Close NEWS-48”  
 → confirm children Done → Done on epic.
