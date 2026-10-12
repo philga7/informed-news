@@ -6,6 +6,7 @@ import {
 	BRIEF_SEED_LOGIN_HINT,
 	BRIEF_SEED_LOGIN_HREF,
 	BRIEF_SEED_LOGIN_LINK_LABEL,
+	BRIEF_SEED_ERROR_GENERIC,
 	BRIEF_SEED_NETWORK_ERROR,
 	BRIEF_SEED_NO_TOPICS,
 	BRIEF_SEED_NO_TOPICS_LINK_LABEL,
@@ -291,5 +292,18 @@ describe('postBriefSeed', () => {
 		expect(BRIEF_SEED_NETWORK_ERROR).toBe(
 			'Network error while creating the story. Check that the server is running.',
 		);
+	});
+
+	it('shows generic copy for 5xx and non-400/409 4xx (NEWS-116)', async () => {
+		for (const status of [403, 404, 429, 500, 503]) {
+			const fetchFn = vi.fn(async () =>
+				jsonResponse(status, { ok: false, error: 'ENOENT: /data/manual-seeds.json' }),
+			);
+			expect(await postBriefSeed(payload, fetchFn as unknown as typeof fetch)).toEqual({
+				ok: false,
+				status,
+				error: BRIEF_SEED_ERROR_GENERIC,
+			});
+		}
 	});
 });
