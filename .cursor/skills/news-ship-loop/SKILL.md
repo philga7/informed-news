@@ -88,7 +88,11 @@ Skipping the *ask* is the defect. “None” after an honest triage is success.
 3. `gh pr create` with:
    - Title referencing NEWS-N
    - Body: Summary + Test plan + `Closes NEWS-N` when the PR fully completes the story
-4. When the user asks to **merge**: prefer green CI (`gh pr checks`) before `gh pr merge <n> --squash --delete-branch` (see NEWS-103 for making this a hard refuse-on-red rule).
+4. When the user asks to **merge**:
+   1. Run `gh pr checks`. Prefer `gh pr checks --required` once a ruleset/branch protection lists required checks (see NEWS-124); until then, treat the CI job **MVP build & typecheck** as blocking anyway.
+   2. **Refuse merge on red/pending** — do not run `gh pr merge` while that CI job (or any required check) is failing, cancelled, or still pending. Tell the user the blocking check names/status and stop.
+   3. **Only merge when required checks are green** (and the CI job above is green when no required list exists yet), then `gh pr merge <n> --squash --delete-branch`.
+   4. Explicit user override: if the user says to merge anyway despite red/pending, document that override in the PR comment or chat reply, then merge. Do not invent an override.
 5. `git checkout main && git pull --ff-only origin main`
 
 ### 4. Close the Jira item
@@ -104,6 +108,7 @@ Skipping the *ask* is the defect. “None” after an honest triage is success.
 | In Progress at start of build | No |
 | Follow-up Jira gate ask (propose or None) | No |
 | Create follow-ups without user confirm | Yes — stop and ask |
+| `gh pr checks` before merge; refuse on red/pending | No (unless explicit user override) |
 | Done after user-requested merge | No |
 | Push/PR/merge without user ask | Yes — stop and ask |
 | Plan delete after merge | No (unless user says keep it) |
