@@ -1069,6 +1069,55 @@ test.describe('Keyboard selection follows the plain story list (NEWS-137)', () =
 	});
 });
 
+test.describe('Keyboard selection on blurred cards (NEWS-143)', () => {
+	test.beforeEach(() => useScenario('topics'));
+
+	const STORAGE = 'Operators add battery storage before winter peak';
+	const TARIFF = 'Regulator opens review of overnight tariffs';
+
+	test('on the plain list, j / k announce a blurred card as filtered without its title; Enter and o reveal and open it', async ({
+		page,
+	}) => {
+		await page.goto('/');
+		await expect(page).toHaveTitle(/Informed News/i, { timeout: 60_000 });
+		const titles = (await loadOwnedStories(page)).map((story) => story.title);
+		const storageIndex = titles.indexOf(STORAGE);
+		const tariffIndex = titles.indexOf(TARIFF);
+		expect(storageIndex).toBeGreaterThanOrEqual(0);
+		expect(tariffIndex).toBeGreaterThan(storageIndex);
+
+		await usePlainList(page);
+		await filterKeywords(page, ['battery', 'tariffs'], 'blur');
+		await page.goto('/');
+		await expect(page.locator('article[id^="story-"]')).toHaveCount(titles.length, {
+			timeout: 60_000,
+		});
+		const blurredStorage = page.getByRole('button', { name: `News story: ${STORAGE}`, exact: true });
+		const blurredTariff = page.getByRole('button', { name: `News story: ${TARIFF}`, exact: true });
+		await expect(blurredStorage).toBeVisible();
+		await expect(blurredTariff).toBeVisible();
+
+		const announcer = page.getByTestId('keyboard-selection-announcer');
+		for (let i = 0; i <= storageIndex; i++) await page.keyboard.press('j');
+		await expect(announcer).toHaveText('Selected story: filtered (matches "battery")');
+		await expect(blurredStorage).toHaveAttribute('aria-current', 'true');
+
+		await page.keyboard.press('Enter');
+		await expect(blurredStorage).toHaveCount(0);
+		const storage = page.getByRole('article', { name: `News story: ${STORAGE}`, exact: true });
+		await expect(storyToggle(storage, STORAGE)).toHaveAttribute('aria-expanded', 'true');
+		await expect(announcer).toHaveText(`Selected story: ${STORAGE}`);
+
+		for (let i = storageIndex; i < tariffIndex; i++) await page.keyboard.press('j');
+		await expect(announcer).toHaveText('Selected story: filtered (matches "tariffs")');
+		await page.keyboard.press('o');
+		await expect(blurredTariff).toHaveCount(0);
+		const tariff = page.getByRole('article', { name: `News story: ${TARIFF}`, exact: true });
+		await expect(storyToggle(tariff, TARIFF)).toHaveAttribute('aria-expanded', 'true');
+		await expect(announcer).toHaveText(`Selected story: ${TARIFF}`);
+	});
+});
+
 test.describe('Linked story on the plain story list (NEWS-142)', () => {
 	test.beforeEach(() => useScenario('topics'));
 

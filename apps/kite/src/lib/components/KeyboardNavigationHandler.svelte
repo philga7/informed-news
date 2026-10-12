@@ -1,5 +1,6 @@
 <script lang="ts">
 import { onMount, untrack } from 'svelte';
+import { blurredStories, selectedStoryAnnouncement } from '$lib/stores/blurredStories.svelte';
 import { keyboardNavigation } from '$lib/stores/keyboardNavigation.svelte';
 import { storyKey } from '$lib/topicBrief';
 import type { Story } from '$lib/types';
@@ -42,11 +43,21 @@ let lastKeyTime = 0;
 let lastKey = '';
 
 // Focus stays put on j / k so Enter / o / x / m act once; the live region names the selection.
-const selectionAnnouncement = $derived(
-	keyboardNavigation.hasSelection
-		? `Selected story: ${stories[keyboardNavigation.selectedIndex]?.title ?? ''}`
-		: '',
-);
+const selectionAnnouncement = $derived.by(() => {
+	if (!keyboardNavigation.hasSelection) return '';
+	const story = stories[keyboardNavigation.selectedIndex];
+	return selectedStoryAnnouncement(
+		story?.title,
+		story ? blurredStories.get(storyKey(story))?.keywords : undefined,
+	);
+});
+
+/** Enter / o on a blurred card reveal it first, as a click on the card does. */
+function revealIfBlurred(story: Story): boolean {
+	const blurred = blurredStories.get(storyKey(story));
+	blurred?.reveal();
+	return blurred !== undefined;
+}
 
 function selectStep(delta: 1 | -1) {
 	if (!navigationOrder) {
@@ -229,7 +240,7 @@ function handleGlobalKeyDown(event: KeyboardEvent) {
 	) {
 		event.preventDefault();
 		const story = stories[keyboardNavigation.selectedIndex];
-		if (story) {
+		if (story && !revealIfBlurred(story)) {
 			onStoryToggle(story.id || story.cluster_number?.toString() || story.title);
 		}
 		return;
@@ -239,7 +250,7 @@ function handleGlobalKeyDown(event: KeyboardEvent) {
 	if (event.key === 'o' && keyboardNavigation.hasSelection) {
 		event.preventDefault();
 		const story = stories[keyboardNavigation.selectedIndex];
-		if (story) {
+		if (story && !revealIfBlurred(story)) {
 			const storyId = story.id || story.cluster_number?.toString() || story.title;
 			if (!expandedStories[storyId]) {
 				onStoryToggle(storyId);
