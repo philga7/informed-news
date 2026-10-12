@@ -30,6 +30,7 @@ import {
 	LESS_LIKE_THIS_NOT_STORED,
 	applyFullStory,
 	autoFullStoryRequestKeys,
+	createFilterMatcher,
 	createSeenBatcher,
 	fetchBriefOverview,
 	filteredCountKey,
@@ -201,6 +202,30 @@ describe('hideFilteredStories (NEWS-141)', () => {
 		const result = hideFilteredStories(sections, (s) => s.id !== 'e');
 		expect(result.sections.map((s) => s.topicId)).toEqual(['watch-1']);
 		expect(result.hiddenCount).toBe(4);
+	});
+});
+
+describe('createFilterMatcher (NEWS-146)', () => {
+	const matchRatepayers = (story: Story) =>
+		story.short_summary.includes('ratepayers') ? ['ratepayers'] : [];
+
+	it("keeps a story's first decision when its summary loads later", () => {
+		const story = makeStory('a');
+		const matcher = createFilterMatcher(matchRatepayers);
+		expect(matcher(story)).toEqual([]);
+		story.short_summary = 'Overnight bills change for ratepayers.';
+		expect(matcher(story)).toEqual([]);
+	});
+
+	it('decides each story on its own, and afresh in a new matcher (filter settings changed)', () => {
+		const loaded = makeStory('a', { short_summary: 'Overnight bills change for ratepayers.' });
+		const pending = makeStory('b');
+		const matcher = createFilterMatcher(matchRatepayers);
+		expect(matcher(loaded)).toEqual(['ratepayers']);
+		expect(matcher(pending)).toEqual([]);
+
+		pending.short_summary = 'Ratepayers: a note for ratepayers.';
+		expect(createFilterMatcher(matchRatepayers)(pending)).toEqual(['ratepayers']);
 	});
 });
 

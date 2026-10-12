@@ -830,16 +830,30 @@ test.describe('Shared link to a missing story (NEWS-140)', () => {
 	});
 });
 
-/** Kite Settings → Filters keywords matching these story titles, seeded before load. */
-async function filterTitles(page: Page, titles: string[], filterMode: 'hide' | 'blur'): Promise<void> {
+/** Kite Settings → Filters, seeded before load. */
+async function filterKeywords(
+	page: Page,
+	keywords: string[],
+	filterMode: 'hide' | 'blur',
+	filterScope: 'title' | 'summary' | 'all' = 'title',
+): Promise<void> {
 	await page.addInitScript(
-		({ keywords, filterMode }) => {
+		({ keywords, filterMode, filterScope }) => {
 			localStorage.setItem(
 				'kite-content-filter',
-				JSON.stringify({ keywords, filterMode, filterScope: 'title', version: 1 }),
+				JSON.stringify({ keywords, filterMode, filterScope, version: 1 }),
 			);
 		},
-		{ keywords: titles.map((title) => title.toLowerCase()), filterMode },
+		{ keywords, filterMode, filterScope },
+	);
+}
+
+/** Kite Settings → Filters keywords matching these story titles, seeded before load. */
+async function filterTitles(page: Page, titles: string[], filterMode: 'hide' | 'blur'): Promise<void> {
+	await filterKeywords(
+		page,
+		titles.map((title) => title.toLowerCase()),
+		filterMode,
 	);
 }
 
@@ -917,6 +931,36 @@ test.describe('Kite content filter on the topic Brief (NEWS-141)', () => {
 		await expect(page.getByRole('dialog')).toBeVisible();
 		await expect(page.getByText(PORTS.toLowerCase(), { exact: true })).toBeVisible();
 	});
+
+	for (const filterMode of ['hide', 'blur'] as const) {
+		test(`${filterMode} mode, all scope: an opened story whose on-demand summary matches stays open and unblurred, and the count holds (NEWS-146)`, async ({
+			page,
+		}) => {
+			// DEMAND is the grid story with no summary yet; TARIFF (More) is unavailable, so it never loads one.
+			await page.route('**/api/brief/stories/*/summary', (route) =>
+				route.fulfill({
+					json: {
+						ok: true,
+						summary: { status: 'ok', text: 'Ratepayers would see overnight bills change.' },
+					},
+				}),
+			);
+			await filterKeywords(page, ['ratepayers', 'battery'], filterMode, 'all');
+			await page.goto('/');
+			await expect(page.getByTestId('topic-brief-section').first()).toBeVisible({ timeout: 60_000 });
+			const count = page.getByText(filterMode === 'hide' ? '1 story hidden' : '1 story filtered', {
+				exact: true,
+			});
+			await expect(count).toBeVisible();
+
+			const demand = card(page, DEMAND);
+			await storyToggle(demand, DEMAND).click();
+			await expect(demand.getByText('AI summary — not ground truth')).toBeVisible();
+			await expect(storyToggle(demand, DEMAND)).toHaveAttribute('aria-expanded', 'true');
+			await expect(demand.getByText(/Click to show/)).toHaveCount(0);
+			await expect(count).toBeVisible();
+		});
+	}
 });
 
 test.describe('Keyboard selection follows the plain story list (NEWS-137)', () => {

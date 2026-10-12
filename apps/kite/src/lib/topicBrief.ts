@@ -298,6 +298,24 @@ export function hideFilteredStories(
 	return { sections: shown, hiddenCount };
 }
 
+/**
+ * Kite content filter matches decided once per story, so a summary or full story that
+ * loads after the card rendered can't hide or blur it. A new matcher decides afresh.
+ */
+export function createFilterMatcher(
+	match: (story: Story) => string[],
+): (story: Story) => string[] {
+	const decided = new WeakMap<Story, string[]>();
+	return (story) => {
+		let matched = decided.get(story);
+		if (!matched) {
+			matched = match(story);
+			decided.set(story, matched);
+		}
+		return matched;
+	};
+}
+
 /** Kite locale key for the "N stories hidden / filtered" line under the sections. */
 export function filteredCountKey(mode: 'hide' | 'blur', count: number): string {
 	if (mode === 'hide') return count === 1 ? 'contentFilter.storyHidden' : 'contentFilter.storiesHidden';
