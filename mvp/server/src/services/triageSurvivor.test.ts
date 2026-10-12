@@ -1,8 +1,17 @@
 import assert from 'node:assert/strict';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { test } from 'node:test';
+import { articleIdFromCanonicalUrl, readArticles, updateArticles } from '../store/index.js';
 import type { Article } from '../types/article.js';
 import type { PublisherBodyResult } from './publisherBodyScrape.js';
-import { prepareSurvivor, type SurvivorDeps } from './triageSurvivor.js';
+import {
+  prepareSurvivor,
+  withSurvivorFields,
+  writeBackSurvivors,
+  type SurvivorDeps,
+} from './triageSurvivor.js';
 
 const NOW = new Date('2026-09-30T12:00:00.000Z');
 const GOOGLE_URL = 'https://news.google.com/rss/articles/CBMiAbc';
@@ -328,4 +337,81 @@ test('throwing deps never escape: resolver error skips scrape, scrape error is u
   assert.equal(throwingScrape.changed, true);
   assert.equal(throwingScrape.article.bodyStatus, 'unavailable');
   assert.equal(throwingScrape.dateIssue, null);
+});
+
+test('withSurvivorFields takes only the fields survivor prep owns; publishedAt only fills an empty one', () => {
+  const stored = makeArticle({
+    title: 'Port strike enters third week',
+    clusterId: 'c-ports',
+    classifiedAt: '2026-09-30T11:30:00.000Z',
+    classifyError: 'model timeout',
+    searchSeenAt: '2026-09-30T11:45:00.000Z',
+    topicIds: ['t-ports', 't-labor'],
+  });
+  const prepared = makeArticle({
+    publisherUrl: PUBLISHER_URL,
+    publisherDomain: 'www.reuters.com',
+    citations: [
+      { label: 'Reuters', url: GOOGLE_URL },
+      { label: 'Reuters', url: PUBLISHER_URL },
+    ],
+    bodyText: 'Dockworkers stayed off the job for a third week.',
+    bodyStatus: 'ok',
+    publisherTitle: 'Port strike drags on',
+    imageUrl: 'https://www.reuters.com/port.jpg',
+    imageCaption: 'Idle cranes',
+    imageCredit: 'Reuters',
+    publishedAt: '2026-09-30T09:00:00.000Z',
+    fetchedAt: '2026-09-30T08:00:00.000Z',
+  });
+
+  assert.deepEqual(withSurvivorFields(stored, prepared), {
+    ...stored,
+    publisherUrl: PUBLISHER_URL,
+    publisherDomain: 'www.reuters.com',
+    citations: prepared.citations,
+    bodyText: 'Dockworkers stayed off the job for a third week.',
+    bodyStatus: 'ok',
+    publisherTitle: 'Port strike drags on',
+    imageUrl: 'https://www.reuters.com/port.jpg',
+    imageCaption: 'Idle cranes',
+    imageCredit: 'Reuters',
+    publishedAt: '2026-09-30T09:00:00.000Z',
+  });
+
+  const dated = makeArticle({ publishedAt: '2026-09-30T10:00:00.000Z' });
+  assert.equal(withSurvivorFields(dated, prepared).publishedAt, '2026-09-30T10:00:00.000Z');
+});
+
+function storedArticle(slug: string, overrides: Partial<Article> = {}): Article {
+  const canonicalUrl = `${GOOGLE_URL}-${slug}`;
+  return makeArticle({ id: articleIdFromCanonicalUrl(canonicalUrl), canonicalUrl, ...overrides });
+}
+
+test('writeBackSurvivors patches rows still pending and leaves rows another writer prepared or pruned mid-run', async () => {
+  const articlesPath = path.join(mkdtempSync(path.join(tmpdir(), 'survivor-write-back-')), 'articles.json');
+  const pending = storedArticle('pending');
+  const scrapedMeanwhile = storedArticle('scraped', {
+    bodyText: 'Body another writer scraped.',
+    bodyStatus: 'ok',
+    publisherTitle: 'Their title',
+    imageUrl: 'https://www.reuters.com/theirs.jpg',
+  });
+  await updateArticles(() => [pending, scrapedMeanwhile], articlesPath);
+
+  const failedScrape = { bodyText: null, bodyStatus: 'unavailable' as const, publisherTitle: null, imageUrl: null };
+  await writeBackSurvivors(
+    [
+      { ...pending, ...failedScrape, publisherUrl: PUBLISHER_URL },
+      { ...storedArticle('scraped'), ...failedScrape },
+      { ...storedArticle('pruned'), ...failedScrape },
+    ],
+    articlesPath,
+  );
+
+  const [patched, untouched, ...rest] = await readArticles(articlesPath);
+  assert.equal(rest.length, 0);
+  assert.equal(patched!.bodyStatus, 'unavailable');
+  assert.equal(patched!.publisherUrl, PUBLISHER_URL);
+  assert.deepEqual(untouched, scrapedMeanwhile);
 });

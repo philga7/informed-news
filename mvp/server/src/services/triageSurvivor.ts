@@ -1,3 +1,4 @@
+import { updateArticles } from '../store/index.js';
 import type { Article } from '../types/article.js';
 import { resolveGoogleNewsUrl } from './googleNewsResolve.js';
 import { scrapePublisherBody, type PublisherBodyResult } from './publisherBodyScrape.js';
@@ -106,4 +107,48 @@ export async function prepareSurvivor(
   };
 
   return { article: prepared, changed: true, dateIssue: dateIssueFor(prepared, now) };
+}
+
+/**
+ * The fields survivor prep owns, from `prepared` onto the stored row: publisher link, citations,
+ * body, publisherTitle, image, and publishedAt only when the stored one is empty. Everything else
+ * (classification, cluster, topic search stamps, fetchedAt) keeps its stored value.
+ */
+export function withSurvivorFields(stored: Article, prepared: Article): Article {
+  return {
+    ...stored,
+    publisherUrl: prepared.publisherUrl,
+    publisherDomain: prepared.publisherDomain,
+    citations: prepared.citations,
+    bodyText: prepared.bodyText,
+    bodyStatus: prepared.bodyStatus,
+    publisherTitle: prepared.publisherTitle,
+    imageUrl: prepared.imageUrl,
+    imageCaption: prepared.imageCaption,
+    imageCredit: prepared.imageCredit,
+    publishedAt: stored.publishedAt ?? prepared.publishedAt,
+  };
+}
+
+/**
+ * Write survivor prep onto the articles as stored now. Triage read its copies at the start of
+ * the refresh, so it patches only the fields it owns; other writes since then stand. A row no
+ * longer `pending` was prepared by another writer meanwhile and is left alone; articles pruned
+ * meanwhile aren't brought back.
+ */
+export async function writeBackSurvivors(
+  prepared: readonly Article[],
+  articlesPath?: string,
+): Promise<void> {
+  const byId = new Map(prepared.map((a) => [a.id, a]));
+  await updateArticles(
+    (articles) =>
+      articles.map((article) => {
+        const survivor = byId.get(article.id);
+        return survivor && article.bodyStatus === 'pending'
+          ? withSurvivorFields(article, survivor)
+          : article;
+      }),
+    articlesPath,
+  );
 }
