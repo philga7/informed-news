@@ -830,6 +830,76 @@ test.describe('Shared link to a missing story (NEWS-140)', () => {
 	});
 });
 
+test.describe('Kite content filter on the topic Brief (NEWS-141)', () => {
+	test.beforeEach(() => useScenario('topics'));
+
+	const STORAGE = 'Operators add battery storage before winter peak';
+	const TRANSMISSION = 'Transmission upgrade approved for northern corridor';
+	const DEMAND = 'Demand response program expands to small businesses';
+	const TARIFF = 'Regulator opens review of overnight tariffs';
+	const PORTS = 'Port workers reach tentative agreement';
+
+	async function filterTitles(page: Page, titles: string[], filterMode: 'hide' | 'blur'): Promise<void> {
+		await page.addInitScript(
+			({ keywords, filterMode }) => {
+				localStorage.setItem(
+					'kite-content-filter',
+					JSON.stringify({ keywords, filterMode, filterScope: 'title', version: 1 }),
+				);
+			},
+			{ keywords: titles.map((title) => title.toLowerCase()), filterMode },
+		);
+	}
+
+	function card(page: Page, title: string): Locator {
+		return page.getByRole('article', { name: `News story: ${title}`, exact: true });
+	}
+
+	test('blur mode blurs only the matching cards; a click reveals and opens one', async ({ page }) => {
+		await filterTitles(page, [STORAGE], 'blur');
+		await page.goto('/');
+		await expect(page.getByTestId('topic-brief-section').first()).toBeVisible({ timeout: 60_000 });
+
+		const blurred = page.getByRole('button', { name: `News story: ${STORAGE}`, exact: true });
+		await expect(blurred).toBeVisible();
+		await expect(blurred.getByText(/Click to show/)).toBeVisible();
+		await expect(page.getByText(/Click to show/)).toHaveCount(1);
+		await expect(page.getByText('1 story filtered', { exact: true })).toBeVisible();
+		await expect(storyToggle(card(page, TRANSMISSION), TRANSMISSION)).toBeVisible();
+
+		await blurred.click();
+		await expect(blurred).toHaveCount(0);
+		const toggle = storyToggle(card(page, STORAGE), STORAGE);
+		await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+	});
+
+	test('hide mode drops matching cards, fills the topic from More, drops an emptied topic, counts them, and j / k walk what is shown', async ({
+		page,
+	}) => {
+		await filterTitles(page, [STORAGE, PORTS], 'hide');
+		await page.goto('/');
+		const sections = page.getByTestId('topic-brief-section');
+		await expect(sections).toHaveCount(1, { timeout: 60_000 });
+		await expect(sections.getByRole('heading', { name: 'Energy grid', exact: true })).toBeVisible();
+
+		const cards = page.locator('article[id^="story-"]');
+		await expect(cards).toHaveCount(3);
+		await expect(card(page, STORAGE)).toHaveCount(0);
+		await expect(card(page, PORTS)).toHaveCount(0);
+		await expect(card(page, TARIFF)).toBeVisible();
+		await expect(sections.getByRole('button', { name: /^More \(/ })).toHaveCount(0);
+		await expect(page.getByText('2 stories hidden', { exact: true })).toBeVisible();
+
+		const announcer = page.getByTestId('keyboard-selection-announcer');
+		for (const title of [TRANSMISSION, DEMAND, TARIFF]) {
+			await page.keyboard.press('j');
+			await expect(announcer).toHaveText(`Selected story: ${title}`);
+		}
+		await page.keyboard.press('j');
+		await expect(announcer).toHaveText(`Selected story: ${TARIFF}`);
+	});
+});
+
 test.describe('Keyboard selection follows the plain story list (NEWS-137)', () => {
 	test.beforeEach(() => useScenario('topics'));
 

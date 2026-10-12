@@ -16,6 +16,7 @@ The Brief is composed each time it is read, from triage's kept records (`mvp/dat
 - **Quiet topics.** Desired topics with nothing to show are listed on one line at the bottom: `Nothing new: A, B, C` (Core first, then Watch).
 - **Empty states.** No desired topics at all → "No topics yet. Add topics to build your Brief." Topics but no stories → "No new stories for your topics." plus the quiet line.
 - **Empty article store** (first run) → the old single fixture story renders in the plain list instead; there are no sections or refresh bar.
+- **Kite keyword filter** (Settings → Filters, saved per browser) applies to the topic Brief as it does to the plain list ([NEWS-141](https://informedcrew.atlassian.net/browse/NEWS-141)). Matching is client-side only: the server still shows the story. **Blur** blurs a matching card until you click it (or press Enter on it). **Hide** takes matching cards out; stories from the topic's More move up to keep its top 3, the More count drops to match, and a topic left with nothing disappears (it isn't listed as quiet). With "show filtered count" on, a line under the sections says how many stories were hidden or filtered. j / k walk only the cards on screen. Undesired topics, Less like this, and mute remain the server-side filters.
 
 Each card shows the headline, a summary line (below), `+N outlets` when more than one outlet ran the story (N = outlets − 1), an `Official statement` badge when triage labelled it official, and up to 8 article links: the kept article first, then its duplicates, one per outlet domain.
 

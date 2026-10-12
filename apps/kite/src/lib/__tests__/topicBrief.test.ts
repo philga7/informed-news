@@ -36,6 +36,7 @@ import {
 	fullStoryErrorCopy,
 	fullStoryLine,
 	groupTopicBrief,
+	hideFilteredStories,
 	isManualSeedStory,
 	isOfficialStory,
 	isRecoverableRefreshFailure,
@@ -161,6 +162,44 @@ describe('groupTopicBrief', () => {
 			['New topic', ['y']],
 			[BRIEF_OTHER_SECTION_NAME, ['z']],
 		]);
+	});
+});
+
+describe('hideFilteredStories (NEWS-141)', () => {
+	const sections = groupTopicBrief(
+		{
+			sections: [
+				{ topicId: 'core-1', name: 'Core one', level: 'core', storyIds: ['a', 'b'], moreIds: ['c', 'd'] },
+				{ topicId: 'watch-1', name: 'Watch one', level: 'watch', storyIds: ['e'], moreIds: [] },
+			],
+		},
+		['a', 'b', 'c', 'd', 'e'].map((id) =>
+			makeStory(id, id === 'e' ? { informed_topic_id: 'watch-1' } : {}),
+		),
+	);
+	const ids = (stories: Story[]) => stories.map((s) => s.id);
+
+	it('leaves the sections as they are when nothing is hidden', () => {
+		expect(hideFilteredStories(sections, () => false)).toEqual({ sections, hiddenCount: 0 });
+	});
+
+	it('fills a hidden top story from More, so More shrinks by one', () => {
+		const result = hideFilteredStories(sections, (s) => s.id === 'a');
+		expect(ids(result.sections[0].top)).toEqual(['b', 'c']);
+		expect(ids(result.sections[0].more)).toEqual(['d']);
+		expect(result.hiddenCount).toBe(1);
+	});
+
+	it('takes hidden More stories out of More', () => {
+		const result = hideFilteredStories(sections, (s) => s.id === 'd');
+		expect(ids(result.sections[0].top)).toEqual(['a', 'b']);
+		expect(ids(result.sections[0].more)).toEqual(['c']);
+	});
+
+	it('drops a topic whose stories are all hidden and counts them', () => {
+		const result = hideFilteredStories(sections, (s) => s.id !== 'e');
+		expect(result.sections.map((s) => s.topicId)).toEqual(['watch-1']);
+		expect(result.hiddenCount).toBe(4);
 	});
 });
 

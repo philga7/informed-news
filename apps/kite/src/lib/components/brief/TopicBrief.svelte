@@ -7,8 +7,10 @@ const requestedSummaries = new Set<string>();
 	import { untrack, type Snippet } from 'svelte';
 	import { s } from '$lib/client/localization.svelte';
 	import { kiteDB } from '$lib/db/dexie';
+	import { contentFilter } from '$lib/stores/contentFilter.svelte';
 	import { keyboardNavigation } from '$lib/stores/keyboardNavigation.svelte';
 	import type { Story } from '$lib/types';
+	import { shouldFilterStory } from '$lib/utils/contentFilter';
 	import StoryCard from '$lib/components/story/StoryCard.svelte';
 	import StoryCardSkeleton from '$lib/components/story/StoryCardSkeleton.svelte';
 	import BriefRefreshBar from './BriefRefreshBar.svelte';
@@ -30,6 +32,7 @@ const requestedSummaries = new Set<string>();
 		fullStoryErrorCopy,
 		fullStoryLine,
 		groupTopicBrief,
+		hideFilteredStories,
 		isManualSeedStory,
 		isOfficialStory,
 		isTopicBriefStory,
@@ -102,7 +105,21 @@ const requestedSummaries = new Set<string>();
 	let overviewSequence = 0;
 
 	const useSections = $derived(overviewLoaded && overview !== null && !overview.fixture);
-	const sections = $derived(overview ? groupTopicBrief(overview, stories) : []);
+	const groupedSections = $derived(overview ? groupTopicBrief(overview, stories) : []);
+	const hidden = $derived(
+		contentFilter.isActive && contentFilter.filterMode === 'hide'
+			? hideFilteredStories(groupedSections, (story) => filterKeywordsFor(story).length > 0)
+			: { sections: groupedSections, hiddenCount: 0 },
+	);
+	const sections = $derived(hidden.sections);
+	const blurredCount = $derived(
+		contentFilter.isActive && contentFilter.filterMode === 'blur'
+			? sections
+					.flatMap((section) => [...section.top, ...section.more])
+					.filter((story) => filterKeywordsFor(story).length > 0).length
+			: 0,
+	);
+	const filteredCount = $derived(hidden.hiddenCount + blurredCount);
 	const quiet = $derived(overview ? quietLine(overview.quiet) : null);
 	const storyIndex = $derived(new Map(stories.map((story, index) => [story, index])));
 	const topicStoryIds = $derived(
@@ -258,6 +275,13 @@ const requestedSummaries = new Set<string>();
 		};
 	}
 
+	/** Kite content filter keywords (Settings → Filters) this story matches. */
+	function filterKeywordsFor(story: Story): string[] {
+		if (!contentFilter.isActive) return [];
+		return shouldFilterStory(story, contentFilter.keywords, contentFilter.filterScope)
+			.matchedKeywords;
+	}
+
 	function handleToggle(story: Story): void {
 		onStoryToggle?.(storyKey(story));
 	}
@@ -406,6 +430,7 @@ const requestedSummaries = new Set<string>();
 
 {#snippet card(story: Story)}
 	{@const index = storyIndex.get(story) ?? -1}
+	{@const blurKeywords = contentFilter.filterMode === 'blur' ? filterKeywordsFor(story) : []}
 	<StoryCard
 		{story}
 		storyIndex={index}
@@ -421,6 +446,8 @@ const requestedSummaries = new Set<string>();
 		onFullStory={() => handleFullStory(story)}
 		onReadToggle={() => handleReadToggle(story)}
 		priority={index >= 0 && index < 3}
+		isFiltered={blurKeywords.length > 0}
+		filterKeywords={blurKeywords}
 		bind:showSourceOverlay
 		bind:currentSource
 		bind:sourceArticles
@@ -450,7 +477,7 @@ const requestedSummaries = new Set<string>();
 			filteredOut={overview.filteredOut}
 		/>
 
-		{#if sections.length === 0}
+		{#if sections.length === 0 && filteredCount === 0}
 			<p class="py-6 text-sm text-gray-600 dark:text-gray-400">
 				{#if overview.quiet.length === 0}
 					No topics yet.
@@ -500,6 +527,21 @@ const requestedSummaries = new Set<string>();
 				{/if}
 			</section>
 		{/each}
+
+		{#if filteredCount > 0 && contentFilter.showFilteredCount}
+			<p class="mt-4 text-center text-sm text-gray-500 dark:text-gray-400">
+				{s(
+					contentFilter.filterMode === 'hide'
+						? filteredCount === 1
+							? 'contentFilter.storyHidden'
+							: 'contentFilter.storiesHidden'
+						: filteredCount === 1
+							? 'contentFilter.storyFiltered'
+							: 'contentFilter.storiesFiltered',
+					{ count: filteredCount.toString() },
+				)}
+			</p>
+		{/if}
 
 		{#if quiet}
 			<p class="mt-10 border-t border-gray-200 pt-3 text-xs text-gray-500 dark:border-gray-700 dark:text-gray-400" data-testid="topic-brief-quiet">

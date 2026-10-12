@@ -272,6 +272,30 @@ export function groupTopicBrief(
 	return sections.filter((section) => section.top.length + section.more.length > 0);
 }
 
+/**
+ * Kite content filter in hide mode: hidden stories leave their section, More
+ * stories move up to keep each topic's top count, and emptied topics drop out.
+ */
+export function hideFilteredStories(
+	sections: TopicBriefSection[],
+	isHidden: (story: Story) => boolean,
+): { sections: TopicBriefSection[]; hiddenCount: number } {
+	let hiddenCount = 0;
+	const shown: TopicBriefSection[] = [];
+	for (const section of sections) {
+		const all = [...section.top, ...section.more];
+		const kept = all.filter((story) => !isHidden(story));
+		hiddenCount += all.length - kept.length;
+		if (kept.length === all.length) {
+			shown.push(section);
+		} else if (kept.length > 0) {
+			const topCount = section.top.length;
+			shown.push({ ...section, top: kept.slice(0, topCount), more: kept.slice(topCount) });
+		}
+	}
+	return { sections: shown, hiddenCount };
+}
+
 /** Ids that became read between two read-state snapshots, limited to `candidates`. */
 export function newlyReadIds(
 	before: Record<string, boolean>,
