@@ -803,52 +803,30 @@ test.describe('Shared article view keyboard shortcuts (NEWS-135)', () => {
 	});
 });
 
-test.describe('Content-filtered shared story (NEWS-136)', () => {
+test.describe('Shared link to a missing story (NEWS-140)', () => {
 	test.beforeEach(() => useScenario('topics'));
 
-	// A found shared story skips the content filter; a shared link whose story isn't found
-	// falls back to the filtered list, which is where blurred cards show in the shared view.
-	test('a blurred card in the shared view reveals on click and on Enter, opens as the shared story, and stays open', async ({
+	test('leaves the shared view with a not-found notice: the Brief shows, its cards open, and the URL drops ?shared=1', async ({
 		page,
 	}) => {
 		await page.goto('/');
 		await expect(page).toHaveTitle(/Informed News/i, { timeout: 60_000 });
 		const stories = await loadOwnedStories(page);
-		const [first, second] = stories;
-		await page.addInitScript((keywords) => {
-			localStorage.setItem(
-				'kite-content-filter',
-				JSON.stringify({ keywords, filterMode: 'blur', filterScope: 'title', version: 1 }),
-			);
-		}, [first!.title!.toLowerCase(), second!.title!.toLowerCase()]);
-		const missingIndex = stories.length + 50;
+		const first = stories[0]!;
 
-		for (const [story, reveal] of [
-			[first!, 'click'],
-			[second!, 'Enter'],
-		] as const) {
-			await page.goto(`/latest/world/${missingIndex}?shared=1`);
-			await expect(sharedBanner(page)).toBeVisible({ timeout: 60_000 });
-			const card = page.locator(`article#story-${story.cluster_number}`);
-			const blurred = page.getByRole('button', { name: `News story: ${story.title}` });
-			await expect(blurred).toBeVisible();
-			await expect(card.getByText(/Click to show/)).toBeVisible();
+		await page.goto(`/latest/world/${stories.length + 50}?shared=1`);
+		await expect(
+			page.getByRole('alert').filter({ hasText: "The shared story couldn't be found" }),
+		).toBeVisible({ timeout: 60_000 });
+		await expect(sharedBanner(page)).toHaveCount(0);
+		await expect(page).not.toHaveURL(/[?&]shared=1/);
+		await expect(page.getByTestId('topic-brief-section').first()).toBeVisible();
 
-			if (reveal === 'click') await blurred.click();
-			else {
-				await blurred.focus();
-				await page.keyboard.press('Enter');
-			}
-			await expect(blurred).toHaveCount(0);
-			const content = storyContent(page, story);
-			await expect(content).toBeVisible();
-			await expect(page.locator('article[id^="story-"]')).toHaveCount(1);
-			await expect(sharedBanner(page)).toBeVisible();
-
-			await blurFocus(page);
-			for (const key of ['Enter', 'x']) await page.keyboard.press(key);
-			await expect(content).toBeVisible();
-		}
+		const toggle = storyToggle(page.locator(`article#story-${first.cluster_number}`), first.title!);
+		await toggle.click();
+		await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+		await expect(storyContent(page, first)).toBeVisible();
+		await expect(page).not.toHaveURL(/[?&]shared=1/);
 	});
 });
 

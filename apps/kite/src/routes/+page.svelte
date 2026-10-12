@@ -35,6 +35,8 @@ import WikipediaPopup from '$lib/components/WikipediaPopup.svelte';
 import Weather from '$lib/components/weather/Weather.svelte';
 import TopicBrief from '$lib/components/brief/TopicBrief.svelte';
 import { BRIEF_STORIES_SECTION_TITLE, TOPIC_BRIEF_CATEGORY_ID } from '$lib/topicBrief';
+import { SHARED_STORY_NOT_FOUND, sharedStoryInList } from '$lib/sharedStory';
+import { toastStore } from '$lib/stores/toast.svelte';
 import {
 	displaySettings,
 	languageSettings,
@@ -527,6 +529,23 @@ const handleUrlNavigation = async (params: NavigationParams) => {
 	}
 	if (updates.storyCountOverride !== undefined) {
 		state.storyCountOverride = updates.storyCountOverride;
+	}
+
+	// Judge only against the link's own category once its stories are loaded; a navigation the
+	// service skipped can leave the page on another category.
+	const linkedCategoryStories = state.allCategoryStories[state.currentCategory];
+	if (
+		params.isShared &&
+		hasStory &&
+		state.isSharedArticleView &&
+		linkedCategoryStories &&
+		(!params.categoryId ||
+			UrlNavigationService.normalizeCategoryId(params.categoryId) ===
+				UrlNavigationService.normalizeCategoryId(state.currentCategory)) &&
+		!sharedStoryInList(linkedCategoryStories, params)
+	) {
+		await helpers.handleExitSharedView();
+		toastStore.info(SHARED_STORY_NOT_FOUND);
 	}
 };
 
