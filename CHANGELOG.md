@@ -1,3 +1,5 @@
+## [0.26.21](https://github.com/philga7/informed-news/compare/v0.26.20...v0.26.21) (2026-10-12)
+
 ## [0.26.20](https://github.com/philga7/informed-news/compare/v0.26.19...v0.26.20) (2026-10-12)
 
 ## [0.26.19](https://github.com/philga7/informed-news/compare/v0.26.18...v0.26.19) (2026-10-12)
