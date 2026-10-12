@@ -205,6 +205,14 @@ export class NavigationHandlerService {
 	isNavigating(): boolean {
 		return this.isHandlingNavigation;
 	}
+
+	/**
+	 * Allow the same URL params to be handled again (e.g. after leaving shared
+	 * view, so re-following the same ?shared=1 link re-expands the story).
+	 */
+	clearLastHandled(): void {
+		this.lastHandledUrl = '';
+	}
 }
 
 // Export singleton instance
