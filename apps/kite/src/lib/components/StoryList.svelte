@@ -307,7 +307,7 @@ const allStoriesExpanded = $derived(
         </p>
         <div class="flex flex-col sm:flex-row gap-2 justify-center">
           <button
-            onclick={() => (window.location.href = "#settings/contentFilter")}
+            onclick={() => (window.location.href = "#settings/filters")}
             class="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
           >
             {s("contentFilter.adjustFilters") || "Adjust filters"}
