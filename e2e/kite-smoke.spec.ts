@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import {
 	E2E_API_PORT,
 	E2E_DATA_DIR,
@@ -70,6 +70,36 @@ async function logIn(page: Page): Promise<void> {
 	const login = await page.request.post('/api/login', { data: { password: E2E_MVP_PASSWORD } });
 	expect(login.ok()).toBeTruthy();
 }
+
+type TopicRow = { id: string; name: string; kind: 'desired' | 'undesired' };
+
+async function listTopics(page: Page): Promise<TopicRow[]> {
+	const list = await page.request.get('/api/topics');
+	expect(list.ok()).toBeTruthy();
+	return ((await list.json()) as { topics: TopicRow[] }).topics;
+}
+
+async function removeUndesiredTopics(page: Page, name: string): Promise<void> {
+	for (const topic of (await listTopics(page)).filter(
+		(t) => t.kind === 'undesired' && t.name === name,
+	)) {
+		const removed = await page.request.delete(`/api/topics/${topic.id}`);
+		expect(removed.ok()).toBeTruthy();
+	}
+}
+
+async function briefCard(page: Page, title: string): Promise<Locator> {
+	await page.goto('/');
+	await expect(page).toHaveTitle(/Informed News/i, { timeout: 60_000 });
+	const story = (await loadOwnedStories(page)).find((s) => s.title === title);
+	expect(story?.cluster_number, `expected "${title}" to have a card`).toBeTruthy();
+	const card = page.locator(`article#story-${story?.cluster_number}`);
+	await expect(card).toBeVisible({ timeout: 60_000 });
+	return card;
+}
+
+/** StoryCard marks the page keyboard selection (j / k) with a ring; it has no ARIA state. */
+const KEYBOARD_SELECTED = /\bring-2\b/;
 
 function watchKagiRequests(page: Page): string[] {
 	const kagiHosts: string[] = [];
@@ -255,14 +285,7 @@ test.describe('Filtered out + Less like this (NEWS-90)', () => {
 	test('Less like this blocks the outlet and Topics lists it under Undesired', async ({ page }) => {
 		const { title, domain } = TOPIC_SCENARIO.lessLikeThis;
 		await logIn(page);
-		await page.goto('/');
-		await expect(page).toHaveTitle(/Informed News/i, { timeout: 60_000 });
-
-		const stories = await loadOwnedStories(page);
-		const story = stories.find((s) => s.title === title);
-		expect(story?.cluster_number, 'expected the outlet-block story to have a card').toBeTruthy();
-		const card = page.locator(`article#story-${story?.cluster_number}`);
-		await expect(card).toBeVisible({ timeout: 60_000 });
+		const card = await briefCard(page, title);
 		const trigger = card.getByRole('button', { name: 'Less like this', exact: true });
 		await expect(trigger).toHaveCount(0);
 
@@ -288,15 +311,7 @@ test.describe('Filtered out + Less like this (NEWS-90)', () => {
 				undesired.getByRole('heading', { name: TOPIC_SCENARIO.undesiredTopic.name, exact: true }),
 			).toBeVisible();
 		} finally {
-			const list = await page.request.get('/api/topics');
-			expect(list.ok()).toBeTruthy();
-			const { topics } = (await list.json()) as {
-				topics: Array<{ id: string; name: string; kind: string }>;
-			};
-			for (const topic of topics.filter((t) => t.kind === 'undesired' && t.name === domain)) {
-				const removed = await page.request.delete(`/api/topics/${topic.id}`);
-				expect(removed.ok()).toBeTruthy();
-			}
+			await removeUndesiredTopics(page, domain);
 		}
 
 		const after = (await loadOwnedStories(page)).map((s) => s.title);
@@ -309,14 +324,7 @@ test.describe('Filtered out + Less like this (NEWS-90)', () => {
 		const { title } = TOPIC_SCENARIO.lessLikeThisSubject;
 		let createdName: string | null = null;
 		await logIn(page);
-		await page.goto('/');
-		await expect(page).toHaveTitle(/Informed News/i, { timeout: 60_000 });
-
-		const stories = await loadOwnedStories(page);
-		const story = stories.find((s) => s.title === title);
-		expect(story?.cluster_number, 'expected the subject-path story to have a card').toBeTruthy();
-		const card = page.locator(`article#story-${story?.cluster_number}`);
-		await expect(card).toBeVisible({ timeout: 60_000 });
+		const card = await briefCard(page, title);
 
 		try {
 			await card.locator('button[aria-label="Expand story"]').click();
@@ -338,20 +346,96 @@ test.describe('Filtered out + Less like this (NEWS-90)', () => {
 				timeout: 60_000,
 			});
 		} finally {
-			if (createdName) {
-				const list = await page.request.get('/api/topics');
-				expect(list.ok()).toBeTruthy();
-				const { topics } = (await list.json()) as {
-					topics: Array<{ id: string; name: string; kind: string }>;
-				};
-				for (const topic of topics.filter(
-					(t) => t.kind === 'undesired' && t.name === createdName,
-				)) {
-					const removed = await page.request.delete(`/api/topics/${topic.id}`);
-					expect(removed.ok()).toBeTruthy();
-				}
-			}
+			if (createdName) await removeUndesiredTopics(page, createdName);
 		}
+	});
+});
+
+test.describe('Less like this keyboard, focus and name taken (NEWS-125)', () => {
+	test.beforeEach(() => useScenario('topics'));
+
+	test('Escape in the open panel cancels it and keeps the page selection; with the panel closed, Escape reaches the page', async ({
+		page,
+	}) => {
+		await logIn(page);
+		const card = await briefCard(page, TOPIC_SCENARIO.lessLikeThis.title);
+		const trigger = card.getByRole('button', { name: 'Less like this', exact: true });
+
+		await page.keyboard.press('j');
+		await expect(card).toHaveClass(KEYBOARD_SELECTED);
+		await card.locator('button[aria-label="Expand story"]').click();
+		await trigger.click();
+		const nameInput = card.getByLabel('Undesired topic name');
+		await expect(nameInput).toBeFocused();
+
+		await page.keyboard.press('Escape');
+		await expect(nameInput).toHaveCount(0);
+		await expect(trigger).toBeFocused();
+		await expect(card).toHaveClass(KEYBOARD_SELECTED);
+
+		await page.keyboard.press('Escape');
+		await expect(card).not.toHaveClass(KEYBOARD_SELECTED);
+		await expect(trigger).toBeVisible();
+	});
+
+	test('after a save, focus is on View Topics and the saved line survives collapse and re-expand', async ({
+		page,
+	}) => {
+		const { title } = TOPIC_SCENARIO.lessLikeThisSubject;
+		const savedLine = `Added "${title}" to undesired topics.`;
+		await logIn(page);
+		const card = await briefCard(page, title);
+		const expand = card.locator('button[aria-label="Expand story"]');
+		const content = card.getByRole('region', { name: 'Story content' });
+		const saved = card.getByTestId('less-like-this-success');
+
+		try {
+			await expand.click();
+			await card.getByRole('button', { name: 'Less like this', exact: true }).click();
+			await card.getByRole('button', { name: 'Add undesired topic', exact: true }).click();
+			await expect(saved).toContainText(savedLine);
+			await expect(saved.getByRole('link', { name: 'View Topics', exact: true })).toBeFocused();
+
+			await expand.click();
+			await expect(content).toHaveCount(0);
+			await expect(saved).toHaveCount(0);
+
+			await expand.click();
+			await expect(content).toBeVisible();
+			await expect(saved).toContainText(savedLine);
+			await expect(card.getByRole('button', { name: 'Less like this', exact: true })).toHaveCount(0);
+		} finally {
+			await removeUndesiredTopics(page, title);
+		}
+	});
+
+	test('a taken name (409) says nothing was saved, links to View Topics, and keeps the panel open', async ({
+		page,
+	}) => {
+		const taken = TOPIC_SCENARIO.sections[0]!.name;
+		await logIn(page);
+		const card = await briefCard(page, TOPIC_SCENARIO.lessLikeThisSubject.title);
+
+		await card.locator('button[aria-label="Expand story"]').click();
+		await card.getByRole('button', { name: 'Less like this', exact: true }).click();
+		const nameInput = card.getByLabel('Undesired topic name');
+		await nameInput.fill(taken);
+		await card.getByRole('button', { name: 'Add undesired topic', exact: true }).click();
+
+		const alert = card.getByRole('alert');
+		await expect(alert).toContainText(
+			`A topic named "${taken}" already exists, so nothing was saved.`,
+		);
+		await expect(alert.getByRole('link', { name: 'View Topics', exact: true })).toHaveAttribute(
+			'href',
+			'/topics',
+		);
+		await expect(nameInput).toHaveValue(taken);
+		await expect(card.getByRole('button', { name: 'Cancel', exact: true })).toBeVisible();
+		await expect(card.getByTestId('less-like-this-success')).toHaveCount(0);
+
+		const undesired = (await listTopics(page)).filter((t) => t.kind === 'undesired');
+		expect(undesired.map((t) => t.name)).toEqual([TOPIC_SCENARIO.undesiredTopic.name]);
 	});
 });
 
