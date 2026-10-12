@@ -28,6 +28,7 @@ const requestedSummaries = new Set<string>();
 		createSeenBatcher,
 		fetchBriefOverview,
 		fullStoryErrorCopy,
+		fullStoryLine,
 		groupTopicBrief,
 		isManualSeedStory,
 		isOfficialStory,
@@ -297,11 +298,12 @@ const requestedSummaries = new Set<string>();
 	{@const official = isOfficialStory(story)}
 	{@const addedByYou = isManualSeedStory(story)}
 	{@const line = summaryLine(story)}
+	{@const fullLine = fullStoryLine(story)}
 	{@const request = story.id ? summaryRequests[story.id] : undefined}
 	{@const fullStoryRequest = story.id ? fullStoryRequests[story.id] : undefined}
 	{@const expanded = Boolean(expandedStories[key])}
 	{@const actionId = expanded && isTopicBriefStory(story) ? story.informed_article_id : undefined}
-	{#if badge || official || addedByYou || line || (expanded && fullStoryRequest) || actionId}
+	{#if badge || official || addedByYou || line || (expanded && fullStoryRequest) || (expanded && fullLine) || actionId}
 		<div class="mb-2 space-y-1">
 			{#if badge || official || addedByYou}
 				<div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-gray-500 dark:text-gray-400">
@@ -359,6 +361,8 @@ const requestedSummaries = new Set<string>();
 				</p>
 			{:else if expanded && fullStoryRequest?.phase === 'error'}
 				<p class="text-xs text-gray-500 dark:text-gray-400">{fullStoryRequest.message}</p>
+			{:else if expanded && fullLine?.kind === 'unavailable'}
+				<p class="text-xs text-gray-500 dark:text-gray-400">{fullLine.text}</p>
 			{/if}
 			{#if actionId && addedByYou}
 				<SeedRemove articleId={actionId} onRemoved={() => handleSeedRemoved(story)} />

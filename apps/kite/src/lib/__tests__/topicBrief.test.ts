@@ -11,6 +11,7 @@ import {
 	BRIEF_FULL_STORY_ERROR,
 	BRIEF_FULL_STORY_NOT_IN_BRIEF,
 	BRIEF_FULL_STORY_RATE_LIMITED,
+	BRIEF_FULL_STORY_UNAVAILABLE,
 	BRIEF_NOT_REFRESHED,
 	BRIEF_REFRESH_ERROR,
 	BRIEF_REFRESH_POLL_FAILURES_TOLERATED,
@@ -33,6 +34,7 @@ import {
 	fetchBriefOverview,
 	formatTimeAgoShort,
 	fullStoryErrorCopy,
+	fullStoryLine,
 	groupTopicBrief,
 	isManualSeedStory,
 	isOfficialStory,
@@ -314,6 +316,17 @@ describe('full-story helpers', () => {
 		expect(fullStoryErrorCopy(undefined)).toBe(BRIEF_FULL_STORY_ERROR);
 	});
 
+	it('fullStoryLine shows quiet copy for unavailable and nothing otherwise', () => {
+		expect(fullStoryLine(makeStory('a', { informed_full_story_status: 'unavailable' }))).toEqual({
+			kind: 'unavailable',
+			text: BRIEF_FULL_STORY_UNAVAILABLE,
+		});
+		expect(fullStoryLine(makeStory('a', { informed_full_story_status: 'ok' }))).toBeNull();
+		expect(fullStoryLine(makeStory('a', { informed_full_story_status: 'missing' }))).toBeNull();
+		expect(fullStoryLine(makeStory('a', { informed_full_story_status: 'error' }))).toBeNull();
+		expect(fullStoryLine(makeStory('a'))).toBeNull();
+	});
+
 	it('requests only missing or failed rich stories', () => {
 		expect(shouldRequestFullStory(makeStory('a', { informed_full_story_status: 'missing' }))).toBe(
 			true,
@@ -344,6 +357,16 @@ describe('full-story helpers', () => {
 			informed_full_story_updated: '1 new outlet; timeline +1',
 			talking_points: ['Key point'],
 			technical_details: ['Detail'],
+		});
+	});
+
+	it('applyFullStory records unavailable so the card can show copy after loading clears', () => {
+		const story = makeStory('a', { informed_full_story_status: 'missing' });
+		applyFullStory(story, { status: 'unavailable' });
+		expect(story.informed_full_story_status).toBe('unavailable');
+		expect(fullStoryLine(story)).toEqual({
+			kind: 'unavailable',
+			text: BRIEF_FULL_STORY_UNAVAILABLE,
 		});
 	});
 });

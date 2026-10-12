@@ -62,6 +62,9 @@ export const BRIEF_FULL_STORY_RATE_LIMITED = 'Full story limit reached for this 
 
 export const BRIEF_FULL_STORY_NOT_IN_BRIEF = 'This story is no longer in the Brief.';
 
+/** Quiet inline copy when full-story generation had no usable source text (NEWS-101). */
+export const BRIEF_FULL_STORY_UNAVAILABLE = 'Full story unavailable — no readable text';
+
 export const BRIEF_REFRESH_LABEL = 'Refresh';
 
 export const BRIEF_REFRESHING_LABEL = 'Refreshing…';
@@ -509,6 +512,16 @@ export function applyFullStory(story: Story, fullStory: FullStoryPayload): void 
 	if (typeof fullStory.changeSummary === 'string' && fullStory.changeSummary.trim()) {
 		story.informed_full_story_updated = fullStory.changeSummary.trim();
 	}
+}
+
+/** Expanded-card full-story status line; only unavailable needs quiet copy (NEWS-101). */
+export function fullStoryLine(
+	story: Story,
+): { kind: 'unavailable'; text: string } | null {
+	if (story.informed_full_story_status === 'unavailable') {
+		return { kind: 'unavailable', text: BRIEF_FULL_STORY_UNAVAILABLE };
+	}
+	return null;
 }
 
 export function fullStoryErrorCopy(code: string | undefined): string {
