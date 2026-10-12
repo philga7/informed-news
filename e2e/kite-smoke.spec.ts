@@ -584,6 +584,7 @@ test.describe('Keyboard selection follows the visible topic Brief (NEWS-133)', (
 		await expectSelected(collapsed[collapsed.length - 1]!);
 
 		await grid.getByRole('button', { name: /^More \(/ }).click();
+		// Keep focus off the More button: Enter on a focused button is NEWS-134, not this test.
 		await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
 		await page.keyboard.press('g');
 		await page.keyboard.press('g');
@@ -605,6 +606,37 @@ test.describe('Keyboard selection follows the visible topic Brief (NEWS-133)', (
 		await expect(grid.getByText(moreTitle!, { exact: true })).toHaveCount(0);
 		await expect(selectedCard).toHaveCount(0);
 		await expect(announcer).toHaveText('');
+	});
+
+	test('before the topic overview loads, j selects nothing; once sections render, j picks the first visible story', async ({
+		page,
+	}) => {
+		let releaseOverview: () => void = () => {};
+		const overviewHeld = new Promise<void>((resolve) => {
+			releaseOverview = resolve;
+		});
+		await page.route('**/api/brief/overview', async (route) => {
+			await overviewHeld;
+			await route.continue();
+		});
+
+		await page.goto('/');
+		await expect(page).toHaveTitle(/Informed News/i, { timeout: 60_000 });
+		const announcer = page.getByTestId('keyboard-selection-announcer');
+		await expect(announcer).toBeAttached({ timeout: 60_000 });
+		await expect(page.getByTestId('topic-brief-section')).toHaveCount(0);
+
+		await page.keyboard.press('j');
+		await page.keyboard.press('G');
+		await expect(announcer).toHaveText('');
+		await expect(page.locator('article[aria-current="true"]')).toHaveCount(0);
+
+		releaseOverview();
+		const grid = page.getByTestId('topic-brief-section').first();
+		const firstCard = grid.locator('article[id^="story-"]').first();
+		await expect(firstCard).toBeVisible({ timeout: 60_000 });
+		await page.keyboard.press('j');
+		await expect(firstCard).toHaveAttribute('aria-current', 'true');
 	});
 });
 

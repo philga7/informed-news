@@ -63,7 +63,7 @@ const requestedSummaries = new Set<string>();
 		sourceArticles?: any[];
 		currentMediaInfo?: any;
 		isLoadingMediaInfo?: boolean;
-		/** Out: `stories` indices of the rendered cards in on-screen order, for j / k; unset on the fallback list. */
+		/** Out: `stories` indices of the rendered cards in on-screen order, for j / k; empty while loading, unset on the fallback list. */
 		navigationOrder?: number[];
 		/** Rendered when the overview is the empty-store fixture or cannot be loaded. */
 		fallback: Snippet;
@@ -114,12 +114,14 @@ const requestedSummaries = new Set<string>();
 		),
 	);
 	const visibleOrder = $derived(
-		useSections
-			? visibleStories.flatMap((story) => {
-					const index = storyIndex.get(story);
-					return index === undefined ? [] : [index];
-				})
-			: undefined,
+		!overviewLoaded
+			? []
+			: useSections
+				? visibleStories.flatMap((story) => {
+						const index = storyIndex.get(story);
+						return index === undefined ? [] : [index];
+					})
+				: undefined,
 	);
 	const allVisibleRead = $derived(
 		visibleStories.every((story) => story.id && readStories[story.id]),
