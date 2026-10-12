@@ -44,12 +44,11 @@ class KeyboardNavigationStore {
 		this.state.enabled = enabled;
 	}
 
-	setTotalStories(total: number) {
-		this.state.totalStories = total;
-		// Reset selection if it's out of bounds
-		if (this.state.selectedIndex >= total) {
-			this.state.selectedIndex = total > 0 ? total - 1 : -1;
-		}
+	/** The list changed under the selection: keep it on the same story key, or clear it if that story is gone. */
+	followStories(previousKeys: string[], nextKeys: string[]) {
+		const selectedKey = previousKeys[this.state.selectedIndex];
+		this.state.totalStories = nextKeys.length;
+		this.state.selectedIndex = selectedKey === undefined ? -1 : nextKeys.indexOf(selectedKey);
 	}
 
 	// Navigation methods

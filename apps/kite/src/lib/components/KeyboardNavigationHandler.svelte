@@ -1,6 +1,7 @@
 <script lang="ts">
-import { onMount } from 'svelte';
+import { onMount, untrack } from 'svelte';
 import { keyboardNavigation } from '$lib/stores/keyboardNavigation.svelte';
+import { storyKey } from '$lib/topicBrief';
 import type { Story } from '$lib/types';
 
 interface Props {
@@ -273,9 +274,12 @@ onMount(() => {
 	return () => window.removeEventListener('keydown', handleGlobalKeyDown);
 });
 
-// Update keyboard navigation state when stories change
-$effect(() => {
-	keyboardNavigation.setTotalStories(stories.length);
+// Before the DOM updates, so the ring and live region never show the story that took the selected index
+let previousStoryKeys: string[] = [];
+$effect.pre(() => {
+	const keys = stories.map(storyKey);
+	untrack(() => keyboardNavigation.followStories(previousStoryKeys, keys));
+	previousStoryKeys = keys;
 });
 
 // Reset keyboard navigation when changing categories
