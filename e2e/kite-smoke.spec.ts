@@ -963,6 +963,11 @@ test.describe('Kite content filter on the topic Brief (NEWS-141)', () => {
 	}
 });
 
+/** A failed overview falls back to the plain list, as the fixture Brief does. */
+async function usePlainList(page: Page): Promise<void> {
+	await page.route('**/api/brief/overview', (route) => route.fulfill({ status: 500 }));
+}
+
 test.describe('Keyboard selection follows the plain story list (NEWS-137)', () => {
 	test.beforeEach(() => useScenario('topics'));
 
@@ -985,8 +990,7 @@ test.describe('Keyboard selection follows the plain story list (NEWS-137)', () =
 		expect(stories.length).toBeGreaterThan(3);
 		const [first, hidden, third] = stories;
 
-		// A failed overview falls back to the plain list, as the fixture Brief does.
-		await page.route('**/api/brief/overview', (route) => route.fulfill({ status: 500 }));
+		await usePlainList(page);
 		await page.addInitScript(() => localStorage.setItem('storyCount', '3'));
 		await filterTitles(page, [hidden!.title!], 'hide');
 		await page.goto('/');
@@ -1062,6 +1066,32 @@ test.describe('Keyboard selection follows the plain story list (NEWS-137)', () =
 		await page.keyboard.press('m');
 		const thirdCard = page.locator(`article#story-${third!.cluster_number}`);
 		await expect(thirdCard.getByRole('button', { name: 'Mark as unread' })).toBeVisible();
+	});
+});
+
+test.describe('Linked story on the plain story list (NEWS-142)', () => {
+	test.beforeEach(() => useScenario('topics'));
+
+	test('a story opened from a link gets the linked-story treatment on its own card when the hide filter drops a story above it', async ({
+		page,
+	}) => {
+		await page.goto('/');
+		await expect(page).toHaveTitle(/Informed News/i, { timeout: 60_000 });
+		const stories = await loadOwnedStories(page);
+		expect(stories.length).toBeGreaterThan(3);
+		const [hidden, , linked] = stories;
+
+		await usePlainList(page);
+		await filterTitles(page, [hidden!.title!], 'hide');
+		await page.goto('/latest/world/2');
+		await expect(page.locator('article[id^="story-"]')).toHaveCount(stories.length - 1, {
+			timeout: 60_000,
+		});
+
+		const linkedCards = page.locator('article[data-linked-story]');
+		await expect(linkedCards).toHaveCount(1);
+		await expect(linkedCards).toHaveAttribute('aria-label', `News story: ${linked!.title}`);
+		await expect(storyToggle(linkedCards, linked!.title!)).toHaveAttribute('aria-expanded', 'true');
 	});
 });
 
