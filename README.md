@@ -85,7 +85,7 @@ Kite UI env: `apps/kite/.env.example`. Brief guide: [docs/BRIEF.md](docs/BRIEF.m
 | `npm run install:all` | Install server and kite (Bun) |
 | `npm run install:kite` | Install `apps/kite` only |
 | `npm run typecheck` | Typecheck `mvp/server` |
-| `npm test` | MVP server unit tests |
+| `npm test` | MVP server unit tests, run against a fresh temp `MVP_DATA_DIR` (never `mvp/data`); fails if a test leaves files there |
 | `npm run test:kite` | Kite provenance + default-entrypoint checks |
 | `npm run test:e2e:kite` | Playwright smoke on its own seeded stack (Kite :5174, API :3101) |
 | `npm run build` | Build archived `_legacy/mvp-web` (current Vercel artifact) |

@@ -20,6 +20,7 @@ import {
   CLAIMS_PATH,
   EVIDENCE_LINKS_PATH,
   MUTE_RULES_PATH,
+  TRACKED_CLAIMS_PATH,
 } from '../store/paths.js';
 import { framingBodyText, sortNewestFirst } from './classifyArticles.js';
 import { articleMatchesMute } from './muteMatch.js';
@@ -83,6 +84,7 @@ export type ExtractClaimsOptions = {
   evidencePath?: string;
   queuePath?: string;
   processedPath?: string;
+  trackedClaimsPath?: string;
   muteRulesPath?: string;
   readMuteRulesFn?: (mutePath?: string) => Promise<MuteRulesStore>;
 };
@@ -243,6 +245,7 @@ export async function extractClaimsFromArticles(
   const evidencePath = options.evidencePath ?? EVIDENCE_LINKS_PATH;
   const queuePath = options.queuePath ?? CLAIM_REVIEW_QUEUE_PATH;
   const processedPath = options.processedPath ?? CLAIM_EXTRACT_PROCESSED_PATH;
+  const trackedClaimsPath = options.trackedClaimsPath ?? TRACKED_CLAIMS_PATH;
 
   const readArticlesFn = options.readArticlesFn ?? readArticles;
   const readClaimsFn = options.readClaimsFn ?? readClaims;
@@ -375,6 +378,7 @@ export async function extractClaimsFromArticles(
         },
         evidencePath,
         claimsPath,
+        trackedClaimsPath,
       );
 
       if (!link) {
