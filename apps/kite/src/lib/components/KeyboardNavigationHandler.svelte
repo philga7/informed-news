@@ -37,6 +37,13 @@ let {
 let lastKeyTime = 0;
 let lastKey = '';
 
+// Focus stays put on j / k so Enter / o / x / m act once; the live region names the selection.
+const selectionAnnouncement = $derived(
+	keyboardNavigation.hasSelection
+		? `Selected story: ${stories[keyboardNavigation.selectedIndex]?.title ?? ''}`
+		: '',
+);
+
 function scrollToSelectedStory() {
 	if (!keyboardNavigation.hasSelection) return;
 
@@ -255,4 +262,7 @@ $effect(() => {
 });
 </script>
 
-<!-- This component has no visual output, only keyboard event handling -->
+<!-- No visual output: keyboard event handling plus a screen-reader-only selection announcement -->
+<div class="sr-only" role="status" aria-live="polite" data-testid="keyboard-selection-announcer">
+	{selectionAnnouncement}
+</div>

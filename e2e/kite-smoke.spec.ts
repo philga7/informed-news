@@ -462,6 +462,85 @@ test.describe('Less like this keyboard, focus and name taken (NEWS-125)', () => 
 	});
 });
 
+test.describe('Keyboard story selection is announced (NEWS-129)', () => {
+	test.beforeEach(() => useScenario('topics'));
+
+	const selected = (story: KiteStory) => `Selected story: ${story.title}`;
+
+	test('j / k / G / gg announce the selected story politely without moving focus; Enter / o / x act once; Escape clears', async ({
+		page,
+	}) => {
+		await page.goto('/');
+		await expect(page).toHaveTitle(/Informed News/i, { timeout: 60_000 });
+		const stories = await loadOwnedStories(page);
+		const first = stories[0]!;
+		const second = stories[1]!;
+		const last = stories[stories.length - 1]!;
+		const secondCard = page.locator(`article#story-${second.cluster_number}`);
+		await expect(secondCard).toBeVisible({ timeout: 60_000 });
+
+		const announcer = page.getByTestId('keyboard-selection-announcer');
+		await expect(announcer).toHaveAttribute('aria-live', 'polite');
+		await expect(announcer).toHaveText('');
+
+		await page.keyboard.press('j');
+		await expect(announcer).toHaveText(selected(first));
+		await page.keyboard.press('j');
+		await expect(announcer).toHaveText(selected(second));
+		await expect(secondCard).toHaveAttribute('aria-current', 'true');
+		await expect(page.locator('body')).toBeFocused();
+
+		const toggle = storyToggle(secondCard, second.title!);
+		await page.keyboard.press('Enter');
+		await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+		await page.keyboard.press('Enter');
+		await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+		await page.keyboard.press('o');
+		await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+		await page.keyboard.press('o');
+		await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+		await page.keyboard.press('x');
+		await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+
+		await page.keyboard.press('G');
+		await expect(announcer).toHaveText(selected(last));
+		await page.keyboard.press('g');
+		await page.keyboard.press('g');
+		await expect(announcer).toHaveText(selected(first));
+		await page.keyboard.press('j');
+		await expect(announcer).toHaveText(selected(second));
+		await page.keyboard.press('k');
+		await expect(announcer).toHaveText(selected(first));
+
+		await page.keyboard.press('Escape');
+		await expect(announcer).toHaveText('');
+		await expect(page.locator('article[aria-current]')).toHaveCount(0);
+	});
+
+	test('typing j / k in the Add story form does not change or announce the selection', async ({
+		page,
+	}) => {
+		await logIn(page);
+		await page.goto('/');
+		await expect(page).toHaveTitle(/Informed News/i, { timeout: 60_000 });
+		const first = (await loadOwnedStories(page))[0]!;
+		await expect(page.locator(`article#story-${first.cluster_number}`)).toBeVisible({
+			timeout: 60_000,
+		});
+		const announcer = page.getByTestId('keyboard-selection-announcer');
+
+		await page.keyboard.press('j');
+		await expect(announcer).toHaveText(selected(first));
+
+		await page.getByRole('button', { name: 'Add story', exact: true }).click();
+		const dialog = page.getByRole('dialog', { name: 'Add story to Brief' });
+		const title = dialog.getByRole('textbox', { name: 'Title', exact: true });
+		await title.pressSequentially('jjk');
+		await expect(title).toHaveValue('jjk');
+		await expect(announcer).toHaveText(selected(first));
+	});
+});
+
 test.describe('Manual seeds (NEWS-98)', () => {
 	test.beforeEach(() => useScenario('topics'));
 
