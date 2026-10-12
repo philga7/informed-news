@@ -4,6 +4,9 @@ on:
   pull_request:
     branches:
       - main
+  push:
+    branches:
+      - main
 
 jobs:
   validate:
@@ -19,11 +22,19 @@ jobs:
           node-version: '22'
           cache: 'npm'
 
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
       - name: Install root dependencies
         run: npm ci
 
       - name: Install MVP server
         run: npm ci --prefix mvp/server
+
+      - name: Install Kite
+        run: bun install --frozen-lockfile --cwd apps/kite
 
       - name: Typecheck
         run: npm run typecheck
@@ -34,10 +45,17 @@ jobs:
       - name: Kite provenance tests
         run: npm run test:kite
 
-      - name: Install & build archived React feed (Vercel artifact until hosting cutover)
-        run: |
-          npm ci --prefix _legacy/mvp-web
-          npm run build
+      - name: Kite unit tests
+        working-directory: apps/kite
+        run: bun run test:unit
 
-      # Optional heavier path: install kite + Playwright when apps/kite changes.
-      # Full e2e remains local via `npm run test:e2e:kite`.
+      - name: Kite check
+        working-directory: apps/kite
+        run: bun run check
+
+      - name: Product-path build (Kite)
+        working-directory: apps/kite
+        run: bun run build
+
+      # Playwright e2e stays local (`npm run test:e2e:kite`) until the hermetic
+      # stack fits the Actions time budget (see NEWS-105).
