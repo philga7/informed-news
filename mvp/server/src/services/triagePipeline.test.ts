@@ -1,12 +1,16 @@
 import assert from 'node:assert/strict';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { test } from 'node:test';
+import { articleIdFromCanonicalUrl, readArticles, updateArticles } from '../store/index.js';
 import type { MuteRule } from '../store/muteRulesStore.js';
-import type { Article, StoreMeta } from '../types/article.js';
+import type { Article, FramingAnalysis, StoreMeta } from '../types/article.js';
 import type { Topic } from '../types/topic.js';
 import type { TriageRecord, TriageStore } from '../types/triage.js';
 import { routeTriageAnswers, type judgeTriage, type TriageJevAnswers } from './triageJev.js';
 import { runTriage, type TriageDeps } from './triagePipeline.js';
-import type { SurvivorResult } from './triageSurvivor.js';
+import { writeBackSurvivors, type SurvivorResult } from './triageSurvivor.js';
 
 const NOW = new Date('2026-09-30T12:00:00.000Z');
 const hoursAgo = (h: number) => new Date(NOW.getTime() - h * 3_600_000).toISOString();
@@ -102,7 +106,7 @@ function harness(opts: HarnessOptions) {
   const state = {
     store: { records: { ...(opts.records ?? {}) }, updatedAt: null } as TriageStore,
     meta: [] as Partial<StoreMeta>[],
-    upserts: [] as Article[][],
+    writeBacks: [] as Article[][],
     judgeCalls: [] as Array<{ stage: 'headline' | 'body'; id: string }>,
     prepareCalls: [] as string[],
   };
@@ -130,9 +134,8 @@ function harness(opts: HarnessOptions) {
       state.store = structuredClone(await mutate(structuredClone(state.store)));
       return structuredClone(state.store);
     },
-    upsertArticles: async (rows) => {
-      state.upserts.push(rows as Article[]);
-      return rows as Article[];
+    writeBackSurvivors: async (rows) => {
+      state.writeBacks.push([...rows]);
     },
     updateMeta: async (patch) => {
       state.meta.push(patch);
@@ -459,7 +462,7 @@ test('headline Jev failure is counted and marks the group not_scored_error', asy
   assert.ok(result.errors.includes('Jev: jev down'));
 });
 
-test('blocked body keeps the headline verdict with bodyChecked false and upserts the changed article', async () => {
+test('blocked body keeps the headline verdict with bodyChecked false and writes the changed article back', async () => {
   const { deps, state } = harness({
     topics: [TARIFFS],
     articles: [article('a', 'Tariff ruling hits steel imports')],
@@ -473,8 +476,8 @@ test('blocked body keeps the headline verdict with bodyChecked false and upserts
   assert.equal(rec.status, 'kept');
   assert.equal(rec.bodyChecked, false);
   assert.equal(rec.stage, 'headline');
-  assert.equal(state.upserts.length, 1);
-  assert.equal(state.upserts[0]![0]!.bodyStatus, 'blocked');
+  assert.equal(state.writeBacks.length, 1);
+  assert.equal(state.writeBacks[0]![0]!.bodyStatus, 'blocked');
 });
 
 test('ok body runs the body check: keep, drop, or failure falls back to headline verdict', async () => {
@@ -531,7 +534,7 @@ test('undated search survivor is dropped undated at the survivor stage', async (
   assert.equal(rec.reason, 'undated');
   assert.equal(rec.stage, 'survivor');
   assert.equal(rec.final, true);
-  assert.equal(state.upserts.length, 1);
+  assert.equal(state.writeBacks.length, 1);
 });
 
 test('final records are not re-triaged; non-final records are, accumulating jevCalls', async () => {
@@ -658,7 +661,7 @@ test('unreadable triage store skips the run: no Jev, no survivor prep, no writes
   assert.equal(state.judgeCalls.length, 0);
   assert.equal(state.prepareCalls.length, 0);
   assert.equal(triageWrites, 0);
-  assert.equal(state.upserts.length, 0);
+  assert.equal(state.writeBacks.length, 0);
   assert.equal(state.meta.length, 1);
   assert.equal(state.meta[0]!.triage!.skipped, true);
   assert.deepEqual(state.meta[0]!.triage!.errors, ['triage store: triage.json corrupt']);
@@ -801,7 +804,7 @@ test('store write failures are caught into errors and never throw', async () => 
       updateTriage: async () => {
         throw new Error('disk full');
       },
-      upsertArticles: async () => {
+      writeBackSurvivors: async () => {
         throw new Error('articles locked');
       },
       readMuteRules: async () => {
@@ -837,7 +840,7 @@ test('a failed triage write after a good article write is reported and never thr
   const result = await run(deps);
 
   assert.deepEqual(result.errors, ['triage write: disk full']);
-  assert.equal(state.upserts.length, 1);
+  assert.equal(state.writeBacks.length, 1);
   assert.equal(state.meta.length, 1);
 });
 
@@ -848,11 +851,11 @@ test('resolved articles are written before triage records, so a kept record neve
     articles: [article('a', 'Tariff ruling hits steel imports')],
     prepare: (a) => ({ article: { ...a, bodyStatus: 'ok', bodyText: 'Full text.' }, changed: true, dateIssue: null }),
   });
-  const upsert = deps.upsertArticles!;
+  const writeBack = deps.writeBackSurvivors!;
   const update = deps.updateTriage!;
-  deps.upsertArticles = async (rows) => {
+  deps.writeBackSurvivors = async (rows) => {
     writes.push('articles');
-    return upsert(rows);
+    return writeBack(rows);
   };
   deps.updateTriage = async (mutate) => {
     writes.push('triage');
@@ -871,7 +874,7 @@ test('a failed article write skips the triage write, so the stories are triaged 
     records: { old: keptRecord('old') },
     prepare: (a) => ({ article: a, changed: true, dateIssue: null }),
     overrides: {
-      upsertArticles: async () => {
+      writeBackSurvivors: async () => {
         throw new Error('articles locked');
       },
     },
@@ -885,6 +888,63 @@ test('a failed article write skips the triage write, so the stories are triaged 
     'triage write: skipped because the article write failed',
   ]);
   assert.equal(state.meta.length, 1);
+});
+
+function framing(framingSummary: string): FramingAnalysis {
+  return {
+    genre: 'news_blurb',
+    headlineDevices: [],
+    dimensions: {
+      loadedLanguage: 0.1,
+      emotionalAppeal: 0.1,
+      certaintyClaiming: 0.1,
+      omissionOrSelectionRisk: 0.1,
+      attributionClarity: 0.9,
+    },
+    framingSummary,
+    evidenceQuotes: [],
+    openQuestions: [],
+    confidence: 0.8,
+  };
+}
+
+test('a classification written while triage runs survives the survivor write-back', async () => {
+  const articlesPath = path.join(mkdtempSync(path.join(tmpdir(), 'triage-write-back-')), 'articles.json');
+  const older = framing('Older framing.');
+  const newer = framing('Newer framing.');
+  const base = article('a', 'Tariff ruling hits steel imports', {
+    classification: older,
+    classifiedAt: hoursAgo(5),
+  });
+  const copy = { ...base, id: articleIdFromCanonicalUrl(base.canonicalUrl) };
+  await updateArticles(() => [copy], articlesPath);
+
+  const { deps } = harness({
+    topics: [TARIFFS],
+    articles: [copy],
+    overrides: {
+      prepareSurvivor: async (a) => {
+        await updateArticles(
+          (rows) => rows.map((r) => ({ ...r, classification: newer, classifiedAt: NOW.toISOString() })),
+          articlesPath,
+        );
+        return {
+          article: { ...a, bodyStatus: 'ok', bodyText: 'Full ruling text.', publisherTitle: 'Steel ruling' },
+          changed: true,
+          dateIssue: null,
+        };
+      },
+      writeBackSurvivors: (rows) => writeBackSurvivors(rows, articlesPath),
+    },
+  });
+
+  await run(deps);
+
+  const [stored] = await readArticles(articlesPath);
+  assert.equal(stored!.bodyText, 'Full ruling text.');
+  assert.equal(stored!.publisherTitle, 'Steel ruling');
+  assert.deepEqual(stored!.classification, newer);
+  assert.equal(stored!.classifiedAt, NOW.toISOString());
 });
 
 function seedRecord(articleId: string, over: Partial<TriageRecord> = {}): TriageRecord {

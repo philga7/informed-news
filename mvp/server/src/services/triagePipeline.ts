@@ -11,7 +11,6 @@ import {
   readTriage,
   updateMeta,
   updateTriage,
-  upsertArticles,
 } from '../store/index.js';
 import type { MuteRule } from '../store/muteRulesStore.js';
 import type { Article, SourceKind, StoreMeta } from '../types/article.js';
@@ -43,7 +42,7 @@ import {
 } from './triageDedupe.js';
 import { judgeTriage, type TriageJevContext, type TriageVerdict } from './triageJev.js';
 import { candidateTopicIds, isOutletOnlyTopic, muteReason } from './triageKeywords.js';
-import { prepareSurvivor } from './triageSurvivor.js';
+import { prepareSurvivor, writeBackSurvivors } from './triageSurvivor.js';
 import { getTypeSafeClient } from './typesafeClient.js';
 
 export type TriageResult = TriageRunMeta & { keptIds: string[] };
@@ -52,7 +51,7 @@ export type TriageDeps = {
   readTopics?: () => Promise<{ topics: Topic[] }>;
   readMuteRules?: () => Promise<{ rules: MuteRule[] }>;
   readArticles?: () => Promise<Article[]>;
-  upsertArticles?: typeof upsertArticles;
+  writeBackSurvivors?: typeof writeBackSurvivors;
   readTriage?: () => Promise<TriageStore>;
   updateTriage?: typeof updateTriage;
   updateMeta?: (patch: Partial<StoreMeta>) => Promise<unknown>;
@@ -585,7 +584,7 @@ export async function runTriage(
     let articleWriteFailed = false;
     if (run.changed.size > 0) {
       try {
-        await (deps.upsertArticles ?? upsertArticles)([...run.changed.values()]);
+        await (deps.writeBackSurvivors ?? writeBackSurvivors)([...run.changed.values()]);
       } catch (err) {
         articleWriteFailed = true;
         addStoreError(meta.errors, `article write: ${errorMessage(err)}`);
