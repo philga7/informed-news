@@ -103,6 +103,11 @@ function storyToggle(card: Locator, title: string): Locator {
 	return card.getByRole('button', { name: title, exact: true });
 }
 
+/** Keep focus off a just-clicked control: Enter on a focused button or link activates it, not the page selection. */
+async function blurFocus(page: Page): Promise<void> {
+	await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+}
+
 function watchKagiRequests(page: Page): string[] {
 	const kagiHosts: string[] = [];
 	page.on('request', (req) => {
@@ -584,8 +589,7 @@ test.describe('Keyboard selection follows the visible topic Brief (NEWS-133)', (
 		await expectSelected(collapsed[collapsed.length - 1]!);
 
 		await grid.getByRole('button', { name: /^More \(/ }).click();
-		// Keep focus off the More button: Enter on a focused button activates that button.
-		await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+		await blurFocus(page);
 		await page.keyboard.press('g');
 		await page.keyboard.press('g');
 		await expectSelected(opened[0]!);
@@ -693,6 +697,91 @@ test.describe('Shared article view (NEWS-130)', () => {
 		await expect(card.getByText(shared.title!, { exact: true })).toBeVisible();
 		await expect(storyToggle(card, shared.title!)).toHaveCount(0);
 		await expect(card.locator('[aria-expanded]')).toHaveCount(0);
+	});
+});
+
+test.describe('Shared article view keyboard shortcuts (NEWS-135)', () => {
+	test.beforeEach(() => useScenario('topics'));
+
+	const sharedBanner = (page: Page) => page.getByText(/Viewing a shared story/);
+	const storyContent = (page: Page, story: KiteStory) =>
+		page
+			.locator(`article#story-${story.cluster_number}`)
+			.getByRole('region', { name: 'Story content', exact: true });
+
+	test('j / k / G / gg select and announce nothing; Enter / o / x keep the shared story open; View latest stories restores them', async ({
+		page,
+	}) => {
+		await page.goto('/');
+		await expect(page).toHaveTitle(/Informed News/i, { timeout: 60_000 });
+		const [first, shared] = await loadOwnedStories(page);
+
+		await page.goto('/latest/world/1?shared=1');
+		await expect(sharedBanner(page)).toBeVisible({ timeout: 60_000 });
+		const content = storyContent(page, shared!);
+		await expect(content).toBeVisible();
+		const sharedUrl = page.url();
+		const announcer = page.getByTestId('keyboard-selection-announcer');
+
+		for (const key of ['j', 'j', 'k', 'G', 'g', 'g']) await page.keyboard.press(key);
+		await expect(announcer).toHaveText('');
+		await expect(page.locator('article[aria-current="true"]')).toHaveCount(0);
+
+		for (const key of ['Enter', 'o', 'x']) await page.keyboard.press(key);
+		await expect(content).toBeVisible();
+		expect(page.url()).toBe(sharedUrl);
+
+		await page.getByRole('button', { name: 'View latest stories', exact: true }).click();
+		await expect(sharedBanner(page)).toHaveCount(0);
+		const firstCard = page.locator(`article#story-${first!.cluster_number}`);
+		await expect(firstCard).toBeVisible({ timeout: 60_000 });
+		await blurFocus(page);
+		await page.keyboard.press('j');
+		await expect(announcer).toHaveText(`Selected story: ${first!.title}`);
+		await expect(firstCard).toHaveAttribute('aria-current', 'true');
+		const firstToggle = storyToggle(firstCard, first!.title!);
+		await page.keyboard.press('Enter');
+		await expect(firstToggle).toHaveAttribute('aria-expanded', 'true');
+		await page.keyboard.press('x');
+		await expect(firstToggle).toHaveAttribute('aria-expanded', 'false');
+	});
+
+	test('browser Back into the shared view drops a selection made on the Brief, so Enter / x keep the shared story open', async ({
+		page,
+	}) => {
+		await page.goto('/');
+		await expect(page).toHaveTitle(/Informed News/i, { timeout: 60_000 });
+		const [first, shared] = await loadOwnedStories(page);
+
+		await page.goto('/latest/world/1?shared=1');
+		await expect(sharedBanner(page)).toBeVisible({ timeout: 60_000 });
+
+		// A same-origin link click is a client-side navigation with its own history entry.
+		await page.evaluate(() => {
+			const link = document.createElement('a');
+			link.href = '/latest/world';
+			link.textContent = 'Open the Brief';
+			document.body.append(link);
+		});
+		await page.getByRole('link', { name: 'Open the Brief', exact: true }).click();
+		await expect(sharedBanner(page)).toHaveCount(0);
+		await expect(page.locator(`article#story-${first!.cluster_number}`)).toBeVisible({
+			timeout: 60_000,
+		});
+		await blurFocus(page);
+		const announcer = page.getByTestId('keyboard-selection-announcer');
+		await page.keyboard.press('j');
+		await expect(announcer).toHaveText(`Selected story: ${first!.title}`);
+
+		await page.goBack();
+		await expect(sharedBanner(page)).toBeVisible({ timeout: 60_000 });
+		const content = storyContent(page, shared!);
+		await expect(content).toBeVisible();
+		await expect(announcer).toHaveText('');
+		await expect(page.locator('article[aria-current="true"]')).toHaveCount(0);
+
+		for (const key of ['Enter', 'x']) await page.keyboard.press(key);
+		await expect(content).toBeVisible();
 	});
 });
 

@@ -958,6 +958,7 @@ if (browser && typeof window !== 'undefined') {
 <Toast />
 
 {#if state.dataLoaded}
+<!-- The shared view's one story can't be collapsed, so j / k / G / gg select nothing there -->
 <KeyboardNavigationHandler
 	stories={state.stories}
 	currentCategory={state.currentCategory}
@@ -967,7 +968,7 @@ if (browser && typeof window !== 'undefined') {
 	wikipediaPopupVisible={state.wikipediaPopup.visible}
 	settingsModalOpen={settingsModalState.isOpen}
 	bind:showSearchModal={state.showSearchModal}
-	navigationOrder={state.topicBriefNavigationOrder}
+	navigationOrder={state.isSharedArticleView ? [] : state.topicBriefNavigationOrder}
 	onStoryToggle={storyToggle.handleToggle}
 	onToggleReadStatus={(index) => state.storyList?.toggleReadStatus(index)}
 	onCategoryChange={categoryManager.handleCategoryChange}
