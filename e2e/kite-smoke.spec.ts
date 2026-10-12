@@ -584,7 +584,7 @@ test.describe('Keyboard selection follows the visible topic Brief (NEWS-133)', (
 		await expectSelected(collapsed[collapsed.length - 1]!);
 
 		await grid.getByRole('button', { name: /^More \(/ }).click();
-		// Keep focus off the More button: Enter on a focused button is NEWS-134, not this test.
+		// Keep focus off the More button: Enter on a focused button activates that button.
 		await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
 		await page.keyboard.press('g');
 		await page.keyboard.press('g');
@@ -637,6 +637,45 @@ test.describe('Keyboard selection follows the visible topic Brief (NEWS-133)', (
 		await expect(firstCard).toBeVisible({ timeout: 60_000 });
 		await page.keyboard.press('j');
 		await expect(firstCard).toHaveAttribute('aria-current', 'true');
+	});
+});
+
+test.describe('Enter on a focused control activates that control (NEWS-134)', () => {
+	test.beforeEach(() => useScenario('topics'));
+
+	test("with story 1 j-selected, Enter on story 2's focused title expands story 2 only; o / x / j / k stay page shortcuts", async ({
+		page,
+	}) => {
+		await page.goto('/');
+		await expect(page).toHaveTitle(/Informed News/i, { timeout: 60_000 });
+		const [first, second] = await loadOwnedStories(page);
+		const firstCard = page.locator(`article#story-${first!.cluster_number}`);
+		const secondCard = page.locator(`article#story-${second!.cluster_number}`);
+		await expect(secondCard).toBeVisible({ timeout: 60_000 });
+		const firstToggle = storyToggle(firstCard, first!.title!);
+		const secondToggle = storyToggle(secondCard, second!.title!);
+		const announcer = page.getByTestId('keyboard-selection-announcer');
+
+		await page.keyboard.press('j');
+		await expect(announcer).toHaveText(`Selected story: ${first!.title}`);
+
+		await secondToggle.focus();
+		await page.keyboard.press('Enter');
+		await expect(secondToggle).toHaveAttribute('aria-expanded', 'true');
+		await expect(firstToggle).toHaveAttribute('aria-expanded', 'false');
+		await expect(firstCard).toHaveAttribute('aria-current', 'true');
+
+		await expect(secondToggle).toBeFocused();
+		await page.keyboard.press('o');
+		await expect(firstToggle).toHaveAttribute('aria-expanded', 'true');
+		await expect(secondToggle).toHaveAttribute('aria-expanded', 'true');
+		await page.keyboard.press('x');
+		await expect(firstToggle).toHaveAttribute('aria-expanded', 'false');
+		await expect(secondToggle).toHaveAttribute('aria-expanded', 'true');
+		await page.keyboard.press('j');
+		await expect(announcer).toHaveText(`Selected story: ${second!.title}`);
+		await page.keyboard.press('k');
+		await expect(announcer).toHaveText(`Selected story: ${first!.title}`);
 	});
 });
 

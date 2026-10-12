@@ -220,8 +220,12 @@ function handleGlobalKeyDown(event: KeyboardEvent) {
 		return;
 	}
 
-	// Enter - Expand/collapse selected story
-	if (event.key === 'Enter' && keyboardNavigation.hasSelection) {
+	// Enter - Expand/collapse selected story; a focused button or link keeps its own Enter
+	if (
+		event.key === 'Enter' &&
+		keyboardNavigation.hasSelection &&
+		!target.closest('button, a[href], [role="button"], [role="link"]')
+	) {
 		event.preventDefault();
 		const story = stories[keyboardNavigation.selectedIndex];
 		if (story) {
