@@ -71,7 +71,7 @@ async function logIn(page: Page): Promise<void> {
 	expect(login.ok()).toBeTruthy();
 }
 
-type TopicRow = { id: string; name: string; kind: string };
+type TopicRow = { id: string; name: string; kind: 'desired' | 'undesired' };
 
 async function listTopics(page: Page): Promise<TopicRow[]> {
 	const list = await page.request.get('/api/topics');
@@ -88,7 +88,6 @@ async function removeUndesiredTopics(page: Page, name: string): Promise<void> {
 	}
 }
 
-/** Open the Brief and return the visible card for the seeded story titled `title`. */
 async function briefCard(page: Page, title: string): Promise<Locator> {
 	await page.goto('/');
 	await expect(page).toHaveTitle(/Informed News/i, { timeout: 60_000 });
@@ -286,14 +285,7 @@ test.describe('Filtered out + Less like this (NEWS-90)', () => {
 	test('Less like this blocks the outlet and Topics lists it under Undesired', async ({ page }) => {
 		const { title, domain } = TOPIC_SCENARIO.lessLikeThis;
 		await logIn(page);
-		await page.goto('/');
-		await expect(page).toHaveTitle(/Informed News/i, { timeout: 60_000 });
-
-		const stories = await loadOwnedStories(page);
-		const story = stories.find((s) => s.title === title);
-		expect(story?.cluster_number, 'expected the outlet-block story to have a card').toBeTruthy();
-		const card = page.locator(`article#story-${story?.cluster_number}`);
-		await expect(card).toBeVisible({ timeout: 60_000 });
+		const card = await briefCard(page, title);
 		const trigger = card.getByRole('button', { name: 'Less like this', exact: true });
 		await expect(trigger).toHaveCount(0);
 
@@ -332,14 +324,7 @@ test.describe('Filtered out + Less like this (NEWS-90)', () => {
 		const { title } = TOPIC_SCENARIO.lessLikeThisSubject;
 		let createdName: string | null = null;
 		await logIn(page);
-		await page.goto('/');
-		await expect(page).toHaveTitle(/Informed News/i, { timeout: 60_000 });
-
-		const stories = await loadOwnedStories(page);
-		const story = stories.find((s) => s.title === title);
-		expect(story?.cluster_number, 'expected the subject-path story to have a card').toBeTruthy();
-		const card = page.locator(`article#story-${story?.cluster_number}`);
-		await expect(card).toBeVisible({ timeout: 60_000 });
+		const card = await briefCard(page, title);
 
 		try {
 			await card.locator('button[aria-label="Expand story"]').click();
