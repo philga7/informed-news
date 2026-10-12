@@ -274,12 +274,10 @@ onMount(() => {
 	return () => window.removeEventListener('keydown', handleGlobalKeyDown);
 });
 
-// Before the DOM updates, so the ring and live region never show the story that took the selected index
-let previousStoryKeys: string[] = [];
+// Pre, so the live region below never renders the story that took the selected index
 $effect.pre(() => {
 	const keys = stories.map(storyKey);
-	untrack(() => keyboardNavigation.followStories(previousStoryKeys, keys));
-	previousStoryKeys = keys;
+	untrack(() => keyboardNavigation.followStories(keys));
 });
 
 // Reset keyboard navigation when changing categories

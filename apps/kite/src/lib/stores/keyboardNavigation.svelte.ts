@@ -17,6 +17,7 @@ class KeyboardNavigationStore {
 		totalStories: 0,
 		showHelp: false,
 	});
+	private storyKeys: string[] = [];
 
 	// Getters
 	get enabled() {
@@ -44,11 +45,11 @@ class KeyboardNavigationStore {
 		this.state.enabled = enabled;
 	}
 
-	/** The list changed under the selection: keep it on the same story key, or clear it if that story is gone. */
-	followStories(previousKeys: string[], nextKeys: string[]) {
-		const selectedKey = previousKeys[this.state.selectedIndex];
-		this.state.totalStories = nextKeys.length;
-		this.state.selectedIndex = selectedKey === undefined ? -1 : nextKeys.indexOf(selectedKey);
+	followStories(storyKeys: string[]) {
+		const selectedKey = this.storyKeys[this.state.selectedIndex];
+		this.storyKeys = storyKeys;
+		this.state.totalStories = storyKeys.length;
+		this.state.selectedIndex = selectedKey === undefined ? -1 : storyKeys.indexOf(selectedKey);
 	}
 
 	// Navigation methods
