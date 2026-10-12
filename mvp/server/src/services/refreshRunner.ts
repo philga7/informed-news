@@ -41,7 +41,10 @@ export type RefreshSteps = {
   updateMeta: (patch: Partial<StoreMeta>) => Promise<unknown>;
 };
 
-/** Steps left out use the real stores, sources and Ollama. */
+/**
+ * Steps left out use the real stores, sources and Ollama. Only side-effect-free
+ * deps belong outside `RefreshSteps`; `createApp` passes nothing else through.
+ */
 export type RefreshRunnerDeps = Partial<RefreshSteps> & {
   now?: () => Date;
   log?: (message: string) => void;

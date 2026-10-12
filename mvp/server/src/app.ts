@@ -81,6 +81,7 @@ export type CreateAppDeps = {
   /** Builds a fresh runner from these steps; all are required so none falls back to mvp/data or Ollama. */
   refresh?: RefreshSteps;
   readArticles?: typeof readArticles;
+  /** Route reads only; a runner built from `refresh` reads `refresh.readMeta`. */
   readMeta?: typeof readMeta;
   acceptCluster?: typeof acceptCluster;
   unacceptCluster?: typeof unacceptCluster;

@@ -132,6 +132,7 @@ function refreshSteps(overrides: Partial<RefreshSteps> = {}): RefreshSteps {
     ...overrides,
   };
 }
+
 async function startServer(app: { listen: (...args: any[]) => Server }): Promise<{
   baseUrl: string;
   close: () => Promise<void>;
@@ -764,11 +765,11 @@ test('POST /api/fetch returns topicSearch + triage summaries and the Brief run',
   }
 });
 
-test('an injected refresh group must stub every step (type-checked)', () => {
+test('an injected refresh group must stub every step (checked by tsc)', async () => {
+  const { createApp } = await import('./app.js');
   const { fetchAll } = refreshSteps();
   // @ts-expect-error a refresh group missing steps would fall back to mvp/data and Ollama
-  const partial: CreateAppDeps = { refresh: { fetchAll } };
-  assert.ok(partial.refresh);
+  createApp({ refresh: { fetchAll } });
 });
 
 test('POST /api/fetch with an injected refresh group runs every step from that group', async () => {
@@ -799,7 +800,7 @@ test('POST /api/fetch with an injected refresh group runs every step from that g
       body: '{}',
     });
     assert.equal(resp.status, 200);
-    // readMeta only runs after a failed fetch (covered by the failed-refresh test).
+    // readMeta only runs after a failed fetch.
     assert.deepEqual(
       [...ran].sort(),
       Object.keys(stubs)
