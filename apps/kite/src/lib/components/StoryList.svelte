@@ -37,6 +37,8 @@ interface Props {
 	initiallyExpandedIndex?: number | null;
 	showCategoryLabels?: boolean; // Show category labels for single page mode
 	skipStoryCountLimit?: boolean; // Skip story count limit (for single page mode)
+	/** Out: `stories` indices of the rendered cards in on-screen order, for j / k (Informed News). */
+	navigationOrder?: number[];
 }
 
 let {
@@ -60,6 +62,7 @@ let {
 	initiallyExpandedIndex = null,
 	showCategoryLabels = false,
 	skipStoryCountLimit = false,
+	navigationOrder = $bindable(),
 }: Props = $props();
 
 // Modal state
@@ -160,9 +163,9 @@ export function toggleExpandAll() {
 	expandedStories = newExpanded;
 }
 
-// Toggle read status by index (for keyboard navigation)
+// Toggle read status by `stories` index (for keyboard navigation)
 export function toggleReadStatus(index: number) {
-	const story = displayedStories[index];
+	const story = stories[index];
 	if (story) {
 		handleReadToggle(story);
 	}
@@ -250,6 +253,32 @@ const { displayedStories, filteredCount, hiddenStories } = $derived.by(() => {
 		filteredCount: 0,
 		hiddenStories: [],
 	};
+});
+
+// The content filter and single-page ordering copy stories, so cards map back to `stories` by key.
+const storyKeyOf = (story: Story) => story.id || story.cluster_number?.toString() || story.title;
+const storyIndexByKey = $derived(
+	new Map(stories.map((story, index) => [storyKeyOf(story), index])),
+);
+const renderedOrder = $derived(
+	displayedStories.flatMap((story) => {
+		const index = storyIndexByKey.get(storyKeyOf(story));
+		return index === undefined ? [] : [index];
+	}),
+);
+
+$effect(() => {
+	navigationOrder = renderedOrder;
+	return () => {
+		navigationOrder = undefined;
+	};
+});
+
+/** A selected card that the story-count cap or content filter takes off screen drops the selection. */
+$effect(() => {
+	if (keyboardNavigation.hasSelection && !renderedOrder.includes(keyboardNavigation.selectedIndex)) {
+		keyboardNavigation.clearSelection();
+	}
 });
 
 // Check if all stories are read
@@ -362,7 +391,8 @@ const allStoriesExpanded = $derived(
       {@const isFiltered =
         contentFilter.filterMode === "blur" && story._filtered}
       {@const isLinkedStory = initiallyExpandedIndex === index}
-      {@const isKeyboardSelected = keyboardNavigation.selectedIndex === index}
+      {@const navIndex = storyIndexByKey.get(storyKeyOf(story)) ?? -1}
+      {@const isKeyboardSelected = navIndex >= 0 && keyboardNavigation.selectedIndex === navIndex}
       {@const storyWithCategory = story as StoryWithCategory}
       {@const categoryId = storyWithCategory._categoryId || currentCategory}
       {@const categoryName = storyWithCategory._categoryName}
@@ -380,7 +410,7 @@ const allStoriesExpanded = $derived(
 
       <StoryCard
         {story}
-        storyIndex={index}
+        storyIndex={navIndex}
         {batchId}
         {batchDateSlug}
         {categoryId}

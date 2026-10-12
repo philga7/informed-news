@@ -802,6 +802,7 @@ if (browser && typeof window !== 'undefined') {
             initiallyExpandedIndex={state.initiallyExpandedStoryIndex}
             showCategoryLabels={derived.singlePageMode === 'sequential'}
             skipStoryCountLimit={true}
+            bind:navigationOrder={state.storyListNavigationOrder}
           />
         {:else if state.currentCategory === "onthisday"}
           <OnThisDay
@@ -868,6 +869,7 @@ if (browser && typeof window !== 'undefined') {
             sharedArticleIndex={state.sharedArticleIndex}
             sharedClusterId={state.sharedClusterId}
             initiallyExpandedIndex={state.initiallyExpandedStoryIndex}
+            bind:navigationOrder={state.storyListNavigationOrder}
           />
           {/snippet}
           {#if !state.isSharedArticleView && state.currentCategory === TOPIC_BRIEF_CATEGORY_ID}
@@ -958,9 +960,10 @@ if (browser && typeof window !== 'undefined') {
 <Toast />
 
 {#if state.dataLoaded}
-<!-- The shared view's one story can't be collapsed, so j / k / G / gg select nothing there -->
+<!-- The shared view's one story can't be collapsed, so j / k / G / gg select nothing there.
+     Elsewhere j / k walk the rendered cards: the topic Brief's sections, else the plain StoryList. -->
 <KeyboardNavigationHandler
-	stories={state.stories}
+	stories={derived.isSinglePageMode ? derived.singlePageStories : state.stories}
 	currentCategory={state.currentCategory}
 	categories={derived.orderedCategories}
 	expandedStories={state.expandedStories}
@@ -968,7 +971,9 @@ if (browser && typeof window !== 'undefined') {
 	wikipediaPopupVisible={state.wikipediaPopup.visible}
 	settingsModalOpen={settingsModalState.isOpen}
 	bind:showSearchModal={state.showSearchModal}
-	navigationOrder={state.isSharedArticleView ? [] : state.topicBriefNavigationOrder}
+	navigationOrder={state.isSharedArticleView
+		? []
+		: (state.topicBriefNavigationOrder ?? state.storyListNavigationOrder)}
 	onStoryToggle={storyToggle.handleToggle}
 	onToggleReadStatus={(index) => state.storyList?.toggleReadStatus(index)}
 	onCategoryChange={categoryManager.handleCategoryChange}
