@@ -17,6 +17,7 @@ class KeyboardNavigationStore {
 		totalStories: 0,
 		showHelp: false,
 	});
+	private storyKeys: string[] = [];
 
 	// Getters
 	get enabled() {
@@ -44,12 +45,11 @@ class KeyboardNavigationStore {
 		this.state.enabled = enabled;
 	}
 
-	setTotalStories(total: number) {
-		this.state.totalStories = total;
-		// Reset selection if it's out of bounds
-		if (this.state.selectedIndex >= total) {
-			this.state.selectedIndex = total > 0 ? total - 1 : -1;
-		}
+	followStories(storyKeys: string[]) {
+		const selectedKey = this.storyKeys[this.state.selectedIndex];
+		this.storyKeys = storyKeys;
+		this.state.totalStories = storyKeys.length;
+		this.state.selectedIndex = selectedKey === undefined ? -1 : storyKeys.indexOf(selectedKey);
 	}
 
 	// Navigation methods

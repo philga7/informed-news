@@ -108,6 +108,20 @@ async function blurFocus(page: Page): Promise<void> {
 	await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
 }
 
+/** Add story (signed in): a manual seed pinned first in `topicName`, backed by the e2e fixture page. */
+async function addSeed(page: Page, title: string, topicName: string): Promise<void> {
+	await page.getByRole('button', { name: 'Add story', exact: true }).click();
+	const dialog = page.getByRole('dialog', { name: 'Add story to Brief' });
+	await expect(dialog).toBeVisible();
+	await dialog.getByRole('textbox', { name: 'Title', exact: true }).fill(title);
+	await dialog.getByRole('combobox', { name: 'Topic', exact: true }).selectOption({ label: topicName });
+	await dialog
+		.getByRole('textbox', { name: 'URLs (one per line, at least one)', exact: true })
+		.fill(e2eFixtureUrl(E2E_SEED_ARTICLE_PATH));
+	await dialog.getByRole('button', { name: 'Add to Brief', exact: true }).click();
+	await expect(dialog).toHaveCount(0, { timeout: 30_000 });
+}
+
 function sharedBanner(page: Page): Locator {
 	return page.getByText(/Viewing a shared story/);
 }
@@ -966,18 +980,7 @@ test.describe('Manual seeds (NEWS-98)', () => {
 		await expect(firstCard).toContainText(TOPIC_SCENARIO.lessLikeThis.title, { timeout: 60_000 });
 		await expect(page.getByRole('button', { name: /Unaccept/i })).toHaveCount(0);
 
-		await page.getByRole('button', { name: 'Add story', exact: true }).click();
-		const dialog = page.getByRole('dialog', { name: 'Add story to Brief' });
-		await expect(dialog).toBeVisible();
-		await dialog.getByRole('textbox', { name: 'Title', exact: true }).fill(seedTitle);
-		await dialog
-			.getByRole('combobox', { name: 'Topic', exact: true })
-			.selectOption({ label: grid!.name });
-		await dialog
-			.getByRole('textbox', { name: 'URLs (one per line, at least one)', exact: true })
-			.fill(e2eFixtureUrl(E2E_SEED_ARTICLE_PATH));
-		await dialog.getByRole('button', { name: 'Add to Brief', exact: true }).click();
-		await expect(dialog).toHaveCount(0, { timeout: 30_000 });
+		await addSeed(page, seedTitle, grid!.name);
 
 		await expect(firstCard).toContainText(seedTitle, { timeout: 30_000 });
 		await expect(firstCard.getByText('Added by you', { exact: true })).toBeVisible();
@@ -998,6 +1001,85 @@ test.describe('Manual seeds (NEWS-98)', () => {
 		await expect(
 			gridSection.getByRole('button', { name: `More (${TOPIC_SCENARIO.gridMoreCount})` }),
 		).toBeVisible();
+	});
+});
+
+test.describe('Keyboard selection stays on its story when the Brief list changes (NEWS-138)', () => {
+	test.beforeEach(() => useScenario('topics'));
+
+	const seedTitle = 'Library extends weekend reading-room hours';
+
+	/** Signed in, with a seed pinned first in the first topic section; returns that section's cards. */
+	async function briefWithSeed(page: Page): Promise<Locator> {
+		const [grid] = TOPIC_SCENARIO.sections;
+		await logIn(page);
+		await page.goto('/');
+		await expect(page).toHaveTitle(/Informed News/i, { timeout: 60_000 });
+		const gridSection = page
+			.getByTestId('topic-brief-section')
+			.filter({ has: page.getByRole('heading', { name: grid!.name, exact: true }) });
+		const cards = gridSection.locator('article[id^="story-"]');
+		await expect(cards.first()).toContainText(TOPIC_SCENARIO.lessLikeThis.title, {
+			timeout: 60_000,
+		});
+		await addSeed(page, seedTitle, grid!.name);
+		await expect(cards.first()).toContainText(seedTitle, { timeout: 30_000 });
+		await blurFocus(page);
+		return cards;
+	}
+
+	test('Remove on a seed above the j-selected story keeps that story selected, with nothing announced', async ({
+		page,
+	}) => {
+		const cards = await briefWithSeed(page);
+		const chosen = TOPIC_SCENARIO.lessLikeThis.title;
+		await expect(cards.nth(1)).toContainText(chosen);
+		const announcer = page.getByTestId('keyboard-selection-announcer');
+		const selectedCard = page.locator('article[aria-current="true"]');
+
+		await page.keyboard.press('j');
+		await page.keyboard.press('j');
+		await expect(announcer).toHaveText(`Selected story: ${chosen}`);
+
+		await announcer.evaluate((el) => {
+			const record: string[] = [];
+			(window as unknown as { announced: string[] }).announced = record;
+			new MutationObserver(() => record.push(el.textContent ?? '')).observe(el, {
+				childList: true,
+				characterData: true,
+				subtree: true,
+			});
+		});
+		await storyToggle(cards.first(), seedTitle).click();
+		await cards.first().getByTestId('seed-remove').click();
+		await expect(page.getByText(seedTitle, { exact: true })).toHaveCount(0);
+		await blurFocus(page);
+
+		await expect(selectedCard).toHaveCount(1);
+		await expect(storyToggle(selectedCard, chosen)).toBeVisible();
+		await expect(announcer).toHaveText(`Selected story: ${chosen}`);
+		expect(
+			await page.evaluate(() => (window as unknown as { announced: string[] }).announced),
+		).toEqual([]);
+
+		await page.keyboard.press('Enter');
+		await expect(storyToggle(selectedCard, chosen)).toHaveAttribute('aria-expanded', 'true');
+	});
+
+	test('Remove on the j-selected seed clears the selection instead of moving it to the next story', async ({
+		page,
+	}) => {
+		const cards = await briefWithSeed(page);
+		const announcer = page.getByTestId('keyboard-selection-announcer');
+
+		await page.keyboard.press('j');
+		await expect(announcer).toHaveText(`Selected story: ${seedTitle}`);
+		await page.keyboard.press('Enter');
+		await cards.first().getByTestId('seed-remove').click();
+		await expect(page.getByText(seedTitle, { exact: true })).toHaveCount(0);
+
+		await expect(announcer).toHaveText('');
+		await expect(page.locator('article[aria-current]')).toHaveCount(0);
 	});
 });
 
