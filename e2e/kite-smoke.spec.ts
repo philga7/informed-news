@@ -694,6 +694,46 @@ test.describe('Shared article view (NEWS-130)', () => {
 		await expect(storyToggle(card, shared.title!)).toHaveCount(0);
 		await expect(card.locator('[aria-expanded]')).toHaveCount(0);
 	});
+
+	test('j / k / G / gg select and announce nothing; Enter / o / x keep the shared story open; View latest stories restores them (NEWS-135)', async ({
+		page,
+	}) => {
+		await page.goto('/');
+		await expect(page).toHaveTitle(/Informed News/i, { timeout: 60_000 });
+		const [first, shared] = await loadOwnedStories(page);
+
+		await page.goto('/latest/world/1?shared=1');
+		await expect(page.getByText(/Viewing a shared story/)).toBeVisible({ timeout: 60_000 });
+		const content = page
+			.locator(`article#story-${shared!.cluster_number}`)
+			.getByRole('region', { name: 'Story content', exact: true });
+		await expect(content).toBeVisible();
+		const sharedUrl = page.url();
+		const announcer = page.getByTestId('keyboard-selection-announcer');
+
+		for (const key of ['j', 'j', 'k', 'G', 'g', 'g']) await page.keyboard.press(key);
+		await expect(announcer).toHaveText('');
+		await expect(page.locator('article[aria-current]')).toHaveCount(0);
+
+		for (const key of ['Enter', 'o', 'x']) await page.keyboard.press(key);
+		await expect(content).toBeVisible();
+		expect(page.url()).toBe(sharedUrl);
+
+		await page.getByRole('button', { name: 'View latest stories', exact: true }).click();
+		await expect(page.getByText(/Viewing a shared story/)).toHaveCount(0);
+		const firstCard = page.locator(`article#story-${first!.cluster_number}`);
+		await expect(firstCard).toBeVisible({ timeout: 60_000 });
+		// Keep focus off the clicked button: Enter on a focused button activates that button.
+		await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+		await page.keyboard.press('j');
+		await expect(announcer).toHaveText(`Selected story: ${first!.title}`);
+		await expect(firstCard).toHaveAttribute('aria-current', 'true');
+		const firstToggle = storyToggle(firstCard, first!.title!);
+		await page.keyboard.press('Enter');
+		await expect(firstToggle).toHaveAttribute('aria-expanded', 'true');
+		await page.keyboard.press('x');
+		await expect(firstToggle).toHaveAttribute('aria-expanded', 'false');
+	});
 });
 
 test.describe('Manual seeds (NEWS-98)', () => {
