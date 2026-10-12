@@ -12,6 +12,8 @@ interface Props {
 	wikipediaPopupVisible: boolean;
 	settingsModalOpen: boolean;
 	showSearchModal?: boolean;
+	/** Indices into `stories` in on-screen order (Informed News topic Brief); omitted = the whole list. */
+	navigationOrder?: number[];
 	onStoryToggle: (storyId: string) => void;
 	onToggleReadStatus?: (index: number) => void;
 	onToggleSearchModal?: () => void;
@@ -27,6 +29,7 @@ let {
 	wikipediaPopupVisible,
 	settingsModalOpen,
 	showSearchModal = $bindable(false),
+	navigationOrder,
 	onStoryToggle,
 	onToggleReadStatus,
 	onToggleSearchModal,
@@ -43,6 +46,25 @@ const selectionAnnouncement = $derived(
 		? `Selected story: ${stories[keyboardNavigation.selectedIndex]?.title ?? ''}`
 		: '',
 );
+
+function selectStep(delta: 1 | -1) {
+	if (!navigationOrder) {
+		if (delta > 0) keyboardNavigation.selectNext();
+		else keyboardNavigation.selectPrevious();
+		return;
+	}
+	if (navigationOrder.length === 0) return;
+	const position = navigationOrder.indexOf(keyboardNavigation.selectedIndex);
+	const next =
+		position === -1 ? 0 : Math.min(Math.max(position + delta, 0), navigationOrder.length - 1);
+	keyboardNavigation.selectStory(navigationOrder[next]);
+}
+
+function selectEdge(edge: 'first' | 'last') {
+	const order = navigationOrder ?? stories.map((_, index) => index);
+	if (order.length === 0) return;
+	keyboardNavigation.selectStory(edge === 'first' ? order[0] : order[order.length - 1]);
+}
 
 function scrollToSelectedStory() {
 	if (!keyboardNavigation.hasSelection) return;
@@ -163,7 +185,7 @@ function handleGlobalKeyDown(event: KeyboardEvent) {
 	if (event.key === 'g') {
 		if (lastKey === 'g' && now - lastKeyTime < 500) {
 			event.preventDefault();
-			keyboardNavigation.selectStory(0);
+			selectEdge('first');
 			lastKey = '';
 			scrollToSelectedStory();
 			return;
@@ -177,7 +199,7 @@ function handleGlobalKeyDown(event: KeyboardEvent) {
 	// j - Next story
 	if (event.key === 'j') {
 		event.preventDefault();
-		keyboardNavigation.selectNext();
+		selectStep(1);
 		scrollToSelectedStory();
 		return;
 	}
@@ -185,7 +207,7 @@ function handleGlobalKeyDown(event: KeyboardEvent) {
 	// k - Previous story
 	if (event.key === 'k') {
 		event.preventDefault();
-		keyboardNavigation.selectPrevious();
+		selectStep(-1);
 		scrollToSelectedStory();
 		return;
 	}
@@ -193,10 +215,8 @@ function handleGlobalKeyDown(event: KeyboardEvent) {
 	// G - Go to last story
 	if (event.key === 'G') {
 		event.preventDefault();
-		if (stories.length > 0) {
-			keyboardNavigation.selectStory(stories.length - 1);
-			scrollToSelectedStory();
-		}
+		selectEdge('last');
+		scrollToSelectedStory();
 		return;
 	}
 

@@ -45,6 +45,8 @@ export function usePageState() {
 
 	// Component references
 	let storyList = $state<StoryListInstance | undefined>();
+	// Informed News topic Brief: on-screen order for j / k (NEWS-133)
+	let topicBriefNavigationOrder = $state<number[] | undefined>();
 
 	// UI overlay state
 	let showSourceOverlay = $state(false);
@@ -263,6 +265,12 @@ export function usePageState() {
 		},
 		set storyList(value) {
 			storyList = value;
+		},
+		get topicBriefNavigationOrder() {
+			return topicBriefNavigationOrder;
+		},
+		set topicBriefNavigationOrder(value) {
+			topicBriefNavigationOrder = value;
 		},
 
 		// UI overlays

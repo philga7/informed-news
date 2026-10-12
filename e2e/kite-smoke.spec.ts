@@ -541,6 +541,105 @@ test.describe('Keyboard story selection is announced (NEWS-129)', () => {
 	});
 });
 
+test.describe('Keyboard selection follows the visible topic Brief (NEWS-133)', () => {
+	test.beforeEach(() => useScenario('topics'));
+
+	test('j / k / G / gg step through on-screen stories only; More adds its stories, Show fewer removes them', async ({
+		page,
+	}) => {
+		await page.goto('/');
+		await expect(page).toHaveTitle(/Informed News/i, { timeout: 60_000 });
+		const stories = await loadOwnedStories(page);
+		const overviewRes = await page.request.get('/api/brief/overview');
+		expect(overviewRes.ok()).toBeTruthy();
+		const overview = (await overviewRes.json()) as BriefOverview;
+		const titleOf = (id: string) => stories.find((s) => s.id === id)!.title!;
+		const collapsed = overview.sections.flatMap((s) => s.storyIds).map(titleOf);
+		const opened = overview.sections
+			.flatMap((s, i) => (i === 0 ? [...s.storyIds, ...s.moreIds] : s.storyIds))
+			.map(titleOf);
+		const [moreTitle] = overview.sections[0]!.moreIds.map(titleOf);
+		expect(moreTitle).toBeTruthy();
+
+		const grid = page.getByTestId('topic-brief-section').first();
+		await expect(grid.locator('article[id^="story-"]').first()).toBeVisible({ timeout: 60_000 });
+		const announcer = page.getByTestId('keyboard-selection-announcer');
+		const selectedCard = page.locator('article[aria-current="true"]');
+		const expectSelected = async (title: string) => {
+			await expect(announcer).toHaveText(`Selected story: ${title}`);
+			await expect(selectedCard).toHaveCount(1);
+			await expect(storyToggle(selectedCard, title)).toBeVisible();
+		};
+
+		for (const title of collapsed) {
+			await page.keyboard.press('j');
+			await expectSelected(title);
+		}
+		await page.keyboard.press('j');
+		await expectSelected(collapsed[collapsed.length - 1]!);
+		await page.keyboard.press('g');
+		await page.keyboard.press('g');
+		await expectSelected(collapsed[0]!);
+		await page.keyboard.press('G');
+		await expectSelected(collapsed[collapsed.length - 1]!);
+
+		await grid.getByRole('button', { name: /^More \(/ }).click();
+		// Keep focus off the More button: Enter on a focused button is NEWS-134, not this test.
+		await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+		await page.keyboard.press('g');
+		await page.keyboard.press('g');
+		await expectSelected(opened[0]!);
+		for (const title of opened.slice(1)) {
+			await page.keyboard.press('j');
+			await expectSelected(title);
+		}
+		await page.keyboard.press('k');
+		await expectSelected(moreTitle!);
+
+		const moreToggle = storyToggle(selectedCard, moreTitle!);
+		await page.keyboard.press('Enter');
+		await expect(moreToggle).toHaveAttribute('aria-expanded', 'true');
+		await page.keyboard.press('x');
+		await expect(moreToggle).toHaveAttribute('aria-expanded', 'false');
+
+		await grid.getByRole('button', { name: 'Show fewer', exact: true }).click();
+		await expect(grid.getByText(moreTitle!, { exact: true })).toHaveCount(0);
+		await expect(selectedCard).toHaveCount(0);
+		await expect(announcer).toHaveText('');
+	});
+
+	test('before the topic overview loads, j selects nothing; once sections render, j picks the first visible story', async ({
+		page,
+	}) => {
+		let releaseOverview: () => void = () => {};
+		const overviewHeld = new Promise<void>((resolve) => {
+			releaseOverview = resolve;
+		});
+		await page.route('**/api/brief/overview', async (route) => {
+			await overviewHeld;
+			await route.continue();
+		});
+
+		await page.goto('/');
+		await expect(page).toHaveTitle(/Informed News/i, { timeout: 60_000 });
+		const announcer = page.getByTestId('keyboard-selection-announcer');
+		await expect(announcer).toBeAttached({ timeout: 60_000 });
+		await expect(page.getByTestId('topic-brief-section')).toHaveCount(0);
+
+		await page.keyboard.press('j');
+		await page.keyboard.press('G');
+		await expect(announcer).toHaveText('');
+		await expect(page.locator('article[aria-current="true"]')).toHaveCount(0);
+
+		releaseOverview();
+		const grid = page.getByTestId('topic-brief-section').first();
+		const firstCard = grid.locator('article[id^="story-"]').first();
+		await expect(firstCard).toBeVisible({ timeout: 60_000 });
+		await page.keyboard.press('j');
+		await expect(firstCard).toHaveAttribute('aria-current', 'true');
+	});
+});
+
 test.describe('Shared article view (NEWS-130)', () => {
 	test.beforeEach(() => useScenario('topics'));
 

@@ -63,6 +63,8 @@ const requestedSummaries = new Set<string>();
 		sourceArticles?: any[];
 		currentMediaInfo?: any;
 		isLoadingMediaInfo?: boolean;
+		/** Out: `stories` indices of the rendered cards in on-screen order, for j / k; empty while loading, unset on the fallback list. */
+		navigationOrder?: number[];
 		/** Rendered when the overview is the empty-store fixture or cannot be loaded. */
 		fallback: Snippet;
 	}
@@ -81,6 +83,7 @@ const requestedSummaries = new Set<string>();
 		sourceArticles = $bindable([]),
 		currentMediaInfo = $bindable(null),
 		isLoadingMediaInfo = $bindable(false),
+		navigationOrder = $bindable(),
 		fallback,
 	}: Props = $props();
 
@@ -110,6 +113,16 @@ const requestedSummaries = new Set<string>();
 			openMore[section.topicId] ? [...section.top, ...section.more] : section.top,
 		),
 	);
+	const visibleOrder = $derived(
+		!overviewLoaded
+			? []
+			: useSections
+				? visibleStories.flatMap((story) => {
+						const index = storyIndex.get(story);
+						return index === undefined ? [] : [index];
+					})
+				: undefined,
+	);
 	const allVisibleRead = $derived(
 		visibleStories.every((story) => story.id && readStories[story.id]),
 	);
@@ -118,6 +131,24 @@ const requestedSummaries = new Set<string>();
 	);
 
 	const seen = createSeenBatcher({ post: (ids) => postBriefSeen(ids) });
+
+	$effect(() => {
+		navigationOrder = visibleOrder;
+		return () => {
+			navigationOrder = undefined;
+		};
+	});
+
+	/** A selected card that Show fewer (or a reload) takes off screen drops the selection. */
+	$effect(() => {
+		if (
+			visibleOrder &&
+			keyboardNavigation.hasSelection &&
+			!visibleOrder.includes(keyboardNavigation.selectedIndex)
+		) {
+			keyboardNavigation.clearSelection();
+		}
+	});
 
 	$effect(() => {
 		const onVisibilityChange = () => {

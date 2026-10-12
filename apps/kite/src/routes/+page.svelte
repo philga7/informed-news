@@ -887,6 +887,7 @@ if (browser && typeof window !== 'undefined') {
               bind:sourceArticles={state.sourceArticles}
               bind:currentMediaInfo={state.currentMediaInfo}
               bind:isLoadingMediaInfo={state.isLoadingMediaInfo}
+              bind:navigationOrder={state.topicBriefNavigationOrder}
               fallback={categoryStoryList}
             />
           {:else}
@@ -966,6 +967,7 @@ if (browser && typeof window !== 'undefined') {
 	wikipediaPopupVisible={state.wikipediaPopup.visible}
 	settingsModalOpen={settingsModalState.isOpen}
 	bind:showSearchModal={state.showSearchModal}
+	navigationOrder={state.topicBriefNavigationOrder}
 	onStoryToggle={storyToggle.handleToggle}
 	onToggleReadStatus={(index) => state.storyList?.toggleReadStatus(index)}
 	onCategoryChange={categoryManager.handleCategoryChange}
