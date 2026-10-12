@@ -830,16 +830,30 @@ test.describe('Shared link to a missing story (NEWS-140)', () => {
 	});
 });
 
-/** Kite Settings → Filters keywords matching these story titles, seeded before load. */
-async function filterTitles(page: Page, titles: string[], filterMode: 'hide' | 'blur'): Promise<void> {
+/** Kite Settings → Filters, seeded before load. */
+async function filterKeywords(
+	page: Page,
+	keywords: string[],
+	filterMode: 'hide' | 'blur',
+	filterScope: 'title' | 'summary' | 'all' = 'title',
+): Promise<void> {
 	await page.addInitScript(
-		({ keywords, filterMode }) => {
+		({ keywords, filterMode, filterScope }) => {
 			localStorage.setItem(
 				'kite-content-filter',
-				JSON.stringify({ keywords, filterMode, filterScope: 'title', version: 1 }),
+				JSON.stringify({ keywords, filterMode, filterScope, version: 1 }),
 			);
 		},
-		{ keywords: titles.map((title) => title.toLowerCase()), filterMode },
+		{ keywords, filterMode, filterScope },
+	);
+}
+
+/** Kite Settings → Filters keywords matching these story titles, seeded before load. */
+async function filterTitles(page: Page, titles: string[], filterMode: 'hide' | 'blur'): Promise<void> {
+	await filterKeywords(
+		page,
+		titles.map((title) => title.toLowerCase()),
+		filterMode,
 	);
 }
 
@@ -917,7 +931,42 @@ test.describe('Kite content filter on the topic Brief (NEWS-141)', () => {
 		await expect(page.getByRole('dialog')).toBeVisible();
 		await expect(page.getByText(PORTS.toLowerCase(), { exact: true })).toBeVisible();
 	});
+
+	for (const filterMode of ['hide', 'blur'] as const) {
+		test(`${filterMode} mode, all scope: an opened story whose on-demand summary matches stays open and unblurred, and the count holds (NEWS-146)`, async ({
+			page,
+		}) => {
+			// DEMAND is the grid story with no summary yet; TARIFF (More) is unavailable, so it never loads one.
+			await page.route('**/api/brief/stories/*/summary', (route) =>
+				route.fulfill({
+					json: {
+						ok: true,
+						summary: { status: 'ok', text: 'Ratepayers would see overnight bills change.' },
+					},
+				}),
+			);
+			await filterKeywords(page, ['ratepayers', 'battery'], filterMode, 'all');
+			await page.goto('/');
+			await expect(page.getByTestId('topic-brief-section').first()).toBeVisible({ timeout: 60_000 });
+			const count = page.getByText(filterMode === 'hide' ? '1 story hidden' : '1 story filtered', {
+				exact: true,
+			});
+			await expect(count).toBeVisible();
+
+			const demand = card(page, DEMAND);
+			await storyToggle(demand, DEMAND).click();
+			await expect(demand.getByText('AI summary — not ground truth')).toBeVisible();
+			await expect(storyToggle(demand, DEMAND)).toHaveAttribute('aria-expanded', 'true');
+			await expect(demand.getByText(/Click to show/)).toHaveCount(0);
+			await expect(count).toBeVisible();
+		});
+	}
 });
+
+/** A failed overview falls back to the plain list, as the fixture Brief does. */
+async function usePlainList(page: Page): Promise<void> {
+	await page.route('**/api/brief/overview', (route) => route.fulfill({ status: 500 }));
+}
 
 test.describe('Keyboard selection follows the plain story list (NEWS-137)', () => {
 	test.beforeEach(() => useScenario('topics'));
@@ -941,8 +990,7 @@ test.describe('Keyboard selection follows the plain story list (NEWS-137)', () =
 		expect(stories.length).toBeGreaterThan(3);
 		const [first, hidden, third] = stories;
 
-		// A failed overview falls back to the plain list, as the fixture Brief does.
-		await page.route('**/api/brief/overview', (route) => route.fulfill({ status: 500 }));
+		await usePlainList(page);
 		await page.addInitScript(() => localStorage.setItem('storyCount', '3'));
 		await filterTitles(page, [hidden!.title!], 'hide');
 		await page.goto('/');
@@ -1018,6 +1066,81 @@ test.describe('Keyboard selection follows the plain story list (NEWS-137)', () =
 		await page.keyboard.press('m');
 		const thirdCard = page.locator(`article#story-${third!.cluster_number}`);
 		await expect(thirdCard.getByRole('button', { name: 'Mark as unread' })).toBeVisible();
+	});
+});
+
+test.describe('Keyboard selection on blurred cards (NEWS-143)', () => {
+	test.beforeEach(() => useScenario('topics'));
+
+	const STORAGE = 'Operators add battery storage before winter peak';
+	const TARIFF = 'Regulator opens review of overnight tariffs';
+
+	test('on the plain list, j / k announce a blurred card as filtered without its title; Enter and o reveal and open it', async ({
+		page,
+	}) => {
+		await page.goto('/');
+		await expect(page).toHaveTitle(/Informed News/i, { timeout: 60_000 });
+		const titles = (await loadOwnedStories(page)).map((story) => story.title);
+		const storageIndex = titles.indexOf(STORAGE);
+		const tariffIndex = titles.indexOf(TARIFF);
+		expect(storageIndex).toBeGreaterThanOrEqual(0);
+		expect(tariffIndex).toBeGreaterThan(storageIndex);
+
+		await usePlainList(page);
+		await filterKeywords(page, ['battery', 'tariffs'], 'blur');
+		await page.goto('/');
+		await expect(page.locator('article[id^="story-"]')).toHaveCount(titles.length, {
+			timeout: 60_000,
+		});
+		const blurredStorage = page.getByRole('button', { name: `News story: ${STORAGE}`, exact: true });
+		const blurredTariff = page.getByRole('button', { name: `News story: ${TARIFF}`, exact: true });
+		await expect(blurredStorage).toBeVisible();
+		await expect(blurredTariff).toBeVisible();
+
+		const announcer = page.getByTestId('keyboard-selection-announcer');
+		for (let i = 0; i <= storageIndex; i++) await page.keyboard.press('j');
+		await expect(announcer).toHaveText('Selected story: filtered (matches "battery")');
+		await expect(blurredStorage).toHaveAttribute('aria-current', 'true');
+
+		await page.keyboard.press('Enter');
+		await expect(blurredStorage).toHaveCount(0);
+		const storage = page.getByRole('article', { name: `News story: ${STORAGE}`, exact: true });
+		await expect(storyToggle(storage, STORAGE)).toHaveAttribute('aria-expanded', 'true');
+		await expect(announcer).toHaveText(`Selected story: ${STORAGE}`);
+
+		for (let i = storageIndex; i < tariffIndex; i++) await page.keyboard.press('j');
+		await expect(announcer).toHaveText('Selected story: filtered (matches "tariffs")');
+		await page.keyboard.press('o');
+		await expect(blurredTariff).toHaveCount(0);
+		const tariff = page.getByRole('article', { name: `News story: ${TARIFF}`, exact: true });
+		await expect(storyToggle(tariff, TARIFF)).toHaveAttribute('aria-expanded', 'true');
+		await expect(announcer).toHaveText(`Selected story: ${TARIFF}`);
+	});
+});
+
+test.describe('Linked story on the plain story list (NEWS-142)', () => {
+	test.beforeEach(() => useScenario('topics'));
+
+	test('a story opened from a link gets the linked-story treatment on its own card when the hide filter drops a story above it', async ({
+		page,
+	}) => {
+		await page.goto('/');
+		await expect(page).toHaveTitle(/Informed News/i, { timeout: 60_000 });
+		const stories = await loadOwnedStories(page);
+		expect(stories.length).toBeGreaterThan(3);
+		const [hidden, , linked] = stories;
+
+		await usePlainList(page);
+		await filterTitles(page, [hidden!.title!], 'hide');
+		await page.goto('/latest/world/2');
+		await expect(page.locator('article[id^="story-"]')).toHaveCount(stories.length - 1, {
+			timeout: 60_000,
+		});
+
+		const linkedCards = page.locator('article[data-linked-story]');
+		await expect(linkedCards).toHaveCount(1);
+		await expect(linkedCards).toHaveAttribute('aria-label', `News story: ${linked!.title}`);
+		await expect(storyToggle(linkedCards, linked!.title!)).toHaveAttribute('aria-expanded', 'true');
 	});
 });
 

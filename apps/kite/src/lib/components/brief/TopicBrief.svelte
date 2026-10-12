@@ -28,6 +28,7 @@ const requestedSummaries = new Set<string>();
 		BRIEF_SUMMARY_LOGIN_HINT,
 		applyFullStory,
 		autoFullStoryRequestKeys,
+		createFilterMatcher,
 		createSeenBatcher,
 		fetchBriefOverview,
 		fullStoryErrorCopy,
@@ -107,16 +108,21 @@ const requestedSummaries = new Set<string>();
 	let overviewSequence = 0;
 
 	const useSections = $derived(overviewLoaded && overview !== null && !overview.fixture);
+	const matchFilter = $derived.by(() => {
+		const keywords = [...contentFilter.keywords];
+		const filterScope = contentFilter.filterScope;
+		return createFilterMatcher(
+			(story) => shouldFilterStory(story, keywords, filterScope).matchedKeywords,
+		);
+	});
 	/** Kite content filter (Settings → Filters) keywords each matching story hits. */
 	const filterMatches = $derived.by(() => {
 		const matches = new Map<Story, string[]>();
 		if (!contentFilter.isActive) return matches;
+		// Tracked here so a filter settings change re-decides; story fields are read untracked.
+		const match = matchFilter;
 		for (const story of stories) {
-			const { matchedKeywords } = shouldFilterStory(
-				story,
-				contentFilter.keywords,
-				contentFilter.filterScope,
-			);
+			const matchedKeywords = untrack(() => match(story));
 			if (matchedKeywords.length > 0) matches.set(story, matchedKeywords);
 		}
 		return matches;

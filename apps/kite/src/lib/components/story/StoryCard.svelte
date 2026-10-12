@@ -8,6 +8,8 @@ import { useHoverPreloading, useViewportPreloading } from '$lib/hooks/useImagePr
 import { useStoryFlashcards } from '$lib/hooks/useStoryFlashcards.svelte';
 import { useStorySimplification } from '$lib/hooks/useStorySimplification.svelte';
 import { useStoryTTS } from '$lib/hooks/useStoryTTS.svelte';
+import { blurredStories } from '$lib/stores/blurredStories.svelte';
+import { storyKey } from '$lib/topicBrief';
 import StoryActions from './StoryActions.svelte';
 import StoryContentSkeleton from './StoryContentSkeleton.svelte';
 import StoryHeader from './StoryHeader.svelte';
@@ -87,6 +89,15 @@ $effect(() => {
 	isBlurred = isFilteredProp;
 	// Reset revealing state when filter changes
 	isRevealing = false;
+});
+
+// Informed News: keyboard selection announces and reveals a blurred card through this registry
+$effect(() => {
+	if (!isBlurred) return;
+	return blurredStories.register(storyKey(story), {
+		keywords: filterKeywords,
+		reveal: handleStoryClick,
+	});
 });
 
 // Determine language code from story
@@ -223,6 +234,7 @@ $effect(() => {
   id="story-{story.cluster_number}"
   data-story-id={story.cluster_number?.toString() || story.title}
   data-story-index={storyIndex}
+  data-linked-story={isLinkedStory || undefined}
   aria-label="News story: {story.title}"
   aria-current={isKeyboardSelected ? 'true' : undefined}
   class="relative py-2 transition-all duration-200 {isKeyboardSelected ? 'ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-900/10 -mx-2 px-2 rounded-lg' : ''} {isBlurred ? 'cursor-pointer' : ''} {!isExpanded ? 'border-b border-gray-200 dark:border-gray-700' : ''}"

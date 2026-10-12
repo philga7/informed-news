@@ -387,8 +387,8 @@ const allStoriesExpanded = $derived(
     {#each displayedStories as story, index (story.id || story.cluster_number || story.title)}
       {@const isFiltered =
         contentFilter.filterMode === "blur" && story._filtered}
-      {@const isLinkedStory = initiallyExpandedIndex === index}
       {@const sourceIndex = storyIndexByKey.get(storyKey(story))}
+      {@const isLinkedStory = sourceIndex !== undefined && initiallyExpandedIndex === sourceIndex}
       {@const isKeyboardSelected = sourceIndex !== undefined && keyboardNavigation.selectedIndex === sourceIndex}
       {@const storyWithCategory = story as StoryWithCategory}
       {@const categoryId = storyWithCategory._categoryId || currentCategory}
