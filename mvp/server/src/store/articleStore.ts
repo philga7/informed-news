@@ -1,8 +1,7 @@
-import { randomBytes } from 'node:crypto';
-import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
-import path from 'node:path';
+import { readFile } from 'node:fs/promises';
 import type { Article } from '../types/article.js';
 import { articleIdFromCanonicalUrl } from './articleId.js';
+import { enqueueFileWrite, writeJsonAtomic } from './jsonFileQueue.js';
 import { articleNeedsRewrite, migrateArticle } from './migrateArticle.js';
 import { mergeArticleOnUpsert } from './mergeArticleOnUpsert.js';
 import { ARTICLES_PATH } from './paths.js';
@@ -37,34 +36,6 @@ async function loadArticles(articlesPath: string): Promise<LoadedArticles> {
   return { articles, needsWrite };
 }
 
-/** Atomic write: temp file in the same directory, then rename. */
-async function atomicWrite(articles: Article[], articlesPath: string): Promise<void> {
-  await mkdir(path.dirname(articlesPath), { recursive: true });
-  const tmpPath = `${articlesPath}.tmp-${process.pid}-${randomBytes(6).toString('hex')}`;
-  try {
-    await writeFile(tmpPath, `${JSON.stringify(articles, null, 2)}\n`, 'utf8');
-    await rename(tmpPath, articlesPath);
-  } catch (err) {
-    await rm(tmpPath, { force: true });
-    throw err;
-  }
-}
-
-/** Per-file write chains: ingest, triage, seeds, classify and prune must not interleave read-modify-write cycles. */
-const writeChains = new Map<string, Promise<unknown>>();
-
-function enqueueWrite<T>(articlesPath: string, work: () => Promise<T>): Promise<T> {
-  const key = path.resolve(articlesPath);
-  const previous = writeChains.get(key) ?? Promise.resolve();
-  const next = previous.then(work);
-  const settled = next.catch(() => undefined);
-  writeChains.set(key, settled);
-  void settled.then(() => {
-    if (writeChains.get(key) === settled) writeChains.delete(key);
-  });
-  return next;
-}
-
 /**
  * Read, apply `mutate`, write atomically; serialized per path. Resolves to the written articles.
  * `mutate` must not call other article store writes (they would wait on this one).
@@ -73,10 +44,10 @@ export async function updateArticles(
   mutate: (articles: Article[]) => Article[],
   articlesPath: string = ARTICLES_PATH,
 ): Promise<Article[]> {
-  return enqueueWrite(articlesPath, async () => {
+  return enqueueFileWrite(articlesPath, async () => {
     const { articles } = await loadArticles(articlesPath);
     const next = mutate(articles);
-    await atomicWrite(next, articlesPath);
+    await writeJsonAtomic(articlesPath, next);
     return next;
   });
 }
@@ -89,12 +60,12 @@ export async function pruneArticles(
   selectKept: (articles: readonly Article[]) => Article[],
   articlesPath: string = ARTICLES_PATH,
 ): Promise<number> {
-  return enqueueWrite(articlesPath, async () => {
+  return enqueueFileWrite(articlesPath, async () => {
     const { articles, needsWrite } = await loadArticles(articlesPath);
     const kept = selectKept(articles);
     const removed = articles.length - kept.length;
     if (removed > 0 || needsWrite) {
-      await atomicWrite(kept, articlesPath);
+      await writeJsonAtomic(articlesPath, kept);
     }
     return removed;
   });

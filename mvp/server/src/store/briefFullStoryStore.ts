@@ -1,6 +1,4 @@
-import { randomBytes } from 'node:crypto';
-import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
-import path from 'node:path';
+import { readFile } from 'node:fs/promises';
 import type {
   BriefFullStoryDeterministic,
   BriefFullStoryEnrichment,
@@ -13,6 +11,7 @@ import type {
 } from '../types/briefFullStory.js';
 import type { EnrichmentQnA, EnrichmentTimelineEvent } from '../types/clusterEnrichment.js';
 import { TOPIC_SECTIONS, type TopicSection } from '../types/topic.js';
+import { enqueueFileWrite, writeJsonAtomic } from './jsonFileQueue.js';
 import { BRIEF_FULL_STORIES_PATH } from './paths.js';
 
 const STATUSES: ReadonlySet<string> = new Set<FullStoryStatus>(['ok', 'unavailable', 'error']);
@@ -243,39 +242,12 @@ export async function readBriefFullStories(
   }
 }
 
-async function atomicWrite(store: BriefFullStoriesStore, fullStoriesPath: string): Promise<void> {
-  await mkdir(path.dirname(fullStoriesPath), { recursive: true });
-  const tmpPath = `${fullStoriesPath}.tmp-${process.pid}-${randomBytes(6).toString('hex')}`;
-  try {
-    await writeFile(tmpPath, `${JSON.stringify(store, null, 2)}\n`, 'utf8');
-    await rename(tmpPath, fullStoriesPath);
-  } catch (err) {
-    await rm(tmpPath, { force: true });
-    throw err;
-  }
-}
-
-/** Per-file write chains: refresh, prune and on-demand writes must not interleave read-modify-write cycles. */
-const writeChains = new Map<string, Promise<unknown>>();
-
-function enqueueWrite<T>(fullStoriesPath: string, work: () => Promise<T>): Promise<T> {
-  const key = path.resolve(fullStoriesPath);
-  const previous = writeChains.get(key) ?? Promise.resolve();
-  const next = previous.then(work);
-  const settled = next.catch(() => undefined);
-  writeChains.set(key, settled);
-  void settled.then(() => {
-    if (writeChains.get(key) === settled) writeChains.delete(key);
-  });
-  return next;
-}
-
 /** Replace the whole store (atomic). */
 export async function writeBriefFullStories(
   store: BriefFullStoriesStore,
   fullStoriesPath: string = BRIEF_FULL_STORIES_PATH,
 ): Promise<void> {
-  return enqueueWrite(fullStoriesPath, () => atomicWrite(store, fullStoriesPath));
+  return enqueueFileWrite(fullStoriesPath, () => writeJsonAtomic(fullStoriesPath, store));
 }
 
 async function mergeAndWrite(
@@ -285,7 +257,7 @@ async function mergeAndWrite(
   const store = await readBriefFullStories(fullStoriesPath);
   for (const record of records) store.fullStories[record.articleId] = record;
   store.updatedAt = new Date().toISOString();
-  await atomicWrite(store, fullStoriesPath);
+  await writeJsonAtomic(fullStoriesPath, store);
 }
 
 /** Upsert records by articleId (read-merge-write, atomic). Retention is `pruneBriefFullStories`. */
@@ -293,7 +265,7 @@ export async function putBriefFullStories(
   records: BriefFullStoryRecord[],
   fullStoriesPath: string = BRIEF_FULL_STORIES_PATH,
 ): Promise<void> {
-  return enqueueWrite(fullStoriesPath, () => mergeAndWrite(records, fullStoriesPath));
+  return enqueueFileWrite(fullStoriesPath, () => mergeAndWrite(records, fullStoriesPath));
 }
 
 async function filterAndWrite(
@@ -307,7 +279,7 @@ async function filterAndWrite(
   }
   const removed = Object.keys(store.fullStories).length - Object.keys(fullStories).length;
   if (removed > 0) {
-    await atomicWrite({ fullStories, updatedAt: new Date().toISOString() }, fullStoriesPath);
+    await writeJsonAtomic(fullStoriesPath, { fullStories, updatedAt: new Date().toISOString() });
   }
   return removed;
 }
@@ -317,5 +289,5 @@ export async function pruneBriefFullStories(
   keep: (record: BriefFullStoryRecord) => boolean,
   fullStoriesPath: string = BRIEF_FULL_STORIES_PATH,
 ): Promise<number> {
-  return enqueueWrite(fullStoriesPath, () => filterAndWrite(keep, fullStoriesPath));
+  return enqueueFileWrite(fullStoriesPath, () => filterAndWrite(keep, fullStoriesPath));
 }

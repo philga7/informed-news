@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import path from 'node:path';
+import { readFile } from 'node:fs/promises';
 import { finalizeTopicFields, parseTopicPatch } from '../services/topicInput.js';
 import { DEFAULT_TOPICS_SEED_PATH, loadTopicSeed } from '../services/topicSeed.js';
 import type { Topic, TopicFields, TopicPatch, TopicsStore } from '../types/topic.js';
+import { enqueueFileWrite, writeJsonAtomic } from './jsonFileQueue.js';
 import { TOPICS_PATH } from './paths.js';
 
 export type TopicsStorePaths = { topicsPath?: string; seedPath?: string };
@@ -78,29 +78,9 @@ function withoutMeta(topic: Topic): TopicFields {
   return fields;
 }
 
-async function writeTopics(store: TopicsStore, topicsPath: string): Promise<void> {
-  await mkdir(path.dirname(topicsPath), { recursive: true });
-  await writeFile(topicsPath, `${JSON.stringify(store, null, 2)}\n`, 'utf8');
-}
-
-/** Per-file write chains so create/update/remove cannot interleave read-modify-write. */
-const writeChains = new Map<string, Promise<unknown>>();
-
-function enqueueWrite<T>(topicsPath: string, work: () => Promise<T>): Promise<T> {
-  const key = path.resolve(topicsPath);
-  const previous = writeChains.get(key) ?? Promise.resolve();
-  const next = previous.then(work);
-  const settled = next.catch(() => undefined);
-  writeChains.set(key, settled);
-  void settled.then(() => {
-    if (writeChains.get(key) === settled) writeChains.delete(key);
-  });
-  return next;
-}
-
 /**
  * Read or seed without taking the write chain. Callers that mutate must already hold
- * `enqueueWrite` for this path (or accept a race on first seed).
+ * `enqueueFileWrite` for this path (or accept a race on first seed).
  */
 async function loadTopics(paths: TopicsStorePaths): Promise<TopicsStore> {
   const topicsPath = paths.topicsPath ?? TOPICS_PATH;
@@ -122,7 +102,7 @@ async function loadTopics(paths: TopicsStorePaths): Promise<TopicsStore> {
       })),
       updatedAt: now,
     };
-    await writeTopics(seeded, topicsPath);
+    await writeJsonAtomic(topicsPath, seeded);
     return seeded;
   }
 }
@@ -141,7 +121,7 @@ export async function readTopics(paths: TopicsStorePaths = {}): Promise<TopicsSt
       throw err;
     }
     // Serialize first-time seed so concurrent readers don't double-write the seed.
-    return enqueueWrite(topicsPath, async () => loadTopics(paths));
+    return enqueueFileWrite(topicsPath, async () => loadTopics(paths));
   }
 }
 
@@ -150,7 +130,7 @@ export async function createTopic(
   paths: TopicsStorePaths = {},
 ): Promise<{ topic: Topic; topics: Topic[] }> {
   const topicsPath = paths.topicsPath ?? TOPICS_PATH;
-  return enqueueWrite(topicsPath, async () => {
+  return enqueueFileWrite(topicsPath, async () => {
     const store = await loadTopics(paths);
 
     const key = nameKey(fields.name);
@@ -161,7 +141,7 @@ export async function createTopic(
     const now = new Date().toISOString();
     const topic: Topic = { id: randomUUID(), ...fields, createdAt: now, updatedAt: now };
     const next: TopicsStore = { topics: [...store.topics, topic], updatedAt: now };
-    await writeTopics(next, topicsPath);
+    await writeJsonAtomic(topicsPath, next);
     return { topic, topics: next.topics };
   });
 }
@@ -173,7 +153,7 @@ export async function updateTopic(
   paths: TopicsStorePaths = {},
 ): Promise<{ topic: Topic; topics: Topic[] } | null> {
   const topicsPath = paths.topicsPath ?? TOPICS_PATH;
-  return enqueueWrite(topicsPath, async () => {
+  return enqueueFileWrite(topicsPath, async () => {
     const trimmed = id.trim();
     const store = await loadTopics(paths);
     const existing = store.topics.find((t) => t.id === trimmed);
@@ -198,7 +178,7 @@ export async function updateTopic(
       topics: store.topics.map((t) => (t.id === existing.id ? topic : t)),
       updatedAt: now,
     };
-    await writeTopics(next, topicsPath);
+    await writeJsonAtomic(topicsPath, next);
     return { topic, topics: next.topics };
   });
 }
@@ -209,7 +189,7 @@ export async function removeTopic(
   paths: TopicsStorePaths = {},
 ): Promise<{ removed: boolean; topics: Topic[] }> {
   const topicsPath = paths.topicsPath ?? TOPICS_PATH;
-  return enqueueWrite(topicsPath, async () => {
+  return enqueueFileWrite(topicsPath, async () => {
     const trimmed = id.trim();
     const store = await loadTopics(paths);
     if (!store.topics.some((t) => t.id === trimmed)) {
@@ -220,7 +200,7 @@ export async function removeTopic(
       topics: store.topics.filter((t) => t.id !== trimmed),
       updatedAt: new Date().toISOString(),
     };
-    await writeTopics(next, topicsPath);
+    await writeJsonAtomic(topicsPath, next);
     return { removed: true, topics: next.topics };
   });
 }

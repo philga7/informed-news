@@ -1,6 +1,4 @@
-import { randomBytes } from 'node:crypto';
-import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
-import path from 'node:path';
+import { readFile } from 'node:fs/promises';
 import type {
   TriageLabel,
   TriageReason,
@@ -9,6 +7,7 @@ import type {
   TriageStatus,
   TriageStore,
 } from '../types/triage.js';
+import { enqueueFileWrite, writeJsonAtomic } from './jsonFileQueue.js';
 import { TRIAGE_PATH } from './paths.js';
 
 const STATUSES: ReadonlySet<string> = new Set<TriageStatus>(['kept', 'dropped']);
@@ -113,30 +112,7 @@ export async function writeTriage(
   store: TriageStore,
   triagePath: string = TRIAGE_PATH,
 ): Promise<void> {
-  await mkdir(path.dirname(triagePath), { recursive: true });
-  const tmpPath = `${triagePath}.tmp-${process.pid}-${randomBytes(6).toString('hex')}`;
-  try {
-    await writeFile(tmpPath, `${JSON.stringify(store, null, 2)}\n`, 'utf8');
-    await rename(tmpPath, triagePath);
-  } catch (err) {
-    await rm(tmpPath, { force: true });
-    throw err;
-  }
-}
-
-/** Per-file update chains: the refresh run and seed save/remove must not interleave read-modify-write cycles. */
-const updateChains = new Map<string, Promise<unknown>>();
-
-function enqueueUpdate<T>(triagePath: string, work: () => Promise<T>): Promise<T> {
-  const key = path.resolve(triagePath);
-  const previous = updateChains.get(key) ?? Promise.resolve();
-  const next = previous.then(work);
-  const settled = next.catch(() => undefined);
-  updateChains.set(key, settled);
-  void settled.then(() => {
-    if (updateChains.get(key) === settled) updateChains.delete(key);
-  });
-  return next;
+  await writeJsonAtomic(triagePath, store);
 }
 
 /**
@@ -148,7 +124,7 @@ export async function updateTriage(
   mutate: (store: TriageStore) => TriageStore | Promise<TriageStore>,
   triagePath: string = TRIAGE_PATH,
 ): Promise<TriageStore> {
-  return enqueueUpdate(triagePath, async () => {
+  return enqueueFileWrite(triagePath, async () => {
     const next = await mutate(await readTriage(triagePath));
     await writeTriage(next, triagePath);
     return next;
