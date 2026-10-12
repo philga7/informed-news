@@ -31,6 +31,11 @@ export function selectedStoryAnnouncement(
 	blurredKeywords?: string[],
 ): string {
 	if (!blurredKeywords) return `Selected story: ${title ?? ''}`;
-	if (blurredKeywords.length === 0) return 'Selected story: filtered';
-	return `Selected story: filtered (matches ${blurredKeywords.map((keyword) => `"${keyword}"`).join(', ')})`;
+	return `Selected story: ${blurredStoryAccessibleName(blurredKeywords)}`;
+}
+
+/** Accessible name for a content-filter-blurred card (no title or story text) — NEWS-148. */
+export function blurredStoryAccessibleName(keywords: string[]): string {
+	if (keywords.length === 0) return 'filtered';
+	return `filtered (matches ${keywords.map((keyword) => `"${keyword}"`).join(', ')})`;
 }
