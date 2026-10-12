@@ -247,16 +247,35 @@ function topicsScenario(now, imageBaseUrl) {
 	});
 	records[portDuplicate.id] = duplicate(now, portDuplicate, { topicId: ports.id, of: portLead.id });
 
-	const [mutedTitle, offTopicTitle, clickbaitTitle, , budgetTitle] = TOPIC_SCENARIO.filtered.map(
-		(f) => f.title,
-	);
+	const filteredTitle = (label) => TOPIC_SCENARIO.filtered.find((f) => f.label === label).title;
 	const droppedStories = [
-		{ slug: 'ribbon', title: mutedTitle, domain: 'tabloid.example', reason: `muted:${TOPIC_SCENARIO.undesiredTopic.id}`, stage: 'keyword', jevCalls: 0 },
-		{ slug: 'bakery', title: offTopicTitle, domain: 'townpaper.example', reason: 'off_topic', stage: 'headline', jevCalls: 1 },
-		{ slug: 'viral', title: clickbaitTitle, domain: 'viralhub.example', reason: 'clickbait', stage: 'headline', jevCalls: 1 },
+		{
+			slug: 'ribbon',
+			title: filteredTitle('Muted'),
+			domain: 'tabloid.example',
+			reason: `muted:${TOPIC_SCENARIO.undesiredTopic.id}`,
+			stage: 'keyword',
+			jevCalls: 0,
+		},
+		{
+			slug: 'bakery',
+			title: filteredTitle('Off-topic'),
+			domain: 'townpaper.example',
+			reason: 'off_topic',
+			stage: 'headline',
+			jevCalls: 1,
+		},
+		{
+			slug: 'viral',
+			title: filteredTitle('Clickbait'),
+			domain: 'viralhub.example',
+			reason: 'clickbait',
+			stage: 'headline',
+			jevCalls: 1,
+		},
 		{
 			slug: 'budget',
-			title: budgetTitle,
+			title: filteredTitle('Not scored (budget)'),
 			domain: 'capwire.example',
 			reason: 'not_scored_budget',
 			stage: 'budget',
