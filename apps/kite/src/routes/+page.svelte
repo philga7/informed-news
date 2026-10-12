@@ -35,6 +35,8 @@ import WikipediaPopup from '$lib/components/WikipediaPopup.svelte';
 import Weather from '$lib/components/weather/Weather.svelte';
 import TopicBrief from '$lib/components/brief/TopicBrief.svelte';
 import { BRIEF_STORIES_SECTION_TITLE, TOPIC_BRIEF_CATEGORY_ID } from '$lib/topicBrief';
+import { findSharedStory, SHARED_STORY_NOT_FOUND } from '$lib/sharedStory';
+import { toastStore } from '$lib/stores/toast.svelte';
 import {
 	displaySettings,
 	languageSettings,
@@ -527,6 +529,22 @@ const handleUrlNavigation = async (params: NavigationParams) => {
 	}
 	if (updates.storyCountOverride !== undefined) {
 		state.storyCountOverride = updates.storyCountOverride;
+	}
+
+	// `expandedStories` comes back only once the story lookup ran against the loaded stories.
+	if (params.isShared && hasStory && updates.expandedStories !== undefined) {
+		const sharedStory = findSharedStory(
+			derived.isSinglePageMode ? derived.singlePageStories : state.stories,
+			{
+				expandedStories: state.expandedStories,
+				sharedArticleIndex: state.sharedArticleIndex,
+				sharedClusterId: state.sharedClusterId,
+			},
+		);
+		if (!sharedStory) {
+			await helpers.handleExitSharedView();
+			toastStore.info(SHARED_STORY_NOT_FOUND);
+		}
 	}
 };
 
