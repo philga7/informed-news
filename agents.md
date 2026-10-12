@@ -26,7 +26,7 @@ mvp/server (Express)
     → Ollama Cloud (framing)
 ```
 
-The server starts an auto-refresh scheduler (`startRefreshScheduler` in `mvp/server/src/index.ts`) that spends real API budget (CFP, search, Jev, Ollama). Set `REFRESH_INTERVAL_HOURS=off` when you need the server up without refreshing. `npm run test:e2e:kite` and the Kite integration suite use their own hermetic stack (`e2e/stack/`: own ports, seeded temp data dir, generated env file with refresh off and no AI keys) — never the dev server, `mvp/data` or `mvp/.env`. `npm test` in `mvp/server` runs through `src/testing/withTempDataDir.ts`, which points `MVP_DATA_DIR` at a fresh temp dir and fails the run if any test leaves files there, so a test that forgets a store stub or temp path is caught instead of touching `mvp/data`. `createApp` never starts timers.
+The server starts an auto-refresh scheduler (`startRefreshScheduler` in `mvp/server/src/index.ts`) that spends real API budget (CFP, search, Jev, Ollama). Set `REFRESH_INTERVAL_HOURS=off` when you need the server up without refreshing. `npm run test:e2e:kite` and the Kite integration suite use their own hermetic stack (`e2e/stack/`: own ports, seeded temp data dir, generated env file with refresh off and no AI keys) — never the dev server, `mvp/data` or `mvp/.env`. `npm test` in `mvp/server` runs through `src/testing/withTempDataDir.ts`, which points `MVP_DATA_DIR` at a fresh temp dir and fails the run if any test leaves files there, so a test that forgets a store stub or temp path is caught instead of touching `mvp/data`. Running a test file directly with `node --test` skips that net; wrap it the same way (`node --import tsx src/testing/withTempDataDir.ts node --import tsx --test <file>`). `createApp` never starts timers.
 
 ### Layout
 

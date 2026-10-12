@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
+import { constants as osConstants } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -52,7 +54,34 @@ test('runWithTempDataDir forwards a failing exit code and removes the temp dir',
   );
 
   assert.equal(result.code, 3);
+  assert.ok(result.stdout.length > 0);
   assert.equal(existsSync(result.stdout), false);
+});
+
+test('withTempDataDir CLI forwards SIGTERM to the command and still removes the temp dir', async () => {
+  const cli = spawn(
+    process.execPath,
+    [
+      '--import',
+      'tsx',
+      fileURLToPath(new URL('./withTempDataDir.ts', import.meta.url)),
+      process.execPath,
+      '-e',
+      `process.stdout.write(process.env.MVP_DATA_DIR + '\\n'); setInterval(() => {}, 1000);`,
+    ],
+    { stdio: ['ignore', 'pipe', 'inherit'] },
+  );
+
+  const dataDir = await new Promise<string>((resolve) => {
+    cli.stdout.once('data', (chunk: Buffer) => resolve(chunk.toString().trim()));
+  });
+  assert.equal(existsSync(dataDir), true);
+
+  cli.kill('SIGTERM');
+  const code = await new Promise<number | null>((resolve) => cli.on('close', resolve));
+
+  assert.equal(code, 128 + osConstants.signals.SIGTERM);
+  assert.equal(existsSync(dataDir), false);
 });
 
 test('runWithTempDataDir passes when the command leaves the data dir empty', async () => {

@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { mkdtemp, readdir, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { constants as osConstants, tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -16,9 +16,13 @@ export type RunWithTempDataDirResult = {
   leaked: string[];
 };
 
+/** Forwarded to the command while it runs; Ctrl-C (SIGINT) already reaches it via the process group. */
+const FORWARDED_SIGNALS = ['SIGTERM', 'SIGHUP'] as const;
+
 /**
  * Run a command with `MVP_DATA_DIR` set to a fresh temp dir, replacing any
  * inherited value, so a test that forgets a store stub can't reach mvp/data.
+ * The temp dir is removed even when the run is interrupted by a signal.
  */
 export async function runWithTempDataDir(
   command: string,
@@ -36,16 +40,25 @@ export async function runWithTempDataDir(
     stdout += chunk.toString();
   });
 
+  const forward = (signal: NodeJS.Signals) => child.kill(signal);
+  const ignoreInterrupt = () => {};
+  for (const signal of FORWARDED_SIGNALS) process.on(signal, forward);
+  process.on('SIGINT', ignoreInterrupt);
+
   try {
     const exitCode = await new Promise<number>((resolve, reject) => {
       child.on('error', reject);
-      child.on('close', (childCode) => resolve(childCode ?? 1));
+      child.on('close', (childCode, signal) =>
+        resolve(childCode ?? (signal ? 128 + osConstants.signals[signal] : 1)),
+      );
     });
 
     const leaked = await listLeaked(dataDir);
     const code = exitCode === 0 && leaked.length > 0 ? 1 : exitCode;
     return { code, stdout, leaked };
   } finally {
+    for (const signal of FORWARDED_SIGNALS) process.off(signal, forward);
+    process.off('SIGINT', ignoreInterrupt);
     await rm(dataDir, { recursive: true, force: true });
   }
 }
@@ -72,10 +85,6 @@ async function main(): Promise<void> {
     console.error('Usage: withTempDataDir.ts <command> [...args]');
     process.exit(2);
   }
-
-  // Ctrl-C reaches the child through the process group; staying alive lets the
-  // temp dir be removed after the child exits.
-  process.on('SIGINT', () => {});
 
   const result = await runWithTempDataDir(command, args);
   if (result.leaked.length > 0) {
