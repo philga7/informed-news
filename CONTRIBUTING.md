@@ -59,7 +59,7 @@ Bot commits `chore(release): … [skip ci]` are intentional so Release does not 
 
 ## Why both CI and Release?
 
-- **CI** (`.github/workflows/ci.yml`): every PR into `main` — install, MVP server typecheck, test, kite checks, archived `_legacy/mvp-web` build (Vercel artifact). Fast review feedback; no publish.
+- **CI** (`.github/workflows/ci.yml`): every PR into `main` and every push to `main` — install (root, `mvp/server`, `apps/kite`), MVP server typecheck + `npm test`, `npm run test:kite`, Kite `bun run test:unit` + `bun run check`, and product-path `bun run build` in `apps/kite`. No secrets. Fast review feedback; no publish. (GitHub ruleset requiring this check on `main` is NEWS-124.)
 - **Release** (`.github/workflows/release.yml`): after merge to `main` — re-validate, then `semantic-release`.
 
 Overlap on validation is intentional: a green PR does not skip the final gate before tagging.

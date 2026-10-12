@@ -89,9 +89,9 @@ Skipping the *ask* is the defect. “None” after an honest triage is success.
    - Title referencing NEWS-N
    - Body: Summary + Test plan + `Closes NEWS-N` when the PR fully completes the story
 4. When the user asks to **merge**:
-   1. Run `gh pr checks` (or `gh pr checks --required` when required checks are configured).
-   2. **Refuse merge on red/pending** — do not run `gh pr merge` while any required check is failing, cancelled, or still pending. Tell the user the blocking check names/status and stop.
-   3. **Only merge when required checks are green**, then `gh pr merge <n> --squash --delete-branch`.
+   1. Run `gh pr checks`. Prefer `gh pr checks --required` once a ruleset/branch protection lists required checks (see NEWS-124); until then, treat the CI job **MVP build & typecheck** as blocking anyway.
+   2. **Refuse merge on red/pending** — do not run `gh pr merge` while that CI job (or any required check) is failing, cancelled, or still pending. Tell the user the blocking check names/status and stop.
+   3. **Only merge when required checks are green** (and the CI job above is green when no required list exists yet), then `gh pr merge <n> --squash --delete-branch`.
    4. Explicit user override: if the user says to merge anyway despite red/pending, document that override in the PR comment or chat reply, then merge. Do not invent an override.
 5. `git checkout main && git pull --ff-only origin main`
 
