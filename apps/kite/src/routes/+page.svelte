@@ -961,7 +961,7 @@ if (browser && typeof window !== 'undefined') {
 
 {#if state.dataLoaded}
 <!-- The shared view's one story can't be collapsed, so j / k / G / gg select nothing there.
-     Elsewhere j / k walk the rendered cards: the topic Brief's sections, else the plain StoryList. -->
+     TopicBrief publishes no order when it falls back to the plain StoryList, so the StoryList's order applies. -->
 <KeyboardNavigationHandler
 	stories={derived.isSinglePageMode ? derived.singlePageStories : state.stories}
 	currentCategory={state.currentCategory}

@@ -14,6 +14,7 @@ import ClusteringExplainerModal from './ClusteringExplainerModal.svelte';
 import StoryCard from './story/StoryCard.svelte';
 import { BRIEF_SEED_ADD_LABEL } from '$lib/briefSeed';
 import { openBriefSeedModal } from '$lib/briefSeedUi.svelte';
+import { storyKey } from '$lib/topicBrief';
 
 // Props
 interface Props {
@@ -256,13 +257,10 @@ const { displayedStories, filteredCount, hiddenStories } = $derived.by(() => {
 });
 
 // The content filter and single-page ordering copy stories, so cards map back to `stories` by key.
-const storyKeyOf = (story: Story) => story.id || story.cluster_number?.toString() || story.title;
-const storyIndexByKey = $derived(
-	new Map(stories.map((story, index) => [storyKeyOf(story), index])),
-);
+const storyIndexByKey = $derived(new Map(stories.map((story, index) => [storyKey(story), index])));
 const renderedOrder = $derived(
 	displayedStories.flatMap((story) => {
-		const index = storyIndexByKey.get(storyKeyOf(story));
+		const index = storyIndexByKey.get(storyKey(story));
 		return index === undefined ? [] : [index];
 	}),
 );
@@ -274,7 +272,6 @@ $effect(() => {
 	};
 });
 
-/** A selected card that the story-count cap or content filter takes off screen drops the selection. */
 $effect(() => {
 	if (keyboardNavigation.hasSelection && !renderedOrder.includes(keyboardNavigation.selectedIndex)) {
 		keyboardNavigation.clearSelection();
@@ -391,8 +388,8 @@ const allStoriesExpanded = $derived(
       {@const isFiltered =
         contentFilter.filterMode === "blur" && story._filtered}
       {@const isLinkedStory = initiallyExpandedIndex === index}
-      {@const navIndex = storyIndexByKey.get(storyKeyOf(story)) ?? -1}
-      {@const isKeyboardSelected = navIndex >= 0 && keyboardNavigation.selectedIndex === navIndex}
+      {@const sourceIndex = storyIndexByKey.get(storyKey(story))}
+      {@const isKeyboardSelected = sourceIndex !== undefined && keyboardNavigation.selectedIndex === sourceIndex}
       {@const storyWithCategory = story as StoryWithCategory}
       {@const categoryId = storyWithCategory._categoryId || currentCategory}
       {@const categoryName = storyWithCategory._categoryName}
@@ -410,7 +407,7 @@ const allStoriesExpanded = $derived(
 
       <StoryCard
         {story}
-        storyIndex={navIndex}
+        storyIndex={sourceIndex}
         {batchId}
         {batchDateSlug}
         {categoryId}
