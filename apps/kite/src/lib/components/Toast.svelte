@@ -1,6 +1,7 @@
 <script lang="ts">
 import { IconAlertTriangle, IconCheck, IconInfoCircle, IconX } from '@tabler/icons-svelte';
 import { type Toast, toastStore } from '$lib/stores/toast.svelte';
+import { toastLiveRegion } from '$lib/utils/toastA11y';
 
 const { toasts } = $derived.by(() => ({ toasts: toastStore.toasts }));
 
@@ -36,9 +37,11 @@ function getColorClasses(type: Toast['type']): string {
 	<div class="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] right-[calc(1rem+env(safe-area-inset-right))] z-notification flex flex-col gap-2 max-w-md sm:max-w-sm max-sm:left-[calc(1rem+env(safe-area-inset-left))] max-sm:right-[calc(1rem+env(safe-area-inset-right))]">
 		{#each toasts as toast (toast.id)}
 			{@const Icon = getIcon(toast.type)}
+			{@const live = toastLiveRegion(toast.type)}
 			<div
 				class="p-4 rounded-lg border shadow-lg animate-slide-in {getColorClasses(toast.type)}"
-				role="alert"
+				role={live.role}
+				aria-live={live['aria-live']}
 			>
 				<div class="flex items-center gap-3">
 					<div class="flex-shrink-0 flex items-center">
