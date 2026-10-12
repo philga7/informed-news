@@ -465,7 +465,9 @@ test.describe('Less like this keyboard, focus and name taken (NEWS-125)', () => 
 test.describe('Keyboard story selection is announced (NEWS-129)', () => {
 	test.beforeEach(() => useScenario('topics'));
 
-	test('j / k / G / gg announce the selected story politely without moving focus; Enter acts once; Escape clears', async ({
+	const selected = (story: KiteStory) => `Selected story: ${story.title}`;
+
+	test('j / k / G / gg announce the selected story politely without moving focus; Enter / o / x act once; Escape clears', async ({
 		page,
 	}) => {
 		await page.goto('/');
@@ -482,9 +484,9 @@ test.describe('Keyboard story selection is announced (NEWS-129)', () => {
 		await expect(announcer).toHaveText('');
 
 		await page.keyboard.press('j');
-		await expect(announcer).toHaveText(`Selected story: ${first.title}`);
+		await expect(announcer).toHaveText(selected(first));
 		await page.keyboard.press('j');
-		await expect(announcer).toHaveText(`Selected story: ${second.title}`);
+		await expect(announcer).toHaveText(selected(second));
 		await expect(secondCard).toHaveAttribute('aria-current', 'true');
 		await expect(page.locator('body')).toBeFocused();
 
@@ -493,15 +495,22 @@ test.describe('Keyboard story selection is announced (NEWS-129)', () => {
 		await expect(toggle).toHaveAttribute('aria-expanded', 'true');
 		await page.keyboard.press('Enter');
 		await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+		await page.keyboard.press('o');
+		await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+		await page.keyboard.press('o');
+		await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+		await page.keyboard.press('x');
+		await expect(toggle).toHaveAttribute('aria-expanded', 'false');
 
 		await page.keyboard.press('G');
-		await expect(announcer).toHaveText(`Selected story: ${last.title}`);
+		await expect(announcer).toHaveText(selected(last));
 		await page.keyboard.press('g');
 		await page.keyboard.press('g');
-		await expect(announcer).toHaveText(`Selected story: ${first.title}`);
+		await expect(announcer).toHaveText(selected(first));
 		await page.keyboard.press('j');
+		await expect(announcer).toHaveText(selected(second));
 		await page.keyboard.press('k');
-		await expect(announcer).toHaveText(`Selected story: ${first.title}`);
+		await expect(announcer).toHaveText(selected(first));
 
 		await page.keyboard.press('Escape');
 		await expect(announcer).toHaveText('');
@@ -514,21 +523,21 @@ test.describe('Keyboard story selection is announced (NEWS-129)', () => {
 		await logIn(page);
 		await page.goto('/');
 		await expect(page).toHaveTitle(/Informed News/i, { timeout: 60_000 });
-		const [first] = await loadOwnedStories(page);
-		await expect(page.locator(`article#story-${first!.cluster_number}`)).toBeVisible({
+		const first = (await loadOwnedStories(page))[0]!;
+		await expect(page.locator(`article#story-${first.cluster_number}`)).toBeVisible({
 			timeout: 60_000,
 		});
 		const announcer = page.getByTestId('keyboard-selection-announcer');
 
 		await page.keyboard.press('j');
-		await expect(announcer).toHaveText(`Selected story: ${first!.title}`);
+		await expect(announcer).toHaveText(selected(first));
 
 		await page.getByRole('button', { name: 'Add story', exact: true }).click();
 		const dialog = page.getByRole('dialog', { name: 'Add story to Brief' });
 		const title = dialog.getByRole('textbox', { name: 'Title', exact: true });
 		await title.pressSequentially('jjk');
 		await expect(title).toHaveValue('jjk');
-		await expect(announcer).toHaveText(`Selected story: ${first!.title}`);
+		await expect(announcer).toHaveText(selected(first));
 	});
 });
 
