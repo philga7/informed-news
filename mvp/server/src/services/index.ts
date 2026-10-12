@@ -145,7 +145,12 @@ export {
   createRefreshRunner,
   getRefreshRunner,
 } from './refreshRunner.js';
-export type { RefreshResult, RefreshRunner, RefreshRunnerDeps } from './refreshRunner.js';
+export type {
+  RefreshResult,
+  RefreshRunner,
+  RefreshRunnerDeps,
+  RefreshSteps,
+} from './refreshRunner.js';
 export { isRefreshDue, startRefreshScheduler } from './refreshScheduler.js';
 export type {
   IntervalHandle,

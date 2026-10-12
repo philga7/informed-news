@@ -14,7 +14,6 @@ import {
   enrichAcceptedClaims,
   enrichUnenrichedClusters,
   extractClaimsFromArticles,
-  fetchAllSources,
   listTriageRecords,
   ManualSeedConflictError,
   ManualSeedValidationError,
@@ -30,18 +29,14 @@ import {
   briefClusterKey,
   clusterMatchesMute,
   createRefreshRunner,
-  generateRefreshSummaries,
-  generateRefreshFullStories,
   generateFullStory,
   getRefreshRunner,
   lessLikeThis,
   loadClaimsRadar,
   markBriefSeen,
-  pruneArticleStore,
-  pruneBriefStores,
   summarizeBriefStory,
 } from './services/index.js';
-import type { RefreshRunner } from './services/index.js';
+import type { RefreshRunner, RefreshSteps } from './services/index.js';
 import {
   acceptCluster,
   acceptClaim,
@@ -73,7 +68,6 @@ import {
   unacceptClaim,
   untrackClaim,
   untrackCluster,
-  updateMeta,
   updateTopic,
   writeBriefSeen,
 } from './store/index.js';
@@ -82,21 +76,12 @@ import type { TrackedClaimEntry } from './store/index.js';
 import type { Article } from './types/article.js';
 
 export type CreateAppDeps = {
-  /** Default: the process runner, or one built from the deps below when `fetchAllSources` is injected */
+  /** Default: the process runner, or one built from `refresh` when that is injected */
   refreshRunner?: RefreshRunner;
-  /**
-   * Injecting this builds a fresh runner from the deps below. Inject
-   * `generateRefreshSummaries`, `generateRefreshFullStories`, `pruneBriefStores`,
-   * `pruneArticleStore`, `readMeta` and `updateMeta` too (or pass a `refreshRunner`
-   * instead): any left out fall back to the real stores (mvp/data) and Ollama.
-   */
-  fetchAllSources?: typeof fetchAllSources;
-  generateRefreshSummaries?: typeof generateRefreshSummaries;
-  generateRefreshFullStories?: typeof generateRefreshFullStories;
-  pruneBriefStores?: typeof pruneBriefStores;
-  pruneArticleStore?: typeof pruneArticleStore;
-  updateMeta?: typeof updateMeta;
+  /** Builds a fresh runner from these steps; all are required so none falls back to mvp/data or Ollama. */
+  refresh?: RefreshSteps;
   readArticles?: typeof readArticles;
+  /** Route reads only; a runner built from `refresh` reads `refresh.readMeta`. */
   readMeta?: typeof readMeta;
   acceptCluster?: typeof acceptCluster;
   unacceptCluster?: typeof unacceptCluster;
@@ -248,17 +233,7 @@ export function createApp(deps: CreateAppDeps = {}): Express {
   const readServerMeta = deps.readMeta ?? readMeta;
   const refreshRunner =
     deps.refreshRunner ??
-    (deps.fetchAllSources
-      ? createRefreshRunner({
-          fetchAll: deps.fetchAllSources,
-          generateSummaries: deps.generateRefreshSummaries ?? generateRefreshSummaries,
-          generateFullStories: deps.generateRefreshFullStories ?? generateRefreshFullStories,
-          pruneBriefStores: deps.pruneBriefStores ?? pruneBriefStores,
-          pruneArticleStore: deps.pruneArticleStore ?? pruneArticleStore,
-          readMeta: readServerMeta,
-          updateMeta: deps.updateMeta ?? updateMeta,
-        })
-      : getRefreshRunner());
+    (deps.refresh ? createRefreshRunner(deps.refresh) : getRefreshRunner());
   const accept = deps.acceptCluster ?? acceptCluster;
   const unaccept = deps.unacceptCluster ?? unacceptCluster;
   const readMembership = deps.readBriefMembership ?? readBriefMembership;

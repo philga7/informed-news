@@ -8,10 +8,15 @@ import express from 'express';
 
 import type { CreateAppDeps } from './app.js';
 import type { Article, StoreMeta } from './types/article.js';
-import type { BriefRunMeta, BriefSeenStore, FullStoriesRunMeta } from './types/brief.js';
+import type {
+  BriefRunMeta,
+  BriefSeenStore,
+  FullStoriesRunMeta,
+  RefreshRun,
+} from './types/brief.js';
 import type { Topic } from './types/topic.js';
 import type { TriageRecord, TriageRunMeta, TriageStore } from './types/triage.js';
-import type { RefreshResult, RefreshRunner } from './services/refreshRunner.js';
+import type { RefreshResult, RefreshRunner, RefreshSteps } from './services/refreshRunner.js';
 import type { SummarizeBriefStoryResult } from './services/briefSummaries.js';
 import type { GenerateFullStoryResult } from './services/briefFullStories.js';
 import {
@@ -114,15 +119,19 @@ const EMPTY_FULL_STORIES_RUN: FullStoriesRunMeta = {
   errors: [],
 };
 
-/** Keeps refresh-time summaries, full stories, store pruning and meta writes out of mvp/data and Ollama. */
-const noRefreshSideEffects = {
-  generateRefreshSummaries: async () => BRIEF_RUN,
-  generateRefreshFullStories: async () => EMPTY_FULL_STORIES_RUN,
-  pruneBriefStores: async () => ({ summaries: 0, fullStories: 0, errors: [] }),
-  pruneArticleStore: async () => ({ articles: 0, errors: [] }),
-  readMeta: async () => ({ lastFetchAt: null, lastError: null }),
-  updateMeta: async () => ({ lastFetchAt: null, lastError: null }),
-};
+/** Every refresh step stubbed, so a refresh never touches mvp/data, the network or Ollama. */
+function refreshSteps(overrides: Partial<RefreshSteps> = {}): RefreshSteps {
+  return {
+    fetchAll: async () => stubFetchResult(),
+    generateSummaries: async () => BRIEF_RUN,
+    generateFullStories: async () => EMPTY_FULL_STORIES_RUN,
+    pruneBriefStores: async () => ({ summaries: 0, fullStories: 0, errors: [] }),
+    pruneArticleStore: async () => ({ articles: 0, errors: [] }),
+    readMeta: async () => ({ lastFetchAt: null, lastError: null }),
+    updateMeta: async () => ({ lastFetchAt: null, lastError: null }),
+    ...overrides,
+  };
+}
 
 async function startServer(app: { listen: (...args: any[]) => Server }): Promise<{
   baseUrl: string;
@@ -681,40 +690,41 @@ test('POST /api/fetch returns topicSearch + triage summaries and the Brief run',
 
   const { createApp } = await import('./app.js');
   const app = createApp({
-    fetchAllSources: async () =>
-      ({
-        fetched: 3,
-        clustered: 1,
-        clusters: [],
-        cfp: { feedUrl: 'x', limit: 3, fetched: 3, upserted: [] },
-        curated: { skipped: true, sources: [], fetched: 0, errors: [], upserted: [] },
-        xcancel: { skipped: true, handles: [], fetched: 0, errors: [], upserted: [] },
-        topicSearch: {
-          skipped: false,
-          providers: {
-            google_news: { state: 'ok', topicsAttempted: 1, topicsFailed: 0, items: 2, errors: [] },
-            searxng: { state: 'disabled', topicsAttempted: 0, topicsFailed: 0, items: 0, errors: [] },
+    refresh: refreshSteps({
+      fetchAll: async () =>
+        ({
+          fetched: 3,
+          clustered: 1,
+          clusters: [],
+          cfp: { feedUrl: 'x', limit: 3, fetched: 3, upserted: [] },
+          curated: { skipped: true, sources: [], fetched: 0, errors: [], upserted: [] },
+          xcancel: { skipped: true, handles: [], fetched: 0, errors: [], upserted: [] },
+          topicSearch: {
+            skipped: false,
+            providers: {
+              google_news: { state: 'ok', topicsAttempted: 1, topicsFailed: 0, items: 2, errors: [] },
+              searxng: { state: 'disabled', topicsAttempted: 0, topicsFailed: 0, items: 0, errors: [] },
+            },
+            fetched: 2,
+            perTopic: { t1: { found: 2, merged: 2, skippedSeen: 1, new: 1 } },
+            upserted: [{ id: 'a2', clusterId: 'c1' } as Article],
+            errors: [],
           },
-          fetched: 2,
-          perTopic: { t1: { found: 2, merged: 2, skippedSeen: 1, new: 1 } },
-          upserted: [{ id: 'a2', clusterId: 'c1' } as Article],
-          errors: [],
-        },
-        triage: {
-          at: '2026-09-30T12:00:00.000Z',
-          skipped: false,
-          candidates: 3,
-          kept: 1,
-          dropped: 2,
-          byReason: { off_topic: 1, duplicate: 1 },
-          jev: { budget: 300, used: 1, errors: 0 },
-          summaryBudget: 60,
-          errors: [],
-          keptIds: ['a2'],
-        },
-        articles: [{ id: 'a2', clusterId: 'c1' } as Article],
-      }) as any,
-    ...noRefreshSideEffects,
+          triage: {
+            at: '2026-09-30T12:00:00.000Z',
+            skipped: false,
+            candidates: 3,
+            kept: 1,
+            dropped: 2,
+            byReason: { off_topic: 1, duplicate: 1 },
+            jev: { budget: 300, used: 1, errors: 0 },
+            summaryBudget: 60,
+            errors: [],
+            keptIds: ['a2'],
+          },
+          articles: [{ id: 'a2', clusterId: 'c1' } as Article],
+        }) as any,
+    }),
   });
 
   const { baseUrl, close } = await startServer(app);
@@ -755,17 +765,31 @@ test('POST /api/fetch returns topicSearch + triage summaries and the Brief run',
   }
 });
 
-test('POST /api/fetch with injected fetchAllSources prunes articles through the injected pruneArticleStore', async () => {
-  let articlePrunes = 0;
+test('an injected refresh group must stub every step (checked by tsc)', async () => {
   const { createApp } = await import('./app.js');
-  const app = createApp({
-    fetchAllSources: async () => stubFetchResult(),
-    ...noRefreshSideEffects,
-    pruneArticleStore: async () => {
-      articlePrunes += 1;
-      return { articles: 0, errors: [] };
-    },
-  });
+  const { fetchAll } = refreshSteps();
+  // @ts-expect-error a refresh group missing steps would fall back to mvp/data and Ollama
+  createApp({ refresh: { fetchAll } });
+});
+
+test('POST /api/fetch with an injected refresh group runs every step from that group', async () => {
+  process.env.SESSION_SECRET = 'test-secret';
+  process.env.MVP_PASSWORD = 'pw';
+  delete process.env.MVP_PASSWORD_HASH;
+
+  const stubs = refreshSteps();
+  const ran = new Set<string>();
+  const refresh = Object.fromEntries(
+    Object.entries(stubs).map(([name, step]) => [
+      name,
+      (...args: unknown[]) => {
+        ran.add(name);
+        return (step as (...stepArgs: unknown[]) => unknown)(...args);
+      },
+    ]),
+  ) as RefreshSteps;
+  const { createApp } = await import('./app.js');
+  const app = createApp({ refresh });
 
   const { baseUrl, close } = await startServer(app);
   try {
@@ -773,10 +797,16 @@ test('POST /api/fetch with injected fetchAllSources prunes articles through the 
     const resp = await fetch(`${baseUrl}/api/fetch`, {
       method: 'POST',
       headers: { cookie, 'content-type': 'application/json' },
-      body: JSON.stringify({ limit: 3 }),
+      body: '{}',
     });
     assert.equal(resp.status, 200);
-    assert.equal(articlePrunes, 1);
+    // readMeta only runs after a failed fetch.
+    assert.deepEqual(
+      [...ran].sort(),
+      Object.keys(stubs)
+        .filter((name) => name !== 'readMeta')
+        .sort(),
+    );
   } finally {
     await close();
   }
@@ -908,25 +938,38 @@ test('POST /api/fetch returns 500 when the refresh fails (CFP)', async () => {
   }
 });
 
-test('POST /api/fetch with injected fetchAllSources records a failed refresh and 500s', async () => {
+test('POST /api/fetch with an injected refresh group records a failed refresh and 500s', async () => {
   process.env.SESSION_SECRET = 'test-secret';
   process.env.MVP_PASSWORD = 'pw';
   delete process.env.MVP_PASSWORD_HASH;
 
+  const previousSuccess: RefreshRun = {
+    trigger: 'timer',
+    startedAt: '2026-09-30T06:00:00.000Z',
+    completedAt: '2026-09-30T06:00:05.000Z',
+    ok: true,
+    error: null,
+  };
   const patches: unknown[] = [];
   const { createApp } = await import('./app.js');
   const app = createApp({
-    fetchAllSources: async () => {
-      throw new Error('CFP down');
-    },
-    readMeta: async () => ({ lastFetchAt: null, lastError: null }),
-    updateMeta: async (patch) => {
-      patches.push(patch);
-      return { lastFetchAt: null, lastError: null };
-    },
-    generateRefreshSummaries: async () => {
-      throw new Error('summaries must not run after a failed fetch');
-    },
+    refresh: refreshSteps({
+      fetchAll: async () => {
+        throw new Error('CFP down');
+      },
+      readMeta: async () => ({
+        lastFetchAt: null,
+        lastError: null,
+        refresh: { last: previousSuccess, lastSuccess: previousSuccess },
+      }),
+      updateMeta: async (patch) => {
+        patches.push(patch);
+        return { lastFetchAt: null, lastError: null };
+      },
+      generateSummaries: async () => {
+        throw new Error('summaries must not run after a failed fetch');
+      },
+    }),
   });
 
   const { baseUrl, close } = await startServer(app);
@@ -944,13 +987,13 @@ test('POST /api/fetch with injected fetchAllSources records a failed refresh and
     assert.equal(refresh.last.ok, false);
     assert.equal(refresh.last.trigger, 'manual');
     assert.equal(refresh.last.error, 'CFP down');
-    assert.equal(refresh.lastSuccess, null);
+    assert.deepEqual(refresh.lastSuccess, previousSuccess);
   } finally {
     await close();
   }
 });
 
-test('POST /api/fetch with injected fetchAllSources runs the injected full-story step, not the real one', async () => {
+test('POST /api/fetch with an injected refresh group runs the injected full-story step with the run boundary', async () => {
   process.env.SESSION_SECRET = 'test-secret';
   process.env.MVP_PASSWORD = 'pw';
   delete process.env.MVP_PASSWORD_HASH;
@@ -967,16 +1010,16 @@ test('POST /api/fetch with injected fetchAllSources runs the injected full-story
   const patches: Array<Partial<StoreMeta>> = [];
   const { createApp } = await import('./app.js');
   const app = createApp({
-    fetchAllSources: async () => stubFetchResult(),
-    ...noRefreshSideEffects,
-    generateRefreshFullStories: async (options) => {
-      fullStoriesCalls.push(options);
-      return fullStoriesRun;
-    },
-    updateMeta: async (patch) => {
-      patches.push(patch);
-      return { lastFetchAt: null, lastError: null };
-    },
+    refresh: refreshSteps({
+      generateFullStories: async (options) => {
+        fullStoriesCalls.push(options);
+        return fullStoriesRun;
+      },
+      updateMeta: async (patch) => {
+        patches.push(patch);
+        return { lastFetchAt: null, lastError: null };
+      },
+    }),
   });
 
   const { baseUrl, close } = await startServer(app);

@@ -26,18 +26,26 @@ export type RefreshResult = {
   brief: BriefRunMeta;
 };
 
-export type RefreshRunnerDeps = {
-  fetchAll?: (options?: FetchAllOptions) => Promise<FetchAllResult>;
-  generateSummaries?: (
+/** Every step a refresh runs; each one reads or writes stores, the network or Ollama. */
+export type RefreshSteps = {
+  fetchAll: (options?: FetchAllOptions) => Promise<FetchAllResult>;
+  generateSummaries: (
     options: { now?: Date; boundaryAt?: string | null },
   ) => Promise<BriefRunMeta>;
-  generateFullStories?: (
+  generateFullStories: (
     options: { now?: Date; boundaryAt?: string | null },
   ) => Promise<FullStoriesRunMeta>;
-  pruneBriefStores?: (options: { now: Date }) => Promise<BriefRetentionResult>;
-  pruneArticleStore?: (options: { now: Date }) => Promise<ArticleRetentionResult>;
-  readMeta?: () => Promise<StoreMeta>;
-  updateMeta?: (patch: Partial<StoreMeta>) => Promise<unknown>;
+  pruneBriefStores: (options: { now: Date }) => Promise<BriefRetentionResult>;
+  pruneArticleStore: (options: { now: Date }) => Promise<ArticleRetentionResult>;
+  readMeta: () => Promise<StoreMeta>;
+  updateMeta: (patch: Partial<StoreMeta>) => Promise<unknown>;
+};
+
+/**
+ * Steps left out use the real stores, sources and Ollama. Only side-effect-free
+ * deps belong outside `RefreshSteps`; `createApp` passes nothing else through.
+ */
+export type RefreshRunnerDeps = Partial<RefreshSteps> & {
   now?: () => Date;
   log?: (message: string) => void;
 };
