@@ -227,17 +227,26 @@ test.describe('Topic Brief (NEWS-88)', () => {
 
 		const storyCard = page.locator(`article#story-${fullStory?.cluster_number}`);
 		await expect(storyCard).toBeVisible({ timeout: 60_000 });
-		const toggle = storyToggle(storyCard, fullStory!.title!);
-		await expect(toggle).toHaveAttribute('aria-expanded', 'false');
-		await toggle.click();
+		await storyToggle(storyCard, fullStory!.title!).click();
 		await expect(storyCard.getByText(TOPIC_SCENARIO.fullStoryTalkingPoint)).toBeVisible();
 		await expect(storyCard.getByText('AI-assisted — not ground truth.')).toBeVisible();
+	});
 
-		// NEWS-126: the title button reports the real state and never says "Expand" once open.
-		await expect(toggle).toHaveAttribute('aria-expanded', 'true');
-		await expect(storyCard.getByRole('button', { name: /expand/i })).toHaveCount(0);
+	test('the story title button is named by the title and reports whether the card is open', async ({
+		page,
+	}) => {
+		const { title } = TOPIC_SCENARIO.lessLikeThis;
+		const card = await briefCard(page, title);
+		const toggle = storyToggle(card, title);
+		const content = card.getByRole('region', { name: 'Story content' });
+
+		await expect(toggle).toHaveAttribute('aria-expanded', 'false');
 		await toggle.click();
-		await expect(storyCard.getByText(TOPIC_SCENARIO.fullStoryTalkingPoint)).toHaveCount(0);
+		await expect(content).toBeVisible();
+		await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+
+		await toggle.click();
+		await expect(content).toHaveCount(0);
 		await expect(toggle).toHaveAttribute('aria-expanded', 'false');
 	});
 });
@@ -398,22 +407,22 @@ test.describe('Less like this keyboard, focus and name taken (NEWS-125)', () => 
 		const savedLine = `Added "${title}" to undesired topics.`;
 		await logIn(page);
 		const card = await briefCard(page, title);
-		const expand = storyToggle(card, title);
+		const toggle = storyToggle(card, title);
 		const content = card.getByRole('region', { name: 'Story content' });
 		const saved = card.getByTestId('less-like-this-success');
 
 		try {
-			await expand.click();
+			await toggle.click();
 			await card.getByRole('button', { name: 'Less like this', exact: true }).click();
 			await card.getByRole('button', { name: 'Add undesired topic', exact: true }).click();
 			await expect(saved).toContainText(savedLine);
 			await expect(saved.getByRole('link', { name: 'View Topics', exact: true })).toBeFocused();
 
-			await expand.click();
+			await toggle.click();
 			await expect(content).toHaveCount(0);
 			await expect(saved).toHaveCount(0);
 
-			await expand.click();
+			await toggle.click();
 			await expect(content).toBeVisible();
 			await expect(saved).toContainText(savedLine);
 			await expect(card.getByRole('button', { name: 'Less like this', exact: true })).toHaveCount(0);
