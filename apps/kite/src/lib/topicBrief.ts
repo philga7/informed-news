@@ -316,6 +316,69 @@ export function createFilterMatcher(
 	};
 }
 
+/**
+ * Filter matches for the topic Brief: open cards keep their prior decision by story key
+ * across reloads (new story objects), so text gained after open can't hide/blur them.
+ * Closed cards and a fresh prior (filter settings change) decide again.
+ */
+export function decideTopicBriefFilterMatches(
+	stories: readonly Story[],
+	match: (story: Story) => string[],
+	openKeys: ReadonlySet<string>,
+	priorCarry: ReadonlyMap<string, string[]>,
+	keyOf: (story: Story) => string = storyKey,
+): { matches: Map<Story, string[]>; carry: Map<string, string[]> } {
+	const matches = new Map<Story, string[]>();
+	const carry = new Map<string, string[]>();
+	for (const story of stories) {
+		const key = keyOf(story);
+		const open = openKeys.has(key);
+		const matched = open && priorCarry.has(key) ? priorCarry.get(key)! : match(story);
+		if (open) carry.set(key, matched);
+		if (matched.length > 0) matches.set(story, matched);
+	}
+	return { matches, carry };
+}
+
+/**
+ * Expand-all keys: skip still-blurred cards so expand-all never leaves a card
+ * expanded under the blur (NEWS-149). Collapse when every expandable card is open.
+ */
+export function toggleExpandAllKeys(
+	keys: readonly string[],
+	expanded: Record<string, boolean>,
+	isBlurred: (key: string) => boolean,
+): Record<string, boolean> {
+	const expandable = keys.filter((key) => !isBlurred(key));
+	const allExpanded =
+		expandable.length > 0 && expandable.every((key) => Boolean(expanded[key]));
+	if (allExpanded) return {};
+	// Never keep a blurred key expanded (even if it was already true).
+	const next: Record<string, boolean> = {};
+	for (const [key, open] of Object.entries(expanded)) {
+		if (open && !isBlurred(key)) next[key] = true;
+	}
+	for (const key of expandable) next[key] = true;
+	return next;
+}
+
+/**
+ * Keep open cards open across a Brief data reload when the story key still exists
+ * (NEWS-150). Drop keys for stories that disappeared.
+ */
+export function survivingExpandedStories(
+	previous: Record<string, boolean>,
+	stories: readonly Story[],
+	keyOf: (story: Story) => string = storyKey,
+): Record<string, boolean> {
+	const known = new Set(stories.map(keyOf));
+	const surviving: Record<string, boolean> = {};
+	for (const [key, open] of Object.entries(previous)) {
+		if (open && known.has(key)) surviving[key] = true;
+	}
+	return surviving;
+}
+
 /** Kite locale key for the "N stories hidden / filtered" line under the sections. */
 export function filteredCountKey(mode: 'hide' | 'blur', count: number): string {
 	if (mode === 'hide') return count === 1 ? 'contentFilter.storyHidden' : 'contentFilter.storiesHidden';

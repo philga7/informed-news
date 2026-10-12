@@ -1036,6 +1036,121 @@ test.describe('Kite content filter on the topic Brief (NEWS-141)', () => {
 			await expect(count).toBeVisible();
 		});
 	}
+
+	for (const filterMode of ['hide', 'blur'] as const) {
+		test(`${filterMode} mode, all scope: an open card keeps its filter decision across a Brief reload (NEWS-150)`, async ({
+			page,
+		}) => {
+			const summaryText = 'Ratepayers would see overnight bills change.';
+			await page.route('**/api/brief/stories/*/summary', (route) =>
+				route.fulfill({
+					json: { ok: true, summary: { status: 'ok', text: summaryText } },
+				}),
+			);
+			await filterKeywords(page, ['ratepayers', 'battery'], filterMode, 'all');
+			await page.goto('/');
+			await expect(page.getByTestId('topic-brief-section').first()).toBeVisible({ timeout: 60_000 });
+			const count = page.getByText(filterMode === 'hide' ? '1 story hidden' : '1 story filtered', {
+				exact: true,
+			});
+			await expect(count).toBeVisible();
+
+			const demand = card(page, DEMAND);
+			await storyToggle(demand, DEMAND).click();
+			await expect(demand.getByText('AI summary — not ground truth')).toBeVisible();
+			await expect(storyToggle(demand, DEMAND)).toHaveAttribute('aria-expanded', 'true');
+
+			// Reload as after a watched refresh: stories now carry the on-demand summary from the server.
+			await page.route('**/api/batches/**/stories**', async (route) => {
+				const response = await route.fetch();
+				const body = (await response.json()) as { stories?: Array<Record<string, unknown>> };
+				for (const story of body.stories ?? []) {
+					if (story.title === DEMAND) {
+						story.short_summary = summaryText;
+						story.informed_summary_status = 'ok';
+					}
+				}
+				await route.fulfill({ response, json: body });
+			});
+			await page.route('**/api/fetch', (route) => route.fulfill({ json: { ok: true } }));
+			await page.getByTestId('brief-refresh-bar').getByRole('button', { name: 'Refresh' }).click();
+
+			const demandAfter = card(page, DEMAND);
+			await expect(demandAfter).toBeVisible();
+			await expect(storyToggle(demandAfter, DEMAND)).toHaveAttribute('aria-expanded', 'true');
+			await expect(demandAfter.getByText(/Click to show/)).toHaveCount(0);
+			await expect(
+				page.getByText(filterMode === 'hide' ? '1 story hidden' : '1 story filtered', {
+					exact: true,
+				}),
+			).toBeVisible();
+		});
+	}
+});
+
+/** Category strip: dndzone exposes listitem, not tab, in the a11y tree. */
+async function doubleClickBriefCategory(page: Page): Promise<void> {
+	await page
+		.getByRole('list', { name: 'News categories' })
+		.getByText('Brief', { exact: true })
+		.dblclick();
+}
+
+test.describe('Expand all skips blurred cards (NEWS-149)', () => {
+	test.beforeEach(() => useScenario('topics'));
+
+	const STORAGE = 'Operators add battery storage before winter peak';
+	const TRANSMISSION = 'Transmission upgrade approved for northern corridor';
+
+	function card(page: Page, title: string): Locator {
+		return page.getByRole('article', { name: `News story: ${title}`, exact: true });
+	}
+
+	test('on the topic Brief, category double-click expands clear cards and leaves blurred ones collapsed', async ({
+		page,
+	}) => {
+		await filterTitles(page, [STORAGE], 'blur');
+		await page.goto('/');
+		await expect(page.getByTestId('topic-brief-section').first()).toBeVisible({ timeout: 60_000 });
+
+		const blurred = blurredCard(page, [STORAGE.toLowerCase()]);
+		await expect(blurred).toBeVisible();
+		await expect(blurred.getByText(/Click to show/)).toBeVisible();
+
+		await doubleClickBriefCategory(page);
+
+		await expect(blurred).toBeVisible();
+		await expect(blurred.getByText(/Click to show/)).toBeVisible();
+		// Blurred content stays collapsed (hidden from AT); clear cards expand.
+		await expect(blurred.locator('[aria-hidden="true"]').first()).toBeAttached();
+		await expect(storyToggle(card(page, TRANSMISSION), TRANSMISSION)).toHaveAttribute(
+			'aria-expanded',
+			'true',
+		);
+	});
+
+	test('on the plain list, category double-click expands clear cards and leaves blurred ones collapsed', async ({
+		page,
+	}) => {
+		await usePlainList(page);
+		await filterTitles(page, [STORAGE], 'blur');
+		await page.goto('/');
+		await expect(page.getByTestId('topic-brief-section')).toHaveCount(0, { timeout: 60_000 });
+
+		const blurred = blurredCard(page, [STORAGE.toLowerCase()]);
+		await expect(blurred).toBeVisible({ timeout: 60_000 });
+		await expect(blurred.getByText(/Click to show/)).toBeVisible();
+
+		await doubleClickBriefCategory(page);
+
+		await expect(blurred).toBeVisible();
+		await expect(blurred.getByText(/Click to show/)).toBeVisible();
+		await expect(blurred.locator('[aria-hidden="true"]').first()).toBeAttached();
+		await expect(storyToggle(card(page, TRANSMISSION), TRANSMISSION)).toHaveAttribute(
+			'aria-expanded',
+			'true',
+		);
+	});
 });
 
 /** A failed overview falls back to the plain list, as the fixture Brief does. */

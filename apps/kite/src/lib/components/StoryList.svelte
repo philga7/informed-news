@@ -3,6 +3,7 @@ import { IconClock, IconInfoCircle } from '@tabler/icons-svelte';
 import { s } from '$lib/client/localization.svelte';
 import { categorySettings, displaySettings } from '$lib/data/settings.svelte.js';
 import { kiteDB } from '$lib/db/dexie';
+import { blurredStories } from '$lib/stores/blurredStories.svelte';
 import { contentFilter } from '$lib/stores/contentFilter.svelte.js';
 import { categoryMetadataStore } from '$lib/stores/categoryMetadata.svelte';
 import { keyboardNavigation } from '$lib/stores/keyboardNavigation.svelte';
@@ -14,7 +15,7 @@ import ClusteringExplainerModal from './ClusteringExplainerModal.svelte';
 import StoryCard from './story/StoryCard.svelte';
 import { BRIEF_SEED_ADD_LABEL } from '$lib/briefSeed';
 import { openBriefSeedModal } from '$lib/briefSeedUi.svelte';
-import { storyKey } from '$lib/topicBrief';
+import { storyKey, toggleExpandAllKeys } from '$lib/topicBrief';
 
 // Props
 interface Props {
@@ -145,23 +146,13 @@ async function markAllAsRead() {
 	});
 }
 
-// Expand or collapse all stories
+// Expand or collapse all stories (skip still-blurred cards — NEWS-149)
 export function toggleExpandAll() {
-	const expand = !allStoriesExpanded;
-
-	// When collapsing, this is simple - just collapse all
-	if (!expand) {
-		expandedStories = {};
-		return;
-	}
-
-	// Expand all at once
-	const newExpanded: Record<string, boolean> = { ...expandedStories };
-	displayedStories.forEach((story) => {
-		const id = story.id || story.cluster_number?.toString() || story.title;
-		newExpanded[id] = true;
-	});
-	expandedStories = newExpanded;
+	expandedStories = toggleExpandAllKeys(
+		displayedStories.map((story) => storyKey(story)),
+		expandedStories,
+		(key) => Boolean(blurredStories.get(key)),
+	);
 }
 
 // Toggle read status by `stories` index (for keyboard navigation)
@@ -283,13 +274,14 @@ const allStoriesRead = $derived(
 	displayedStories.every((story) => story.id && readStories[story.id]),
 );
 
-// Check if all stories are expanded
-const allStoriesExpanded = $derived(
-	displayedStories.length > 0 &&
-		displayedStories.every(
-			(story) => expandedStories[story.cluster_number?.toString() || story.title],
-		),
-);
+// Check if all expandable (non-blurred) stories are expanded
+const allStoriesExpanded = $derived.by(() => {
+	const expandable = displayedStories.filter((story) => !blurredStories.get(storyKey(story)));
+	return (
+		expandable.length > 0 &&
+		expandable.every((story) => expandedStories[storyKey(story)])
+	);
+});
 </script>
 
 <div class="story-list">
