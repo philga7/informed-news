@@ -108,6 +108,16 @@ async function blurFocus(page: Page): Promise<void> {
 	await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
 }
 
+function sharedBanner(page: Page): Locator {
+	return page.getByText(/Viewing a shared story/);
+}
+
+function storyContent(page: Page, story: KiteStory): Locator {
+	return page
+		.locator(`article#story-${story.cluster_number}`)
+		.getByRole('region', { name: 'Story content', exact: true });
+}
+
 function watchKagiRequests(page: Page): string[] {
 	const kagiHosts: string[] = [];
 	page.on('request', (req) => {
@@ -692,7 +702,7 @@ test.describe('Shared article view (NEWS-130)', () => {
 		const shared = (await loadOwnedStories(page))[0]!;
 
 		await page.goto('/latest/world/0?shared=1');
-		await expect(page.getByText(/Viewing a shared story/)).toBeVisible({ timeout: 60_000 });
+		await expect(sharedBanner(page)).toBeVisible({ timeout: 60_000 });
 		const card = page.locator(`article#story-${shared.cluster_number}`);
 		await expect(card.getByText(shared.title!, { exact: true })).toBeVisible();
 		await expect(storyToggle(card, shared.title!)).toHaveCount(0);
@@ -702,12 +712,6 @@ test.describe('Shared article view (NEWS-130)', () => {
 
 test.describe('Shared article view keyboard shortcuts (NEWS-135)', () => {
 	test.beforeEach(() => useScenario('topics'));
-
-	const sharedBanner = (page: Page) => page.getByText(/Viewing a shared story/);
-	const storyContent = (page: Page, story: KiteStory) =>
-		page
-			.locator(`article#story-${story.cluster_number}`)
-			.getByRole('region', { name: 'Story content', exact: true });
 
 	test('j / k / G / gg select and announce nothing; Enter / o / x keep the shared story open; View latest stories restores them', async ({
 		page,
@@ -782,6 +786,55 @@ test.describe('Shared article view keyboard shortcuts (NEWS-135)', () => {
 
 		for (const key of ['Enter', 'x']) await page.keyboard.press(key);
 		await expect(content).toBeVisible();
+	});
+});
+
+test.describe('Content-filtered shared story (NEWS-136)', () => {
+	test.beforeEach(() => useScenario('topics'));
+
+	// A found shared story skips the content filter; a shared link whose story isn't found
+	// falls back to the filtered list, which is where blurred cards show in the shared view.
+	test('a blurred card in the shared view reveals on click and on Enter, opens as the shared story, and stays open', async ({
+		page,
+	}) => {
+		await page.goto('/');
+		await expect(page).toHaveTitle(/Informed News/i, { timeout: 60_000 });
+		const stories = await loadOwnedStories(page);
+		const [first, second] = stories;
+		await page.addInitScript((keywords) => {
+			localStorage.setItem(
+				'kite-content-filter',
+				JSON.stringify({ keywords, filterMode: 'blur', filterScope: 'title', version: 1 }),
+			);
+		}, [first!.title!.toLowerCase(), second!.title!.toLowerCase()]);
+		const missingIndex = stories.length + 50;
+
+		for (const [story, reveal] of [
+			[first!, 'click'],
+			[second!, 'Enter'],
+		] as const) {
+			await page.goto(`/latest/world/${missingIndex}?shared=1`);
+			await expect(sharedBanner(page)).toBeVisible({ timeout: 60_000 });
+			const card = page.locator(`article#story-${story.cluster_number}`);
+			const blurred = page.getByRole('button', { name: `News story: ${story.title}` });
+			await expect(blurred).toBeVisible();
+			await expect(card.getByText(/Click to show/)).toBeVisible();
+
+			if (reveal === 'click') await blurred.click();
+			else {
+				await blurred.focus();
+				await page.keyboard.press('Enter');
+			}
+			await expect(blurred).toHaveCount(0);
+			const content = storyContent(page, story);
+			await expect(content).toBeVisible();
+			await expect(page.locator('article[id^="story-"]')).toHaveCount(1);
+			await expect(sharedBanner(page)).toBeVisible();
+
+			await blurFocus(page);
+			for (const key of ['Enter', 'x']) await page.keyboard.press(key);
+			await expect(content).toBeVisible();
+		}
 	});
 });
 

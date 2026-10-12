@@ -135,9 +135,6 @@ $effect(() => {
 
 // Handle story click
 function handleStoryClick() {
-	// In shared view mode, don't allow toggling/closing
-	if (isSharedView) return;
-
 	// If blurred, reveal
 	if (isBlurred) {
 		isRevealing = true;
@@ -154,6 +151,9 @@ function handleStoryClick() {
 		}, 300);
 		return;
 	}
+
+	// In shared view mode, don't allow toggling/closing
+	if (isSharedView) return;
 
 	// If we're closing the story (isExpanded is true), clean up all features
 	if (isExpanded) {
