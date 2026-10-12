@@ -391,8 +391,7 @@ const isCJKStory = $derived(containsCJK(story.title));
       class="mb-2 flex cursor-pointer items-center text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 text-start w-full bg-transparent border-none p-0 focus-visible-ring rounded"
       class:font-semibold={!isRead}
       onclick={onTitleClick}
-      aria-label="Expand story"
-      aria-expanded="false"
+      aria-expanded={isExpanded}
     >
       {#if articleEmoji}
         <span aria-hidden="true" class="me-2">{articleEmoji}</span>
