@@ -35,7 +35,7 @@ import WikipediaPopup from '$lib/components/WikipediaPopup.svelte';
 import Weather from '$lib/components/weather/Weather.svelte';
 import TopicBrief from '$lib/components/brief/TopicBrief.svelte';
 import { BRIEF_STORIES_SECTION_TITLE, TOPIC_BRIEF_CATEGORY_ID } from '$lib/topicBrief';
-import { findSharedStory, SHARED_STORY_NOT_FOUND } from '$lib/sharedStory';
+import { SHARED_STORY_NOT_FOUND, sharedStoryInList } from '$lib/sharedStory';
 import { toastStore } from '$lib/stores/toast.svelte';
 import {
 	displaySettings,
@@ -531,20 +531,21 @@ const handleUrlNavigation = async (params: NavigationParams) => {
 		state.storyCountOverride = updates.storyCountOverride;
 	}
 
-	// `expandedStories` comes back only once the story lookup ran against the loaded stories.
-	if (params.isShared && hasStory && updates.expandedStories !== undefined) {
-		const sharedStory = findSharedStory(
-			derived.isSinglePageMode ? derived.singlePageStories : state.stories,
-			{
-				expandedStories: state.expandedStories,
-				sharedArticleIndex: state.sharedArticleIndex,
-				sharedClusterId: state.sharedClusterId,
-			},
-		);
-		if (!sharedStory) {
-			await helpers.handleExitSharedView();
-			toastStore.info(SHARED_STORY_NOT_FOUND);
-		}
+	// Judge only against the link's own category once its stories are loaded; a navigation the
+	// service skipped can leave the page on another category.
+	const linkedCategoryStories = state.allCategoryStories[state.currentCategory];
+	if (
+		params.isShared &&
+		hasStory &&
+		state.isSharedArticleView &&
+		linkedCategoryStories &&
+		(!params.categoryId ||
+			UrlNavigationService.normalizeCategoryId(params.categoryId) ===
+				UrlNavigationService.normalizeCategoryId(state.currentCategory)) &&
+		!sharedStoryInList(linkedCategoryStories, params)
+	) {
+		await helpers.handleExitSharedView();
+		toastStore.info(SHARED_STORY_NOT_FOUND);
 	}
 };
 

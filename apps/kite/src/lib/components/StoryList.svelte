@@ -14,7 +14,6 @@ import ClusteringExplainerModal from './ClusteringExplainerModal.svelte';
 import StoryCard from './story/StoryCard.svelte';
 import { BRIEF_SEED_ADD_LABEL } from '$lib/briefSeed';
 import { openBriefSeedModal } from '$lib/briefSeedUi.svelte';
-import { findSharedStory } from '$lib/sharedStory';
 import { storyKey } from '$lib/topicBrief';
 
 // Props
@@ -177,11 +176,43 @@ export function toggleReadStatus(index: number) {
 const { displayedStories, filteredCount, hiddenStories } = $derived.by(() => {
 	// If in shared view mode, only show the specific shared article
 	if (isSharedView) {
-		const sharedStory: Story | undefined = findSharedStory(stories, {
-			expandedStories,
+		let sharedStory: Story | undefined;
+
+		console.log('🔍 [StoryList] Shared view mode - finding story:', {
 			sharedArticleIndex,
 			sharedClusterId,
+			storiesCount: stories.length,
+			expandedStories,
+			firstStory: stories[0]?.title,
+			firstCluster: stories[0]?.cluster_number,
 		});
+
+		// First try to find by UUID from expandedStories (most reliable)
+		const expandedStoryId = Object.keys(expandedStories).find((id) => expandedStories[id]);
+		if (expandedStoryId) {
+			sharedStory = stories.find(
+				(s) =>
+					s.id === expandedStoryId ||
+					s.cluster_number?.toString() === expandedStoryId ||
+					s.title === expandedStoryId,
+			);
+			console.log(
+				'🔍 [StoryList] Found by expandedStoryId:',
+				expandedStoryId,
+				'->',
+				sharedStory?.title,
+			);
+		}
+		// Fall back to index (legacy format)
+		else if (sharedArticleIndex !== null && stories[sharedArticleIndex]) {
+			sharedStory = stories[sharedArticleIndex];
+			console.log('🔍 [StoryList] Found by index:', sharedStory?.title);
+		}
+		// Fall back to clusterId (old format, unreliable in single page mode)
+		else if (sharedClusterId !== null) {
+			sharedStory = stories.find((s) => s.cluster_number === sharedClusterId);
+			console.log('🔍 [StoryList] Found by clusterId:', sharedClusterId, '->', sharedStory?.title);
+		}
 
 		if (sharedStory) {
 			console.log('✅ [StoryList] Showing shared story:', sharedStory.title);
