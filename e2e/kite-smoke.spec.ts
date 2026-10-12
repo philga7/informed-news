@@ -541,6 +541,23 @@ test.describe('Keyboard story selection is announced (NEWS-129)', () => {
 	});
 });
 
+test.describe('Shared article view (NEWS-130)', () => {
+	test.beforeEach(() => useScenario('topics'));
+
+	test('the shared story title is plain text, not a dead expand toggle', async ({ page }) => {
+		await page.goto('/');
+		await expect(page).toHaveTitle(/Informed News/i, { timeout: 60_000 });
+		const shared = (await loadOwnedStories(page))[0]!;
+
+		await page.goto('/latest/world/0?shared=1');
+		await expect(page.getByText(/Viewing a shared story/)).toBeVisible({ timeout: 60_000 });
+		const card = page.locator(`article#story-${shared.cluster_number}`);
+		await expect(card.getByText(shared.title!, { exact: true })).toBeVisible();
+		await expect(storyToggle(card, shared.title!)).toHaveCount(0);
+		await expect(card.locator('[aria-expanded]')).toHaveCount(0);
+	});
+});
+
 test.describe('Manual seeds (NEWS-98)', () => {
 	test.beforeEach(() => useScenario('topics'));
 
