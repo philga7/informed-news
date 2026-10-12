@@ -98,8 +98,10 @@ async function briefCard(page: Page, title: string): Promise<Locator> {
 	return card;
 }
 
-/** StoryCard marks the page keyboard selection (j / k) with a ring; it has no ARIA state. */
-const KEYBOARD_SELECTED = /\bring-2\b/;
+/** The story title button toggles expand / collapse; its accessible name is the title. */
+function storyToggle(card: Locator, title: string): Locator {
+	return card.getByRole('button', { name: title, exact: true });
+}
 
 function watchKagiRequests(page: Page): string[] {
 	const kagiHosts: string[] = [];
@@ -225,9 +227,18 @@ test.describe('Topic Brief (NEWS-88)', () => {
 
 		const storyCard = page.locator(`article#story-${fullStory?.cluster_number}`);
 		await expect(storyCard).toBeVisible({ timeout: 60_000 });
-		await storyCard.locator('button[aria-label="Expand story"]').click();
+		const toggle = storyToggle(storyCard, fullStory!.title!);
+		await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+		await toggle.click();
 		await expect(storyCard.getByText(TOPIC_SCENARIO.fullStoryTalkingPoint)).toBeVisible();
 		await expect(storyCard.getByText('AI-assisted — not ground truth.')).toBeVisible();
+
+		// NEWS-126: the title button reports the real state and never says "Expand" once open.
+		await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+		await expect(storyCard.getByRole('button', { name: /expand/i })).toHaveCount(0);
+		await toggle.click();
+		await expect(storyCard.getByText(TOPIC_SCENARIO.fullStoryTalkingPoint)).toHaveCount(0);
+		await expect(toggle).toHaveAttribute('aria-expanded', 'false');
 	});
 });
 
@@ -290,7 +301,7 @@ test.describe('Filtered out + Less like this (NEWS-90)', () => {
 		await expect(trigger).toHaveCount(0);
 
 		try {
-			await card.locator('button[aria-label="Expand story"]').click();
+			await storyToggle(card, title).click();
 			await trigger.click();
 			await expect(card.getByLabel('Undesired topic name')).toHaveValue(title);
 			await card.getByRole('button', { name: `Block ${domain}`, exact: true }).click();
@@ -327,7 +338,7 @@ test.describe('Filtered out + Less like this (NEWS-90)', () => {
 		const card = await briefCard(page, title);
 
 		try {
-			await card.locator('button[aria-label="Expand story"]').click();
+			await storyToggle(card, title).click();
 			await card.getByRole('button', { name: 'Less like this', exact: true }).click();
 			await expect(card.getByText('Not interested in this subject')).toBeVisible();
 			const nameInput = card.getByLabel('Undesired topic name');
@@ -357,13 +368,15 @@ test.describe('Less like this keyboard, focus and name taken (NEWS-125)', () => 
 	test('Escape in the open panel cancels it and keeps the page selection; with the panel closed, Escape reaches the page', async ({
 		page,
 	}) => {
+		const { title } = TOPIC_SCENARIO.lessLikeThis;
 		await logIn(page);
-		const card = await briefCard(page, TOPIC_SCENARIO.lessLikeThis.title);
+		const card = await briefCard(page, title);
 		const trigger = card.getByRole('button', { name: 'Less like this', exact: true });
 
+		await expect(card).not.toHaveAttribute('aria-current');
 		await page.keyboard.press('j');
-		await expect(card).toHaveClass(KEYBOARD_SELECTED);
-		await card.locator('button[aria-label="Expand story"]').click();
+		await expect(card).toHaveAttribute('aria-current', 'true');
+		await storyToggle(card, title).click();
 		await trigger.click();
 		const nameInput = card.getByLabel('Undesired topic name');
 		await expect(nameInput).toBeFocused();
@@ -371,10 +384,10 @@ test.describe('Less like this keyboard, focus and name taken (NEWS-125)', () => 
 		await page.keyboard.press('Escape');
 		await expect(nameInput).toHaveCount(0);
 		await expect(trigger).toBeFocused();
-		await expect(card).toHaveClass(KEYBOARD_SELECTED);
+		await expect(card).toHaveAttribute('aria-current', 'true');
 
 		await page.keyboard.press('Escape');
-		await expect(card).not.toHaveClass(KEYBOARD_SELECTED);
+		await expect(card).not.toHaveAttribute('aria-current');
 		await expect(trigger).toBeVisible();
 	});
 
@@ -385,7 +398,7 @@ test.describe('Less like this keyboard, focus and name taken (NEWS-125)', () => 
 		const savedLine = `Added "${title}" to undesired topics.`;
 		await logIn(page);
 		const card = await briefCard(page, title);
-		const expand = card.locator('button[aria-label="Expand story"]');
+		const expand = storyToggle(card, title);
 		const content = card.getByRole('region', { name: 'Story content' });
 		const saved = card.getByTestId('less-like-this-success');
 
@@ -413,10 +426,11 @@ test.describe('Less like this keyboard, focus and name taken (NEWS-125)', () => 
 		page,
 	}) => {
 		const taken = TOPIC_SCENARIO.sections[0]!.name;
+		const { title } = TOPIC_SCENARIO.lessLikeThisSubject;
 		await logIn(page);
-		const card = await briefCard(page, TOPIC_SCENARIO.lessLikeThisSubject.title);
+		const card = await briefCard(page, title);
 
-		await card.locator('button[aria-label="Expand story"]').click();
+		await storyToggle(card, title).click();
 		await card.getByRole('button', { name: 'Less like this', exact: true }).click();
 		const nameInput = card.getByLabel('Undesired topic name');
 		await nameInput.fill(taken);
@@ -475,7 +489,7 @@ test.describe('Manual seeds (NEWS-98)', () => {
 			firstCard.getByText('Summary loads when you open this story', { exact: true }),
 		).toBeVisible();
 
-		await firstCard.locator('button[aria-label="Expand story"]').click();
+		await storyToggle(firstCard, seedTitle).click();
 		const remove = firstCard.getByTestId('seed-remove');
 		await expect(remove).toBeVisible();
 		await expect(page.getByRole('button', { name: /Unaccept/i })).toHaveCount(0);
@@ -522,7 +536,7 @@ test.describe('Owned brief fixture (NEWS-44, NEWS-51)', () => {
 		const storyCard = page.locator(`article#story-${story.cluster_number}`);
 		await expect(storyCard).toBeVisible({ timeout: 60_000 });
 		await storyCard.scrollIntoViewIfNeeded();
-		await storyCard.locator('button[aria-label="Expand story"]').click();
+		await storyToggle(storyCard, story.title!).click();
 		await expect(page.getByText('AI-assisted — not ground truth.')).toBeVisible({
 			timeout: 60_000,
 		});

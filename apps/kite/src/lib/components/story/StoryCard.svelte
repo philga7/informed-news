@@ -224,6 +224,7 @@ $effect(() => {
   data-story-id={story.cluster_number?.toString() || story.title}
   data-story-index={storyIndex}
   aria-label="News story: {story.title}"
+  aria-current={isKeyboardSelected ? 'true' : undefined}
   class="relative py-2 transition-all duration-200 {isKeyboardSelected ? 'ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-900/10 -mx-2 px-2 rounded-lg' : ''} {isBlurred ? 'cursor-pointer' : ''} {!isExpanded ? 'border-b border-gray-200 dark:border-gray-700' : ''}"
   onmouseenter={hoverPreloader.handleMouseEnter}
   onmouseleave={hoverPreloader.handleMouseLeave}
