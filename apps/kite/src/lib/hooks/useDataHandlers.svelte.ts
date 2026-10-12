@@ -3,6 +3,7 @@ import { displaySettings, languageSettings } from '$lib/data/settings.svelte';
 import { dataService } from '$lib/services/dataService';
 import type { NavigationParams } from '$lib/services/urlNavigationService';
 import { timeTravelBatch } from '$lib/stores/timeTravelBatch.svelte';
+import { survivingExpandedStories } from '$lib/topicBrief';
 import type { Category, OnThisDayEvent, Story } from '$lib/types';
 import type { HistoryManagerInstance } from '$lib/types/components';
 import { formatTimeAgo } from '$lib/utils/formatTimeAgo';
@@ -70,8 +71,9 @@ export function useDataHandlers(
 		// Clear loading state
 		state.isLoadingCategory = false;
 
-		// Reset app state for fresh data
-		state.expandedStories = {};
+		// Reset app state for fresh data. Keep open cards that still exist so a Brief
+		// reload (e.g. after refresh) can't hide/blur them via a new filter decision (NEWS-150).
+		const previousExpanded = state.expandedStories;
 		state.lastLoadedCategory = '';
 		state.onThisDayEvents = [];
 
@@ -92,6 +94,10 @@ export function useDataHandlers(
 		state.currentDateSlug = data.dateSlug;
 		state.currentBatchCreatedAt = data.batchCreatedAt || '';
 		state.lastLoadedCategory = data.currentCategory;
+		state.expandedStories = survivingExpandedStories(previousExpanded, [
+			...data.stories,
+			...Object.values(data.allCategoryStories).flat(),
+		]);
 
 		state.isLatestBatch = data.isLatestBatch;
 		timeTravelBatch.set(
