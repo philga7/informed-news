@@ -387,17 +387,30 @@ const isCJKStory = $derived(containsCJK(story.title));
 <!-- Story Title and Read Button -->
 <div class="flex items-start">
   <div class="flex-grow">
-    <button
-      class="mb-2 flex cursor-pointer items-center text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 text-start w-full bg-transparent border-none p-0 focus-visible-ring rounded"
-      class:font-semibold={!isRead}
-      onclick={onTitleClick}
-      aria-expanded={isExpanded}
-    >
+    {#snippet titleContent()}
       {#if articleEmoji}
         <span aria-hidden="true" class="me-2">{articleEmoji}</span>
       {/if}
       <span dir="auto">{displayTitle}</span>
-    </button>
+    {/snippet}
+    {#if isSharedView}
+      <!-- The shared story can't be collapsed, so its title is not a toggle. -->
+      <div
+        class="mb-2 flex items-center text-sm font-medium text-blue-600 dark:text-blue-400 text-start w-full"
+        class:font-semibold={!isRead}
+      >
+        {@render titleContent()}
+      </div>
+    {:else}
+      <button
+        class="mb-2 flex cursor-pointer items-center text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 text-start w-full bg-transparent border-none p-0 focus-visible-ring rounded"
+        class:font-semibold={!isRead}
+        onclick={onTitleClick}
+        aria-expanded={isExpanded}
+      >
+        {@render titleContent()}
+      </button>
+    {/if}
     {#if fullStoryAvailable && !isExpanded}
       <button
         type="button"
