@@ -45,11 +45,24 @@ export const TOPIC_SCENARIO = {
 		{ title: 'Local bakery wins regional pastry award', label: 'Off-topic' },
 		{ title: 'You will not believe what this battery can do', label: 'Clickbait' },
 		{ title: 'Tentative deal ends port walkout', label: 'Duplicate' },
+		{ title: 'Overnight capacity filing hits the scoring budget', label: 'Not scored (budget)' },
 	],
+	/**
+	 * Dropped in an earlier refresh (triagedAt ≠ last run) but still inside 48h — only
+	 * "Last 48 hours" on /filtered lists it (NEWS-105).
+	 */
+	filteredEarlier: {
+		title: 'Column blames grid operators for summer heat',
+		label: 'Opinion',
+	},
 	/** Seeded Brief story Less like this blocks by outlet (has a cached full story). */
 	lessLikeThis: {
 		title: 'Operators add battery storage before winter peak',
 		domain: 'gridwatch.example',
+	},
+	/** Seeded Brief story for the Less like this subject (undesired topic) path (NEWS-105). */
+	lessLikeThisSubject: {
+		title: 'Transmission upgrade approved for northern corridor',
 	},
 };
 
@@ -136,13 +149,13 @@ function duplicate(now, a, { topicId, of }) {
 	};
 }
 
-function dropped(now, a, { topicId, reason, stage, jevCalls }) {
+function dropped(now, a, { topicId, reason, stage, jevCalls, final = true, triagedHoursAgo = 1 }) {
 	return {
 		articleId: a.id,
 		status: 'dropped',
 		reason,
 		stage,
-		final: true,
+		final,
 		topicIds: [topicId],
 		labels: [],
 		duplicateOf: null,
@@ -151,13 +164,14 @@ function dropped(now, a, { topicId, reason, stage, jevCalls }) {
 		significance: null,
 		bodyChecked: false,
 		jevCalls,
-		triagedAt: hoursAgo(now, 1),
+		triagedAt: hoursAgo(now, triagedHoursAgo),
 	};
 }
 
-/** `meta.json → triage` for a non-skipped run whose records all carry `triagedAt === at`. */
+/** `meta.json → triage` for the last run: only records with `triagedAt === at`. */
 function triageRun(now, records) {
-	const list = Object.values(records);
+	const at = hoursAgo(now, 1);
+	const list = Object.values(records).filter((rec) => rec.triagedAt === at);
 	const byReason = {};
 	for (const rec of list) {
 		if (rec.status !== 'dropped') continue;
@@ -166,7 +180,7 @@ function triageRun(now, records) {
 	}
 	const keptCount = list.filter((rec) => rec.status === 'kept').length;
 	return {
-		at: hoursAgo(now, 1),
+		at,
 		skipped: false,
 		candidates: list.length,
 		kept: keptCount,
@@ -233,11 +247,22 @@ function topicsScenario(now, imageBaseUrl) {
 	});
 	records[portDuplicate.id] = duplicate(now, portDuplicate, { topicId: ports.id, of: portLead.id });
 
-	const [mutedTitle, offTopicTitle, clickbaitTitle] = TOPIC_SCENARIO.filtered.map((f) => f.title);
+	const [mutedTitle, offTopicTitle, clickbaitTitle, , budgetTitle] = TOPIC_SCENARIO.filtered.map(
+		(f) => f.title,
+	);
 	const droppedStories = [
 		{ slug: 'ribbon', title: mutedTitle, domain: 'tabloid.example', reason: `muted:${TOPIC_SCENARIO.undesiredTopic.id}`, stage: 'keyword', jevCalls: 0 },
 		{ slug: 'bakery', title: offTopicTitle, domain: 'townpaper.example', reason: 'off_topic', stage: 'headline', jevCalls: 1 },
 		{ slug: 'viral', title: clickbaitTitle, domain: 'viralhub.example', reason: 'clickbait', stage: 'headline', jevCalls: 1 },
+		{
+			slug: 'budget',
+			title: budgetTitle,
+			domain: 'capwire.example',
+			reason: 'not_scored_budget',
+			stage: 'budget',
+			jevCalls: 0,
+			final: false,
+		},
 	].map((s, i) => {
 		const a = article(now, {
 			slug: s.slug,
@@ -253,9 +278,29 @@ function topicsScenario(now, imageBaseUrl) {
 			reason: s.reason,
 			stage: s.stage,
 			jevCalls: s.jevCalls,
+			final: s.final ?? true,
 		});
 		return a;
 	});
+
+	// Earlier refresh inside the 48h window — not in "Last refresh", yes in "Last 48 hours".
+	const earlier = article(now, {
+		slug: 'opinion-heat',
+		title: TOPIC_SCENARIO.filteredEarlier.title,
+		domain: 'opinions.example',
+		topicId: grid.id,
+		hours: 20,
+		body: null,
+		imageBaseUrl: null,
+	});
+	records[earlier.id] = dropped(now, earlier, {
+		topicId: grid.id,
+		reason: 'opinion',
+		stage: 'headline',
+		jevCalls: 1,
+		triagedHoursAgo: 12,
+	});
+	droppedStories.push(earlier);
 
 	const lead = gridStories[0];
 	const refreshRun = {
@@ -347,7 +392,8 @@ function emptyScenario() {
  * Replace every store file in `dataDir` with the named scenario.
  * - `topics`: the topic Brief (NEWS-88) — 2 sections, 1 quiet topic, a "More" story,
  *   a duplicate-member story and one cached summary; the last triage run also dropped
- *   one story each as muted (undesired topic), off-topic, clickbait and duplicate (NEWS-90).
+ *   muted / off-topic / clickbait / duplicate / not_scored_budget (NEWS-90/105), plus one
+ *   earlier-in-window opinion drop for the Last 48 hours toggle (NEWS-105).
  * - `empty`: empty article store → the owned-brief fixture stories (NEWS-44/51).
  * Files not starting with "." are removed first; the generated env file survives.
  */

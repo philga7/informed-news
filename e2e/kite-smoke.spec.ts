@@ -238,13 +238,18 @@ test.describe('Filtered out + Less like this (NEWS-90)', () => {
 		await expect(group('Duplicate').getByText(/^Duplicate of:/)).toContainText(
 			'Port workers reach tentative agreement',
 		);
+		await expect(group('Not scored (budget)').getByText('Retried next refresh')).toBeVisible();
+		await expect(page.getByText(TOPIC_SCENARIO.filteredEarlier.title)).toHaveCount(0);
 
 		await page.getByRole('button', { name: 'Last 48 hours' }).click();
 		await expect(page.getByRole('button', { name: 'Last 48 hours' })).toHaveAttribute(
 			'aria-pressed',
 			'true',
 		);
-		await expect(groups).toHaveCount(TOPIC_SCENARIO.filtered.length);
+		await expect(groups).toHaveCount(TOPIC_SCENARIO.filtered.length + 1);
+		await expect(
+			group(TOPIC_SCENARIO.filteredEarlier.label).getByTestId('filtered-item'),
+		).toContainText(TOPIC_SCENARIO.filteredEarlier.title);
 	});
 
 	test('Less like this blocks the outlet and Topics lists it under Undesired', async ({ page }) => {
@@ -269,6 +274,10 @@ test.describe('Filtered out + Less like this (NEWS-90)', () => {
 			await expect(card.getByTestId('less-like-this-success')).toContainText(
 				`Added "${domain}" to undesired topics. Matching stories are hidden the next time the Brief loads, and filtered out from the next refresh.`,
 			);
+			// Wait for the success line (and its View Topics link) before leaving the Brief so
+			// in-flight proxy work is not aborted mid-navigation (NEWS-105).
+			await expect(card.getByRole('link', { name: 'View Topics', exact: true })).toBeVisible();
+			await page.waitForLoadState('networkidle');
 
 			await page.goto('/topics');
 			const undesired = page.locator('section[aria-labelledby="topics-undesired"]');
@@ -292,6 +301,57 @@ test.describe('Filtered out + Less like this (NEWS-90)', () => {
 
 		const after = (await loadOwnedStories(page)).map((s) => s.title);
 		expect(after).toContain(title);
+	});
+
+	test('Less like this Not interested in this subject creates an undesired topic on Topics', async ({
+		page,
+	}) => {
+		const { title } = TOPIC_SCENARIO.lessLikeThisSubject;
+		let createdName: string | null = null;
+		await logIn(page);
+		await page.goto('/');
+		await expect(page).toHaveTitle(/Informed News/i, { timeout: 60_000 });
+
+		const stories = await loadOwnedStories(page);
+		const story = stories.find((s) => s.title === title);
+		expect(story?.cluster_number, 'expected the subject-path story to have a card').toBeTruthy();
+		const card = page.locator(`article#story-${story?.cluster_number}`);
+		await expect(card).toBeVisible({ timeout: 60_000 });
+
+		try {
+			await card.locator('button[aria-label="Expand story"]').click();
+			await card.getByRole('button', { name: 'Less like this', exact: true }).click();
+			await expect(card.getByText('Not interested in this subject')).toBeVisible();
+			const nameInput = card.getByLabel('Undesired topic name');
+			await expect(nameInput).toHaveValue(title);
+			createdName = title;
+			await card.getByRole('button', { name: 'Add undesired topic', exact: true }).click();
+			await expect(card.getByTestId('less-like-this-success')).toContainText(
+				`Added "${title}" to undesired topics. Matching stories are hidden the next time the Brief loads, and filtered out from the next refresh.`,
+			);
+			await expect(card.getByRole('link', { name: 'View Topics', exact: true })).toBeVisible();
+			await page.waitForLoadState('networkidle');
+
+			await page.goto('/topics');
+			const undesired = page.locator('section[aria-labelledby="topics-undesired"]');
+			await expect(undesired.getByRole('heading', { name: title, exact: true })).toBeVisible({
+				timeout: 60_000,
+			});
+		} finally {
+			if (createdName) {
+				const list = await page.request.get('/api/topics');
+				expect(list.ok()).toBeTruthy();
+				const { topics } = (await list.json()) as {
+					topics: Array<{ id: string; name: string; kind: string }>;
+				};
+				for (const topic of topics.filter(
+					(t) => t.kind === 'undesired' && t.name === createdName,
+				)) {
+					const removed = await page.request.delete(`/api/topics/${topic.id}`);
+					expect(removed.ok()).toBeTruthy();
+				}
+			}
+		}
 	});
 });
 

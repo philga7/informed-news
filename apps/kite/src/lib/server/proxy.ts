@@ -1,5 +1,6 @@
 import { env } from '$env/dynamic/private';
 import type { RequestHandler } from '@sveltejs/kit';
+import { isProxyClientAbortError } from './proxyClientAbort';
 
 // Captured at server start (imported by hooks.server.ts): in dev, SvelteKit swaps
 // globalThis.fetch during every async SSR render, so a proxy call overlapping a render
@@ -69,7 +70,10 @@ export function createProxy(endpoint: string): RequestHandler {
       });
       
     } catch (error) {
-      console.error('Proxy error:', error);
+      // Client navigations abort in-flight proxies; logging those as Proxy error is noise (NEWS-105).
+      if (!isProxyClientAbortError(error)) {
+        console.error('Proxy error:', error);
+      }
       return new Response(JSON.stringify({ error: 'Proxy request failed' }), {
         status: 500,
         headers: { 'Content-Type': 'application/json' }
