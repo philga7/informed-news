@@ -1,5 +1,6 @@
 /** Copy + helpers for operator-seeded topic Brief stories (NEWS-66, NEWS-98). */
 
+import { shownServerError } from '$lib/serverError';
 import { TOPICS_LOAD_ERROR, TOPICS_NETWORK_ERROR, type Topic, type TopicLevel } from '$lib/topics';
 
 export const BRIEF_SEED_ADD_LABEL = 'Add story';
@@ -146,7 +147,7 @@ export async function postBriefSeed(
 			return {
 				ok: false,
 				status: response.status,
-				error: (body && body.error) || BRIEF_SEED_ERROR_GENERIC,
+				error: shownServerError(response.status, body?.error, BRIEF_SEED_ERROR_GENERIC),
 			};
 		}
 

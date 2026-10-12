@@ -6,8 +6,12 @@ import TopicForm from '$lib/components/topics/TopicForm.svelte';
 import TopicsMuteSection from '$lib/components/topics/TopicsMuteSection.svelte';
 import { FILTERED_TOPICS_LINK } from '$lib/filteredOut';
 import {
+	fetchTopicsPage,
+	mutateTopicsApi,
+	type TopicsApiBody,
+} from '$lib/topicsApi';
+import {
 	MUTES_DELETE_ERROR,
-	MUTES_LOAD_ERROR,
 	MUTES_SAVE_ERROR,
 	type MuteRule,
 	TOPICS_ADD_LABEL,
@@ -18,7 +22,6 @@ import {
 	TOPICS_EMPTY_UNDESIRED,
 	TOPICS_FOOTER_NOTE,
 	TOPICS_INTRO_HELP,
-	TOPICS_LOAD_ERROR,
 	TOPICS_LOADING_LABEL,
 	TOPICS_LOGIN_ERROR,
 	TOPICS_LOGIN_INTRO,
@@ -43,15 +46,8 @@ import {
 	type TopicPayload,
 } from '$lib/topics';
 
-type ApiBody = {
-	ok?: boolean;
-	error?: string;
-	topics?: Topic[];
-	rules?: MuteRule[];
-} | null;
-
 type MutationResult =
-	| { ok: true; body: ApiBody; seq: number | null }
+	| { ok: true; body: TopicsApiBody; seq: number | null }
 	| { ok: false; error: string | null };
 
 let loading = $state(true);
@@ -114,49 +110,35 @@ function applyTopics(next: Topic[], seq: number): void {
 	topics = next;
 }
 
-async function readBody(response: Response): Promise<ApiBody> {
-	return (await response.json().catch(() => null)) as ApiBody;
-}
-
 async function loadAll(): Promise<void> {
 	loading = true;
 	loadError = null;
 	muteLoadError = null;
 	muteActionError = null;
 
-	try {
-		const [topicsResponse, mutesResponse] = await Promise.all([
-			fetch('/api/topics', { credentials: 'include' }),
-			fetch('/api/brief/mutes', { credentials: 'include' }),
-		]);
+	const result = await fetchTopicsPage();
+	loading = false;
 
-		if (topicsResponse.status === 401 || mutesResponse.status === 401) {
-			enterLoginShell();
-			return;
-		}
-
-		const topicsBody = await readBody(topicsResponse);
-		if (topicsResponse.ok && topicsBody?.ok && Array.isArray(topicsBody.topics)) {
-			const seq = ++topicsRequestSeq;
-			applyTopics(topicsBody.topics, seq);
-		} else {
-			topics = [];
-			loadError = topicsBody?.error || TOPICS_LOAD_ERROR;
-		}
-
-		const mutesBody = await readBody(mutesResponse);
-		if (mutesResponse.ok && mutesBody?.ok && Array.isArray(mutesBody.rules)) {
-			muteRules = mutesBody.rules;
-		} else {
-			muteRules = [];
-			muteLoadError = mutesBody?.error || MUTES_LOAD_ERROR;
-		}
-	} catch (err) {
-		console.error('Error loading topics', err);
-		loadError = TOPICS_NETWORK_ERROR;
-	} finally {
-		loading = false;
+	if (!result.ok && result.unauthenticated) {
+		enterLoginShell();
+		return;
 	}
+	if (!result.ok) {
+		topics = [];
+		muteRules = [];
+		loadError = result.loadError;
+		return;
+	}
+
+	if (result.loadError) {
+		topics = [];
+		loadError = result.loadError;
+	} else {
+		const seq = ++topicsRequestSeq;
+		applyTopics(result.topics, seq);
+	}
+	muteRules = result.muteRules;
+	muteLoadError = result.muteLoadError;
 }
 
 async function mutate(
@@ -167,29 +149,15 @@ async function mutate(
 	options?: { trackTopicsSeq?: boolean },
 ): Promise<MutationResult> {
 	const seq = options?.trackTopicsSeq ? ++topicsRequestSeq : null;
-	try {
-		const response = await fetch(path, {
-			method,
-			credentials: 'include',
-			...(payload === undefined
-				? {}
-				: { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }),
-		});
-
-		if (response.status === 401) {
-			enterLoginShell();
-			return { ok: false, error: null };
-		}
-
-		const body = await readBody(response);
-		if (!response.ok || !body || body.ok === false) {
-			return { ok: false, error: body?.error || fallbackError };
-		}
-		return { ok: true, body, seq };
-	} catch (err) {
-		console.error(`Error calling ${method} ${path}`, err);
-		return { ok: false, error: TOPICS_NETWORK_ERROR };
+	const result = await mutateTopicsApi(path, method, fallbackError, payload);
+	if (!result.ok && result.unauthenticated) {
+		enterLoginShell();
+		return { ok: false, error: null };
 	}
+	if (!result.ok) {
+		return { ok: false, error: result.error };
+	}
+	return { ok: true, body: result.body, seq };
 }
 
 async function addTopic(payload: TopicPayload): Promise<void> {
@@ -324,7 +292,10 @@ async function handleLogin(event: SubmitEvent): Promise<void> {
 			credentials: 'include',
 			body: JSON.stringify({ password }),
 		});
-		const body = await readBody(response);
+		const body = (await response.json().catch(() => null)) as {
+			ok?: boolean;
+			error?: string;
+		} | null;
 
 		if (!response.ok || (body && body.ok === false)) {
 			loginError = body?.error || TOPICS_LOGIN_ERROR;

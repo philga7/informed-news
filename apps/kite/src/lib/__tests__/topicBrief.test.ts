@@ -32,6 +32,7 @@ import {
 	autoFullStoryRequestKeys,
 	createFilterMatcher,
 	createSeenBatcher,
+	decideTopicBriefFilterMatches,
 	fetchBriefOverview,
 	filteredCountKey,
 	formatTimeAgoShort,
@@ -66,6 +67,8 @@ import {
 	summaryErrorCopy,
 	summaryLine,
 	shouldRequestFullStory,
+	survivingExpandedStories,
+	toggleExpandAllKeys,
 	updatedLabel,
 	type BriefOverview,
 	type BriefOverviewRefresh,
@@ -226,6 +229,103 @@ describe('createFilterMatcher (NEWS-146)', () => {
 
 		pending.short_summary = 'Ratepayers: a note for ratepayers.';
 		expect(createFilterMatcher(matchRatepayers)(pending)).toEqual(['ratepayers']);
+	});
+});
+
+describe('decideTopicBriefFilterMatches (NEWS-150)', () => {
+	const matchRatepayers = (story: Story) =>
+		story.short_summary.includes('ratepayers') ? ['ratepayers'] : [];
+
+	it('carries an open card\'s decision across a reload (new story object) by story key', () => {
+		const before = makeStory('a');
+		const matcher = createFilterMatcher(matchRatepayers);
+		const open = new Set(['a']);
+		const first = decideTopicBriefFilterMatches([before], matcher, open, new Map());
+		expect(first.matches.has(before)).toBe(false);
+		expect(first.carry.get('a')).toEqual([]);
+
+		const afterReload = makeStory('a', {
+			short_summary: 'Overnight bills change for ratepayers.',
+		});
+		const second = decideTopicBriefFilterMatches(
+			[afterReload],
+			createFilterMatcher(matchRatepayers),
+			open,
+			first.carry,
+		);
+		expect(second.matches.has(afterReload)).toBe(false);
+		expect(second.carry.get('a')).toEqual([]);
+	});
+
+	it('re-decides a closed card after reload, and with an empty prior (filter settings)', () => {
+		const openCard = makeStory('open');
+		const closed = makeStory('closed');
+		const first = decideTopicBriefFilterMatches(
+			[openCard, closed],
+			createFilterMatcher(matchRatepayers),
+			new Set(['open']),
+			new Map(),
+		);
+
+		const reloadedOpen = makeStory('open', {
+			short_summary: 'Overnight bills change for ratepayers.',
+		});
+		const reloadedClosed = makeStory('closed', {
+			short_summary: 'Overnight bills change for ratepayers.',
+		});
+		const afterReload = decideTopicBriefFilterMatches(
+			[reloadedOpen, reloadedClosed],
+			createFilterMatcher(matchRatepayers),
+			new Set(['open']),
+			first.carry,
+		);
+		expect(afterReload.matches.has(reloadedOpen)).toBe(false);
+		expect(afterReload.matches.get(reloadedClosed)).toEqual(['ratepayers']);
+
+		const afterSettings = decideTopicBriefFilterMatches(
+			[reloadedOpen],
+			createFilterMatcher(matchRatepayers),
+			new Set(['open']),
+			new Map(),
+		);
+		expect(afterSettings.matches.get(reloadedOpen)).toEqual(['ratepayers']);
+	});
+});
+
+describe('toggleExpandAllKeys (NEWS-149)', () => {
+	it('skips blurred keys when expanding and collapses only expandable cards', () => {
+		const blurred = new Set(['blurred']);
+		const isBlurred = (key: string) => blurred.has(key);
+		const expanded = toggleExpandAllKeys(['clear', 'blurred', 'other'], {}, isBlurred);
+		expect(expanded).toEqual({ clear: true, other: true });
+		expect(expanded.blurred).toBeUndefined();
+
+		// A blurred key that was already expanded is dropped, not left under the blur.
+		expect(
+			toggleExpandAllKeys(
+				['clear', 'blurred'],
+				{ blurred: true },
+				isBlurred,
+			),
+		).toEqual({ clear: true });
+
+		const collapsed = toggleExpandAllKeys(
+			['clear', 'blurred', 'other'],
+			{ clear: true, other: true, blurred: true },
+			isBlurred,
+		);
+		expect(collapsed).toEqual({});
+	});
+});
+
+describe('survivingExpandedStories (NEWS-150)', () => {
+	it('keeps open keys that still exist after reload and drops the rest', () => {
+		expect(
+			survivingExpandedStories(
+				{ a: true, b: true, c: false, gone: true },
+				[makeStory('a'), makeStory('b')],
+			),
+		).toEqual({ a: true, b: true });
 	});
 });
 

@@ -1,12 +1,20 @@
 <script module lang="ts">
 /** Story ids whose on-demand summary was already requested this page load. */
 const requestedSummaries = new Set<string>();
+
+/**
+ * Open-card filter decisions by story key. Module-scoped so a Brief reload (or a
+ * remount) keeps them; cleared only when filter settings change (NEWS-150).
+ */
+let moduleOpenFilterCarry = new Map<string, string[]>();
+let moduleCarrySettingsKey = '';
 </script>
 
 <script lang="ts">
 	import { untrack, type Snippet } from 'svelte';
 	import { s } from '$lib/client/localization.svelte';
 	import { kiteDB } from '$lib/db/dexie';
+	import { blurredStories } from '$lib/stores/blurredStories.svelte';
 	import { contentFilter } from '$lib/stores/contentFilter.svelte';
 	import { keyboardNavigation } from '$lib/stores/keyboardNavigation.svelte';
 	import type { Story } from '$lib/types';
@@ -30,6 +38,7 @@ const requestedSummaries = new Set<string>();
 		autoFullStoryRequestKeys,
 		createFilterMatcher,
 		createSeenBatcher,
+		decideTopicBriefFilterMatches,
 		fetchBriefOverview,
 		fullStoryErrorCopy,
 		fullStoryLine,
@@ -52,6 +61,7 @@ const requestedSummaries = new Set<string>();
 		summaryAttemptCounts,
 		summaryErrorCopy,
 		summaryLine,
+		toggleExpandAllKeys,
 		type BriefOverview,
 	} from '$lib/topicBrief';
 
@@ -117,15 +127,45 @@ const requestedSummaries = new Set<string>();
 	});
 	/** Kite content filter (Settings → Filters) keywords each matching story hits. */
 	const filterMatches = $derived.by(() => {
-		const matches = new Map<Story, string[]>();
-		if (!contentFilter.isActive) return matches;
-		// Tracked here so a filter settings change re-decides; story fields are read untracked.
-		const match = matchFilter;
-		for (const story of stories) {
-			const matchedKeywords = untrack(() => match(story));
-			if (matchedKeywords.length > 0) matches.set(story, matchedKeywords);
+		if (!contentFilter.isActive) {
+			moduleOpenFilterCarry = new Map();
+			moduleCarrySettingsKey = '';
+			return new Map<Story, string[]>();
 		}
-		return matches;
+		// Track settings so a change clears carry; story fields are matched untracked.
+		const settingsKey = `${contentFilter.filterMode}|${contentFilter.filterScope}|${contentFilter.keywords.join('\0')}`;
+		const match = matchFilter;
+		expandedStories;
+		stories;
+		if (settingsKey !== moduleCarrySettingsKey) {
+			moduleCarrySettingsKey = settingsKey;
+			moduleOpenFilterCarry = new Map();
+		}
+		const openKeys = new Set(
+			Object.keys(expandedStories).filter((key) => expandedStories[key]),
+		);
+		const decided = untrack(() => {
+			// Keep prior open-card decisions if expandedStories is transiently empty (reload
+			// swaps the list while TopicBrief remounts) so a summary gained after open can't
+			// hide/blur the card (NEWS-150).
+			const effectiveOpen =
+				openKeys.size > 0 || moduleOpenFilterCarry.size === 0
+					? openKeys
+					: new Set(
+							[...moduleOpenFilterCarry.keys()].filter((key) =>
+								stories.some((story) => storyKey(story) === key),
+							),
+						);
+			const result = decideTopicBriefFilterMatches(
+				stories,
+				match,
+				effectiveOpen,
+				moduleOpenFilterCarry,
+			);
+			moduleOpenFilterCarry = result.carry;
+			return result.matches;
+		});
+		return decided;
 	});
 	const hideMode = $derived(contentFilter.filterMode === 'hide');
 	const groupedSections = $derived(overview ? groupTopicBrief(overview, stories) : []);
@@ -163,9 +203,12 @@ const requestedSummaries = new Set<string>();
 	const allVisibleRead = $derived(
 		visibleStories.every((story) => story.id && readStories[story.id]),
 	);
-	const allVisibleExpanded = $derived(
-		visibleStories.length > 0 && visibleStories.every((story) => expandedStories[storyKey(story)]),
-	);
+	const allVisibleExpanded = $derived.by(() => {
+		const expandable = visibleStories.filter((story) => !blurredStories.get(storyKey(story)));
+		return (
+			expandable.length > 0 && expandable.every((story) => expandedStories[storyKey(story)])
+		);
+	});
 
 	const seen = createSeenBatcher({ post: (ids) => postBriefSeen(ids) });
 
@@ -345,13 +388,11 @@ const requestedSummaries = new Set<string>();
 
 	/** StoryListInstance (page keyboard shortcuts / category double-click). */
 	export function toggleExpandAll(): void {
-		if (allVisibleExpanded) {
-			expandedStories = {};
-			return;
-		}
-		const next = { ...expandedStories };
-		for (const story of visibleStories) next[storyKey(story)] = true;
-		expandedStories = next;
+		expandedStories = toggleExpandAllKeys(
+			visibleStories.map((story) => storyKey(story)),
+			expandedStories,
+			(key) => Boolean(blurredStories.get(key)),
+		);
 	}
 
 	export function toggleReadStatus(index: number): void {
