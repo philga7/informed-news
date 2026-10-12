@@ -11,6 +11,7 @@ import { readClaims } from '../store/claimStore.js';
 import { readEvidenceLinks } from '../store/evidenceLinkStore.js';
 import { writeClaims } from '../store/claimStore.js';
 import type { MuteRule } from '../store/muteRulesStore.js';
+import { readTrackedClaims, trackClaim } from '../store/trackedClaimsStore.js';
 import { extractClaimsFromArticles } from './extractClaims.js';
 import type { ClaimJudgeAnswers, ClaimJudgeResult, ClaimJudgeState } from './typesafeClaimQuestions.js';
 import type { ProposeClaimsInput, ProposeClaimsResult } from './ollamaProposeClaims.js';
@@ -23,6 +24,7 @@ function tempStorePaths() {
     queuePath: path.join(dir, 'claim-review-queue.json'),
     processedPath: path.join(dir, 'claim-extract-processed.json'),
     muteRulesPath: path.join(dir, 'mute-rules.json'),
+    trackedClaimsPath: path.join(dir, 'tracked-claims.json'),
   };
 }
 
@@ -317,6 +319,50 @@ test('extractClaims: alignment to existing id adds evidence only', async () => {
   const links = await readEvidenceLinks(paths.evidencePath);
   assert.equal(links.length, 1);
   assert.equal(links[0]!.claimId, 'existing-1');
+});
+
+test('extractClaims: new evidence on a tracked claim marks it pending in trackedClaimsPath', async () => {
+  const paths = tempStorePaths();
+  const existing: Claim = {
+    id: 'tracked-1',
+    text: 'Prior claim about border movement.',
+    claimType: 'event_occurrence',
+    status: 'insufficient_evidence',
+    entities: [],
+    createdAt: '2026-01-01T00:00:00.000Z',
+    domain: 'conflict',
+  };
+  await writeClaims([existing], paths.claimsPath);
+  await trackClaim('tracked-1', paths.trackedClaimsPath);
+
+  const article = sampleArticle({ id: 'art-tracked' });
+
+  await extractClaimsFromArticles({
+    articleIds: [article.id],
+    readArticlesFn: async () => [article],
+    proposeFn: async (): Promise<ProposeClaimsResult> => ({
+      ok: true,
+      candidates: [{ text: 'More detail on border movement.', claimTypeGuess: null, quote: null }],
+      model: 'mock-propose',
+      rawText: '{}',
+    }),
+    judgeFn: async (): Promise<ClaimJudgeResult> =>
+      mockJudgeResult(
+        highConfidenceAnswers({
+          claimAlignment: {
+            choice: 'tracked-1',
+            confidence: 0.92,
+            probabilities: { 'tracked-1': 0.92 },
+          },
+        }),
+      ),
+    ...paths,
+  });
+
+  const tracked = await readTrackedClaims(paths.trackedClaimsPath);
+  assert.equal(tracked.entries.length, 1);
+  assert.equal(tracked.entries[0]!.claimId, 'tracked-1');
+  assert.equal(tracked.entries[0]!.pendingUpdate, true);
 });
 
 test('extractClaims: already-processed skipped unless force', async () => {

@@ -22,7 +22,7 @@ function tempStorePaths(): { claimsPath: string; evidencePath: string; trackedCl
 }
 
 test('upsertEvidenceLink refreshes claim status on add/remove', async () => {
-  const { claimsPath, evidencePath } = tempStorePaths();
+  const { claimsPath, evidencePath, trackedClaimsPath } = tempStorePaths();
 
   await upsertClaim(
     {
@@ -47,6 +47,7 @@ test('upsertEvidenceLink refreshes claim status on add/remove', async () => {
     },
     evidencePath,
     claimsPath,
+    trackedClaimsPath,
   );
   assert.ok(primarySupport);
 
@@ -66,6 +67,7 @@ test('upsertEvidenceLink refreshes claim status on add/remove', async () => {
     },
     evidencePath,
     claimsPath,
+    trackedClaimsPath,
   );
   assert.ok(contradict);
 
@@ -80,7 +82,7 @@ test('upsertEvidenceLink refreshes claim status on add/remove', async () => {
 });
 
 test('upsertEvidenceLink refreshes claim status on stance change', async () => {
-  const { claimsPath, evidencePath } = tempStorePaths();
+  const { claimsPath, evidencePath, trackedClaimsPath } = tempStorePaths();
 
   await upsertClaim(
     {
@@ -105,6 +107,7 @@ test('upsertEvidenceLink refreshes claim status on stance change', async () => {
     },
     evidencePath,
     claimsPath,
+    trackedClaimsPath,
   );
 
   await upsertEvidenceLink(
@@ -120,6 +123,7 @@ test('upsertEvidenceLink refreshes claim status on stance change', async () => {
     },
     evidencePath,
     claimsPath,
+    trackedClaimsPath,
   );
 
   const before = await getClaimById('c1', claimsPath);
@@ -138,6 +142,7 @@ test('upsertEvidenceLink refreshes claim status on stance change', async () => {
     },
     evidencePath,
     claimsPath,
+    trackedClaimsPath,
   );
 
   const after = await getClaimById('c1', claimsPath);

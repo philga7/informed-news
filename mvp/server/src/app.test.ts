@@ -189,6 +189,7 @@ test('POST /api/brief/accept default-tracks with computed memberCount', async ()
     trackCluster: async (clusterId, memberCount) =>
       await trackCluster(clusterId, memberCount, trackedPath),
     readTrackedStories: async () => await readTrackedStories(trackedPath),
+    readMuteRules: async () => ({ rules: [], updatedAt: null }),
   });
 
   const { baseUrl, close } = await startServer(app);
@@ -2351,6 +2352,7 @@ test('POST /api/claims/unaccept removes membership but does not untrack', async 
 
   const membershipPath = tempClaimMembershipPath();
   const trackedPath = tempTrackedClaimsPath();
+  const reviewQueuePath = tempClaimReviewQueuePath();
 
   const { createApp } = await import('./app.js');
   const app = createApp({
@@ -2369,6 +2371,8 @@ test('POST /api/claims/unaccept removes membership but does not untrack', async 
     readClaimMembership: async () => await readClaimMembership(membershipPath),
     trackClaim: async (claimId) => await trackClaim(claimId, trackedPath),
     readTrackedClaims: async () => await readTrackedClaims(trackedPath),
+    dismissClaimReview: async (claimId) =>
+      await storeDismissClaimReview(claimId, reviewQueuePath),
   });
 
   const { baseUrl, close } = await startServer(app);
