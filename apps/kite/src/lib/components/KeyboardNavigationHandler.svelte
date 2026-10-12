@@ -12,7 +12,7 @@ interface Props {
 	wikipediaPopupVisible: boolean;
 	settingsModalOpen: boolean;
 	showSearchModal?: boolean;
-	/** Indices into `stories` in on-screen order (Informed News topic Brief); omitted = the whole list. */
+	/** Indices into `stories` of the rendered cards in on-screen order (Informed News); omitted = the whole list. */
 	navigationOrder?: number[];
 	onStoryToggle: (storyId: string) => void;
 	onToggleReadStatus?: (index: number) => void;

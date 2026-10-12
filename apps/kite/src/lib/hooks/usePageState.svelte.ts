@@ -47,6 +47,8 @@ export function usePageState() {
 	let storyList = $state<StoryListInstance | undefined>();
 	// Informed News topic Brief: on-screen order for j / k (NEWS-133)
 	let topicBriefNavigationOrder = $state<number[] | undefined>();
+	// Plain story list (fixture, other categories, single-page mode): rendered order for j / k
+	let storyListNavigationOrder = $state<number[] | undefined>();
 
 	// UI overlay state
 	let showSourceOverlay = $state(false);
@@ -271,6 +273,12 @@ export function usePageState() {
 		},
 		set topicBriefNavigationOrder(value) {
 			topicBriefNavigationOrder = value;
+		},
+		get storyListNavigationOrder() {
+			return storyListNavigationOrder;
+		},
+		set storyListNavigationOrder(value) {
+			storyListNavigationOrder = value;
 		},
 
 		// UI overlays

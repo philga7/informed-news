@@ -838,6 +838,117 @@ test.describe('Content-filtered shared story (NEWS-136)', () => {
 	});
 });
 
+test.describe('Keyboard selection follows the plain story list (NEWS-137)', () => {
+	test.beforeEach(() => useScenario('topics'));
+
+	async function hideTitles(page: Page, titles: string[]): Promise<void> {
+		await page.addInitScript((keywords) => {
+			localStorage.setItem(
+				'kite-content-filter',
+				JSON.stringify({ keywords, filterMode: 'hide', filterScope: 'title', version: 1 }),
+			);
+		}, titles.map((title) => title.toLowerCase()));
+	}
+
+	function expectSelection(page: Page) {
+		const announcer = page.getByTestId('keyboard-selection-announcer');
+		const selectedCard = page.locator('article[aria-current="true"]');
+		return async (title: string) => {
+			await expect(announcer).toHaveText(`Selected story: ${title}`);
+			await expect(selectedCard).toHaveCount(1);
+			await expect(storyToggle(selectedCard, title)).toBeVisible();
+		};
+	}
+
+	test('with the story-count cap and a hide filter, j / k / G / gg walk the shown cards; Enter / x / m act on the selected card', async ({
+		page,
+	}) => {
+		await page.goto('/');
+		await expect(page).toHaveTitle(/Informed News/i, { timeout: 60_000 });
+		const stories = await loadOwnedStories(page);
+		expect(stories.length).toBeGreaterThan(3);
+		const [first, hidden, third] = stories;
+
+		// A failed overview falls back to the plain list, as the fixture Brief does.
+		await page.route('**/api/brief/overview', (route) => route.fulfill({ status: 500 }));
+		await page.addInitScript(() => localStorage.setItem('storyCount', '3'));
+		await hideTitles(page, [hidden!.title!]);
+		await page.goto('/');
+		const cards = page.locator('article[id^="story-"]');
+		await expect(cards).toHaveCount(2, { timeout: 60_000 });
+		await expect(page.getByTestId('topic-brief-section')).toHaveCount(0);
+
+		const expectSelected = expectSelection(page);
+		await page.keyboard.press('j');
+		await expectSelected(first!.title!);
+		await page.keyboard.press('j');
+		await expectSelected(third!.title!);
+		await page.keyboard.press('j');
+		await expectSelected(third!.title!);
+		await page.keyboard.press('g');
+		await page.keyboard.press('g');
+		await expectSelected(first!.title!);
+		await page.keyboard.press('G');
+		await expectSelected(third!.title!);
+		await page.keyboard.press('k');
+		await expectSelected(first!.title!);
+		await page.keyboard.press('j');
+		await expectSelected(third!.title!);
+
+		const thirdCard = page.locator(`article#story-${third!.cluster_number}`);
+		const firstCard = page.locator(`article#story-${first!.cluster_number}`);
+		// m first: opening a story marks it read on its own.
+		await page.keyboard.press('m');
+		await expect(thirdCard.getByRole('button', { name: 'Mark as unread' })).toBeVisible();
+		await expect(firstCard.getByRole('button', { name: 'Mark as read' })).toBeVisible();
+
+		const thirdToggle = storyToggle(thirdCard, third!.title!);
+		await page.keyboard.press('Enter');
+		await expect(thirdToggle).toHaveAttribute('aria-expanded', 'true');
+		await page.keyboard.press('x');
+		await expect(thirdToggle).toHaveAttribute('aria-expanded', 'false');
+		await page.keyboard.press('o');
+		await expect(thirdToggle).toHaveAttribute('aria-expanded', 'true');
+		await expect(storyToggle(firstCard, first!.title!)).toHaveAttribute('aria-expanded', 'false');
+	});
+
+	test('in single-page mode with a hide filter, j / k / G / gg walk the shown cards in on-screen order', async ({
+		page,
+	}) => {
+		await page.goto('/');
+		await expect(page).toHaveTitle(/Informed News/i, { timeout: 60_000 });
+		const stories = await loadOwnedStories(page);
+		const [first, hidden, third] = stories;
+		const last = stories[stories.length - 1]!;
+		expect(last.title).not.toBe(hidden!.title);
+
+		await page.addInitScript(() => localStorage.setItem('singlePageMode', 'sequential'));
+		await hideTitles(page, [hidden!.title!]);
+		await page.goto('/');
+		const cards = page.locator('article[id^="story-"]');
+		await expect(cards).toHaveCount(stories.length - 1, { timeout: 60_000 });
+		await expect(page.getByText(hidden!.title!, { exact: true })).toHaveCount(0);
+
+		const expectSelected = expectSelection(page);
+		await page.keyboard.press('j');
+		await expectSelected(first!.title!);
+		await page.keyboard.press('j');
+		await expectSelected(third!.title!);
+		await page.keyboard.press('k');
+		await expectSelected(first!.title!);
+		await page.keyboard.press('G');
+		await expectSelected(last.title!);
+		await page.keyboard.press('g');
+		await page.keyboard.press('g');
+		await expectSelected(first!.title!);
+
+		await page.keyboard.press('j');
+		await page.keyboard.press('m');
+		const thirdCard = page.locator(`article#story-${third!.cluster_number}`);
+		await expect(thirdCard.getByRole('button', { name: 'Mark as unread' })).toBeVisible();
+	});
+});
+
 test.describe('Manual seeds (NEWS-98)', () => {
 	test.beforeEach(() => useScenario('topics'));
 
