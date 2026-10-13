@@ -1,3 +1,9 @@
+## [0.26.24](https://github.com/philga7/informed-news/compare/v0.26.23...v0.26.24) (2026-10-13)
+
+### Bug Fixes
+
+* **NEWS-132, NEWS-151:** pin changelog preset to ^9.3.1; topic Brief filter carry out of $derived ([#192](https://github.com/philga7/informed-news/issues/192)) ([9f2dd04](https://github.com/philga7/informed-news/commit/9f2dd04106076ee7ec45595bfaac4618c93c29a1))
+
 ## [0.26.23](https://github.com/philga7/informed-news/compare/v0.26.22...v0.26.23) (2026-10-12)
 
 ## [0.26.22](https://github.com/philga7/informed-news/compare/v0.26.21...v0.26.22) (2026-10-12)
