@@ -1,13 +1,6 @@
 <script module lang="ts">
 /** Story ids whose on-demand summary was already requested this page load. */
 const requestedSummaries = new Set<string>();
-
-/**
- * Open-card filter decisions by story key. Module-scoped so a Brief reload (or a
- * remount) keeps them; cleared only when filter settings change (NEWS-150).
- */
-let moduleOpenFilterCarry = new Map<string, string[]>();
-let moduleCarrySettingsKey = '';
 </script>
 
 <script lang="ts">
@@ -17,6 +10,7 @@ let moduleCarrySettingsKey = '';
 	import { blurredStories } from '$lib/stores/blurredStories.svelte';
 	import { contentFilter } from '$lib/stores/contentFilter.svelte';
 	import { keyboardNavigation } from '$lib/stores/keyboardNavigation.svelte';
+	import { openFilterCarry } from '$lib/stores/openFilterCarry';
 	import type { Story } from '$lib/types';
 	import { shouldFilterStory } from '$lib/utils/contentFilter';
 	import StoryCard from '$lib/components/story/StoryCard.svelte';
@@ -125,47 +119,45 @@ let moduleCarrySettingsKey = '';
 			(story) => shouldFilterStory(story, keywords, filterScope).matchedKeywords,
 		);
 	});
-	/** Kite content filter (Settings → Filters) keywords each matching story hits. */
-	const filterMatches = $derived.by(() => {
-		if (!contentFilter.isActive) {
-			moduleOpenFilterCarry = new Map();
-			moduleCarrySettingsKey = '';
-			return new Map<Story, string[]>();
-		}
-		// Track settings so a change clears carry; story fields are matched untracked.
-		const settingsKey = `${contentFilter.filterMode}|${contentFilter.filterScope}|${contentFilter.keywords.join('\0')}`;
+	const filterSettingsKey = $derived(
+		contentFilter.isActive
+			? `${contentFilter.filterMode}|${contentFilter.filterScope}|${contentFilter.keywords.join('\0')}`
+			: null,
+	);
+	/** Kite content filter (Settings → Filters) decisions: keywords each matching story hits, plus the open-card carry. */
+	const filterDecision = $derived.by(() => {
+		const settingsKey = filterSettingsKey;
+		if (settingsKey === null) return null;
+		// Story fields are matched untracked; the list and open cards are tracked.
 		const match = matchFilter;
 		expandedStories;
 		stories;
-		if (settingsKey !== moduleCarrySettingsKey) {
-			moduleCarrySettingsKey = settingsKey;
-			moduleOpenFilterCarry = new Map();
-		}
 		const openKeys = new Set(
 			Object.keys(expandedStories).filter((key) => expandedStories[key]),
 		);
-		const decided = untrack(() => {
+		return untrack(() => {
+			const prior = openFilterCarry.get(settingsKey);
 			// Keep prior open-card decisions if expandedStories is transiently empty (reload
 			// swaps the list while TopicBrief remounts) so a summary gained after open can't
 			// hide/blur the card (NEWS-150).
 			const effectiveOpen =
-				openKeys.size > 0 || moduleOpenFilterCarry.size === 0
+				openKeys.size > 0 || prior.size === 0
 					? openKeys
 					: new Set(
-							[...moduleOpenFilterCarry.keys()].filter((key) =>
+							[...prior.keys()].filter((key) =>
 								stories.some((story) => storyKey(story) === key),
 							),
 						);
-			const result = decideTopicBriefFilterMatches(
-				stories,
-				match,
-				effectiveOpen,
-				moduleOpenFilterCarry,
-			);
-			moduleOpenFilterCarry = result.carry;
-			return result.matches;
+			return {
+				settingsKey,
+				...decideTopicBriefFilterMatches(stories, match, effectiveOpen, prior),
+			};
 		});
-		return decided;
+	});
+	const filterMatches = $derived(filterDecision?.matches ?? new Map<Story, string[]>());
+	$effect(() => {
+		if (filterDecision) openFilterCarry.set(filterDecision.settingsKey, filterDecision.carry);
+		else openFilterCarry.clear();
 	});
 	const hideMode = $derived(contentFilter.filterMode === 'hide');
 	const groupedSections = $derived(overview ? groupTopicBrief(overview, stories) : []);
