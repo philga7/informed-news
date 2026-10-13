@@ -4,7 +4,8 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 import { articleIdFromCanonicalUrl, readArticles, updateArticles } from '../store/index.js';
-import type { Article } from '../types/article.js';
+import type { Article, FramingAnalysis } from '../types/article.js';
+import { classifyUnclassifiedArticles } from './classifyArticles.js';
 import type { PublisherBodyResult } from './publisherBodyScrape.js';
 import {
   prepareSurvivor,
@@ -377,7 +378,14 @@ test('withSurvivorFields takes only the fields survivor prep owns; publishedAt o
     imageCaption: 'Idle cranes',
     imageCredit: 'Reuters',
     publishedAt: '2026-09-30T09:00:00.000Z',
+    classifiedAt: null,
+    classifyError: null,
   });
+
+  const failedScrape = { ...prepared, bodyText: null, bodyStatus: 'unavailable' as const };
+  const keptClassify = withSurvivorFields(stored, failedScrape);
+  assert.equal(keptClassify.classifiedAt, '2026-09-30T11:30:00.000Z');
+  assert.equal(keptClassify.classifyError, 'model timeout');
 
   const dated = makeArticle({ publishedAt: '2026-09-30T10:00:00.000Z' });
   assert.equal(withSurvivorFields(dated, prepared).publishedAt, '2026-09-30T10:00:00.000Z');
@@ -414,4 +422,84 @@ test('writeBackSurvivors patches rows still pending and leaves rows another writ
   assert.equal(patched!.bodyStatus, 'unavailable');
   assert.equal(patched!.publisherUrl, PUBLISHER_URL);
   assert.deepEqual(untouched, scrapedMeanwhile);
+});
+
+function framing(framingSummary: string): FramingAnalysis {
+  return {
+    genre: 'news_blurb',
+    headlineDevices: [],
+    dimensions: {
+      loadedLanguage: 0.1,
+      emotionalAppeal: 0.1,
+      certaintyClaiming: 0.1,
+      omissionOrSelectionRisk: 0.1,
+      attributionClarity: 0.9,
+    },
+    framingSummary,
+    evidenceQuotes: [],
+    openQuestions: [],
+    confidence: 0.8,
+  };
+}
+
+test('an article classified before triage scraped its body is classified again with the body', async () => {
+  const articlesPath = path.join(mkdtempSync(path.join(tmpdir(), 'survivor-reclassify-')), 'articles.json');
+  const headlineOnly = storedArticle('headline-only', {
+    sourceKind: 'cfp',
+    classification: framing('From the headline'),
+    classifiedAt: '2026-09-30T11:30:00.000Z',
+  });
+  await updateArticles(() => [headlineOnly], articlesPath);
+
+  await writeBackSurvivors(
+    [{ ...headlineOnly, publisherUrl: PUBLISHER_URL, bodyText: 'Full body text.', bodyStatus: 'ok' }],
+    articlesPath,
+  );
+  const bodies: Array<string | null | undefined> = [];
+  await classifyUnclassifiedArticles(
+    {},
+    {
+      articlesPath,
+      classifyFraming: async (input) => {
+        bodies.push(input.bodyText);
+        return { ok: true, analysis: framing('From the body'), model: 'stub', rawText: '' };
+      },
+    },
+  );
+
+  const [stored] = await readArticles(articlesPath);
+  assert.deepEqual(bodies, ['Full body text.']);
+  assert.equal(stored!.classification?.framingSummary, 'From the body');
+});
+
+test('an article classified with its body keeps that classification through triage write-back', async () => {
+  const articlesPath = path.join(mkdtempSync(path.join(tmpdir(), 'survivor-keep-classify-')), 'articles.json');
+  const triageCopy = storedArticle('with-body', { sourceKind: 'cfp' });
+  const classifiedWithBody: Article = {
+    ...triageCopy,
+    bodyText: 'Body another writer scraped.',
+    bodyStatus: 'ok',
+    classification: framing('From the body'),
+    classifiedAt: '2026-09-30T11:30:00.000Z',
+  };
+  await updateArticles(() => [classifiedWithBody], articlesPath);
+
+  await writeBackSurvivors(
+    [{ ...triageCopy, publisherUrl: PUBLISHER_URL, bodyText: 'Full body text.', bodyStatus: 'ok' }],
+    articlesPath,
+  );
+  let calls = 0;
+  await classifyUnclassifiedArticles(
+    {},
+    {
+      articlesPath,
+      classifyFraming: async () => {
+        calls += 1;
+        return { ok: false, error: 'should not run', model: null, rawText: null };
+      },
+    },
+  );
+
+  assert.equal(calls, 0);
+  assert.deepEqual(await readArticles(articlesPath), [classifiedWithBody]);
 });

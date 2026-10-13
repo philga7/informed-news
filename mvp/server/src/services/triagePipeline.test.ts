@@ -908,7 +908,7 @@ function framing(framingSummary: string): FramingAnalysis {
   };
 }
 
-test('a classification written while triage runs survives the survivor write-back', async () => {
+test('survivor write-back keeps fields written while triage runs, but clears a headline-only classification once the body lands', async () => {
   const articlesPath = path.join(mkdtempSync(path.join(tmpdir(), 'triage-write-back-')), 'articles.json');
   const older = framing('Older framing.');
   const newer = framing('Newer framing.');
@@ -925,7 +925,13 @@ test('a classification written while triage runs survives the survivor write-bac
     overrides: {
       prepareSurvivor: async (a) => {
         await updateArticles(
-          (rows) => rows.map((r) => ({ ...r, classification: newer, classifiedAt: NOW.toISOString() })),
+          (rows) =>
+            rows.map((r) => ({
+              ...r,
+              clusterId: 'c-steel',
+              classification: newer,
+              classifiedAt: NOW.toISOString(),
+            })),
           articlesPath,
         );
         return {
@@ -943,8 +949,9 @@ test('a classification written while triage runs survives the survivor write-bac
   const [stored] = await readArticles(articlesPath);
   assert.equal(stored!.bodyText, 'Full ruling text.');
   assert.equal(stored!.publisherTitle, 'Steel ruling');
-  assert.deepEqual(stored!.classification, newer);
-  assert.equal(stored!.classifiedAt, NOW.toISOString());
+  assert.equal(stored!.clusterId, 'c-steel');
+  assert.equal(stored!.classification, null);
+  assert.equal(stored!.classifiedAt, null);
 });
 
 function seedRecord(articleId: string, over: Partial<TriageRecord> = {}): TriageRecord {

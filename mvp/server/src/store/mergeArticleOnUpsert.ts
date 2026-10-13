@@ -99,7 +99,7 @@ function hasUsableBody(status: BodyStatus, bodyText: string | null): boolean {
 }
 
 /** True when merged body becomes usable for framing vs the prior row. */
-function bodyNewlyUsable(existing: Article, merged: Article): boolean {
+export function bodyNewlyUsable(existing: Article, merged: Article): boolean {
   return (
     hasUsableBody(merged.bodyStatus, merged.bodyText) &&
     !hasUsableBody(existing.bodyStatus, existing.bodyText)

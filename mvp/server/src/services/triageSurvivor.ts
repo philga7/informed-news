@@ -1,4 +1,4 @@
-import { updateArticles } from '../store/index.js';
+import { bodyNewlyUsable, updateArticles } from '../store/index.js';
 import type { Article } from '../types/article.js';
 import { resolveGoogleNewsUrl } from './googleNewsResolve.js';
 import { scrapePublisherBody, type PublisherBodyResult } from './publisherBodyScrape.js';
@@ -112,10 +112,12 @@ export async function prepareSurvivor(
 /**
  * The fields survivor prep owns, from `prepared` onto the stored row: publisher link, citations,
  * body, publisherTitle, image, and publishedAt only when the stored one is empty. Everything else
- * (classification, cluster, topic search stamps, fetchedAt) keeps its stored value.
+ * (classification, cluster, topic search stamps, fetchedAt) keeps its stored value, except that a
+ * body newly usable for framing clears classification: it was made without the body, and batch
+ * classify re-runs `classification === null` rows.
  */
 export function withSurvivorFields(stored: Article, prepared: Article): Article {
-  return {
+  const patched: Article = {
     ...stored,
     publisherUrl: prepared.publisherUrl,
     publisherDomain: prepared.publisherDomain,
@@ -128,6 +130,9 @@ export function withSurvivorFields(stored: Article, prepared: Article): Article 
     imageCredit: prepared.imageCredit,
     publishedAt: stored.publishedAt ?? prepared.publishedAt,
   };
+  return bodyNewlyUsable(stored, patched)
+    ? { ...patched, classification: null, classifiedAt: null, classifyError: null }
+    : patched;
 }
 
 /**
