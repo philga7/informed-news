@@ -1,7 +1,6 @@
-import { randomBytes } from 'node:crypto';
-import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
-import path from 'node:path';
+import { readFile } from 'node:fs/promises';
 import type { BriefSeenEntry, BriefSeenStore } from '../types/brief.js';
+import { writeJsonAtomic } from './jsonFileQueue.js';
 import { BRIEF_SEEN_PATH } from './paths.js';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -57,13 +56,5 @@ export async function writeBriefSeen(
   store: BriefSeenStore,
   seenPath: string = BRIEF_SEEN_PATH,
 ): Promise<void> {
-  await mkdir(path.dirname(seenPath), { recursive: true });
-  const tmpPath = `${seenPath}.tmp-${process.pid}-${randomBytes(6).toString('hex')}`;
-  try {
-    await writeFile(tmpPath, `${JSON.stringify(store, null, 2)}\n`, 'utf8');
-    await rename(tmpPath, seenPath);
-  } catch (err) {
-    await rm(tmpPath, { force: true });
-    throw err;
-  }
+  await writeJsonAtomic(seenPath, store);
 }
