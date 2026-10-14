@@ -1,3 +1,9 @@
+## [0.26.25](https://github.com/philga7/informed-news/compare/v0.26.24...v0.26.25) (2026-10-14)
+
+### Bug Fixes
+
+* **NEWS-152, NEWS-153:** last three stores on the shared JSON write helper; re-classify when triage scrapes the body ([#193](https://github.com/philga7/informed-news/issues/193)) ([f66bc66](https://github.com/philga7/informed-news/commit/f66bc6689d3492b16e03b0c1c4db129a4c7989ce))
+
 ## [0.26.24](https://github.com/philga7/informed-news/compare/v0.26.23...v0.26.24) (2026-10-13)
 
 ### Bug Fixes
