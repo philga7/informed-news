@@ -299,8 +299,10 @@ export function hideFilteredStories(
 }
 
 /**
- * Kite content filter matches decided once per story, so a summary or full story that
- * loads after the card rendered can't hide or blur it. A new matcher decides afresh.
+ * Kite content filter matches decided once per story object, so a summary or full story
+ * that loads later can't change the result. Topic Brief open cards use open-card carry
+ * instead (NEWS-150 / NEWS-154); a caching matcher there would block closed cards from
+ * deciding again. A new matcher decides afresh (e.g. after filter settings change).
  */
 export function createFilterMatcher(
 	match: (story: Story) => string[],
@@ -313,6 +315,33 @@ export function createFilterMatcher(
 			decided.set(story, matched);
 		}
 		return matched;
+	};
+}
+
+/**
+ * Which story keys count as "open" for filter carry.
+ *
+ * A Brief reload briefly empties `expandedStories` while `openFilterCarry` still holds
+ * the open cards (NEWS-150). Before this TopicBrief session has seen any open card,
+ * treat carried keys still in the list as open so that remount doesn't re-decide them.
+ * Once the session has seen opens and every card is closed, return empty so closed cards
+ * decide again (NEWS-154) — otherwise the remount fallback can't tell close from reload.
+ */
+export function openKeysForFilterDecision(
+	openKeys: ReadonlySet<string>,
+	priorCarry: ReadonlyMap<string, string[]>,
+	storyKeys: ReadonlySet<string>,
+	sessionSawOpen: boolean,
+): { effectiveOpen: Set<string>; sessionSawOpen: boolean } {
+	if (openKeys.size > 0) {
+		return { effectiveOpen: new Set(openKeys), sessionSawOpen: true };
+	}
+	if (sessionSawOpen || priorCarry.size === 0) {
+		return { effectiveOpen: new Set(), sessionSawOpen };
+	}
+	return {
+		effectiveOpen: new Set([...priorCarry.keys()].filter((key) => storyKeys.has(key))),
+		sessionSawOpen: false,
 	};
 }
 

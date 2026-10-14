@@ -1086,6 +1086,48 @@ test.describe('Kite content filter on the topic Brief (NEWS-141)', () => {
 			).toBeVisible();
 		});
 	}
+
+	for (const filterMode of ['hide', 'blur'] as const) {
+		test(`${filterMode} mode, all scope: closing the last open card re-decides its filter match (NEWS-154)`, async ({
+			page,
+		}) => {
+			await page.route('**/api/brief/stories/*/summary', (route) =>
+				route.fulfill({
+					json: {
+						ok: true,
+						summary: { status: 'ok', text: 'Ratepayers would see overnight bills change.' },
+					},
+				}),
+			);
+			await filterKeywords(page, ['ratepayers', 'battery'], filterMode, 'all');
+			await page.goto('/');
+			await expect(page.getByTestId('topic-brief-section').first()).toBeVisible({ timeout: 60_000 });
+			await expect(
+				page.getByText(filterMode === 'hide' ? '1 story hidden' : '1 story filtered', {
+					exact: true,
+				}),
+			).toBeVisible();
+
+			const demand = card(page, DEMAND);
+			await storyToggle(demand, DEMAND).click();
+			await expect(demand.getByText('AI summary — not ground truth')).toBeVisible();
+			await expect(storyToggle(demand, DEMAND)).toHaveAttribute('aria-expanded', 'true');
+			await expect(demand.getByText(/Click to show/)).toHaveCount(0);
+
+			// Close the only open card: carry must clear so the summary match applies.
+			await storyToggle(demand, DEMAND).click();
+
+			if (filterMode === 'hide') {
+				await expect(card(page, DEMAND)).toHaveCount(0);
+				await expect(page.getByText('2 stories hidden', { exact: true })).toBeVisible();
+			} else {
+				const blurred = blurredCard(page, ['ratepayers']);
+				await expect(blurred).toBeVisible();
+				await expect(blurred.getByText(/Click to show/)).toBeVisible();
+				await expect(page.getByText('2 stories filtered', { exact: true })).toBeVisible();
+			}
+		});
+	}
 });
 
 /** Category strip: dndzone exposes listitem, not tab, in the a11y tree. */

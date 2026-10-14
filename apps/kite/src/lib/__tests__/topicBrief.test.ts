@@ -53,6 +53,7 @@ import {
 	newlyExpandedKeys,
 	newlyReadIds,
 	nextRefreshLabel,
+	openKeysForFilterDecision,
 	outletBadge,
 	overviewPollFailure,
 	postBriefRefresh,
@@ -289,6 +290,60 @@ describe('decideTopicBriefFilterMatches (NEWS-150)', () => {
 			new Map(),
 		);
 		expect(afterSettings.matches.get(reloadedOpen)).toEqual(['ratepayers']);
+	});
+});
+
+describe('openKeysForFilterDecision (NEWS-154)', () => {
+	const prior = new Map<string, string[]>([['a', []]]);
+	const storyKeys = new Set(['a', 'b']);
+
+	it('treats carried keys still in the list as open only before this session saw an open card (Brief remount)', () => {
+		const remount = openKeysForFilterDecision(new Set(), prior, storyKeys, false);
+		expect([...remount.effectiveOpen]).toEqual(['a']);
+		expect(remount.sessionSawOpen).toBe(false);
+	});
+
+	it('returns empty open keys when this session already saw opens and every card is closed', () => {
+		const closed = openKeysForFilterDecision(new Set(), prior, storyKeys, true);
+		expect([...closed.effectiveOpen]).toEqual([]);
+		expect(closed.sessionSawOpen).toBe(true);
+	});
+
+	it('marks sessionSawOpen when any card is open', () => {
+		const open = openKeysForFilterDecision(new Set(['a']), prior, storyKeys, false);
+		expect([...open.effectiveOpen]).toEqual(['a']);
+		expect(open.sessionSawOpen).toBe(true);
+	});
+
+	it('re-decides a closed card after the last open card closes (carry no longer shields it)', () => {
+		// Same story object + non-caching match (TopicBrief's seam): carry protected while
+		// open; closing clears effectiveOpen so current text is matched again.
+		const matchRatepayers = (story: Story) =>
+			story.short_summary.includes('ratepayers') ? ['ratepayers'] : [];
+		const story = makeStory('a');
+		const first = decideTopicBriefFilterMatches(
+			[story],
+			matchRatepayers,
+			new Set(['a']),
+			new Map(),
+		);
+		expect(first.carry.get('a')).toEqual([]);
+
+		story.short_summary = 'Overnight bills change for ratepayers.';
+		const { effectiveOpen } = openKeysForFilterDecision(
+			new Set(),
+			first.carry,
+			new Set(['a']),
+			true,
+		);
+		const afterClose = decideTopicBriefFilterMatches(
+			[story],
+			matchRatepayers,
+			effectiveOpen,
+			first.carry,
+		);
+		expect(afterClose.matches.get(story)).toEqual(['ratepayers']);
+		expect(afterClose.carry.size).toBe(0);
 	});
 });
 
