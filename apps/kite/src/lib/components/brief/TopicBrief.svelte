@@ -30,7 +30,6 @@ const requestedSummaries = new Set<string>();
 		BRIEF_SUMMARY_LOGIN_HINT,
 		applyFullStory,
 		autoFullStoryRequestKeys,
-		createFilterMatcher,
 		createSeenBatcher,
 		decideTopicBriefFilterMatches,
 		openKeysForFilterDecision,
@@ -115,12 +114,12 @@ const requestedSummaries = new Set<string>();
 	let overviewSequence = 0;
 
 	const useSections = $derived(overviewLoaded && overview !== null && !overview.fixture);
+	// Fresh match each call: open cards keep their decision via openFilterCarry (NEWS-150),
+	// so a caching matcher would block closed cards from deciding again (NEWS-154).
 	const matchFilter = $derived.by(() => {
 		const keywords = [...contentFilter.keywords];
 		const filterScope = contentFilter.filterScope;
-		return createFilterMatcher(
-			(story) => shouldFilterStory(story, keywords, filterScope).matchedKeywords,
-		);
+		return (story: Story) => shouldFilterStory(story, keywords, filterScope).matchedKeywords;
 	});
 	const filterSettingsKey = $derived(
 		contentFilter.isActive

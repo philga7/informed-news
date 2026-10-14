@@ -316,20 +316,20 @@ describe('openKeysForFilterDecision (NEWS-154)', () => {
 	});
 
 	it('re-decides a closed card after the last open card closes (carry no longer shields it)', () => {
+		// Same story object + non-caching match (TopicBrief's seam): carry protected while
+		// open; closing clears effectiveOpen so current text is matched again.
 		const matchRatepayers = (story: Story) =>
 			story.short_summary.includes('ratepayers') ? ['ratepayers'] : [];
-		const before = makeStory('a');
+		const story = makeStory('a');
 		const first = decideTopicBriefFilterMatches(
-			[before],
-			createFilterMatcher(matchRatepayers),
+			[story],
+			matchRatepayers,
 			new Set(['a']),
 			new Map(),
 		);
 		expect(first.carry.get('a')).toEqual([]);
 
-		const afterSummary = makeStory('a', {
-			short_summary: 'Overnight bills change for ratepayers.',
-		});
+		story.short_summary = 'Overnight bills change for ratepayers.';
 		const { effectiveOpen } = openKeysForFilterDecision(
 			new Set(),
 			first.carry,
@@ -337,12 +337,12 @@ describe('openKeysForFilterDecision (NEWS-154)', () => {
 			true,
 		);
 		const afterClose = decideTopicBriefFilterMatches(
-			[afterSummary],
-			createFilterMatcher(matchRatepayers),
+			[story],
+			matchRatepayers,
 			effectiveOpen,
 			first.carry,
 		);
-		expect(afterClose.matches.get(afterSummary)).toEqual(['ratepayers']);
+		expect(afterClose.matches.get(story)).toEqual(['ratepayers']);
 		expect(afterClose.carry.size).toBe(0);
 	});
 });
