@@ -1,3 +1,9 @@
+## [0.26.26](https://github.com/philga7/informed-news/compare/v0.26.25...v0.26.26) (2026-10-14)
+
+### Bug Fixes
+
+* **brief:** reset keyword-filter decisions when all cards close (NEWS-154) ([#194](https://github.com/philga7/informed-news/issues/194)) ([21ad7fe](https://github.com/philga7/informed-news/commit/21ad7fe5fb26978e4d60ad3aa8d854911b0a73da))
+
 ## [0.26.25](https://github.com/philga7/informed-news/compare/v0.26.24...v0.26.25) (2026-10-14)
 
 ### Bug Fixes
