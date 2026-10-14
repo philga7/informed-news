@@ -317,6 +317,33 @@ export function createFilterMatcher(
 }
 
 /**
+ * Which story keys count as "open" for filter carry.
+ *
+ * A Brief reload briefly empties `expandedStories` while `openFilterCarry` still holds
+ * the open cards (NEWS-150). Before this TopicBrief session has seen any open card,
+ * treat carried keys still in the list as open so that remount doesn't re-decide them.
+ * Once the session has seen opens and every card is closed, return empty so closed cards
+ * decide again (NEWS-154) — otherwise the remount fallback can't tell close from reload.
+ */
+export function openKeysForFilterDecision(
+	openKeys: ReadonlySet<string>,
+	priorCarry: ReadonlyMap<string, string[]>,
+	storyKeys: ReadonlySet<string>,
+	sessionSawOpen: boolean,
+): { effectiveOpen: Set<string>; sessionSawOpen: boolean } {
+	if (openKeys.size > 0) {
+		return { effectiveOpen: new Set(openKeys), sessionSawOpen: true };
+	}
+	if (sessionSawOpen || priorCarry.size === 0) {
+		return { effectiveOpen: new Set(), sessionSawOpen };
+	}
+	return {
+		effectiveOpen: new Set([...priorCarry.keys()].filter((key) => storyKeys.has(key))),
+		sessionSawOpen: false,
+	};
+}
+
+/**
  * Filter matches for the topic Brief: open cards keep their prior decision by story key
  * across reloads (new story objects), so text gained after open can't hide/blur them.
  * Closed cards and a fresh prior (filter settings change) decide again.

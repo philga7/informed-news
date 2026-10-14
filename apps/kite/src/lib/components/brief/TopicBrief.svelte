@@ -33,6 +33,7 @@ const requestedSummaries = new Set<string>();
 		createFilterMatcher,
 		createSeenBatcher,
 		decideTopicBriefFilterMatches,
+		openKeysForFilterDecision,
 		fetchBriefOverview,
 		fullStoryErrorCopy,
 		fullStoryLine,
@@ -109,6 +110,8 @@ const requestedSummaries = new Set<string>();
 	let openMore = $state<Record<string, boolean>>({});
 	let summaryRequests = $state<Record<string, SummaryRequestState>>({});
 	let fullStoryRequests = $state<Record<string, FullStoryRequestState>>({});
+	/** True after this mount has seen at least one open card (NEWS-154 vs remount fallback). */
+	let filterSessionSawOpen = $state(false);
 	let overviewSequence = 0;
 
 	const useSections = $derived(overviewLoaded && overview !== null && !overview.fixture);
@@ -128,36 +131,42 @@ const requestedSummaries = new Set<string>();
 	const filterDecision = $derived.by(() => {
 		const settingsKey = filterSettingsKey;
 		if (settingsKey === null) return null;
-		// Story fields are matched untracked; the list and open cards are tracked.
+		// Story fields are matched untracked; the list, open cards, and session flag are tracked.
 		const match = matchFilter;
 		expandedStories;
 		stories;
+		const sessionSawOpen = filterSessionSawOpen;
 		const openKeys = new Set(
 			Object.keys(expandedStories).filter((key) => expandedStories[key]),
 		);
 		return untrack(() => {
 			const prior = openFilterCarry.get(settingsKey);
-			// Keep prior open-card decisions if expandedStories is transiently empty (reload
-			// swaps the list while TopicBrief remounts) so a summary gained after open can't
-			// hide/blur the card (NEWS-150).
-			const effectiveOpen =
-				openKeys.size > 0 || prior.size === 0
-					? openKeys
-					: new Set(
-							[...prior.keys()].filter((key) =>
-								stories.some((story) => storyKey(story) === key),
-							),
-						);
+			const storyKeys = new Set(stories.map(storyKey));
+			// Remount briefly empties expandedStories while carry still holds open cards
+			// (NEWS-150). After this session has seen opens, an empty set means the reader
+			// closed every card — don't keep the remount fallback (NEWS-154).
+			const { effectiveOpen, sessionSawOpen: nextSessionSawOpen } = openKeysForFilterDecision(
+				openKeys,
+				prior,
+				storyKeys,
+				sessionSawOpen,
+			);
 			return {
 				settingsKey,
+				sessionSawOpen: nextSessionSawOpen,
 				...decideTopicBriefFilterMatches(stories, match, effectiveOpen, prior),
 			};
 		});
 	});
 	const filterMatches = $derived(filterDecision?.matches ?? new Map<Story, string[]>());
 	$effect(() => {
-		if (filterDecision) openFilterCarry.set(filterDecision.settingsKey, filterDecision.carry);
-		else openFilterCarry.clear();
+		if (filterDecision) {
+			openFilterCarry.set(filterDecision.settingsKey, filterDecision.carry);
+			filterSessionSawOpen = filterDecision.sessionSawOpen;
+		} else {
+			openFilterCarry.clear();
+			filterSessionSawOpen = false;
+		}
 	});
 	const hideMode = $derived(contentFilter.filterMode === 'hide');
 	const groupedSections = $derived(overview ? groupTopicBrief(overview, stories) : []);
