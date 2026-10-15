@@ -187,3 +187,41 @@ test('NEWS-156: a result made with the body in hand stands when the body changes
   assert.deepEqual(bodies, ['First scrape.']);
   assert.equal(stored!.classification?.framingSummary, 'From the body: First scrape.');
 });
+
+test('NEWS-161: overlapping batch classify makes one model call per unclassified row', async () => {
+  const articlesPath = path.join(mkdtempSync(path.join(tmpdir(), 'classify-single-flight-')), 'articles.json');
+  await upsertArticles(
+    [
+      article({ id: 'a', title: 'A', publishedAt: '2026-09-12T12:00:00.000Z' }),
+      article({ id: 'b', title: 'B', publishedAt: '2026-09-11T12:00:00.000Z' }),
+    ],
+    articlesPath,
+  );
+
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let calls = 0;
+  const classifyFraming: ClassifyDeps['classifyFraming'] = async (input) => {
+    calls += 1;
+    await gate;
+    return { ok: true, analysis: framing(`Framed ${input.title}`), model: 'stub', rawText: '' };
+  };
+
+  // Lock is set synchronously on the first call, so the second joins before any model await.
+  const first = classifyUnclassifiedArticles({}, { articlesPath, classifyFraming });
+  const second = classifyUnclassifiedArticles({}, { articlesPath, classifyFraming });
+  release();
+
+  const [a, b] = await Promise.all([first, second]);
+  assert.equal(calls, 2);
+  assert.equal(a.joined, false);
+  assert.equal(b.joined, true);
+  assert.equal(a.attempted, 2);
+  assert.equal(b.attempted, 2);
+  assert.deepEqual(
+    a.articles.map((row) => row.id).sort(),
+    b.articles.map((row) => row.id).sort(),
+  );
+});

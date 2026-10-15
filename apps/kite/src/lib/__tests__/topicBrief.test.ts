@@ -30,7 +30,6 @@ import {
 	LESS_LIKE_THIS_NOT_STORED,
 	applyFullStory,
 	autoFullStoryRequestKeys,
-	createFilterMatcher,
 	createSeenBatcher,
 	decideTopicBriefFilterMatches,
 	fetchBriefOverview,
@@ -209,39 +208,14 @@ describe('hideFilteredStories (NEWS-141)', () => {
 	});
 });
 
-describe('createFilterMatcher (NEWS-146)', () => {
-	const matchRatepayers = (story: Story) =>
-		story.short_summary.includes('ratepayers') ? ['ratepayers'] : [];
-
-	it("keeps a story's first decision when its summary loads later", () => {
-		const story = makeStory('a');
-		const matcher = createFilterMatcher(matchRatepayers);
-		expect(matcher(story)).toEqual([]);
-		story.short_summary = 'Overnight bills change for ratepayers.';
-		expect(matcher(story)).toEqual([]);
-	});
-
-	it('decides each story on its own, and afresh in a new matcher (filter settings changed)', () => {
-		const loaded = makeStory('a', { short_summary: 'Overnight bills change for ratepayers.' });
-		const pending = makeStory('b');
-		const matcher = createFilterMatcher(matchRatepayers);
-		expect(matcher(loaded)).toEqual(['ratepayers']);
-		expect(matcher(pending)).toEqual([]);
-
-		pending.short_summary = 'Ratepayers: a note for ratepayers.';
-		expect(createFilterMatcher(matchRatepayers)(pending)).toEqual(['ratepayers']);
-	});
-});
-
 describe('decideTopicBriefFilterMatches (NEWS-150)', () => {
 	const matchRatepayers = (story: Story) =>
 		story.short_summary.includes('ratepayers') ? ['ratepayers'] : [];
 
 	it('carries an open card\'s decision across a reload (new story object) by story key', () => {
 		const before = makeStory('a');
-		const matcher = createFilterMatcher(matchRatepayers);
 		const open = new Set(['a']);
-		const first = decideTopicBriefFilterMatches([before], matcher, open, new Map());
+		const first = decideTopicBriefFilterMatches([before], matchRatepayers, open, new Map());
 		expect(first.matches.has(before)).toBe(false);
 		expect(first.carry.get('a')).toEqual([]);
 
@@ -250,7 +224,7 @@ describe('decideTopicBriefFilterMatches (NEWS-150)', () => {
 		});
 		const second = decideTopicBriefFilterMatches(
 			[afterReload],
-			createFilterMatcher(matchRatepayers),
+			matchRatepayers,
 			open,
 			first.carry,
 		);
@@ -263,7 +237,7 @@ describe('decideTopicBriefFilterMatches (NEWS-150)', () => {
 		const closed = makeStory('closed');
 		const first = decideTopicBriefFilterMatches(
 			[openCard, closed],
-			createFilterMatcher(matchRatepayers),
+			matchRatepayers,
 			new Set(['open']),
 			new Map(),
 		);
@@ -276,7 +250,7 @@ describe('decideTopicBriefFilterMatches (NEWS-150)', () => {
 		});
 		const afterReload = decideTopicBriefFilterMatches(
 			[reloadedOpen, reloadedClosed],
-			createFilterMatcher(matchRatepayers),
+			matchRatepayers,
 			new Set(['open']),
 			first.carry,
 		);
@@ -285,7 +259,7 @@ describe('decideTopicBriefFilterMatches (NEWS-150)', () => {
 
 		const afterSettings = decideTopicBriefFilterMatches(
 			[reloadedOpen],
-			createFilterMatcher(matchRatepayers),
+			matchRatepayers,
 			new Set(['open']),
 			new Map(),
 		);

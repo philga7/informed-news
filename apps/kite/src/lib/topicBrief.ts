@@ -299,26 +299,6 @@ export function hideFilteredStories(
 }
 
 /**
- * Kite content filter matches decided once per story object, so a summary or full story
- * that loads later can't change the result. Topic Brief open cards use open-card carry
- * instead (NEWS-150 / NEWS-154); a caching matcher there would block closed cards from
- * deciding again. A new matcher decides afresh (e.g. after filter settings change).
- */
-export function createFilterMatcher(
-	match: (story: Story) => string[],
-): (story: Story) => string[] {
-	const decided = new WeakMap<Story, string[]>();
-	return (story) => {
-		let matched = decided.get(story);
-		if (!matched) {
-			matched = match(story);
-			decided.set(story, matched);
-		}
-		return matched;
-	};
-}
-
-/**
  * Which story keys count as "open" for filter carry.
  *
  * A Brief reload briefly empties `expandedStories` while `openFilterCarry` still holds
