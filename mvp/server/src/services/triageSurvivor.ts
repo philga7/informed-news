@@ -1,5 +1,5 @@
-import { bodyNewlyUsable, updateArticles } from '../store/index.js';
-import type { Article } from '../types/article.js';
+import { updateArticles } from '../store/index.js';
+import { UNCLASSIFIED, bodyNewlyUsable, type Article } from '../types/article.js';
 import { resolveGoogleNewsUrl } from './googleNewsResolve.js';
 import { scrapePublisherBody, type PublisherBodyResult } from './publisherBodyScrape.js';
 import { publisherDomainFromUrl } from './publisherScrape.js';
@@ -130,9 +130,7 @@ export function withSurvivorFields(stored: Article, prepared: Article): Article 
     imageCredit: prepared.imageCredit,
     publishedAt: stored.publishedAt ?? prepared.publishedAt,
   };
-  return bodyNewlyUsable(stored, patched)
-    ? { ...patched, classification: null, classifiedAt: null, classifyError: null }
-    : patched;
+  return bodyNewlyUsable(stored, patched) ? { ...patched, ...UNCLASSIFIED } : patched;
 }
 
 /**

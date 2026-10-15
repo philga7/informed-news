@@ -8,7 +8,13 @@ export type {
   SourceKind,
   StoreMeta,
 } from './article.js';
-export { BODY_TEXT_MAX_CHARS, truncateBodyText } from './article.js';
+export {
+  BODY_TEXT_MAX_CHARS,
+  UNCLASSIFIED,
+  bodyNewlyUsable,
+  truncateBodyText,
+  usableBodyText,
+} from './article.js';
 
 export type {
   Claim,

@@ -116,6 +116,31 @@ export function truncateBodyText(
   return text.slice(0, maxChars);
 }
 
+type ArticleBody = Pick<Article, 'bodyStatus' | 'bodyText'>;
+
+/**
+ * The body text usable for framing, trimmed: publisher scrape `ok` or xcancel tweet-as-body
+ * (`not_applicable`) with non-blank text; otherwise null.
+ */
+export function usableBodyText(article: ArticleBody): string | null {
+  if (article.bodyStatus !== 'ok' && article.bodyStatus !== 'not_applicable') {
+    return null;
+  }
+  return article.bodyText?.trim() || null;
+}
+
+/** True when `after` has a body usable for framing and `before` didn't. */
+export function bodyNewlyUsable(before: ArticleBody, after: ArticleBody): boolean {
+  return usableBodyText(after) !== null && usableBodyText(before) === null;
+}
+
+/** Field values of an unclassified article; batch classify picks these rows up. */
+export const UNCLASSIFIED = {
+  classification: null,
+  classifiedAt: null,
+  classifyError: null,
+} as const satisfies Pick<Article, 'classification' | 'classifiedAt' | 'classifyError'>;
+
 /** Optional fetch/run metadata stored alongside articles */
 export type StoreMeta = {
   lastFetchAt: string | null;

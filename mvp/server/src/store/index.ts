@@ -5,7 +5,7 @@ export {
   citationsFromXcancel,
   migrateArticle,
 } from './migrateArticle.js';
-export { bodyNewlyUsable, mergeArticleOnUpsert } from './mergeArticleOnUpsert.js';
+export { mergeArticleOnUpsert } from './mergeArticleOnUpsert.js';
 export {
   getArticleById,
   markArticlesSearchSeen,

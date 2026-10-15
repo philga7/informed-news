@@ -1,4 +1,4 @@
-import type { Article, BodyStatus } from '../types/article.js';
+import { UNCLASSIFIED, bodyNewlyUsable, type Article } from '../types/article.js';
 
 export type ArticleUpsertInput = Omit<Article, 'id'> & { id?: string };
 
@@ -92,20 +92,6 @@ function withTopicSearchProvenance(existing: Article, merged: Article): Article 
   return next;
 }
 
-function hasUsableBody(status: BodyStatus, bodyText: string | null): boolean {
-  return (
-    (status === 'ok' || status === 'not_applicable') && Boolean(bodyText?.trim())
-  );
-}
-
-/** True when merged body becomes usable for framing vs the prior row. */
-export function bodyNewlyUsable(existing: Article, merged: Article): boolean {
-  return (
-    hasUsableBody(merged.bodyStatus, merged.bodyText) &&
-    !hasUsableBody(existing.bodyStatus, existing.bodyText)
-  );
-}
-
 /**
  * Merge an incoming upsert onto an existing article (if any).
  *
@@ -171,12 +157,7 @@ export function mergeArticleOnUpsert(
   }
 
   if (bodyNewlyUsable(existing, merged)) {
-    return {
-      ...merged,
-      classification: null,
-      classifiedAt: null,
-      classifyError: null,
-    };
+    return { ...merged, ...UNCLASSIFIED };
   }
 
   if (contentUnchanged(existing, incoming)) {
@@ -188,10 +169,5 @@ export function mergeArticleOnUpsert(
     };
   }
 
-  return {
-    ...merged,
-    classification: null,
-    classifiedAt: null,
-    classifyError: null,
-  };
+  return { ...merged, ...UNCLASSIFIED };
 }

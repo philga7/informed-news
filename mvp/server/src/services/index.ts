@@ -206,7 +206,6 @@ export {
   classifyUnclassifiedArticles,
   classifyArticleById,
   sortNewestFirst,
-  framingBodyText,
 } from './classifyArticles.js';
 export {
   extractClaimsFromArticles,

@@ -3,9 +3,21 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
-import { pruneArticles, readArticles, upsertArticle, upsertArticles } from '../store/index.js';
-import type { Article } from '../types/article.js';
-import { classifyUnclassifiedArticles, selectClassifyBatchCandidates } from './classifyArticles.js';
+import {
+  pruneArticles,
+  readArticles,
+  updateArticles,
+  upsertArticle,
+  upsertArticles,
+} from '../store/index.js';
+import type { Article, FramingAnalysis } from '../types/article.js';
+import {
+  classifyArticleById,
+  classifyUnclassifiedArticles,
+  selectClassifyBatchCandidates,
+  type ClassifyDeps,
+} from './classifyArticles.js';
+import { writeBackSurvivors } from './triageSurvivor.js';
 
 function article(overrides: Partial<Article> & Pick<Article, 'id'>): Article {
   return {
@@ -83,4 +95,95 @@ test('classifyUnclassifiedArticles keeps article writes made while it waits on t
   assert.deepEqual(stored.map((x) => x.title).sort(), ['A', 'B']);
   assert.equal(stored.find((x) => x.title === 'A')?.classifyError, 'offline');
   assert.equal(result.attempted, 2);
+});
+
+function framing(framingSummary: string): FramingAnalysis {
+  return {
+    genre: 'news_blurb',
+    headlineDevices: [],
+    dimensions: {
+      loadedLanguage: 0.1,
+      emotionalAppeal: 0.1,
+      certaintyClaiming: 0.1,
+      omissionOrSelectionRisk: 0.1,
+      attributionClarity: 0.9,
+    },
+    framingSummary,
+    evidenceQuotes: [],
+    openQuestions: [],
+    confidence: 0.8,
+  };
+}
+
+/** Stub model whose summary says which input it framed. */
+function recordingClassify(onCall?: (call: number) => Promise<void>) {
+  const bodies: Array<string | null | undefined> = [];
+  const classifyFraming: ClassifyDeps['classifyFraming'] = async (input) => {
+    bodies.push(input.bodyText);
+    await onCall?.(bodies.length);
+    const summary = input.bodyText ? `From the body: ${input.bodyText}` : 'From the headline';
+    return { ok: true, analysis: framing(summary), model: 'stub', rawText: '' };
+  };
+  return { bodies, classifyFraming };
+}
+
+/**
+ * A stored pending row and a stub model; triage's write-back lands 'Full body.' on the row
+ * during the first model call.
+ */
+async function pendingRowWithLateBody() {
+  const articlesPath = path.join(mkdtempSync(path.join(tmpdir(), 'classify-late-body-')), 'articles.json');
+  await updateArticles(() => [article({ id: 'late-body' })], articlesPath);
+  const [pending] = await readArticles(articlesPath);
+  const { bodies, classifyFraming } = recordingClassify(async (call) => {
+    if (call === 1) {
+      await writeBackSurvivors([{ ...pending!, bodyText: 'Full body.', bodyStatus: 'ok' }], articlesPath);
+    }
+  });
+  return { articlesPath, id: pending!.id, bodies, classifyFraming };
+}
+
+test('NEWS-156: a headline-only result that lands after triage wrote the body is redone with the body', async () => {
+  const { articlesPath, bodies, classifyFraming } = await pendingRowWithLateBody();
+
+  const result = await classifyUnclassifiedArticles({}, { articlesPath, classifyFraming });
+
+  const [stored] = await readArticles(articlesPath);
+  assert.deepEqual(bodies, [null, 'Full body.']);
+  assert.equal(stored!.bodyText, 'Full body.');
+  assert.equal(stored!.classification?.framingSummary, 'From the body: Full body.');
+  assert.deepEqual(result.articles, [stored]);
+  assert.deepEqual(
+    { attempted: result.attempted, succeeded: result.succeeded, failed: result.failed },
+    { attempted: 1, succeeded: 1, failed: 0 },
+  );
+});
+
+test('NEWS-156: reclassifying one article redoes a headline-only result when the body lands meanwhile', async () => {
+  const { articlesPath, id, bodies, classifyFraming } = await pendingRowWithLateBody();
+
+  const result = await classifyArticleById(id, { articlesPath, classifyFraming });
+
+  const [stored] = await readArticles(articlesPath);
+  assert.deepEqual(bodies, [null, 'Full body.']);
+  assert.equal(stored!.classification?.framingSummary, 'From the body: Full body.');
+  assert.deepEqual(result, { article: stored, ok: true, error: undefined });
+});
+
+test('NEWS-156: a result made with the body in hand stands when the body changes while the model runs', async () => {
+  const articlesPath = path.join(mkdtempSync(path.join(tmpdir(), 'classify-body-in-hand-')), 'articles.json');
+  const withBody = article({ id: 'with-body', bodyText: 'First scrape.', bodyStatus: 'ok' });
+  await updateArticles(() => [withBody], articlesPath);
+  const { bodies, classifyFraming } = recordingClassify(async () => {
+    await updateArticles(
+      (rows) => rows.map((row) => ({ ...row, bodyText: 'Second scrape.' })),
+      articlesPath,
+    );
+  });
+
+  await classifyUnclassifiedArticles({}, { articlesPath, classifyFraming });
+
+  const [stored] = await readArticles(articlesPath);
+  assert.deepEqual(bodies, ['First scrape.']);
+  assert.equal(stored!.classification?.framingSummary, 'From the body: First scrape.');
 });
