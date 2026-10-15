@@ -1,3 +1,9 @@
+## [0.26.29](https://github.com/philga7/informed-news/compare/v0.26.28...v0.26.29) (2026-10-15)
+
+### Bug Fixes
+
+* **classify:** single-flight batch classify; retire createFilterMatcher (NEWS-161, NEWS-160) ([#197](https://github.com/philga7/informed-news/issues/197)) ([600c9b8](https://github.com/philga7/informed-news/commit/600c9b83c13174be06e816663a10c68ccbc4e02f))
+
 ## [0.26.28](https://github.com/philga7/informed-news/compare/v0.26.27...v0.26.28) (2026-10-15)
 
 ### Bug Fixes
