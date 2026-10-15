@@ -100,8 +100,11 @@ export async function readArticles(articlesPath: string = ARTICLES_PATH): Promis
 /**
  * Find a single article by id.
  */
-export async function getArticleById(id: string): Promise<Article | null> {
-  const articles = await readArticles();
+export async function getArticleById(
+  id: string,
+  articlesPath: string = ARTICLES_PATH,
+): Promise<Article | null> {
+  const articles = await readArticles(articlesPath);
   return articles.find((a) => a.id === id) ?? null;
 }
 

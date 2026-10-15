@@ -1,8 +1,9 @@
-import { usableBodyText, type Article } from '../types/article.js';
+import { bodyNewlyUsable, usableBodyText, type Article } from '../types/article.js';
 import { getArticleById, readArticles, updateArticles } from '../store/index.js';
 import {
   articleFieldsFromClassifyResult,
   classifyFraming,
+  type FramingClassifyResult,
 } from './ollamaFraming.js';
 
 const DEFAULT_BATCH_LIMIT = 10;
@@ -14,6 +15,10 @@ export type ClassifyBatchOptions = {
 
 export type ClassifyBatchResult = {
   limit: number;
+  /**
+   * Articles classified; `succeeded` / `failed` count each once by its last model result, even
+   * when its body landed mid-run and it was classified again.
+   */
   attempted: number;
   succeeded: number;
   failed: number;
@@ -65,37 +70,87 @@ export type ClassifyDeps = {
   articlesPath?: string;
 };
 
-type ClassifyFields = ReturnType<typeof articleFieldsFromClassifyResult>;
+/** A model result and the article as classify read it. */
+type ModelRun = { read: Article; result: FramingClassifyResult };
 
 /**
- * Write classify results onto the articles as stored now: the model calls run outside the
- * article write queue, so other writes may land meanwhile. Articles pruned since are not
- * written back. Resolves to the updated articles that still exist.
+ * Write each result onto its article as stored now: the model calls run outside the article
+ * write queue, so other writes may land meanwhile. Articles pruned since are not written back.
+ * A result made without a body is not written onto a row whose body became usable meanwhile;
+ * those rows resolve as `bodyLanded`.
  */
-async function applyClassifyFields(
-  fieldsById: ReadonlyMap<string, ClassifyFields>,
+async function writeModelRuns(
+  runs: ReadonlyMap<string, ModelRun>,
   articlesPath?: string,
-): Promise<Article[]> {
+): Promise<{ applied: Article[]; bodyLanded: Article[] }> {
   const applied: Article[] = [];
+  const bodyLanded: Article[] = [];
   await updateArticles(
-    (articles) =>
-      articles.map((article) => {
-        const fields = fieldsById.get(article.id);
-        if (!fields) return article;
-        const next = { ...article, ...fields };
+    (stored) =>
+      stored.map((article) => {
+        const run = runs.get(article.id);
+        if (!run) return article;
+        if (bodyNewlyUsable(run.read, article)) {
+          bodyLanded.push(article);
+          return article;
+        }
+        const next = { ...article, ...articleFieldsFromClassifyResult(run.result) };
         applied.push(next);
         return next;
       }),
     articlesPath,
   );
-  return applied;
+  return { applied, bodyLanded };
+}
+
+type ClassifyRun = {
+  /** Updated articles that still exist. */
+  applied: Article[];
+  /** The last model result for each article classified, including articles pruned meanwhile. */
+  results: Map<string, FramingClassifyResult>;
+};
+
+/**
+ * Classify each article as read and write the results (`writeModelRuns`). A row whose body
+ * landed while the model ran is classified again with its body; it already has a usable body,
+ * so its result can't be set aside again: at most two passes.
+ */
+async function classifyAndApply(
+  articles: readonly Article[],
+  classify: typeof classifyFraming,
+  articlesPath?: string,
+): Promise<ClassifyRun> {
+  const applied: Article[] = [];
+  const results = new Map<string, FramingClassifyResult>();
+  let pending = articles;
+
+  while (pending.length > 0) {
+    const runs = new Map<string, ModelRun>();
+    for (const article of pending) {
+      const result = await classify({
+        title: article.title,
+        snippet: article.snippet,
+        publisherDomain: article.publisherDomain,
+        bodyText: usableBodyText(article),
+      });
+      runs.set(article.id, { read: article, result });
+      results.set(article.id, result);
+    }
+
+    const written = await writeModelRuns(runs, articlesPath);
+    applied.push(...written.applied);
+    pending = written.bodyLanded;
+  }
+
+  return { applied, results };
 }
 
 /**
  * Classify articles with null classification, newest-first, up to `limit`.
  * Source-agnostic: CFP and xcancel items share FramingAnalysis.
  * Uses body text when present; otherwise title + snippet.
- * Persists each result (success or recoverable error) via a single write cycle.
+ * Persists each result (success or recoverable error) in one write cycle, plus one more for
+ * rows whose body landed while the model ran.
  */
 export async function classifyUnclassifiedArticles(
   options: ClassifyBatchOptions = {},
@@ -107,37 +162,21 @@ export async function classifyUnclassifiedArticles(
 
   const candidates = selectClassifyBatchCandidates(articles, limit);
 
-  let succeeded = 0;
-  let failed = 0;
   const bySourceKind = { cfp: 0, xcancel: 0, rss: 0, manual: 0, search: 0 };
-  const fieldsById = new Map<string, ClassifyFields>();
-
   for (const article of candidates) {
     bySourceKind[article.sourceKind] += 1;
-    const result = await classify({
-      title: article.title,
-      snippet: article.snippet,
-      publisherDomain: article.publisherDomain,
-      bodyText: usableBodyText(article),
-    });
-    fieldsById.set(article.id, articleFieldsFromClassifyResult(result));
-    if (result.ok) {
-      succeeded += 1;
-    } else {
-      failed += 1;
-    }
   }
 
-  const updated =
-    fieldsById.size > 0 ? await applyClassifyFields(fieldsById, deps.articlesPath) : [];
+  const { applied, results } = await classifyAndApply(candidates, classify, deps.articlesPath);
+  const succeeded = [...results.values()].filter((result) => result.ok).length;
 
   return {
     limit,
-    attempted: fieldsById.size,
+    attempted: results.size,
     succeeded,
-    failed,
+    failed: results.size - succeeded,
     bySourceKind,
-    articles: updated,
+    articles: applied,
   };
 }
 
@@ -147,21 +186,21 @@ export async function classifyUnclassifiedArticles(
  */
 export async function classifyArticleById(
   id: string,
+  deps: ClassifyDeps = {},
 ): Promise<ClassifyOneResult | null> {
-  const article = await getArticleById(id);
+  const article = await getArticleById(id, deps.articlesPath);
   if (!article) {
     return null;
   }
 
-  const result = await classifyFraming({
-    title: article.title,
-    snippet: article.snippet,
-    publisherDomain: article.publisherDomain,
-    bodyText: usableBodyText(article),
-  });
-  const fields = articleFieldsFromClassifyResult(result);
-  const [next] = await applyClassifyFields(new Map([[id, fields]]));
-  if (!next) {
+  const { applied, results } = await classifyAndApply(
+    [article],
+    deps.classifyFraming ?? classifyFraming,
+    deps.articlesPath,
+  );
+  const [next] = applied;
+  const result = results.get(id);
+  if (!next || !result) {
     return null;
   }
 
