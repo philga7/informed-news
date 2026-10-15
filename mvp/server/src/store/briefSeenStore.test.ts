@@ -4,8 +4,8 @@ import { readFile, readdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
-import type { BriefSeenStore } from '../types/brief.js';
-import { readBriefSeen, writeBriefSeen } from './briefSeenStore.js';
+import type { BriefSeenEntry, BriefSeenStore } from '../types/brief.js';
+import { readBriefSeen, updateBriefSeen, writeBriefSeen } from './briefSeenStore.js';
 
 function tempSeenPath(): string {
   const dir = mkdtempSync(path.join(tmpdir(), 'brief-seen-'));
@@ -77,4 +77,29 @@ test('readBriefSeen drops malformed entries', async () => {
     seen: { good: { seenAt: '2026-09-30T12:00:00.000Z', outletCount: 2, significance: 0.8 } },
     updatedAt: null,
   });
+});
+
+/** NEWS-157: concurrent mark-seen style merges must not drop each other's ids. */
+test('NEWS-157 updateBriefSeen serializes concurrent merges so none are lost', async () => {
+  const seenPath = tempSeenPath();
+  await writeBriefSeen({ seen: {}, updatedAt: null }, seenPath);
+
+  const entry = (id: string): BriefSeenEntry => ({
+    seenAt: `2026-09-30T12:00:0${id}.000Z`,
+    outletCount: 1,
+    significance: 1,
+  });
+
+  const mergeOne = (id: string) =>
+    updateBriefSeen(async (store) => {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      return {
+        seen: { ...store.seen, [id]: entry(id) },
+        updatedAt: entry(id).seenAt,
+      };
+    }, seenPath);
+
+  await Promise.all([mergeOne('1'), mergeOne('2'), mergeOne('3')]);
+  const next = await readBriefSeen(seenPath);
+  assert.deepEqual(Object.keys(next.seen).sort(), ['1', '2', '3']);
 });

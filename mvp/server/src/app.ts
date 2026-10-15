@@ -68,8 +68,8 @@ import {
   unacceptClaim,
   untrackClaim,
   untrackCluster,
+  updateBriefSeen,
   updateTopic,
-  writeBriefSeen,
 } from './store/index.js';
 import type { TrackedEntry } from './store/index.js';
 import type { TrackedClaimEntry } from './store/index.js';
@@ -118,7 +118,8 @@ export type CreateAppDeps = {
   ackTrackedClaimUpdate?: typeof ackTrackedClaimUpdate;
   getClaimById?: typeof getClaimById;
   readBriefSeen?: typeof readBriefSeen;
-  writeBriefSeen?: typeof writeBriefSeen;
+  /** Queued brief-seen read-modify-write (NEWS-157). Default: store `updateBriefSeen`. */
+  updateBriefSeen?: typeof updateBriefSeen;
   readBriefSummaries?: typeof readBriefSummaries;
   readBriefFullStories?: typeof readBriefFullStories;
   summarizeBriefStory?: typeof summarizeBriefStory;
@@ -138,15 +139,6 @@ function parseSeenArticleIds(body: unknown): string[] | null {
     ids.push(value.trim());
   }
   return ids;
-}
-
-/** In-process queue for brief-seen.json read-modify-write so concurrent marks aren't lost. */
-let seenWriteChain: Promise<unknown> = Promise.resolve();
-
-function serializeSeenWrite<T>(task: () => Promise<T>): Promise<T> {
-  const run = seenWriteChain.then(task, task);
-  seenWriteChain = run.catch(() => undefined);
-  return run;
 }
 
 const SUMMARY_ERROR_STATUS = { not_in_brief: 404, rate_limited: 429, error: 502 } as const;
@@ -269,7 +261,7 @@ export function createApp(deps: CreateAppDeps = {}): Express {
   const ackTrackedClaim = deps.ackTrackedClaimUpdate ?? ackTrackedClaimUpdate;
   const getClaim = deps.getClaimById ?? getClaimById;
   const readSeen = deps.readBriefSeen ?? readBriefSeen;
-  const writeSeen = deps.writeBriefSeen ?? writeBriefSeen;
+  const updateSeen = deps.updateBriefSeen ?? updateBriefSeen;
   const readSummaries = deps.readBriefSummaries ?? readBriefSummaries;
   const readFullStories = deps.readBriefFullStories ?? readBriefFullStories;
   const summarizeStory = deps.summarizeBriefStory ?? summarizeBriefStory;
@@ -438,11 +430,12 @@ export function createApp(deps: CreateAppDeps = {}): Express {
       return;
     }
     try {
-      const recorded = await serializeSeenWrite(async () => {
-        const [seen, triage] = await Promise.all([readSeen(), readTriageStore()]);
+      let recorded = 0;
+      await updateSeen(async (seen) => {
+        const triage = await readTriageStore();
         const result = markBriefSeen({ seen, triage, articleIds, now: now() });
-        await writeSeen(result.store);
-        return result.recorded;
+        recorded = result.recorded;
+        return result.store;
       });
       res.json({ ok: true, recorded });
     } catch (err) {

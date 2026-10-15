@@ -1,7 +1,7 @@
 import { mkdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { StoreMeta } from '../types/article.js';
-import { writeJsonAtomic } from './jsonFileQueue.js';
+import { enqueueFileWrite, writeJsonAtomic } from './jsonFileQueue.js';
 import { META_PATH } from './paths.js';
 
 const EMPTY_META: StoreMeta = {
@@ -43,13 +43,18 @@ export async function writeMeta(meta: StoreMeta, metaPath: string = META_PATH): 
 
 /**
  * Merge partial updates into existing meta.
+ * Serialized per path so concurrent patches can't drop each other's keys.
+ * `readMeta`'s create-on-missing still uses `writeMeta` (not the queue), so it
+ * can't deadlock with this enqueue.
  */
 export async function updateMeta(
   patch: Partial<StoreMeta>,
   metaPath: string = META_PATH,
 ): Promise<StoreMeta> {
-  const current = await readMeta(metaPath);
-  const next: StoreMeta = { ...current, ...patch };
-  await writeMeta(next, metaPath);
-  return next;
+  return enqueueFileWrite(metaPath, async () => {
+    const current = await readMeta(metaPath);
+    const next: StoreMeta = { ...current, ...patch };
+    await writeMeta(next, metaPath);
+    return next;
+  });
 }

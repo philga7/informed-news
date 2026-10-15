@@ -57,7 +57,7 @@ export {
   readBriefFullStories,
   writeBriefFullStories,
 } from './briefFullStoryStore.js';
-export { readBriefSeen, writeBriefSeen } from './briefSeenStore.js';
+export { readBriefSeen, updateBriefSeen, writeBriefSeen } from './briefSeenStore.js';
 export { acceptClaim, readClaimMembership, unacceptClaim } from './claimMembershipStore.js';
 export type { ClaimMembership } from './claimMembershipStore.js';
 export {

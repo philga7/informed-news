@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import type { BriefSeenEntry, BriefSeenStore } from '../types/brief.js';
-import { writeJsonAtomic } from './jsonFileQueue.js';
+import { enqueueFileWrite, writeJsonAtomic } from './jsonFileQueue.js';
 import { BRIEF_SEEN_PATH } from './paths.js';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -57,4 +57,21 @@ export async function writeBriefSeen(
   seenPath: string = BRIEF_SEEN_PATH,
 ): Promise<void> {
   await writeJsonAtomic(seenPath, store);
+}
+
+/**
+ * Read, apply `mutate`, write atomically; serialized per path so concurrent
+ * mark-seen merges don't drop each other's ids. `mutate` must not call other
+ * brief-seen writes (they would wait on this one).
+ */
+export async function updateBriefSeen(
+  mutate: (seen: BriefSeenStore) => BriefSeenStore | Promise<BriefSeenStore>,
+  seenPath: string = BRIEF_SEEN_PATH,
+): Promise<BriefSeenStore> {
+  return enqueueFileWrite(seenPath, async () => {
+    const current = await readBriefSeen(seenPath);
+    const next = await mutate(current);
+    await writeJsonAtomic(seenPath, next);
+    return next;
+  });
 }
