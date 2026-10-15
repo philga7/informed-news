@@ -3403,7 +3403,7 @@ test('Kite brief: unreadable triage store still fails with 500', async () => {
 });
 
 async function startSeenServer(f: BriefFixture & {
-  writeBriefSeen?: (store: BriefSeenStore) => Promise<void>;
+  updateBriefSeen?: CreateAppDeps['updateBriefSeen'];
   summarizeBriefStory?: CreateAppDeps['summarizeBriefStory'];
   generateFullStory?: CreateAppDeps['generateFullStory'];
 }): Promise<{ baseUrl: string; close: () => Promise<void> }> {
@@ -3411,10 +3411,17 @@ async function startSeenServer(f: BriefFixture & {
   process.env.MVP_PASSWORD = 'pw';
   delete process.env.MVP_PASSWORD_HASH;
 
+  let disk: BriefSeenStore = structuredClone(f.seen ?? { seen: {}, updatedAt: null });
   const { createApp } = await import('./app.js');
   const app = createApp({
     ...briefReads(f),
-    writeBriefSeen: f.writeBriefSeen ?? (async () => {}),
+    readBriefSeen: async () => structuredClone(disk),
+    updateBriefSeen:
+      f.updateBriefSeen ??
+      (async (mutate) => {
+        disk = await mutate(structuredClone(disk));
+        return disk;
+      }),
     ...(f.summarizeBriefStory ? { summarizeBriefStory: f.summarizeBriefStory } : {}),
     ...(f.generateFullStory ? { generateFullStory: f.generateFullStory } : {}),
   });
@@ -3433,8 +3440,9 @@ test('POST /api/brief/seen requires session', async () => {
   let writes = 0;
   const { baseUrl, close } = await startSeenServer({
     articles: [],
-    writeBriefSeen: async () => {
+    updateBriefSeen: async (mutate) => {
       writes += 1;
+      return mutate({ seen: {}, updatedAt: null });
     },
   });
   try {
@@ -3450,8 +3458,9 @@ test('POST /api/brief/seen returns 400 on bad bodies', async () => {
   let writes = 0;
   const { baseUrl, close } = await startSeenServer({
     articles: [],
-    writeBriefSeen: async () => {
+    updateBriefSeen: async (mutate) => {
       writes += 1;
+      return mutate({ seen: {}, updatedAt: null });
     },
   });
   try {
@@ -3502,8 +3511,17 @@ test('POST /api/brief/seen records kept-record snapshots, ignores unknown ids, p
       },
       updatedAt: null,
     },
-    writeBriefSeen: async (store) => {
-      written.push(store);
+    updateBriefSeen: async (mutate) => {
+      const next = await mutate({
+        seen: {
+          'k-recent': { seenAt: '2026-09-25T00:00:00.000Z', outletCount: 1, significance: 1 },
+          'k-old': { seenAt: '2026-09-20T00:00:00.000Z', outletCount: 1, significance: 1 },
+          gone: { seenAt: '2026-09-29T00:00:00.000Z', outletCount: 1, significance: 1 },
+        },
+        updatedAt: null,
+      });
+      written.push(next);
+      return next;
     },
   });
   try {
@@ -3529,26 +3547,28 @@ test('POST /api/brief/seen records kept-record snapshots, ignores unknown ids, p
   }
 });
 
-test('POST /api/brief/seen serializes concurrent marks so none are lost', async () => {
+test('NEWS-157 POST /api/brief/seen serializes concurrent marks so none are lost', async () => {
   let disk: BriefSeenStore = { seen: {}, updatedAt: null };
   process.env.SESSION_SECRET = 'test-secret';
   process.env.MVP_PASSWORD = 'pw';
   delete process.env.MVP_PASSWORD_HASH;
+  const { enqueueFileWrite } = await import('./store/jsonFileQueue.js');
+  const queueKey = path.join(mkdtempSync(path.join(tmpdir(), 'brief-seen-q-')), 'brief-seen.json');
   const { createApp } = await import('./app.js');
   const app = createApp({
     ...briefReads({
       articles: [],
       records: ['k1', 'k2', 'k3'].map((id) => keptRecord(id, ['t1'])),
     }),
-    readBriefSeen: async () => {
-      const snapshot = structuredClone(disk);
-      await new Promise((resolve) => setTimeout(resolve, 10));
-      return snapshot;
-    },
-    writeBriefSeen: async (store) => {
-      await new Promise((resolve) => setTimeout(resolve, 5));
-      disk = store;
-    },
+    updateBriefSeen: (mutate) =>
+      enqueueFileWrite(queueKey, async () => {
+        const snapshot = structuredClone(disk);
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        const next = await mutate(snapshot);
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        disk = next;
+        return next;
+      }),
   });
   const { baseUrl, close } = await startServer(app);
   try {
