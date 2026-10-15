@@ -25,6 +25,8 @@ export type ClassifyBatchResult = {
   /** How many attempted items came from each source (manual seeds and search rows are skipped). */
   bySourceKind: { cfp: number; xcancel: number; rss: number; manual: number; search: number };
   articles: Article[];
+  /** true when this call joined a batch that was already running (NEWS-161). */
+  joined: boolean;
 };
 
 export type ClassifyOneResult = {
@@ -145,16 +147,12 @@ async function classifyAndApply(
   return { applied, results };
 }
 
-/**
- * Classify articles with null classification, newest-first, up to `limit`.
- * Source-agnostic: CFP and xcancel items share FramingAnalysis.
- * Uses body text when present; otherwise title + snippet.
- * Persists each result (success or recoverable error) in one write cycle, plus one more for
- * rows whose body landed while the model ran.
- */
-export async function classifyUnclassifiedArticles(
-  options: ClassifyBatchOptions = {},
-  deps: ClassifyDeps = {},
+/** Process-wide single-flight for batch classify (NEWS-161); mirrors refresh. */
+let batchInFlight: Promise<ClassifyBatchResult> | null = null;
+
+async function runClassifyBatch(
+  options: ClassifyBatchOptions,
+  deps: ClassifyDeps,
 ): Promise<ClassifyBatchResult> {
   const classify = deps.classifyFraming ?? classifyFraming;
   const limit = resolveBatchLimit(options.limit);
@@ -177,7 +175,33 @@ export async function classifyUnclassifiedArticles(
     failed: results.size - succeeded,
     bySourceKind,
     articles: applied,
+    joined: false,
   };
+}
+
+/**
+ * Classify articles with null classification, newest-first, up to `limit`.
+ * Source-agnostic: CFP and xcancel items share FramingAnalysis.
+ * Uses body text when present; otherwise title + snippet.
+ * Persists each result (success or recoverable error) in one write cycle, plus one more for
+ * rows whose body landed while the model ran.
+ *
+ * Single-flight (NEWS-161): an overlapping call joins the running batch and shares its
+ * outcome (including `limit` / deps of the first caller). `POST /api/classify/:id` is
+ * unchanged and does not wait for a running batch.
+ */
+export async function classifyUnclassifiedArticles(
+  options: ClassifyBatchOptions = {},
+  deps: ClassifyDeps = {},
+): Promise<ClassifyBatchResult> {
+  if (batchInFlight) {
+    return batchInFlight.then((result) => ({ ...result, joined: true }));
+  }
+  const promise = runClassifyBatch(options, deps).finally(() => {
+    batchInFlight = null;
+  });
+  batchInFlight = promise;
+  return promise;
 }
 
 /**

@@ -1189,6 +1189,7 @@ export function createApp(deps: CreateAppDeps = {}): Express {
         failed: result.failed,
         bySourceKind: result.bySourceKind,
         articles: result.articles,
+        joined: result.joined,
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
