@@ -1,4 +1,4 @@
-import type { Article } from '../types/article.js';
+import { usableBodyText, type Article } from '../types/article.js';
 import { getArticleById, readArticles, updateArticles } from '../store/index.js';
 import {
   articleFieldsFromClassifyResult,
@@ -45,19 +45,6 @@ function sortNewestFirst(articles: Article[]): Article[] {
     const bKey = b.publishedAt || b.fetchedAt || '';
     return bKey.localeCompare(aKey);
   });
-}
-
-/**
- * Body usable for framing: publisher scrape ok, or xcancel tweet-as-body.
- */
-export function framingBodyText(article: Article): string | null {
-  if (
-    (article.bodyStatus === 'ok' || article.bodyStatus === 'not_applicable') &&
-    article.bodyText?.trim()
-  ) {
-    return article.bodyText.trim();
-  }
-  return null;
 }
 
 /**
@@ -131,7 +118,7 @@ export async function classifyUnclassifiedArticles(
       title: article.title,
       snippet: article.snippet,
       publisherDomain: article.publisherDomain,
-      bodyText: framingBodyText(article),
+      bodyText: usableBodyText(article),
     });
     fieldsById.set(article.id, articleFieldsFromClassifyResult(result));
     if (result.ok) {
@@ -170,7 +157,7 @@ export async function classifyArticleById(
     title: article.title,
     snippet: article.snippet,
     publisherDomain: article.publisherDomain,
-    bodyText: framingBodyText(article),
+    bodyText: usableBodyText(article),
   });
   const fields = articleFieldsFromClassifyResult(result);
   const [next] = await applyClassifyFields(new Map([[id, fields]]));

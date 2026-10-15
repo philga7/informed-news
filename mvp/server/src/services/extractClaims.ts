@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { Article } from '../types/article.js';
+import { usableBodyText, type Article } from '../types/article.js';
 import type { Claim, ClaimType, EvidenceLink, EvidenceStance, SourceTier } from '../types/claim.js';
 import type { ClaimReviewQueueEntry } from '../store/claimReviewQueueStore.js';
 import type { MuteRule, MuteRulesStore } from '../store/muteRulesStore.js';
@@ -22,7 +22,7 @@ import {
   MUTE_RULES_PATH,
   TRACKED_CLAIMS_PATH,
 } from '../store/paths.js';
-import { framingBodyText, sortNewestFirst } from './classifyArticles.js';
+import { sortNewestFirst } from './classifyArticles.js';
 import { articleMatchesMute } from './muteMatch.js';
 import {
   proposeClaimCandidates,
@@ -118,7 +118,7 @@ function resolveBatchLimit(override?: number): number {
 }
 
 function articleExcerpt(article: Article): string {
-  const body = framingBodyText(article);
+  const body = usableBodyText(article);
   if (body) return body;
   const title = article.title?.trim() || '';
   const snippet = article.snippet?.trim() || '';
@@ -291,7 +291,7 @@ export async function extractClaimsFromArticles(
   };
 
   for (const article of candidates) {
-    const bodyText = framingBodyText(article);
+    const bodyText = usableBodyText(article);
     const proposeResult = await proposeFn({
       title: article.title,
       snippet: article.snippet,
