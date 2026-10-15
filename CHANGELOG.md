@@ -1,3 +1,9 @@
+## [0.26.28](https://github.com/philga7/informed-news/compare/v0.26.27...v0.26.28) (2026-10-15)
+
+### Bug Fixes
+
+* **pipeline:** single usable-body rule; re-classify late headline-only results (NEWS-159, NEWS-156) ([#196](https://github.com/philga7/informed-news/issues/196)) ([582cf2b](https://github.com/philga7/informed-news/commit/582cf2b93f5588c1ba2b35fbe6adf9552a9b0a82))
+
 ## [0.26.27](https://github.com/philga7/informed-news/compare/v0.26.26...v0.26.27) (2026-10-15)
 
 ### Bug Fixes
