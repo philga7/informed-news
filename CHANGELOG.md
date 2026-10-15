@@ -1,3 +1,9 @@
+## [0.26.27](https://github.com/philga7/informed-news/compare/v0.26.26...v0.26.27) (2026-10-15)
+
+### Bug Fixes
+
+* **store:** queue brief-seen and meta writes (NEWS-157, NEWS-158) ([#195](https://github.com/philga7/informed-news/issues/195)) ([c005a65](https://github.com/philga7/informed-news/commit/c005a65c488e5c6c197ad5263f1db36e40fe1c28))
+
 ## [0.26.26](https://github.com/philga7/informed-news/compare/v0.26.25...v0.26.26) (2026-10-14)
 
 ### Bug Fixes
