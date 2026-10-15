@@ -55,3 +55,29 @@ test('writeMeta is atomic: concurrent writes leave valid JSON and no .tmp files'
   assert.match(meta.lastError ?? '', /^e\d$/);
   assert.deepEqual(readdirSync(path.dirname(metaPath)), ['meta.json']);
 });
+
+/** NEWS-158: concurrent updateMeta patches with different keys must all land. */
+test('NEWS-158 concurrent updateMeta patches with different keys all land', async () => {
+  const metaPath = tempMetaPath();
+  await writeMeta({ lastFetchAt: null, lastError: null }, metaPath);
+
+  await Promise.all([
+    updateMeta({ lastFetchAt: '2026-09-30T12:00:00.000Z' }, metaPath),
+    updateMeta({ lastError: 'CFP down' }, metaPath),
+    updateMeta(
+      {
+        brief: {
+          at: '2026-09-30T12:02:00.000Z',
+          summaries: { budget: 60, used: 1, generated: 1, reused: 0, unavailable: 0, errors: [] },
+        },
+      },
+      metaPath,
+    ),
+  ]);
+
+  const meta = await readMeta(metaPath);
+  assert.equal(meta.lastFetchAt, '2026-09-30T12:00:00.000Z');
+  assert.equal(meta.lastError, 'CFP down');
+  assert.equal(meta.brief?.at, '2026-09-30T12:02:00.000Z');
+  assert.equal(meta.brief?.summaries.used, 1);
+});
