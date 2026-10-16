@@ -142,6 +142,10 @@ Repo-local skills live under `.cursor/skills/` (see [docs/AGENT_SKILLS.md](docs/
 | `/code-review` | Two parallel reviews of a diff: repo standards + code smells, and spec (the NEWS ticket) | Before opening a PR; "review since `main`" |
 | `/playwright-best-practices` | Playwright locators, waiting, fixtures, flaky-test fixes | Writing or debugging `test:e2e:kite` specs (keep the hermetic `e2e/stack/`) |
 | `/news-ship-loop` | NEWS Jira In Progress → PR/merge → Done + plan cleanup | Starting/finishing a NEWS-* item or merging its PR |
+| `/osint` | Source credibility, verification, privacy/ethics | News analysis / OSINT planning |
+| `/seo` | Metadata, headings, alt text, technical SEO | Landing / marketing pages |
+| `/devops-risk-reducer` | CI/CD, secrets, deploy/rollback risk | Workflows, infra, deploy scripts |
+| `/database-sage` | Schema, indexes, migrations, ORM pitfalls | SQL / models / migrations |
 | `/update-skills` | Check copied skills for freshness | Refreshing repo-local skills with the portable recipe |
 | `/agent-browser` | Scripted browser CLI (stub skill; install CLI separately) | Inspect/verify pages outside IDE browser |
 | `/diagnosing-bugs` | Gated debug loop: repro → minimize → fix → regression | Hard bugs / “why is this broken/slow?” |

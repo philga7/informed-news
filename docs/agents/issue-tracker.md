@@ -1,6 +1,6 @@
 # Issue tracker: Jira (NEWS)
 
-Issues and specs for this repo live in the **NEWS** project on Jira Cloud (`https://informedcrew.atlassian.net`). Use the Atlassian MCP server for all operations; there is no `gh issue` / GitHub Issues workflow here. Full connection details and issue type ids: [`.cursor/rules/jira-news.mdc`](../../.cursor/rules/jira-news.mdc).
+Issues and specs for this repo live in the **NEWS** project on Jira Cloud (`https://informedcrew.atlassian.net`). Use the Atlassian MCP server for all operations; there is no `gh issue` / GitHub Issues workflow here. Connection defaults: [`.cursor/rules/jira-news.mdc`](../../.cursor/rules/jira-news.mdc). Ticket body shape when filing: [news-ship-loop](../../.cursor/skills/news-ship-loop/SKILL.md) (§ Ticket description shape).
 
 ## Conventions
 

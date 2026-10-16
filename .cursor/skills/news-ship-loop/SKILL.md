@@ -81,6 +81,26 @@ After SDD final review is clean (or a focused build is ready to ship), **before*
 
 Skipping the *ask* is the defect. “None” after an honest triage is success.
 
+### Ticket description shape (when creating NEWS issues)
+
+Use plain language. Prefer this shape (keep it short):
+
+```
+## Summary
+<2–3 sentences: context + goal>
+
+## Size
+S | M | L
+
+## Acceptance criteria
+- [ ] …
+
+## Edge cases / constraints
+- …
+```
+
+Focus on why/what, not implementation. Do not invent architecture in the ticket body.
+
 ### 3. Ship to GitHub (only when asked)
 
 1. Ensure working tree is clean of secrets (never commit `mvp/.env`, `mvp/data/*.json`).

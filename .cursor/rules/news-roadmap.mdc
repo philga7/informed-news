@@ -5,8 +5,8 @@ alwaysApply: true
 
 # NEWS roadmap pointer
 
-Before choosing “what to build next” in the NEWS project, read [docs/ROADMAP.md](docs/ROADMAP.md).
+Before choosing “what to build next”, read [docs/ROADMAP.md](../../docs/ROADMAP.md).
 
-- **Current next** is documented in [docs/ROADMAP.md](docs/ROADMAP.md) (as of writing: Epic **L** NEWS-84 topic-driven brief, NEWS-85 through NEWS-91, NEWS-99, NEWS-100, NEWS-102, NEWS-98, NEWS-104, NEWS-115, NEWS-117 Done; Epic L has only Later rows left; Epic K NEWS-118 through NEWS-161 and NEWS-123 Done; next NEWS-162 (Epic K: classify-by-id vs batch race); hosting NEWS-109–112 deferred to Later (app runs locally); Epic K NEWS-83 open as bug intake; Epic J Done, claims desk parked (NEWS-91); ask before parked Later under NEWS-57 or Epic B).
-- Parked epics B–G stay parked unless the user explicitly reorders.
-- If Jira status disagrees with the doc, Jira wins — update `docs/ROADMAP.md` in the same change set.
+- **Current next** is the preferred order; Jira is status source of truth
+- Parked epics stay parked unless the user explicitly reorders
+- If Jira and the doc disagree, **Jira wins** — update `docs/ROADMAP.md` in the same change set

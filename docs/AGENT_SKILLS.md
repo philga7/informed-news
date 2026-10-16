@@ -26,6 +26,10 @@ Mid-epic: do not re-grill finished work. New discoveries → additional tickets 
 
 - `news-ship-loop` — repo-local NEWS ship ritual for Jira, git, and PR handoff.
 - `update-skills` — repo-local freshness checker for copied skills in this repository.
+- `osint` — OSINT / source verification lead (retired from `.cursor/rules/osint-practitioner.mdc`).
+- `seo` — landing/marketing SEO (retired from rules).
+- `devops-risk-reducer` — CI/CD and ops risk review (retired from rules).
+- `database-sage` — schema/query/migration review (retired from rules).
 
 ## Inventory
 
@@ -43,6 +47,10 @@ Mid-epic: do not re-grill finished work. New discoveries → additional tickets 
 | `playwright-best-practices` | Build / Verify | [currents-dev/playwright-best-practices-skill](https://github.com/currents-dev/playwright-best-practices-skill) |
 | `news-ship-loop` | Ship | Informed News (repo-local) |
 | `update-skills` | Package / Maintain | Informed News (portable recipe) |
+| `osint` | Shape / Verify | Informed News (from retired OSINT rule) |
+| `seo` | Shape / Verify | Informed News (from retired SEO rule) |
+| `devops-risk-reducer` | Verify | Informed News (from retired DevOps rule) |
+| `database-sage` | Build / Verify | Informed News (from retired DB rule) |
 | `agent-browser` | Verify | [vercel-labs/agent-browser](https://github.com/vercel-labs/agent-browser) |
 | `diagnosing-bugs` | Verify | mattpocock/skills |
 | `skill-creator` | Package | anthropics/skills |
@@ -138,5 +146,5 @@ In Cursor Agent chat: `/skill-name` (e.g. `/grill-me`) or `@` attach. Model-invo
 
 - Tracker: **NEWS** (`informedcrew.atlassian.net`). Prefer JQL `project = NEWS`.
 - Product path: `npm run dev` → Kite Brief + `mvp/server`. Prototypes stay off that default entrypoint.
-- Skills do not replace [AGENTS.md](../AGENTS.md) rules or `.cursor/rules/`.
-- Ship ritual: `/news-ship-loop` + `.cursor/rules/news-ship-loop.mdc`.
+- Skills do not replace [AGENTS.md](../AGENTS.md). Always-on guardrails stay in `.cursor/rules/` (`jira-news`, `news-roadmap`, `no-subagent-timers`); personas live as skills.
+- Ship ritual: `/news-ship-loop`.
