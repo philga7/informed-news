@@ -107,7 +107,7 @@ export function articleOwnedUrls(article: Article): Set<string> {
   return urls;
 }
 
-/** URLs mentioned in tweet/snippet text (xcancel ↔ publisher link). */
+/** URLs mentioned in tweet/snippet text (legacy xcancel ↔ publisher link). */
 export function urlsInText(...texts: Array<string | null | undefined>): Set<string> {
   const urls = new Set<string>();
   for (const text of texts) {

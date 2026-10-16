@@ -34,6 +34,7 @@ export type FramingAnalysis = {
   confidence: number;
 };
 
+/** `xcancel` is legacy only (NEWS-123); refresh no longer creates these rows. */
 export type SourceKind = 'cfp' | 'xcancel' | 'rss' | 'manual' | 'search';
 
 /** Publisher body scrape / tweet-as-body status. */
@@ -71,7 +72,7 @@ export type Article = {
   snippet: string;
   /**
    * Truncated original text when available.
-   * CFP: from publisher scrape. xcancel: tweet text (bodyStatus not_applicable).
+   * CFP: from publisher scrape. Legacy xcancel: tweet text (bodyStatus not_applicable).
    */
   bodyText: string | null;
   bodyStatus: BodyStatus;
@@ -119,7 +120,7 @@ export function truncateBodyText(
 type ArticleBody = Pick<Article, 'bodyStatus' | 'bodyText'>;
 
 /**
- * The body text usable for framing, trimmed: publisher scrape `ok` or xcancel tweet-as-body
+ * The body text usable for framing, trimmed: publisher scrape `ok` or legacy xcancel tweet-as-body
  * (`not_applicable`) with non-blank text; otherwise null.
  */
 export function usableBodyText(article: ArticleBody): string | null {

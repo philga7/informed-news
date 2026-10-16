@@ -108,7 +108,7 @@ function withTopicSearchProvenance(existing: Article, merged: Article): Article 
  * selects `classification === null`, and a stale flag would need schema + UI.
  *
  * Body fields: placeholders and flaky unavailable do not wipe a prior ok scrape;
- * intentional ok/blocked (and xcancel tweet text) apply from incoming.
+ * intentional ok/blocked (and legacy xcancel tweet text) apply from incoming.
  *
  * clusterId: fetch paths send null; keep existing until the cluster pass rewrites.
  *

@@ -31,7 +31,6 @@ playwright/.cache
 
 # MVP local JSON data store
 mvp/data/*.json
-!mvp/data/x-profiles.example.json
 
 # Committed SSH key material — rotate and untrack (separate security chore)
 informed_news

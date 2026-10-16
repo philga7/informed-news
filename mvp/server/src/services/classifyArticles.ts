@@ -181,7 +181,7 @@ async function runClassifyBatch(
 
 /**
  * Classify articles with null classification, newest-first, up to `limit`.
- * Source-agnostic: CFP and xcancel items share FramingAnalysis.
+ * Source-agnostic: CFP and legacy xcancel items share FramingAnalysis.
  * Uses body text when present; otherwise title + snippet.
  * Persists each result (success or recoverable error) in one write cycle, plus one more for
  * rows whose body landed while the model ran.

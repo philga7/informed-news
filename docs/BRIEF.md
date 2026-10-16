@@ -30,7 +30,7 @@ Summaries are 1–2 neutral sentences written by Ollama **only for stories shown
 
 1. The kept article's scraped body.
 2. The scraped body of its first duplicate (in group order).
-3. For posts with no page to scrape (e.g. xcancel), the post text when it is at least 120 characters.
+3. For posts with no page to scrape (e.g. legacy xcancel rows), the post text when it is at least 120 characters.
 
 The first 3,000 characters are used, with the source article's headline. With no source text the card shows the headline and **"Full text unavailable"** — no Ollama call is made and nothing is invented.
 
@@ -91,7 +91,7 @@ A story counts as **seen** when you open it or mark it read in the Brief (includ
 
 ## Refresh
 
-A refresh runs the whole pipeline: CFP → curated RSS → xcancel → topic search → clustering → triage → Brief summaries → qualifying full stories → prune saved summaries, full stories, and articles ([Retention](#retention)). There is no tracked-stories step and no claims extraction. The timer, the startup catch-up, and the Refresh button share one runner: a refresh requested while one is running joins it instead of starting another.
+A refresh runs the whole pipeline: CFP → curated RSS → topic search → clustering → triage → Brief summaries → qualifying full stories → prune saved summaries, full stories, and articles ([Retention](#retention)). There is no tracked-stories step and no claims extraction. X/Twitter history is not ingested on refresh ([NEWS-123](https://informedcrew.atlassian.net/browse/NEWS-123); [BIRDCLAW.md](BIRDCLAW.md)). The timer, the startup catch-up, and the Refresh button share one runner: a refresh requested while one is running joins it instead of starting another.
 
 **Timer.** The server checks once at startup and then every 5 minutes. A refresh starts when the last successful one finished at least `REFRESH_INTERVAL_HOURS` ago (default 3), or there has never been one (a store from before NEWS-88 uses its last fetch time instead). After a failed refresh it waits 30 minutes before trying again. A stored time that is unreadable or in the future (e.g. after a clock change) counts as missing, so a refresh runs and the 30-minute wait is skipped. A laptop that slept catches up on the first check after it wakes; an always-on host behaves the same. The server log says at startup whether auto-refresh is on and at what interval.
 
@@ -147,7 +147,7 @@ Tickets: [NEWS-99](https://informedcrew.atlassian.net/browse/NEWS-99) (summaries
 - A failed refresh (e.g. CFP down) doesn't prune; triage didn't change, so there's nothing new to drop.
 - A pruned story that reappears (kept again, or opened later) gets a new summary or full story on demand or at the next refresh, as if it had never had one. While a summary is kept, the source-text hash check still reuses it without a call.
 
-**Articles** ([NEWS-117](https://informedcrew.atlassian.net/browse/NEWS-117)). Right after that, the server prunes `articles.json`. An article's age runs from when it was **last seen**: the latest of `publishedAt`, `fetchedAt`, and `searchSeenAt`. A feed (CFP, curated RSS, xcancel) that returns the article again re-upserts it and moves `fetchedAt` forward; topic search skips stored stories and sets `searchSeenAt` instead ([TOPIC_SEARCH.md](TOPIC_SEARCH.md)). So nothing a source still returns is pruned and then re-triaged as new.
+**Articles** ([NEWS-117](https://informedcrew.atlassian.net/browse/NEWS-117)). Right after that, the server prunes `articles.json`. An article's age runs from when it was **last seen**: the latest of `publishedAt`, `fetchedAt`, and `searchSeenAt`. A feed (CFP, curated RSS) that returns the article again re-upserts it and moves `fetchedAt` forward; topic search skips stored stories and sets `searchSeenAt` instead ([TOPIC_SEARCH.md](TOPIC_SEARCH.md)). So nothing a source still returns is pruned and then re-triaged as new.
 
 - An article **with a triage record** (kept, dropped, or a seed) stays for **14 days** after it was last seen (`ARTICLE_RETENTION_DAYS` in `triageConfig.ts`), longer than any Brief cache. Its triage record is dropped at the next refresh's triage write, and its summary and full story then go with the rule above.
 - An article **with no triage record** (never a candidate, a removed seed, or a seed whose save failed) stays for **48 hours** after it was last seen; past that, triage can't pick it up.

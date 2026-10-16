@@ -6,11 +6,11 @@ Triage decides which new stories are worth a reader's attention. Kept stories ar
 
 ## When it runs
 
-In every refresh — the auto-refresh timer, the startup catch-up, the Kite **Refresh** button, or `POST /api/fetch` ([BRIEF.md](BRIEF.md#refresh)): CFP → curated RSS → xcancel → topic search → clustering → **triage** → Brief summaries. It runs inline (4 story groups in flight at once).
+In every refresh — the auto-refresh timer, the startup catch-up, the Kite **Refresh** button, or `POST /api/fetch` ([BRIEF.md](BRIEF.md#refresh)): CFP → curated RSS → topic search → clustering → **triage** → Brief summaries. It runs inline (4 story groups in flight at once).
 
 **Candidates** are articles that:
 
-- come from any source except manual Brief seeds (`sourceKind` `cfp`, `rss`, `xcancel`, or `search`; a seed gets its own kept record when saved, [BRIEF.md](BRIEF.md#added-stories-seeds)),
+- come from any source except manual Brief seeds (`sourceKind` `cfp`, `rss`, `search`, or legacy `xcancel`; a seed gets its own kept record when saved, [BRIEF.md](BRIEF.md#added-stories-seeds)),
 - are within the last **48 hours** (`publishedAt`, or `fetchedAt` when there is no date), and
 - have no triage record yet, or only a non-final one (see drop reasons).
 

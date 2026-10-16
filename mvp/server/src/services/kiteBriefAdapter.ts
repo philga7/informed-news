@@ -151,7 +151,7 @@ export function ownedBriefFixtureArticles(
       handle: null,
       publishedAt: iso,
       snippet:
-        'Placeholder cluster from Informed News owned-brief adapter. Run POST /api/fetch after login to replace with live CFP/xcancel ingest.',
+        'Placeholder cluster from Informed News owned-brief adapter. Run POST /api/fetch after login to replace with live CFP / curated / topic-search ingest.',
       bodyText: null,
       bodyStatus: 'not_applicable',
       publisherTitle: null,

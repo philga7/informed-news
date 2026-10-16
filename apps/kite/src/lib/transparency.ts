@@ -28,7 +28,7 @@ export const TRANSPARENCY_SECTIONS: TransparencySection[] = [
 		id: 'methodology',
 		title: 'Methodology',
 		paragraphs: [
-			'The Brief pulls from owned ingest (today: Citizen Free Press RSS and optional xcancel profiles), stores dual citations when available (aggregator + original publisher), and may cluster related items. Framing and enrichment use AI models (Ollama Cloud) to produce structured analysis such as framing summaries, evidence quotes, and — as enrichment lands — highlights, timelines, and Q&A.',
+			'The Brief pulls from owned ingest (today: Citizen Free Press RSS, curated radar feeds, and topic search), stores dual citations when available (aggregator + original publisher), and may cluster related items. Framing and enrichment use AI models (Ollama Cloud) to produce structured analysis such as framing summaries, evidence quotes, and — as enrichment lands — highlights, timelines, and Q&A.',
 			'That analysis is AI-assisted, not ground truth. It is not a left–right bias score, an outlet “trust” rating, or a claim verdict. Readers should verify important details against the cited sources. Summaries can be wrong, incomplete, or skewed by source selection.',
 			'We intentionally reject spectrum meters, trust grids, and automated “verified / false” badges as product features.',
 		],

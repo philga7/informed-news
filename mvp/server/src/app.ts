@@ -309,12 +309,12 @@ export function createApp(deps: CreateAppDeps = {}): Express {
   app.use('/api', createAuthRouter());
 
   /**
-   * Unified refresh: CFP → curated RSS → xcancel (when configured) → topic search → triage
-   * → tracked-stories sync → Brief summaries (shared single-flight runner with the timer).
+   * Unified refresh: CFP → curated RSS → topic search → triage → Brief summaries
+   * (shared single-flight runner with the timer).
    * Optional body/query: { limit?: number, feedUrl?: string } — ignored when joining a running refresh.
    * Empty/missing radar-sources.json skips curated without failing CFP.
-   * Empty XCANCEL_PROFILES / x-profiles.json skips xcancel without failing CFP.
-   * Curated/xcancel/topic search errors are returned in the payload; CFP still succeeds.
+   * Curated/topic search errors are returned in the payload; CFP still succeeds.
+   * X/Twitter history is not part of refresh (NEWS-123); see docs/BIRDCLAW.md.
    */
   app.post('/api/fetch', async (req, res) => {
     try {
@@ -342,13 +342,6 @@ export function createApp(deps: CreateAppDeps = {}): Express {
           fetched: result.curated.fetched,
           errors: result.curated.errors,
           articles: result.curated.upserted,
-        },
-        xcancel: {
-          skipped: result.xcancel.skipped,
-          handles: result.xcancel.handles,
-          fetched: result.xcancel.fetched,
-          errors: result.xcancel.errors,
-          articles: result.xcancel.upserted,
         },
         topicSearch: {
           skipped: result.topicSearch.skipped,

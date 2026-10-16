@@ -3,8 +3,6 @@ import type { Article } from '../types/article.js';
 import { assignClusterIds } from './clusterArticles.js';
 import { fetchCfpArticles } from './cfpFetch.js';
 import type { CfpFetchOptions, CfpFetchResult } from './cfpFetch.js';
-import { fetchXcancelArticles } from './xcancelFetch.js';
-import type { XcancelFetchOptions, XcancelFetchResult } from './xcancelFetch.js';
 import { fetchCuratedRss } from './curatedRssFetch.js';
 import type {
   CuratedRssFetchOptions,
@@ -16,9 +14,7 @@ import { resolveTriageBudgets } from './triageConfig.js';
 import { runTriage } from './triagePipeline.js';
 import type { TriageResult } from './triagePipeline.js';
 
-export type FetchAllOptions = CfpFetchOptions &
-  XcancelFetchOptions &
-  CuratedRssFetchOptions;
+export type FetchAllOptions = CfpFetchOptions & CuratedRssFetchOptions;
 
 export type FetchTierCounts = {
   fetched: number;
@@ -33,7 +29,6 @@ export type FetchTiers = {
 export type FetchAllResult = {
   cfp: CfpFetchResult;
   curated: CuratedRssFetchResult;
-  xcancel: XcancelFetchResult;
   topicSearch: TopicSearchResult;
   triage: TriageResult;
   articles: Article[];
@@ -58,20 +53,6 @@ export function countFetchTiers(
   return {
     sensor: { fetched: sensor, upserted: sensor },
     primary: { fetched: primary, upserted: primary },
-  };
-}
-
-function emptyXcancelFailure(
-  message: string,
-  options: XcancelFetchOptions = {},
-): XcancelFetchResult {
-  return {
-    fetched: 0,
-    upserted: [],
-    handles: options.handles ?? [],
-    perProfileLimit: 0,
-    skipped: false,
-    errors: [message],
   };
 }
 
@@ -124,10 +105,11 @@ function emptyTriageFailure(message: string): TriageResult {
 }
 
 /**
- * Run enabled sources in sequence: CFP, then curated RSS, then xcancel, then
- * topic search (Google News RSS + SearXNG), then cluster and triage.
+ * Run enabled sources in sequence: CFP, then curated RSS, then topic search
+ * (Google News RSS + SearXNG), then cluster and triage.
  * CFP failure fails the whole refresh. Other source and triage failures are
  * isolated — CFP results are still returned and errors surface on the result.
+ * X/Twitter history is not ingested here; use birdclaw locally ([docs/BIRDCLAW.md]).
  */
 export async function fetchAllSources(
   options: FetchAllOptions = {},
@@ -149,19 +131,6 @@ export async function fetchAllSources(
     curated = emptyCuratedFailure(message, options);
   }
 
-  let xcancel: XcancelFetchResult;
-  try {
-    xcancel = await fetchXcancelArticles({
-      handles: options.handles,
-      perProfileLimit: options.perProfileLimit,
-      delayMs: options.delayMs,
-    });
-  } catch (err) {
-    // CFP already persisted; do not roll the refresh into a hard failure.
-    const message = err instanceof Error ? err.message : String(err);
-    xcancel = emptyXcancelFailure(message, options);
-  }
-
   let topicSearch: TopicSearchResult;
   try {
     topicSearch = await runTopicSearch();
@@ -170,7 +139,7 @@ export async function fetchAllSources(
     topicSearch = emptyTopicSearchFailure(message);
   }
 
-  // Crude same-event ids across the full store (CFP + curated + xcancel + topic search + prior rows).
+  // Crude same-event ids across the full store (CFP + curated + topic search + prior rows).
   const clustered = await assignClusterIds();
 
   let triage: TriageResult;
@@ -198,10 +167,6 @@ export async function fetchAllSources(
     ...curated,
     upserted: withCluster(curated.upserted),
   };
-  const xcancelWithCluster: XcancelFetchResult = {
-    ...xcancel,
-    upserted: withCluster(xcancel.upserted),
-  };
   const topicSearchWithCluster: TopicSearchResult = {
     ...topicSearch,
     upserted: withCluster(topicSearch.upserted),
@@ -209,7 +174,6 @@ export async function fetchAllSources(
   const articles = [
     ...cfpWithCluster.upserted,
     ...curatedWithCluster.upserted,
-    ...xcancelWithCluster.upserted,
     ...topicSearchWithCluster.upserted,
   ];
   const tiers = countFetchTiers(articles);
@@ -217,12 +181,11 @@ export async function fetchAllSources(
   return {
     cfp: cfpWithCluster,
     curated: curatedWithCluster,
-    xcancel: xcancelWithCluster,
     topicSearch: topicSearchWithCluster,
     triage,
     articles,
     tiers,
-    fetched: cfp.fetched + curated.fetched + xcancel.fetched + topicSearch.fetched,
+    fetched: cfp.fetched + curated.fetched + topicSearch.fetched,
     clustered: clustered.clustered,
     clusters: clustered.clusters,
   };

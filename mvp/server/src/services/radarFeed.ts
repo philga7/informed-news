@@ -57,7 +57,7 @@ function toHeadline(article: Article): RadarHeadline {
 /**
  * Build the radar feed clusters from the full article store.
  *
- * - Filters to sourceKind `cfp` | `rss` only (excludes `xcancel`).
+ * - Filters to sourceKind `cfp` | `rss` only (excludes legacy `xcancel`).
  * - Groups by existing `clusterId`; null/empty → `solo:<articleId>`.
  * - Sorts clusters by `newestAt` (desc); headlines newest-first within cluster.
  * - Sets `accepted` from Brief membership ids (default: none accepted).

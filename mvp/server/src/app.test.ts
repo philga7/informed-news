@@ -698,7 +698,6 @@ test('POST /api/fetch returns topicSearch + triage summaries and the Brief run',
           clusters: [],
           cfp: { feedUrl: 'x', limit: 3, fetched: 3, upserted: [] },
           curated: { skipped: true, sources: [], fetched: 0, errors: [], upserted: [] },
-          xcancel: { skipped: true, handles: [], fetched: 0, errors: [], upserted: [] },
           topicSearch: {
             skipped: false,
             providers: {
@@ -759,6 +758,11 @@ test('POST /api/fetch returns topicSearch + triage summaries and the Brief run',
       errors: [],
       articles: 1,
     });
+    assert.equal(
+      Object.prototype.hasOwnProperty.call(json, 'xcancel'),
+      false,
+      'NEWS-123: POST /api/fetch must not mention xcancel',
+    );
     assert.deepEqual((json as { brief?: unknown }).brief, { summaries: BRIEF_RUN.summaries });
   } finally {
     await close();
@@ -820,7 +824,6 @@ function stubFetchResult(): RefreshResult['fetch'] {
     tiers: { sensor: { fetched: 1, upserted: 1 }, primary: { fetched: 0, upserted: 0 } },
     cfp: { feedUrl: 'x', limit: 5, fetched: 1, upserted: [] },
     curated: { skipped: true, sources: [], fetched: 0, errors: [], upserted: [] },
-    xcancel: { skipped: true, handles: [], fetched: 0, errors: [], upserted: [] },
     topicSearch: {
       skipped: true,
       providers: {
