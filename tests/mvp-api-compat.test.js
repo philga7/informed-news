@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -85,8 +85,27 @@ describe('NEWS-43 MVP API compat surface', () => {
 		assert.match(doc, /pendingUpdate/);
 		assert.match(doc, /Session/);
 		assert.match(doc, /CFP/);
-		assert.match(doc, /xcancel/i);
 		assert.match(doc, /NEWS-46/);
+	});
+
+	it('retires xcancel ingest and points X history at birdclaw (NEWS-123)', () => {
+		const doc = readFileSync(join(root, 'docs/MVP_API_COMPAT.md'), 'utf8');
+		const fetchRow = compatRow(doc, 'POST', '/api/fetch');
+		assert.doesNotMatch(fetchRow, /optional xcancel/i);
+		assert.doesNotMatch(fetchRow, /`xcancel`/);
+		assert.match(doc, /birdclaw/i);
+		assert.match(doc, /NEWS-123/);
+		assert.doesNotMatch(doc, /Empty `XCANCEL_PROFILES`/);
+
+		const envExample = readFileSync(join(root, 'mvp/.env.example'), 'utf8');
+		assert.doesNotMatch(envExample, /XCANCEL_/);
+		assert.doesNotMatch(envExample, /x-profiles/i);
+
+		assert.equal(
+			existsSync(join(root, 'mvp/server/src/services/xcancelFetch.ts')),
+			false,
+		);
+		assert.equal(existsSync(join(root, 'mvp/data/x-profiles.example.json')), false);
 	});
 
 	it('marks the Radar / claims / accept / track rows parked and refresh as tracked-sync free (NEWS-91)', () => {

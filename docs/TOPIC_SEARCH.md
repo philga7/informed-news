@@ -4,7 +4,7 @@ Part of Epic **L** ([NEWS-84](https://informedcrew.atlassian.net/browse/NEWS-84)
 
 ## What it does
 
-On every refresh (timer, startup catch-up, Kite **Refresh** button, or `POST /api/fetch` — [BRIEF.md](BRIEF.md#refresh)), after CFP, curated RSS, and xcancel, `mvp/server` searches each **desired** topic (`kind: 'desired'`; undesired topics are never searched):
+On every refresh (timer, startup catch-up, Kite **Refresh** button, or `POST /api/fetch` — [BRIEF.md](BRIEF.md#refresh)), after CFP and curated RSS, `mvp/server` searches each **desired** topic (`kind: 'desired'`; undesired topics are never searched):
 
 - **Query:** `topic.searchQuery.trim() || topic.name`.
 - **Both providers every refresh:** Google News RSS and a local SearXNG instance run side by side per topic (3 topics in flight at once).

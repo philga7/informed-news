@@ -29,7 +29,7 @@ Batch id is always `owned-latest`. Category slug `world` (named **Brief**) / UUI
 
 ## Source data
 
-- Prefer articles in `mvp/data/articles.json` (CFP / xcancel + framing; curated RSS from `radar-sources.json`; topic search rows).
+- Prefer articles in `mvp/data/articles.json` (CFP + framing; curated RSS from `radar-sources.json`; topic search rows; legacy xcancel rows if any remain).
 - Cluster-level enrichments are stored separately in `mvp/data/cluster-enrichments.json` (generated via `POST /api/enrich`).
 - If the store is **empty**, the adapter returns a single **fixture** story so Brief still loads (first-run / smoke).
 - If the store has articles, the Brief is the **topic Brief**: triage kept stories (`mvp/data/triage.json`) composed by `mvp/server/src/services/topicBrief.ts` and mapped by `topicBriefToKiteStories` in `kiteBriefAdapter.ts`, with AI summaries from `mvp/data/brief-summaries.json` ([BRIEF.md](BRIEF.md)). No kept stories → no stories, not the fixture.
@@ -100,7 +100,7 @@ Documented in [THIRD_PARTY.md](../THIRD_PARTY.md). Do not use as the commercial 
 Stories need at least: `title`, `short_summary`, `category`, `articles[]` with `title`, `link`, `domain`, `date`.  
 Perfect parity with every Kagi brief field is out of scope (NEWS-44).
 
-Session-gated CFP/xcancel article + classify routes remain on the same server — see [MVP_API_COMPAT.md](MVP_API_COMPAT.md).
+Session-gated CFP article + classify routes remain on the same server — see [MVP_API_COMPAT.md](MVP_API_COMPAT.md).
 
 ### Owned story fields from the MVP store
 

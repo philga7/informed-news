@@ -16,7 +16,7 @@ export const BRIEF_CACHE_RETENTION_DAYS = 7;
 export const SUMMARY_SOURCE_MAX_CHARS = 3000;
 export const SUMMARY_MIN_CHARS = 20;
 export const SUMMARY_MAX_CHARS = 400;
-/** Post text (e.g. xcancel snippet) used as summary source only at this length or longer */
+/** Post text (e.g. legacy xcancel snippet) used as summary source only at this length or longer */
 export const SUMMARY_POST_MIN_CHARS = 120;
 /** Ollama summary calls in flight */
 export const SUMMARY_CONCURRENCY = 2;

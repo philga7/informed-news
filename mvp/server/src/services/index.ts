@@ -1,15 +1,6 @@
 export { fetchCfpArticles } from './cfpFetch.js';
 export type { BriefClaimItem, BriefClaimVerbiage } from '../types/briefClaim.js';
 export type { CfpFetchOptions, CfpFetchResult } from './cfpFetch.js';
-export {
-  fetchXcancelArticles,
-  fetchTweetsForHandle,
-  resolveXcancelHandles,
-} from './xcancelFetch.js';
-export type {
-  XcancelFetchOptions,
-  XcancelFetchResult,
-} from './xcancelFetch.js';
 export { fetchAllSources } from './fetchAllSources.js';
 export type { FetchAllOptions, FetchAllResult } from './fetchAllSources.js';
 export {

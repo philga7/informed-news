@@ -34,7 +34,7 @@ npm run dev
 
 `npm run dev` starts **mvp/server + Kite**. The old OSINT monolith and archived React feed under `_legacy/` are not on this path.
 
-CFP / xcancel / framing stay on the MVP API while Kite is the shell — frozen surface: [docs/MVP_API_COMPAT.md](docs/MVP_API_COMPAT.md).
+CFP / curated RSS / topic search / framing stay on the MVP API while Kite is the shell — frozen surface: [docs/MVP_API_COMPAT.md](docs/MVP_API_COMPAT.md). X/Twitter history uses [birdclaw](docs/BIRDCLAW.md) locally (xcancel ingest retired, NEWS-123).
 
 ## Smoke test
 
@@ -52,9 +52,6 @@ See `mvp/.env.example` for the API:
 - `OLLAMA_API_KEY` / `OLLAMA_MODEL` — framing classify and Brief summaries  
 - `REFRESH_INTERVAL_HOURS` — Brief auto-refresh interval (default 3; `0` / `off` / `false` / `no` disables)  
 - `CFP_FEED_URL` / `FETCH_LIMIT` — CFP RSS fetch defaults  
-- `XCANCEL_PROFILES` — optional comma-separated handles (empty = CFP-only)  
-- `XCANCEL_PER_PROFILE_LIMIT` / `XCANCEL_FETCH_DELAY_MS` — xcancel polite fetch knobs  
-- Optional file: `mvp/data/x-profiles.json` (gitignored; see `x-profiles.example.json`)  
 - `PORT` — API port (default `3001`)
 
 ### Topic search (optional SearXNG)

@@ -66,7 +66,10 @@ export function citationsFromCfp(
   return citations;
 }
 
-/** Dual citations for an xcancel-ingested tweet: mirror page + x.com permalink. */
+/**
+ * Dual citations for a legacy xcancel-ingested tweet (NEWS-123: ingest retired).
+ * Kept so old store rows and tests that build the same shape stay consistent.
+ */
 export function citationsFromXcancel(
   xcancelUrl: string,
   xPermalink: string,

@@ -135,7 +135,7 @@ function extractImageMeta(
   return { imageUrl, imageCaption, imageCredit };
 }
 
-/** Do not scrape X / Twitter pages (xcancel items already carry tweet text). */
+/** Do not scrape X / Twitter pages (legacy xcancel rows already carry tweet text). */
 export function isBlockedPublisherHost(url: string): boolean {
   const host = hostnameOf(url);
   if (!host) return true;
