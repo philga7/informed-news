@@ -1,12 +1,12 @@
 ---
 name: news-ship-loop
 description: >-
-  Informed News ship ritual for NEWS Jira items: transition In Progress, run
-  SDD (or focused build), confirm follow-up Jira items with the user, push/open
-  PR, squash-merge to main when asked, mark Done, delete the SDD plan. Use when
-  starting or finishing a NEWS-* ticket, opening/merging a feature PR, closing
-  an epic after children are Done, or when the user says ship / merge the PR /
-  close the ticket.
+  Informed News ship ritual for NEWS Jira items: transition In Progress, choose
+  /tdd or /subagent-driven-development per Approach rule, confirm follow-up
+  Jira items with the user, push/open PR, squash-merge to main when asked, mark
+  Done, delete the SDD plan. Use when starting or finishing a NEWS-* ticket,
+  opening/merging a feature PR, closing an epic after children are Done, or
+  when the user says ship / merge the PR / close the ticket.
 ---
 
 # NEWS ship loop
@@ -17,7 +17,8 @@ Codifies how Informed News work moves through **Jira ↔ git ↔ GitHub**. Does 
 
 | Piece | Role |
 |-------|------|
-| `/subagent-driven-development` | Build + review loop on a feat branch |
+| `/tdd` | Focused red → green build (see Approach) |
+| `/subagent-driven-development` | Multi-task build + review loop on a feat branch |
 | `.cursor/rules/jira-news.mdc` | Always `project = NEWS` + `cloudId` |
 | `.cursor/rules/no-subagent-timers.mdc` | End turn on background Tasks; no timer waits |
 | User git / `gh pr` rules | Commit/PR formatting when those steps run |
@@ -48,7 +49,7 @@ Same spirit as SDD: do **not** push to a shared branch, open a PR, or merge to `
 ```
 gate ticket ready
   → In Progress
-  → plan + feat branch + /subagent-driven-development
+  → plan + feat branch + /tdd or /subagent-driven-development
   → follow-up Jira gate (propose → user confirms → file or none)
   → delete SDD plan on the feat branch
   → (user) push + PR
@@ -63,8 +64,13 @@ gate ticket ready
 1. Fetch the issue (`searchJiraIssuesUsingJql` / `getJiraIssue`) — confirm summary, acceptance, parent epic.
 2. Transition to **In Progress** (`transitionJiraIssue` with transition id `21`, or looked-up equivalent).
 3. Sync `main`, create `feat/news-<N>-…` (never implement on `main` without explicit consent).
-4. Write/commit the SDD plan under `.cursor/plans/` if using SDD; run `scripts/sdd-workspace` + ledger.
-5. Execute `/subagent-driven-development` until final review is clean. Obey **no-subagent-timers**.
+4. **Approach** — before building, choose per ticket and state `ticket → approach → one-line reason`:
+   - Use `/tdd` when the ticket touches one module or seam, adds no new public interfaces or dependencies, and fits in about 3 tasks or fewer.
+   - Otherwise use `/subagent-driven-development`.
+   - In a batch, choose per ticket; mixed batches are fine.
+   - An explicit `Approach:` line in the prompt always overrides this rule.
+5. If using SDD: write/commit the SDD plan under `.cursor/plans/`; run `scripts/sdd-workspace` + ledger.
+6. Execute the chosen approach until final review is clean. Obey **no-subagent-timers**.
 
 ### 2. Follow-up Jira gate (before ship)
 
