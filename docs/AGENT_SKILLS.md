@@ -9,7 +9,7 @@ Copy this file into another project, run the install commands from that project�
 ```
 find-skills → grill-me → frontend-design / prototype / image-to-code
         → gate (tracker item)
-        → subagent-driven-development
+        → tdd | subagent-driven-development
         → news-ship-loop
         → agent-browser / diagnosing-bugs
         → skill-creator / mcp-builder
@@ -17,7 +17,7 @@ find-skills → grill-me → frontend-design / prototype / image-to-code
 
 1. **Shape first** — pressure-test and prototype until scope is sharp. Do not start product implementation from a vague idea.
 2. **Gate** — create/update a tracker item only when scope, UX direction, and open questions are resolved. (Informed News: **NEWS** on Atlassian.)
-3. **Build / ship** — implement via SDD, then `/news-ship-loop` for Jira status + PR/merge/Done.
+3. **Build / ship** — implement via `/tdd` or SDD per `/news-ship-loop` Approach rule, then ship-loop for Jira status + PR/merge/Done.
 4. **Product invariants win** — skills do not override `AGENTS.md` / project rules.
 
 Mid-epic: do not re-grill finished work. New discoveries → additional tickets (or edits to open ones). See “Adopting mid-epic” in the integration plan notes below.
