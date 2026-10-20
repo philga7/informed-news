@@ -46,6 +46,13 @@ Mid-epic: do not re-grill finished work. New discoveries → additional tickets 
 | `svelte5-best-practices` | Build | [ejirocodes/agent-skills](https://github.com/ejirocodes/agent-skills) |
 | `playwright-best-practices` | Build / Verify | [currents-dev/playwright-best-practices-skill](https://github.com/currents-dev/playwright-best-practices-skill) |
 | `news-ship-loop` | Ship | Informed News (repo-local) |
+| `fix-ci` | Ship / Verify | [cursor-team-kit](https://github.com/cursor/plugins/tree/main/cursor-team-kit) (copied; not plugin-installed) |
+| `get-pr-comments` | Verify | cursor-team-kit |
+| `make-pr-easy-to-review` | Verify | cursor-team-kit |
+| `deslop` | Verify | cursor-team-kit |
+| `verify-this` | Verify | cursor-team-kit |
+| `weekly-review` | Verify | cursor-team-kit |
+| `what-did-i-get-done` | Verify | cursor-team-kit |
 | `update-skills` | Package / Maintain | Informed News (portable recipe) |
 | `osint` | Shape / Verify | Informed News (from retired OSINT rule) |
 | `seo` | Shape / Verify | Informed News (from retired SEO rule) |
@@ -57,7 +64,9 @@ Mid-epic: do not re-grill finished work. New discoveries → additional tickets 
 | `mcp-builder` | Package | anthropics/skills |
 | `jev` | Verify / Judge | [jkudish/jev-mcp](https://github.com/jkudish/jev-mcp) (pairs with the `jev` MCP server) |
 
-Licenses: keep each skill’s `LICENSE` / `LICENSE.txt` (MIT / Apache-2.0 mix).
+Also copied (not a skill folder): `.cursor/agents/ci-watcher.md` from cursor-team-kit — used by `/news-ship-loop` for CI watch. TypeScript rule: `.cursor/rules/typescript-exhaustive-switch.mdc` (same source). `no-inline-imports` was skipped (no matching existing lint).
+
+Licenses: keep each skill’s `LICENSE` / `LICENSE.txt` (MIT / Apache-2.0 mix). Team Kit copies note MIT + provenance in each `SKILL.md`.
 
 ## Install (target repo root, no `-g`)
 

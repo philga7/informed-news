@@ -19,9 +19,14 @@ Codifies how Informed News work moves through **Jira ↔ git ↔ GitHub**. Does 
 |-------|------|
 | `/tdd` | Focused red → green build (see Approach) |
 | `/subagent-driven-development` | Multi-task build + review loop on a feat branch |
+| `/fix-ci` | Diagnose and fix failing PR checks (CI-green path) |
+| `ci-watcher` agent | Watch PR checks; report pass/fail + failure links |
+| `/get-pr-comments` | Summarize review feedback on the active PR |
 | `.cursor/rules/jira-news.mdc` | Always `project = NEWS` + `cloudId` |
 | `.cursor/rules/no-subagent-timers.mdc` | End turn on background Tasks; no timer waits |
 | User git / `gh pr` rules | Commit/PR formatting when those steps run |
+
+This skill stays the **only** entry point for shipping NEWS work. `/fix-ci` and `ci-watcher` are helpers invoked from the CI-green step below — do not treat them as alternate ship rituals.
 
 ## When to use
 
@@ -115,10 +120,11 @@ Focus on why/what, not implementation. Do not invent architecture in the ticket 
    - Title referencing NEWS-N
    - Body: Summary + Test plan + `Closes NEWS-N` when the PR fully completes the story
 4. When the user asks to **merge**:
-   1. Run `gh pr checks --required` (the **main requires CI** ruleset lists **MVP build & typecheck**). `gh pr checks --watch` is fine while it is pending.
-   2. **Refuse merge on red/pending** — do not run `gh pr merge` while a required check is failing, cancelled, or still pending. Tell the user the blocking check names/status and stop. GitHub rejects the merge anyway.
-   3. **Only merge when required checks are green**, then `gh pr merge <n> --squash --delete-branch`.
-   4. No override path: nobody can bypass the ruleset except deploy keys (the release job). Merging on red needs the user to change the ruleset themselves; do not do it for them.
+   1. **CI green** — invoke `/fix-ci` and/or the `ci-watcher` agent (do not improvise a parallel check ritual). Required check: **MVP build & typecheck** (see `main` requires CI). Watch until settled; on failure, `/fix-ci` applies the smallest fix and re-checks.
+   2. **Link the green run before ticking CI** — from `gh pr checks` / `gh run view`, record the passing GitHub Actions run URL in the ship notes (and the PR body test-plan CI item). Do **not** mark the CI test-plan box until that green run link is present.
+   3. **Refuse merge on red/pending** — do not run `gh pr merge` while a required check is failing, cancelled, or still pending. Tell the user the blocking check names/status and stop. GitHub rejects the merge anyway.
+   4. **Only merge when required checks are green** and the green run is linked, then `gh pr merge <n> --squash --delete-branch`.
+   5. No override path: nobody can bypass the ruleset except deploy keys (the release job). Merging on red needs the user to change the ruleset themselves; do not do it for them.
 5. `git checkout main && git pull --ff-only origin main`
 
 ### `main` requires CI
@@ -138,7 +144,7 @@ The repository ruleset rejects any update to `main` without a passing **MVP buil
 | In Progress at start of build | No |
 | Follow-up Jira gate ask (propose or None) | No |
 | Create follow-ups without user confirm | Yes — stop and ask |
-| `gh pr checks --required` before merge; refuse on red/pending | No |
+| CI green via `/fix-ci` / `ci-watcher`; green run linked before ticking CI; refuse on red/pending | No |
 | Done after user-requested merge | No |
 | Push/PR/merge without user ask | Yes — stop and ask |
 | Plan delete on the feat branch before merge | No (unless user says keep it) |
