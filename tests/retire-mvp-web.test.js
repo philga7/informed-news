@@ -33,9 +33,9 @@ describe('NEWS-46 retire mvp/web', () => {
 		assert.doesNotMatch(vercel.outputDirectory, /mvp\/web/);
 	});
 
-	it('documents archive in README and agents.md', () => {
+	it('documents archive in README and AGENTS.md', () => {
 		const readme = readFileSync(join(root, 'README.md'), 'utf8');
-		const agents = readFileSync(join(root, 'agents.md'), 'utf8');
+		const agents = readFileSync(join(root, 'AGENTS.md'), 'utf8');
 		assert.match(readme, /_legacy\/mvp-web/);
 		assert.doesNotMatch(readme, /Frozen UI \| `mvp\/web`/);
 		assert.doesNotMatch(readme, /npm run dev:mvp-web/);

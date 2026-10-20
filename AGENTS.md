@@ -118,7 +118,7 @@ Informed News work uses the **NEWS** project on Atlassian (`informedcrew.atlassi
 
 ## Agent skill loop
 
-Repo-local skills live under `.cursor/skills/` (see [docs/AGENT_SKILLS.md](docs/AGENT_SKILLS.md)). They do not override this file or `.cursor/rules/`. Mid-epic: do not re-grill finished work; new discoveries become additional NEWS items.
+Repo-local skills live under `.cursor/skills/` (see [docs/AGENT_SKILLS.md](docs/AGENT_SKILLS.md)). Skills are the up-to-date source of truth for agent workflows; where a skill and a legacy `.cursor/rules/` entry conflict, the **skill wins**. Product invariants in this file still win over skills. Mid-epic: do not re-grill finished work; new discoveries become additional NEWS items.
 
 1. **Shape first:** `/find-skills` → `/grill-me` → `/frontend-design` and/or `/prototype` / `/image-to-code` until scope is sharp. Do not start product implementation from a vague idea.
 2. **Gate:** create or update a **NEWS** issue only when scope, UX direction, and open questions are resolved.
@@ -141,7 +141,14 @@ Repo-local skills live under `.cursor/skills/` (see [docs/AGENT_SKILLS.md](docs/
 | `/svelte5-best-practices` | Svelte 5 runes, snippets, SvelteKit load/SSR patterns | Writing Kite components (leave upstream legacy-syntax files alone) |
 | `/code-review` | Two parallel reviews of a diff: repo standards + code smells, and spec (the NEWS ticket) | Before opening a PR; "review since `main`" |
 | `/playwright-best-practices` | Playwright locators, waiting, fixtures, flaky-test fixes | Writing or debugging `test:e2e:kite` specs (keep the hermetic `e2e/stack/`) |
-| `/news-ship-loop` | NEWS Jira In Progress → PR/merge → Done + plan cleanup | Starting/finishing a NEWS-* item or merging its PR |
+| `/news-ship-loop` | NEWS Jira In Progress → PR/merge → Done + plan cleanup | Starting/finishing a NEWS-* item or merging its PR (only ship entry point) |
+| `/fix-ci` | Find failing PR checks, inspect logs, apply focused fixes | PR CI red; used from `/news-ship-loop` CI-green step |
+| `/get-pr-comments` | Summarize review comments on the active PR | Addressing PR feedback |
+| `/make-pr-easy-to-review` | Clean noisy history / improve PR description without behavior changes | Before asking for review |
+| `/deslop` | Remove AI-generated slop from the branch diff | After agent-heavy edits |
+| `/verify-this` | Prove a falsifiable claim with baseline vs treatment evidence | “Did this fix it?” / verify before Done |
+| `/weekly-review` | Weekly authored-commit synthesis | Status / retro |
+| `/what-did-i-get-done` | Authored-commit summary for a time window | Status updates |
 | `/osint` | Source credibility, verification, privacy/ethics | News analysis / OSINT planning |
 | `/seo` | Metadata, headings, alt text, technical SEO | Landing / marketing pages |
 | `/devops-risk-reducer` | CI/CD, secrets, deploy/rollback risk | Workflows, infra, deploy scripts |
