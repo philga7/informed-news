@@ -123,7 +123,7 @@ Repo-local skills live under `.cursor/skills/` (see [docs/AGENT_SKILLS.md](docs/
 1. **Shape first:** `/find-skills` → `/grill-me` → `/frontend-design` and/or `/prototype` / `/image-to-code` until scope is sharp. Do not start product implementation from a vague idea.
 2. **Gate:** create or update a **NEWS** issue only when scope, UX direction, and open questions are resolved.
 3. **Build:** `/tdd` or `/subagent-driven-development` per `/news-ship-loop` Approach → `/agent-browser` / `/diagnosing-bugs` → `/skill-creator` / `/mcp-builder` as needed.
-4. **Ship:** `/news-ship-loop` — In Progress → (chosen approach) → PR/merge when asked → Done → delete SDD plan.
+4. **Ship:** `/news-ship-loop` — In Progress → (chosen approach) → PR → Claude Code review → resolve findings → merge when asked → Done → delete SDD plan.
 5. **Product invariants still win** (Kite + `mvp/server`, no `_legacy/` default, no Supabase on the live path). Keep throwaway prototypes off the default `npm run dev` entrypoint.
 
 ### Skill cheat sheet
