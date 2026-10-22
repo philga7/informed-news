@@ -71,13 +71,13 @@ describe('NEWS-166 Claude Code PR review', () => {
 		);
 	});
 
-	it('ROADMAP lists NEWS-166 under Dev tooling as in progress', () => {
+	it('ROADMAP lists NEWS-166 under Dev tooling as Done', () => {
 		const rows = roadmap
 			.split('\n')
 			.filter((line) => line.startsWith('|') && line.includes('/browse/NEWS-166)'));
 		assert.equal(rows.length, 1, rows);
 		assert.match(rows[0], /Dev tooling/);
-		assert.doesNotMatch(rows[0], /\*\*Done\*\*/);
-		assert.match(rows[0], /in progress|In Progress|\*\(in progress\)\*/i);
+		assert.match(rows[0], /\*\*Done\*\*/);
+		assert.doesNotMatch(rows[0], /\*\(in progress\)\*/i);
 	});
 });
