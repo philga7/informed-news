@@ -1,3 +1,9 @@
+## [0.26.30](https://github.com/philga7/informed-news/compare/v0.26.29...v0.26.30) (2026-10-22)
+
+### Bug Fixes
+
+* **classify:** NEWS-162 join :id with owning batch ([#202](https://github.com/philga7/informed-news/issues/202)) ([5c99cfd](https://github.com/philga7/informed-news/commit/5c99cfd32dad34eeb730ca9be91bf29056bd9a3b))
+
 ## [0.26.29](https://github.com/philga7/informed-news/compare/v0.26.28...v0.26.29) (2026-10-15)
 
 ### Bug Fixes
