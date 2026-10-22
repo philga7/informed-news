@@ -149,6 +149,19 @@ async function classifyAndApply(
 
 /** Process-wide single-flight for batch classify (NEWS-161); mirrors refresh. */
 let batchInFlight: Promise<ClassifyBatchResult> | null = null;
+/**
+ * Ids the running batch will classify. `null` while idle, or while the batch is still
+ * selecting candidates (a `:id` call then waits — NEWS-162).
+ */
+let batchCandidateIds: Set<string> | null = null;
+
+/** Coalesces overlapping `:id` calls for the same article (NEWS-162). */
+const byIdInFlight = new Map<string, Promise<ClassifyOneResult | null>>();
+/**
+ * Ids currently running a solo model classify (not merely waiting on a batch).
+ * A later batch skips these so it does not double-pay (NEWS-162 reverse race).
+ */
+const byIdSoloIds = new Set<string>();
 
 async function runClassifyBatch(
   options: ClassifyBatchOptions,
@@ -158,7 +171,10 @@ async function runClassifyBatch(
   const limit = resolveBatchLimit(options.limit);
   const articles = await readArticles(deps.articlesPath);
 
-  const candidates = selectClassifyBatchCandidates(articles, limit);
+  const candidates = selectClassifyBatchCandidates(articles, limit).filter(
+    (article) => !byIdSoloIds.has(article.id),
+  );
+  batchCandidateIds = new Set(candidates.map((article) => article.id));
 
   const bySourceKind = { cfp: 0, xcancel: 0, rss: 0, manual: 0, search: 0 };
   for (const article of candidates) {
@@ -187,8 +203,11 @@ async function runClassifyBatch(
  * rows whose body landed while the model ran.
  *
  * Single-flight (NEWS-161): an overlapping call joins the running batch and shares its
- * outcome (including `limit` / deps of the first caller). `POST /api/classify/:id` is
- * unchanged and does not wait for a running batch.
+ * outcome (including `limit` / deps of the first caller).
+ *
+ * vs `:id` (NEWS-162): a single-id call for a batch candidate waits for that batch and
+ * returns the stored row (no second model call). A later batch skips rows a running `:id`
+ * already owns.
  */
 export async function classifyUnclassifiedArticles(
   options: ClassifyBatchOptions = {},
@@ -199,40 +218,93 @@ export async function classifyUnclassifiedArticles(
   }
   const promise = runClassifyBatch(options, deps).finally(() => {
     batchInFlight = null;
+    batchCandidateIds = null;
   });
   batchInFlight = promise;
   return promise;
 }
 
+function oneResultFromStored(article: Article): ClassifyOneResult {
+  if (article.classification) {
+    return { article, ok: true };
+  }
+  return {
+    article,
+    ok: false,
+    error: article.classifyError ?? 'classify failed',
+  };
+}
+
+async function classifyArticleByIdOnce(
+  id: string,
+  deps: ClassifyDeps,
+): Promise<ClassifyOneResult | null> {
+  const batchOwnsRow =
+    batchInFlight !== null &&
+    (batchCandidateIds === null || batchCandidateIds.has(id));
+
+  if (batchOwnsRow && batchInFlight) {
+    await batchInFlight;
+    const afterBatch = await getArticleById(id, deps.articlesPath);
+    if (!afterBatch) {
+      return null;
+    }
+    if (afterBatch.classification !== null || afterBatch.classifyError !== null) {
+      return oneResultFromStored(afterBatch);
+    }
+    // Waited while candidates were selecting, but this id was not in the batch.
+  }
+
+  // Mark solo before any await so a batch that starts now skips this id.
+  byIdSoloIds.add(id);
+  try {
+    const article = await getArticleById(id, deps.articlesPath);
+    if (!article) {
+      return null;
+    }
+
+    const { applied, results } = await classifyAndApply(
+      [article],
+      deps.classifyFraming ?? classifyFraming,
+      deps.articlesPath,
+    );
+    const [next] = applied;
+    const result = results.get(id);
+    if (!next || !result) {
+      return null;
+    }
+
+    return {
+      article: next,
+      ok: result.ok,
+      error: result.ok ? undefined : result.error,
+    };
+  } finally {
+    byIdSoloIds.delete(id);
+  }
+}
+
 /**
  * Reclassify a single article by id (even if already classified).
  * Null when the article is missing, or was pruned while the model ran.
+ *
+ * When a batch already owns this id (NEWS-162), waits for that batch and returns the
+ * stored row without a second model call. Overlapping `:id` calls for the same id share
+ * one in-flight promise; a batch that starts later skips those ids.
  */
 export async function classifyArticleById(
   id: string,
   deps: ClassifyDeps = {},
 ): Promise<ClassifyOneResult | null> {
-  const article = await getArticleById(id, deps.articlesPath);
-  if (!article) {
-    return null;
+  const existing = byIdInFlight.get(id);
+  if (existing) {
+    return existing;
   }
-
-  const { applied, results } = await classifyAndApply(
-    [article],
-    deps.classifyFraming ?? classifyFraming,
-    deps.articlesPath,
-  );
-  const [next] = applied;
-  const result = results.get(id);
-  if (!next || !result) {
-    return null;
-  }
-
-  return {
-    article: next,
-    ok: result.ok,
-    error: result.ok ? undefined : result.error,
-  };
+  const promise = classifyArticleByIdOnce(id, deps).finally(() => {
+    byIdInFlight.delete(id);
+  });
+  byIdInFlight.set(id, promise);
+  return promise;
 }
 
 export { sortNewestFirst };

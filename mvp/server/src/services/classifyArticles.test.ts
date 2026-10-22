@@ -225,3 +225,67 @@ test('NEWS-161: overlapping batch classify makes one model call per unclassified
     b.articles.map((row) => row.id).sort(),
   );
 });
+
+test('NEWS-162: classify by id joins a running batch that owns its row (one model call)', async () => {
+  const articlesPath = path.join(mkdtempSync(path.join(tmpdir(), 'classify-id-joins-batch-')), 'articles.json');
+  await updateArticles(
+    () => [article({ id: 'owned', title: 'Owned', publishedAt: '2026-09-12T12:00:00.000Z' })],
+    articlesPath,
+  );
+  const [row] = await readArticles(articlesPath);
+  const id = row!.id;
+
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let calls = 0;
+  const classifyFraming: ClassifyDeps['classifyFraming'] = async (input) => {
+    calls += 1;
+    await gate;
+    return { ok: true, analysis: framing(`Framed ${input.title}`), model: 'stub', rawText: '' };
+  };
+
+  const batch = classifyUnclassifiedArticles({}, { articlesPath, classifyFraming });
+  // Batch has claimed candidates before the model await; :id must join, not pay again.
+  const byId = classifyArticleById(id, { articlesPath, classifyFraming });
+  release();
+
+  const [batchResult, one] = await Promise.all([batch, byId]);
+  assert.equal(calls, 1);
+  assert.equal(batchResult.attempted, 1);
+  assert.equal(one?.ok, true);
+  assert.equal(one?.article.classification?.framingSummary, 'Framed Owned');
+  assert.equal(one?.article.id, id);
+});
+
+test('NEWS-162: a running classify-by-id makes the batch skip that row (one model call)', async () => {
+  const articlesPath = path.join(mkdtempSync(path.join(tmpdir(), 'classify-batch-skips-id-')), 'articles.json');
+  await updateArticles(
+    () => [article({ id: 'solo', title: 'Solo', publishedAt: '2026-09-12T12:00:00.000Z' })],
+    articlesPath,
+  );
+  const [row] = await readArticles(articlesPath);
+  const id = row!.id;
+
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let calls = 0;
+  const classifyFraming: ClassifyDeps['classifyFraming'] = async (input) => {
+    calls += 1;
+    await gate;
+    return { ok: true, analysis: framing(`Framed ${input.title}`), model: 'stub', rawText: '' };
+  };
+
+  const byId = classifyArticleById(id, { articlesPath, classifyFraming });
+  const batch = classifyUnclassifiedArticles({}, { articlesPath, classifyFraming });
+  release();
+
+  const [one, batchResult] = await Promise.all([byId, batch]);
+  assert.equal(calls, 1);
+  assert.equal(batchResult.attempted, 0);
+  assert.equal(one?.ok, true);
+  assert.equal(one?.article.classification?.framingSummary, 'Framed Solo');
+});
