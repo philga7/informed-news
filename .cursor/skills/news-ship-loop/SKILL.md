@@ -119,13 +119,14 @@ Focus on why/what, not implementation. Do not invent architecture in the ticket 
 3. `gh pr create` with:
    - Title referencing NEWS-N
    - Body: Summary + Test plan + `Closes NEWS-N` when the PR fully completes the story
-4. When the user asks to **merge**:
+4. Opening the PR starts **automatic Claude Code review** (`.github/workflows/claude-review.yml`, against `CLAUDE.md` "When reviewing a PR"); resolve findings (push re-runs it) before Phil's ship request — never merge without that request.
+5. When the user asks to **merge**:
    1. **CI green** — invoke `/fix-ci` and/or the `ci-watcher` agent (do not improvise a parallel check ritual). Required check: **MVP build & typecheck** (see `main` requires CI). Watch until settled; on failure, `/fix-ci` applies the smallest fix and re-checks.
    2. **Link the green run before ticking CI** — from `gh pr checks` / `gh run view`, record the passing GitHub Actions run URL in the ship notes (and the PR body test-plan CI item). Do **not** mark the CI test-plan box until that green run link is present.
    3. **Refuse merge on red/pending** — do not run `gh pr merge` while a required check is failing, cancelled, or still pending. Tell the user the blocking check names/status and stop. GitHub rejects the merge anyway.
    4. **Only merge when required checks are green** and the green run is linked, then `gh pr merge <n> --squash --delete-branch`.
    5. No override path: nobody can bypass the ruleset except deploy keys (the release job). Merging on red needs the user to change the ruleset themselves; do not do it for them.
-5. `git checkout main && git pull --ff-only origin main`
+6. `git checkout main && git pull --ff-only origin main`
 
 ### `main` requires CI
 

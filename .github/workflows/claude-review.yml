@@ -1,0 +1,75 @@
+name: Claude Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+
+# id-token: write is required by the action's default GitHub App token path
+# (docs/setup.md), not only by workload-identity federation.
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  id-token: write
+
+jobs:
+  review:
+    name: claude-review
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # Action docs: comma-separated bot usernames, e.g. dependabot[bot].
+          # Only this automatic review job. The mention job leaves the default
+          # (no bots) so @claude stays limited to humans.
+          allowed_bots: "cursor[bot]"
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            This is an automatic pull request review. Read CLAUDE.md and review
+            this pull request against its "When reviewing a PR" section. Post
+            findings as pull request comments: a summary with `gh pr comment`,
+            and inline comments for specific lines.
+
+            On this automatic review run, never approve the pull request, never
+            request a merge, and never push commits. Do not run
+            `gh pr review --approve`, `gh pr merge`, or `git push`.
+          claude_args: |
+            --model claude-sonnet-5-5
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
+            --disallowedTools "Bash(git push:*),Bash(git commit:*),Bash(gh pr merge:*),Bash(gh pr review:*)"
+
+  mention:
+    name: claude-mention
+    if: |
+      (
+        github.event_name == 'issue_comment' &&
+        contains(github.event.comment.body, '@claude') &&
+        github.event.issue.draft != true
+      ) || (
+        github.event_name == 'pull_request_review_comment' &&
+        contains(github.event.comment.body, '@claude') &&
+        github.event.pull_request.draft == false
+      )
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: |
+            --model claude-sonnet-5-5
