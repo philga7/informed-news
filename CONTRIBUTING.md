@@ -42,7 +42,7 @@ Common types:
 |------|----------------|
 | `feat` | Minor (`0.1.0` → `0.2.0`) |
 | `fix` / `perf` | Patch |
-| `BREAKING CHANGE` / `type!:` | Major (`0.x` → `1.0.0` if you leave 0.x, or `1.x` → `2.x`) |
+| `BREAKING CHANGE` / `type!:` | Minor while the line is 0.x (`0.26.30` → `0.27.0`). Major again after 1.0 |
 | `docs` / `chore` / `ci` / `test` / `style` / `build` | No release |
 
 ### Squash merges and semantic-release (HARN-10)
@@ -97,6 +97,8 @@ Inspect or change the ruleset with an admin token: `gh api repos/philga7/informe
 ### Version line (0.x)
 
 We stay on **`0.x`** until an intentional `1.0.0` product decision (same idea as HARN). Baseline tag: **`v0.1.0`**. Subsequent `feat` / `fix` merges bump within `0.x`.
+
+While the version is 0.x, `.releaserc.json` maps a breaking change (`feat!:` or a `BREAKING CHANGE:` footer) to a minor bump, so that commit does not cut `1.0.0`. `feat:` stays minor and `fix:` stays patch. Remove that `releaseRules` entry in the same change that ships 1.0. After that, a breaking change is a major bump again. The `conventional-changelog-conventionalcommits` pin at `^9.3.1` (NEWS-132) stays; it is what keeps the Features and Bug Fixes sections in the notes.
 
 ## Pull request process
 
