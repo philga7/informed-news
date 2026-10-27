@@ -154,8 +154,8 @@ describe('NEWS-165 vision and decisions', () => {
 		const next = currentNext.slice(currentNext.indexOf(nextClause));
 		const nextAt = (key) => next.indexOf(key);
 		assert.ok(at('NEWS-167') !== -1 && at('NEWS-167') < at(nextClause), 'NEWS-167 is Done before Current next');
-		assert.ok(nextAt('NEWS-172') !== -1 && nextAt('NEWS-172') < nextAt('NEWS-173'));
-		assert.ok(nextAt('NEWS-173') < nextAt('NEWS-168'));
+		assert.ok(at('NEWS-172') !== -1 && at('NEWS-172') < at(nextClause), 'NEWS-172 is Done before Current next');
+		assert.ok(nextAt('NEWS-173') !== -1 && nextAt('NEWS-173') < nextAt('NEWS-168'));
 		assert.ok(at('NEWS-131') < at(nextClause), 'NEWS-131 is listed as Done before Current next');
 	});
 
