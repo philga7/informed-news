@@ -29,6 +29,8 @@ export type CitationSourcesStore = {
 /** Citation item kinds (court reserved for NEWS-173). */
 export type CitationKind = 'url' | 'quote' | 'claim' | 'court';
 
+export type CitationScope = 'summary' | 'story';
+
 /** Shared terminal check states. */
 export type CitationCheckStatus = 'match' | 'mismatch' | 'missing-source';
 
@@ -71,6 +73,8 @@ export type CitationCheckLogEntry = {
   url?: string | null;
   quote?: string | null;
   refutingUrl?: string | null;
+  /** Which generate pass produced this mark; absent on old rows. */
+  scope?: CitationScope;
   checkedAt: string; // ISO
   runId: string;
 };

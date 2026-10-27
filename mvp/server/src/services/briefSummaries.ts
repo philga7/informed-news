@@ -189,6 +189,7 @@ async function runSummaryCitationGuard(
     await runGuard(
       {
         articleId,
+        scope: 'summary',
         runId,
         now,
         sourceCandidates: [

@@ -145,3 +145,34 @@ test('pruneCitationCheckLogs on a missing file removes nothing and creates no fi
   assert.equal(await pruneCitationCheckLogs('2099-01-01T00:00:00.000Z', logPath), 0);
   await assert.rejects(access(logPath), { code: 'ENOENT' });
 });
+
+test('log entries persist scope; invalid scope dropped; missing scope loads', async () => {
+  const logPath = tempLogPath();
+  await mkdir(path.dirname(logPath), { recursive: true });
+  const { scope: _s, ...noScope } = { ...entry({ itemId: 'old' }), scope: undefined };
+  await writeFile(
+    logPath,
+    JSON.stringify({
+      logs: {
+        a: {
+          articleId: 'a',
+          entries: [
+            { ...entry({ itemId: 'sum' }), scope: 'summary' },
+            { ...entry({ itemId: 'sto' }), scope: 'story' },
+            { ...entry({ itemId: 'bad' }), scope: 'other' },
+            noScope,
+          ],
+          updatedAt: '2026-10-27T12:00:00.000Z',
+          runId: 'run-a',
+        },
+      },
+      updatedAt: null,
+    }),
+    'utf8',
+  );
+  const log = await readCitationCheckLog('a', logPath);
+  assert.deepEqual(
+    log!.entries.map((e) => [e.itemId, e.scope]),
+    [['sum', 'summary'], ['sto', 'story'], ['old', undefined]],
+  );
+});

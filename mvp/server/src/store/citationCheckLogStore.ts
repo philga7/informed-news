@@ -5,6 +5,7 @@ import type {
   CitationCheckLogStore,
   CitationCheckStatus,
   CitationKind,
+  CitationScope,
 } from '../types/citationGuard.js';
 import { enqueueFileWrite, writeJsonAtomic } from './jsonFileQueue.js';
 import { CITATION_CHECK_LOG_PATH } from './paths.js';
@@ -28,6 +29,10 @@ function isCitationCheckStatus(value: unknown): value is CitationCheckStatus {
   return value === 'match' || value === 'mismatch' || value === 'missing-source';
 }
 
+function isCitationScope(value: unknown): value is CitationScope {
+  return value === 'summary' || value === 'story';
+}
+
 function isDisplay(value: unknown): value is CitationCheckLogEntry['display'] {
   return value === 'ok' || value === 'unverified' || value === 'unconfirmed';
 }
@@ -43,6 +48,7 @@ function normalizeEntry(raw: unknown): CitationCheckLogEntry | null {
   if (!isStringOrNull(raw.url) && raw.url !== undefined) return null;
   if (!isStringOrNull(raw.quote) && raw.quote !== undefined) return null;
   if (!isStringOrNull(raw.refutingUrl) && raw.refutingUrl !== undefined) return null;
+  if (raw.scope !== undefined && !isCitationScope(raw.scope)) return null;
 
   return {
     kind: raw.kind,
@@ -52,6 +58,7 @@ function normalizeEntry(raw: unknown): CitationCheckLogEntry | null {
     ...(raw.url !== undefined ? { url: raw.url } : {}),
     ...(raw.quote !== undefined ? { quote: raw.quote } : {}),
     ...(raw.refutingUrl !== undefined ? { refutingUrl: raw.refutingUrl } : {}),
+    ...(raw.scope !== undefined ? { scope: raw.scope } : {}),
     checkedAt: raw.checkedAt,
     runId: raw.runId,
   };
@@ -124,15 +131,26 @@ export async function readCitationCheckLog(
 
 /**
  * Merge incoming entries into any prior log for the same articleId by itemId:
- * new entry replaces the same itemId; unrelated prior entries are kept.
+ * new entry replaces the same itemId. A prior entry whose scope appears in the
+ * incoming batch is dropped when its itemId is not incoming (stale mark); prior
+ * entries from other scopes, or with no scope, are kept.
  */
 export function mergeCitationCheckLogEntries(
   prior: CitationCheckLogEntry[] | undefined,
   incoming: CitationCheckLogEntry[],
 ): CitationCheckLogEntry[] {
+  const incomingIds = new Set(incoming.map((entry) => entry.itemId));
+  const incomingScopes = new Set<CitationScope>();
+  for (const entry of incoming) {
+    if (entry.scope) incomingScopes.add(entry.scope);
+  }
   const byId = new Map<string, CitationCheckLogEntry>();
   for (const entry of prior ?? []) {
-    byId.set(entry.itemId, entry);
+    const stale =
+      entry.scope !== undefined &&
+      incomingScopes.has(entry.scope) &&
+      !incomingIds.has(entry.itemId);
+    if (!stale) byId.set(entry.itemId, entry);
   }
   for (const entry of incoming) {
     byId.set(entry.itemId, entry);

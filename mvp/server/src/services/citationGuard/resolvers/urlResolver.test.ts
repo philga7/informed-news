@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { CitationSourceRecord } from '../../../types/citationGuard.js';
 import { filterCitationSourcesForRun } from '../registry.js';
-import { normalizeCitationUrl, resolveUrlCitation } from './urlResolver.js';
+import { displayForUrlStatus, normalizeCitationUrl, resolveUrlCitation } from './urlResolver.js';
 
 function source(
   overrides: Partial<CitationSourceRecord> & Pick<CitationSourceRecord, 'url' | 'runId'>,
@@ -96,4 +96,28 @@ test('resolveUrlCitation: preserves optional id on the result', () => {
     id: 'cite-1',
   });
   assert.equal(result.id, 'cite-1');
+});
+
+test('normalizeCitationUrl: trailing slash, http/https and utm_* collapse; other query kept', () => {
+  const key = 'https://publisher.example/story';
+  assert.equal(normalizeCitationUrl('https://publisher.example/story/'), key);
+  assert.equal(normalizeCitationUrl('http://publisher.example/story?utm_source=brief'), key);
+  assert.equal(normalizeCitationUrl('https://publisher.example/story?UTM_Medium=x'), key);
+  assert.notEqual(normalizeCitationUrl('https://publisher.example/story?id=1'), key);
+  assert.equal(normalizeCitationUrl('https://publisher.example/'), 'https://publisher.example/');
+  assert.equal(normalizeCitationUrl('  not a url '), 'not a url');
+});
+
+test('resolveUrlCitation: matches despite slash, scheme and utm differences', () => {
+  const sources = [source({ url: 'https://publisher.example/story/', runId: 'run-a' })];
+  const result = resolveUrlCitation('http://publisher.example/story?utm_source=brief', sources);
+  assert.equal(result.status, 'match');
+  const other = resolveUrlCitation('https://publisher.example/story?id=2', sources);
+  assert.equal(other.status, 'missing-source');
+});
+
+test('displayForUrlStatus maps mismatch and missing-source to unverified', () => {
+  assert.equal(displayForUrlStatus('match'), 'ok');
+  assert.equal(displayForUrlStatus('mismatch'), 'unverified');
+  assert.equal(displayForUrlStatus('missing-source'), 'unverified');
 });

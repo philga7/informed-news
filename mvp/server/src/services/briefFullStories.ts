@@ -192,6 +192,7 @@ async function runFullStoryCitationGuard(
     await runGuard(
       {
         articleId,
+        scope: 'story',
         runId,
         now,
         sourceCandidates: citationCandidatesForMembers(members),

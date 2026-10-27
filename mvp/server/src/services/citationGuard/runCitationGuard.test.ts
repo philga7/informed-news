@@ -72,6 +72,7 @@ test('runCitationGuardForArticle writes log and returns match / missing-source /
   const results = await runCitationGuardForArticle(
     {
       articleId: 'art-1',
+      scope: 'story',
       runId: 'run-1',
       now,
       sourcesForRun,
@@ -107,6 +108,7 @@ test('runCitationGuardForArticle merges new entries with prior log by itemId', a
   await runCitationGuardForArticle(
     {
       articleId: 'art-merge',
+      scope: 'summary',
       runId: 'run-summary',
       now: t1,
       sourcesForRun: [],
@@ -119,6 +121,7 @@ test('runCitationGuardForArticle merges new entries with prior log by itemId', a
   await runCitationGuardForArticle(
     {
       articleId: 'art-merge',
+      scope: 'story',
       runId: 'run-full',
       now: t2,
       sourcesForRun: [],
@@ -162,6 +165,7 @@ test('runCitationGuardForArticle replaces an existing entry with the same itemId
   await runCitationGuardForArticle(
     {
       articleId: 'art-replace',
+      scope: 'story',
       runId: 'run-a',
       now: new Date('2026-10-27T12:00:00.000Z'),
       sourcesForRun: [],
@@ -175,6 +179,7 @@ test('runCitationGuardForArticle replaces an existing entry with the same itemId
   await runCitationGuardForArticle(
     {
       articleId: 'art-replace',
+      scope: 'story',
       runId: 'run-b',
       now: new Date('2026-10-27T12:10:00.000Z'),
       sourcesForRun,
@@ -193,6 +198,7 @@ test('runCitationGuardForArticle swallows put errors and still returns check res
   const results = await runCitationGuardForArticle(
     {
       articleId: 'art-err',
+      scope: 'story',
       runId: 'run-err',
       now: new Date('2026-10-27T12:00:00.000Z'),
       sourcesForRun: [],
@@ -209,25 +215,108 @@ test('runCitationGuardForArticle swallows put errors and still returns check res
   assert.equal(results[0]!.status, 'missing-source');
 });
 
-test('runCitationGuardForArticle returns empty when check itself throws', async () => {
-  const results = await runCitationGuardForArticle(
-    {
-      articleId: 'art-check-err',
-      runId: 'run-err',
-      now: new Date('2026-10-27T12:00:00.000Z'),
-      sourcesForRun: [],
-      items: [{ kind: 'url', url: 'https://x.example' }],
-    },
-    {
-      checkCitationItems: () => {
-        throw new Error('resolver boom');
+test('runCitationGuardForArticle fails closed when check itself throws', async () => {
+  const dir = tempDir();
+  const logPath = path.join(dir, 'citation-check-log.json');
+  const originalWarn = console.warn;
+  let warned = 0;
+  console.warn = () => {
+    warned += 1;
+  };
+  try {
+    const results = await runCitationGuardForArticle(
+      {
+        articleId: 'art-check-err',
+        scope: 'story',
+        runId: 'run-err',
+        now: new Date('2026-10-27T12:00:00.000Z'),
+        sourcesForRun: [],
+        items: [
+          { kind: 'url', url: 'https://x.example' },
+          { kind: 'claim', refutingUrl: 'https://y.example', claimText: 'c' },
+        ],
       },
-      putCitationCheckLog: async () => {
-        throw new Error('should not be called');
+      {
+        checkCitationItems: () => {
+          throw new Error('resolver boom');
+        },
+        putCitationCheckLog: (record) => putCitationCheckLog(record, logPath),
       },
-    },
+    );
+    assert.equal(results.length, 2);
+    assert.equal(results[0]!.status, 'missing-source');
+    assert.equal(results[0]!.display, 'unverified');
+    assert.equal(results[1]!.status, 'missing-source');
+    assert.equal(results[1]!.display, 'unconfirmed');
+    assert.ok(warned > 0);
+    const log = await readCitationCheckLog('art-check-err', logPath);
+    assert.equal(log?.entries.length, 2);
+  } finally {
+    console.warn = originalWarn;
+  }
+});
+
+test('claim items with the same refutingUrl and different claimText get different ids', () => {
+  const a = citationCheckItemId({ kind: 'claim', refutingUrl: 'https://r.example/x', claimText: 'one' });
+  const b = citationCheckItemId({ kind: 'claim', refutingUrl: 'https://r.example/x', claimText: 'two' });
+  assert.notEqual(a, b);
+  const expected = `claim:${hash16('https://r.example/x\none')}`;
+  assert.equal(a, expected);
+});
+
+test('second story run omitting an item drops it and keeps summary entries', async () => {
+  const dir = tempDir();
+  const logPath = path.join(dir, 'citation-check-log.json');
+  const deps = { putCitationCheckLog: (r: Parameters<typeof putCitationCheckLog>[0]) => putCitationCheckLog(r, logPath) };
+  const base = { articleId: 'art-drop', sourcesForRun: [] as CitationSourceRecord[] };
+  await runCitationGuardForArticle(
+    { ...base, scope: 'summary', runId: 'r1', now: new Date('2026-10-27T12:00:00.000Z'), items: [{ kind: 'url', url: 'https://s.example/a' }] },
+    deps,
   );
-  assert.deepEqual(results, []);
+  await runCitationGuardForArticle(
+    { ...base, scope: 'story', runId: 'r1', now: new Date('2026-10-27T12:01:00.000Z'), items: [{ kind: 'url', url: 'https://f.example/a' }, { kind: 'url', url: 'https://f.example/b' }] },
+    deps,
+  );
+  await runCitationGuardForArticle(
+    { ...base, scope: 'story', runId: 'r2', now: new Date('2026-10-27T12:02:00.000Z'), items: [{ kind: 'url', url: 'https://f.example/a' }] },
+    deps,
+  );
+  const log = await readCitationCheckLog('art-drop', logPath);
+  assert.deepEqual(
+    log!.entries.map((e) => e.itemId).sort(),
+    ['https://f.example/a', 'https://s.example/a'],
+  );
+  assert.deepEqual(log!.entries.map((e) => e.scope).sort(), ['story', 'summary']);
+});
+
+test('registerSourcesAndRunCitationGuard still checks when registering throws', async () => {
+  const originalWarn = console.warn;
+  console.warn = () => {};
+  try {
+    const results = await registerSourcesAndRunCitationGuard(
+      {
+        articleId: 'art-reg-err',
+        scope: 'story',
+        runId: 'run-x',
+        now: new Date('2026-10-27T12:00:00.000Z'),
+        sourceCandidates: [{ url: 'https://p.example/a', text: 'body text', articleId: 'a' }],
+        items: [{ kind: 'url', url: 'https://p.example/a' }],
+      },
+      {
+        registerCitationSources: async () => {
+          throw new Error('disk');
+        },
+        readCitationSources: async () => ({ sources: {}, updatedAt: null }),
+        putCitationCheckLog: async () => {
+          throw new Error('skip');
+        },
+      },
+    );
+    assert.equal(results.length, 1);
+    assert.equal(results[0]!.status, 'missing-source');
+  } finally {
+    console.warn = originalWarn;
+  }
 });
 
 test('registerSourcesAndRunCitationGuard registers by hash and checks against this run', async () => {
@@ -240,6 +329,7 @@ test('registerSourcesAndRunCitationGuard registers by hash and checks against th
   const results = await registerSourcesAndRunCitationGuard(
     {
       articleId: 'art-reg',
+      scope: 'story',
       runId: 'run-reg',
       now,
       sourceCandidates: [
