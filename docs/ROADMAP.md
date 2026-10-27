@@ -27,6 +27,8 @@ On hold: Epic B Signals ([NEWS-34](https://informedcrew.atlassian.net/browse/NEW
 
 Unscheduled: Watchers stay on [NEWS-84](https://informedcrew.atlassian.net/browse/NEWS-84) and run after hosting. Source presets and OPML stay on parked [NEWS-67](https://informedcrew.atlassian.net/browse/NEWS-67).
 
+**Process trial (approved 2026-10-26):** Every ship-loop pull request updates [PRODUCT_SPEC.md](PRODUCT_SPEC.md) in the same PR, and adds a [WHATS_NEW.md](WHATS_NEW.md) entry (or states there is no user-visible change). Review after 5 tickets have merged since this trial landed. This does not change the combined order. See [DECISIONS.md](DECISIONS.md).
+
 **Epic L. Topic-driven brief** ([NEWS-84](https://informedcrew.atlassian.net/browse/NEWS-84)) — product pivot grilled 2026-09-28. The operator's topic list drives sources and filtering; AI triages cheaply (Jev) and writes only for shown stories (Ollama); no review queue. Running-app detail lives in the epic description, [TRIAGE.md](TRIAGE.md), and [BRIEF.md](BRIEF.md). Target and binding choices: [VISION.md](VISION.md), [DECISIONS.md](DECISIONS.md).
 
 | Order | Key | Summary |
@@ -192,3 +194,4 @@ Former [NEWS-53](https://informedcrew.atlassian.net/browse/NEWS-53) (Brief sourc
 3. Ship via `/news-ship-loop`. Mid-epic discoveries → new NEWS items, not silent rewrites of Done work.
 4. The running product path stays Kite Brief + `mvp/server` until [NEWS-170](https://informedcrew.atlassian.net/browse/NEWS-170) ([AGENTS.md](../AGENTS.md)). Target direction: [VISION.md](VISION.md). Binding choices: [DECISIONS.md](DECISIONS.md).
 5. Ask before NEWS-57 Later/Parked children or Epics **B–G** — do not start them from open To Do alone.
+6. Ship-loop PRs keep [PRODUCT_SPEC.md](PRODUCT_SPEC.md) and [WHATS_NEW.md](WHATS_NEW.md) current (trial approved 2026-10-26; review after 5 tickets have merged since it landed). [DECISIONS.md](DECISIONS.md).

@@ -56,6 +56,7 @@ gate ticket ready
   → In Progress
   → plan + feat branch + /tdd or /subagent-driven-development
   → follow-up Jira gate (propose → user confirms → file or none)
+  → update docs/PRODUCT_SPEC.md and docs/WHATS_NEW.md on the feat branch
   → delete SDD plan on the feat branch
   → (user) push + PR
   → (user) squash-merge + delete branch
@@ -76,6 +77,7 @@ gate ticket ready
    - An explicit `Approach:` line in the prompt always overrides this rule.
 5. If using SDD: write/commit the SDD plan under `.cursor/plans/`; run `scripts/sdd-workspace` + ledger.
 6. Execute the chosen approach until final review is clean. Obey **no-subagent-timers**.
+7. **Product spec and what's new** (required, same branch as the code). See § Product spec and what's new. Do this before push, so the pull request contains it.
 
 ### 2. Follow-up Jira gate (before ship)
 
@@ -112,21 +114,39 @@ S | M | L
 
 Focus on why/what, not implementation. Do not invent architecture in the ticket body.
 
+### Product spec and what's new
+
+Trial approved 2026-10-26. Review after 5 tickets have merged since it landed. Recorded in [docs/DECISIONS.md](../../../docs/DECISIONS.md) and [docs/ROADMAP.md](../../../docs/ROADMAP.md).
+
+Every ship-loop pull request updates both files **in the same PR as the code**:
+
+1. [docs/PRODUCT_SPEC.md](../../../docs/PRODUCT_SPEC.md) — plain-language list of what the product does now. Features and user scenarios. No implementation detail. If what a reader can do changed, edit the scenarios. If it did not, bump **Last checked** so the file is still in the diff.
+2. [docs/WHATS_NEW.md](../../../docs/WHATS_NEW.md) — one dated entry for what changed for a reader of the app, or the words **No user-visible change.** Newest first. No commit jargon and no ticket-key lists.
+
+Leave semantic-release's `CHANGELOG.md` and its config alone. Do not hand-edit `CHANGELOG.md` to mirror `WHATS_NEW.md`.
+
+The PR test plan includes both items. Tick them only when the diff actually contains the update. The CI item stays unticked until the green Actions run is linked.
+
 ### 3. Ship to GitHub (only when asked)
 
 1. Ensure working tree is clean of secrets (never commit `mvp/.env`, `mvp/data/*.json`).
-2. `git push -u origin HEAD`.
-3. `gh pr create` with:
+2. Confirm `docs/PRODUCT_SPEC.md` and `docs/WHATS_NEW.md` are updated on this branch (see § Product spec and what's new).
+3. `git push -u origin HEAD`.
+4. `gh pr create` with:
    - Title referencing NEWS-N
    - Body: Summary + Test plan + `Closes NEWS-N` when the PR fully completes the story
-4. Opening the PR starts **automatic Claude Code review** (`.github/workflows/claude-review.yml`, against `CLAUDE.md` "When reviewing a PR"); resolve findings (push re-runs it) before Phil's ship request — never merge without that request.
-5. When the user asks to **merge**:
+   - Test plan includes:
+     - [ ] `docs/PRODUCT_SPEC.md` updated in this PR (scenarios edited, or **Last checked** bumped when behavior did not change)
+     - [ ] `docs/WHATS_NEW.md` has a new entry for the reader-visible change, or states **No user-visible change.**
+     - [ ] CI green (**MVP build & typecheck**), with the Actions run URL — tick only when that link is present
+5. Opening the PR starts **automatic Claude Code review** (`.github/workflows/claude-review.yml`, against `CLAUDE.md` "When reviewing a PR"); resolve findings (push re-runs it) before Phil's ship request — never merge without that request.
+6. When the user asks to **merge**:
    1. **CI green** — invoke `/fix-ci` and/or the `ci-watcher` agent (do not improvise a parallel check ritual). Required check: **MVP build & typecheck** (see `main` requires CI). Watch until settled; on failure, `/fix-ci` applies the smallest fix and re-checks.
    2. **Link the green run before ticking CI** — from `gh pr checks` / `gh run view`, record the passing GitHub Actions run URL in the ship notes (and the PR body test-plan CI item). Do **not** mark the CI test-plan box until that green run link is present.
    3. **Refuse merge on red/pending** — do not run `gh pr merge` while a required check is failing, cancelled, or still pending. Tell the user the blocking check names/status and stop. GitHub rejects the merge anyway.
    4. **Only merge when required checks are green** and the green run is linked, then `gh pr merge <n> --squash --delete-branch`.
    5. No override path: nobody can bypass the ruleset except deploy keys (the release job). Merging on red needs the user to change the ruleset themselves; do not do it for them.
-6. `git checkout main && git pull --ff-only origin main`
+7. `git checkout main && git pull --ff-only origin main`
 
 ### `main` requires CI
 
@@ -149,11 +169,14 @@ The repository ruleset rejects any update to `main` without a passing **MVP buil
 | Done after user-requested merge | No |
 | Push/PR/merge without user ask | Yes — stop and ask |
 | Plan delete on the feat branch before merge | No (unless user says keep it) |
+| `docs/PRODUCT_SPEC.md` updated in the same PR as the code | No |
+| `docs/WHATS_NEW.md` entry (or "No user-visible change.") in that PR | No |
+| Hand-edit `CHANGELOG.md` for the reader-facing note | Yes — leave it to semantic-release |
 
 ## Examples
 
 **User:** “Do NEWS-54 via /subagent-driven-development”  
-→ In Progress → plan/branch → SDD → follow-up Jira gate → stop at finish options (do not merge until asked).
+→ In Progress → plan/branch → SDD → follow-up Jira gate → update `docs/PRODUCT_SPEC.md` and `docs/WHATS_NEW.md` → stop at finish options (do not merge until asked).
 
 **User:** “Merge the PR to main”  
 → (if gate not done yet, run it first) → plan already deleted on the branch → required checks green → squash-merge → pull main → Done on the NEWS key.
