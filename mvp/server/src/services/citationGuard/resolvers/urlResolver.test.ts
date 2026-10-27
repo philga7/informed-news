@@ -121,3 +121,14 @@ test('displayForUrlStatus maps mismatch and missing-source to unverified', () =>
   assert.equal(displayForUrlStatus('mismatch'), 'unverified');
   assert.equal(displayForUrlStatus('missing-source'), 'unverified');
 });
+
+test('normalizeCitationUrl keeps the fragment', () => {
+  assert.notEqual(
+    normalizeCitationUrl('https://publisher.example/story#section'),
+    normalizeCitationUrl('https://publisher.example/story'),
+  );
+  assert.equal(
+    normalizeCitationUrl('https://publisher.example/story#section'),
+    'https://publisher.example/story#section',
+  );
+});

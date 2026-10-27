@@ -24,7 +24,6 @@ export function normalizeCitationUrl(url: string): string {
     );
     parsed.search = '';
     for (const [key, value] of kept) parsed.searchParams.append(key, value);
-    parsed.hash = '';
     return parsed.href;
   } catch {
     return trimmed;
