@@ -22,6 +22,13 @@ export type CitationSourceRecord = {
   procedural?: boolean;
 };
 
+/** Resolved CourtListener lookup handed to the court resolver (NEWS-173). */
+export type CourtItemAttachment = {
+  status: 'resolved' | 'unresolved';
+  courtRecordUrl: string | null;
+  procedural: boolean;
+};
+
 /** Parsed CourtListener record kept in the 7-day cache (never headers or raw bodies). */
 export type CourtCacheHit = {
   url: string;
@@ -73,6 +80,8 @@ export type CitationCheckItem = {
   volume?: string | null;
   reporter?: string | null;
   page?: string | null;
+  /** Set by the guard run before checking; never by callers. */
+  courtAttachment?: CourtItemAttachment;
 };
 
 export type CitationCheckResult = {
@@ -88,6 +97,14 @@ export type CitationCheckResult = {
   /** Optional claim text identity for later logging */
   claimText?: string | null;
   id?: string;
+  citation?: string | null;
+  volume?: string | null;
+  reporter?: string | null;
+  page?: string | null;
+  /** Court kind, matched only: the CourtListener record URL. */
+  courtRecordUrl?: string | null;
+  /** Court kind, matched only: the record is a procedural disposition. */
+  procedural?: boolean;
 };
 
 /** One checked citation item persisted for a story (NEWS-172). */
@@ -100,6 +117,12 @@ export type CitationCheckLogEntry = {
   url?: string | null;
   quote?: string | null;
   refutingUrl?: string | null;
+  courtRecordUrl?: string | null;
+  procedural?: boolean;
+  citation?: string | null;
+  volume?: string | null;
+  reporter?: string | null;
+  page?: string | null;
   /** Which generate pass produced this mark; absent on old rows. */
   scope?: CitationScope;
   checkedAt: string; // ISO

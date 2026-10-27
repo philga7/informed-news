@@ -16,6 +16,7 @@ function source(
     runId,
     contentHash,
     articleId: overrides.articleId ?? 'art-1',
+    ...(overrides.procedural !== undefined ? { procedural: overrides.procedural } : {}),
   };
 }
 
@@ -99,4 +100,21 @@ test('resolveClaimCitation: refutingUrl not in sources → missing-source + unco
   assert.equal(result.display, 'unconfirmed');
   assert.equal(result.refutingUrl, 'https://publisher.example/refute');
   assertNoBadgeFields(result);
+});
+
+test('resolveClaimCitation: a procedural source does not satisfy the claim', () => {
+  const url = 'https://www.courtlistener.com/opinion/1/x/';
+  const result = resolveClaimCitation(url, [source({ url, runId: 'r', procedural: true })]);
+  assert.equal(result.status, 'missing-source');
+  assert.equal(result.display, 'unconfirmed');
+});
+
+test('resolveClaimCitation: a non-procedural source with the same URL still matches', () => {
+  const url = 'https://www.courtlistener.com/opinion/1/x/';
+  const result = resolveClaimCitation(url, [
+    source({ url, runId: 'r', procedural: true, contentHash: 'h1' }),
+    source({ url, runId: 'r', procedural: false, contentHash: 'h2' }),
+  ]);
+  assert.equal(result.status, 'match');
+  assert.equal(result.display, 'ok');
 });

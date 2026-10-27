@@ -48,6 +48,10 @@ function normalizeEntry(raw: unknown): CitationCheckLogEntry | null {
   if (!isStringOrNull(raw.url) && raw.url !== undefined) return null;
   if (!isStringOrNull(raw.quote) && raw.quote !== undefined) return null;
   if (!isStringOrNull(raw.refutingUrl) && raw.refutingUrl !== undefined) return null;
+  for (const key of ['courtRecordUrl', 'citation', 'volume', 'reporter', 'page'] as const) {
+    if (!isStringOrNull(raw[key]) && raw[key] !== undefined) return null;
+  }
+  if (raw.procedural !== undefined && typeof raw.procedural !== 'boolean') return null;
   if (raw.scope !== undefined && !isCitationScope(raw.scope)) return null;
 
   return {
@@ -58,6 +62,12 @@ function normalizeEntry(raw: unknown): CitationCheckLogEntry | null {
     ...(raw.url !== undefined ? { url: raw.url } : {}),
     ...(raw.quote !== undefined ? { quote: raw.quote } : {}),
     ...(raw.refutingUrl !== undefined ? { refutingUrl: raw.refutingUrl } : {}),
+    ...(raw.courtRecordUrl !== undefined ? { courtRecordUrl: raw.courtRecordUrl as string | null } : {}),
+    ...(raw.procedural !== undefined ? { procedural: raw.procedural as boolean } : {}),
+    ...(raw.citation !== undefined ? { citation: raw.citation as string | null } : {}),
+    ...(raw.volume !== undefined ? { volume: raw.volume as string | null } : {}),
+    ...(raw.reporter !== undefined ? { reporter: raw.reporter as string | null } : {}),
+    ...(raw.page !== undefined ? { page: raw.page as string | null } : {}),
     ...(raw.scope !== undefined ? { scope: raw.scope } : {}),
     checkedAt: raw.checkedAt,
     runId: raw.runId,

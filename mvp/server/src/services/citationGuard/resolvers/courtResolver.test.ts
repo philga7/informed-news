@@ -19,24 +19,42 @@ function source(
   };
 }
 
-test('resolveCourtCitation: stub always returns missing-source + unverified', () => {
-  const sources = [
-    source({ url: 'https://courtlistener.example/docket/1', runId: 'run-a' }),
-  ];
+test('resolveCourtCitation: resolved attachment → match / ok with record url and procedural', () => {
   const result = resolveCourtCitation(
-    { kind: 'court', id: 'court-1', url: 'https://courtlistener.example/docket/1' },
-    sources,
+    {
+      kind: 'court',
+      id: 'court-1',
+      url: 'https://www.courtlistener.com/docket/1/x/',
+      citation: '576 U.S. 644',
+      courtAttachment: {
+        status: 'resolved',
+        courtRecordUrl: 'https://www.courtlistener.com/opinion/1/x/',
+        procedural: true,
+      },
+    },
+    [],
   );
-  assert.equal(result.kind, 'court');
-  assert.equal(result.status, 'missing-source');
-  assert.equal(result.display, 'unverified');
+  assert.equal(result.status, 'match');
+  assert.equal(result.display, 'ok');
+  assert.equal(result.courtRecordUrl, 'https://www.courtlistener.com/opinion/1/x/');
+  assert.equal(result.procedural, true);
+  assert.equal(result.url, 'https://www.courtlistener.com/docket/1/x/');
   assert.equal(result.id, 'court-1');
-  assert.equal(result.url, 'https://courtlistener.example/docket/1');
+  assert.equal(result.citation, '576 U.S. 644');
 });
 
-test('resolveCourtCitation: stub does not throw with empty sources', () => {
-  const result = resolveCourtCitation({ kind: 'court' }, []);
-  assert.equal(result.kind, 'court');
-  assert.equal(result.status, 'missing-source');
-  assert.equal(result.display, 'unverified');
+test('resolveCourtCitation: unresolved or missing attachment → missing-source / unverified', () => {
+  for (const courtAttachment of [
+    undefined,
+    { status: 'unresolved' as const, courtRecordUrl: null, procedural: false },
+  ]) {
+    const result = resolveCourtCitation(
+      { kind: 'court', citation: '1 U.S. 200', ...(courtAttachment ? { courtAttachment } : {}) },
+      [source({ url: 'https://x.example', runId: 'r' })],
+    );
+    assert.equal(result.status, 'missing-source');
+    assert.equal(result.display, 'unverified');
+    assert.notEqual(result.procedural, true);
+    assert.equal(result.courtRecordUrl, undefined);
+  }
 });

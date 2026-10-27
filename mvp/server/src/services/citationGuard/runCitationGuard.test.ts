@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -14,6 +15,7 @@ import type {
   CitationCheckItem,
   CitationSourceRecord,
 } from '../../types/citationGuard.js';
+import { lookupCourtCitations, type CourtAttachment } from './courtListenerClient.js';
 import {
   citationCheckItemId,
   citationGuardRunId,
@@ -351,4 +353,164 @@ test('registerSourcesAndRunCitationGuard registers by hash and checks against th
   assert.equal(results[1]!.status, 'match');
   const log = await readCitationCheckLog('art-reg', logPath);
   assert.equal(log?.entries.length, 2);
+});
+
+const OBER_URL = 'https://www.courtlistener.com/opinion/2812209/obergefell-v-hodges/';
+const COURT_ITEM: CitationCheckItem = { kind: 'court', citation: '576 U.S. 644' };
+const CLAIM_ITEM: CitationCheckItem = { kind: 'claim', claimText: 'c', refutingUrl: OBER_URL };
+
+async function courtRun(opts: {
+  items: CitationCheckItem[];
+  lookup?: typeof lookupCourtCitations;
+  fetchImpl?: () => Promise<Response>;
+}) {
+  const dir = tempDir();
+  const registered: CitationSourceRecord[] = [];
+  const results = await runCitationGuardForArticle(
+    {
+      articleId: 'art-court',
+      scope: 'story',
+      runId: 'run-court',
+      now: new Date('2026-10-27T12:00:00.000Z'),
+      sourcesForRun: [],
+      items: opts.items,
+    },
+    {
+      lookupCourtCitations:
+        opts.lookup ??
+        ((items, o) =>
+          lookupCourtCitations(items, {
+            ...o,
+            token: 'tok',
+            fetchImpl: opts.fetchImpl ?? (async () =>
+              new Response(
+                JSON.stringify(
+                  JSON.parse(
+                    readFileSync(new URL('./fixtures/courtListener/obergefell.json', import.meta.url), 'utf8'),
+                  ),
+                ),
+                { status: 200, headers: { 'content-type': 'application/json' } },
+              )),
+            cachePath: path.join(dir, 'cache.json'),
+          })),
+      registerCitationSources: async (records) => {
+        registered.push(...records);
+        return { sources: {}, updatedAt: null };
+      },
+      putCitationCheckLog: (record) => putCitationCheckLog(record, path.join(dir, 'log.json')),
+    },
+  );
+  return { results, registered, dir };
+}
+
+test('court cite resolves from fixture; claim citing the court URL matches in the same run', async () => {
+  const { results, registered, dir } = await courtRun({ items: [COURT_ITEM, CLAIM_ITEM] });
+  assert.equal(results[0]!.status, 'match');
+  assert.equal(results[0]!.display, 'ok');
+  assert.equal(results[0]!.courtRecordUrl, OBER_URL);
+  assert.equal(registered.length, 1);
+  assert.equal(registered[0]!.url, OBER_URL);
+  assert.equal(registered[0]!.text, 'The judgment is affirmed.');
+  assert.equal(results[1]!.status, 'match');
+  assert.equal(results[1]!.display, 'ok');
+  const log = await readCitationCheckLog('art-court', path.join(dir, 'log.json'));
+  assert.equal(log?.entries[0]!.courtRecordUrl, OBER_URL);
+  assert.equal(log?.entries[0]!.citation, '576 U.S. 644');
+});
+
+test('court items are not mutated on the caller array', async () => {
+  const items = [{ ...COURT_ITEM }];
+  await courtRun({ items });
+  assert.equal(items[0]!.courtAttachment, undefined);
+});
+
+test('procedural court source: item matches, claim citing it is unconfirmed', async () => {
+  const attachment: CourtAttachment = {
+    status: 'resolved',
+    courtRecordUrl: OBER_URL,
+    text: 'Dismissed for lack of standing.',
+    procedural: true,
+    url: OBER_URL,
+    runId: 'run-court',
+    articleId: 'art-court',
+  };
+  const { results, registered } = await courtRun({
+    items: [COURT_ITEM, CLAIM_ITEM],
+    lookup: async () => ({ attachments: { '576 U.S. 644': attachment }, sources: [] }),
+  });
+  assert.equal(registered[0]!.procedural, true);
+  assert.equal(results[0]!.status, 'match');
+  assert.equal(results[0]!.procedural, true);
+  assert.equal(results[1]!.status, 'missing-source');
+  assert.equal(results[1]!.display, 'unconfirmed');
+});
+
+test('unknown cite → unverified court item', async () => {
+  const { results, registered } = await courtRun({
+    items: [{ kind: 'court', citation: '1 U.S. 200' }],
+    fetchImpl: async () => new Response('{}', { status: 404 }),
+  });
+  assert.equal(results[0]!.status, 'missing-source');
+  assert.equal(results[0]!.display, 'unverified');
+  assert.equal(registered.length, 0);
+});
+
+test('lookup throw fails closed: every item still checked, token redacted in warn', async () => {
+  const warns: string[] = [];
+  const orig = console.warn;
+  console.warn = (...a: unknown[]) => void warns.push(a.map(String).join(' '));
+  const prev = process.env.COURTLISTENER_API_TOKEN;
+  process.env.COURTLISTENER_API_TOKEN = 'sekrit-token';
+  try {
+    const { results } = await courtRun({
+      items: [COURT_ITEM, { kind: 'url', url: 'https://x.example/a' }],
+      lookup: async () => {
+        throw new Error('boom sekrit-token');
+      },
+    });
+    assert.equal(results.length, 2);
+    assert.equal(results[0]!.status, 'missing-source');
+    assert.equal(results[0]!.display, 'unverified');
+    assert.ok(warns.length > 0);
+    assert.ok(!warns.join('\n').includes('sekrit-token'));
+  } finally {
+    console.warn = orig;
+    if (prev === undefined) delete process.env.COURTLISTENER_API_TOKEN;
+    else process.env.COURTLISTENER_API_TOKEN = prev;
+  }
+});
+
+test('no token: lookup gets a null token, performs no fetch, court item unverified', async () => {
+  const prev = process.env.COURTLISTENER_API_TOKEN;
+  process.env.COURTLISTENER_API_TOKEN = '   ';
+  let fetches = 0;
+  let seenToken: unknown = 'unset';
+  try {
+    const { results } = await courtRun({
+      items: [COURT_ITEM],
+      lookup: (items, o) => {
+        seenToken = o.token;
+        return lookupCourtCitations(items, {
+          ...o,
+          fetchImpl: async () => {
+            fetches += 1;
+            return new Response('{}');
+          },
+          cachePath: path.join(tempDir(), 'c.json'),
+        });
+      },
+    });
+    assert.equal(seenToken, null);
+    assert.equal(fetches, 0);
+    assert.equal(results[0]!.display, 'unverified');
+  } finally {
+    if (prev === undefined) delete process.env.COURTLISTENER_API_TOKEN;
+    else process.env.COURTLISTENER_API_TOKEN = prev;
+  }
+});
+
+test('court itemId is court: + sha256-16 of the normalized cite; cites differ', () => {
+  const a = citationCheckItemId({ kind: 'court', citation: '576  U.S. 644' });
+  assert.equal(a, `court:${hash16('576 U.S. 644')}`);
+  assert.notEqual(a, citationCheckItemId({ kind: 'court', citation: '598 U.S. 651' }));
 });

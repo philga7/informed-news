@@ -5,21 +5,31 @@ import type {
 } from '../../../types/citationGuard.js';
 
 /**
- * NEWS-173 hook: court citation stub.
- * Always returns missing-source / unverified until CourtListener / RECAP checks land.
- * Uses only existing status/display unions — no new terminal states.
- * Does not call the network; does not mutate any payload.
+ * Court citation check (NEWS-173). Reads the attachment the guard run put on the
+ * item; does no I/O and never mutates its input.
  */
 export function resolveCourtCitation(
   item: CitationCheckItem,
   _sourcesForRun: CitationSourceRecord[],
 ): CitationCheckResult {
-  const status = 'missing-source' as const;
-  return {
-    kind: 'court',
-    status,
-    display: 'unverified',
+  const base = {
+    kind: 'court' as const,
     ...(item.url !== undefined ? { url: item.url } : {}),
     ...(item.id !== undefined ? { id: item.id } : {}),
+    ...(item.citation !== undefined ? { citation: item.citation } : {}),
+    ...(item.volume !== undefined ? { volume: item.volume } : {}),
+    ...(item.reporter !== undefined ? { reporter: item.reporter } : {}),
+    ...(item.page !== undefined ? { page: item.page } : {}),
   };
+  const attachment = item.courtAttachment;
+  if (attachment?.status === 'resolved' && attachment.courtRecordUrl) {
+    return {
+      ...base,
+      status: 'match',
+      display: 'ok',
+      courtRecordUrl: attachment.courtRecordUrl,
+      procedural: attachment.procedural,
+    };
+  }
+  return { ...base, status: 'missing-source', display: 'unverified' };
 }

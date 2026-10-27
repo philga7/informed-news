@@ -14,6 +14,7 @@ import type {
   CitationScope,
   CitationSourceRecord,
 } from '../../types/citationGuard.js';
+import { courtItemKey, lookupCourtCitations, normalizeCourtCite } from './courtListenerClient.js';
 import { checkCitationItems, filterCitationSourcesForRun } from './registry.js';
 import { normalizeCitationUrl } from './resolvers/urlResolver.js';
 
@@ -53,10 +54,9 @@ export function citationCheckItemId(item: CitationCheckItem | CitationCheckResul
       return `claim:${createHash('sha256').update(key).digest('hex').slice(0, 16)}`;
     }
     case 'court': {
-      const key =
-        (typeof item.url === 'string' && item.url) ||
-        (typeof item.claimText === 'string' && item.claimText) ||
-        'court';
+      const cite = typeof item.citation === 'string' ? normalizeCourtCite(item.citation) : '';
+      const url = typeof item.url === 'string' && item.url.trim() ? normalizeCitationUrl(item.url) : '';
+      const key = cite || url || 'court';
       return `court:${createHash('sha256').update(key).digest('hex').slice(0, 16)}`;
     }
     default: {
@@ -80,6 +80,12 @@ export function citationCheckResultToLogEntry(
     ...(result.url !== undefined ? { url: result.url } : {}),
     ...(result.quote !== undefined ? { quote: result.quote } : {}),
     ...(result.refutingUrl !== undefined ? { refutingUrl: result.refutingUrl } : {}),
+    ...(result.courtRecordUrl !== undefined ? { courtRecordUrl: result.courtRecordUrl } : {}),
+    ...(result.procedural !== undefined ? { procedural: result.procedural } : {}),
+    ...(result.citation !== undefined ? { citation: result.citation } : {}),
+    ...(result.volume !== undefined ? { volume: result.volume } : {}),
+    ...(result.reporter !== undefined ? { reporter: result.reporter } : {}),
+    ...(result.page !== undefined ? { page: result.page } : {}),
     scope,
     checkedAt,
     runId,
@@ -96,13 +102,26 @@ function failClosedResults(items: CitationCheckItem[]): CitationCheckResult[] {
     ...(item.refutingUrl !== undefined ? { refutingUrl: item.refutingUrl } : {}),
     ...(item.claimText !== undefined ? { claimText: item.claimText } : {}),
     ...(item.id !== undefined ? { id: item.id } : {}),
+    ...(item.citation !== undefined ? { citation: item.citation } : {}),
+    ...(item.volume !== undefined ? { volume: item.volume } : {}),
+    ...(item.reporter !== undefined ? { reporter: item.reporter } : {}),
+    ...(item.page !== undefined ? { page: item.page } : {}),
   }));
 }
 
 export type RunCitationGuardDeps = {
   putCitationCheckLog?: typeof putCitationCheckLog;
   checkCitationItems?: typeof checkCitationItems;
+  lookupCourtCitations?: typeof lookupCourtCitations;
+  registerCitationSources?: typeof registerCitationSources;
 };
+
+function redactToken(message: string): string {
+  const token = process.env.COURTLISTENER_API_TOKEN?.trim();
+  let out = token ? message.split(token).join('[redacted]') : message;
+  out = out.replace(/COURTLISTENER_API_TOKEN\S*/g, '[redacted]');
+  return out;
+}
 
 export type RunCitationGuardArgs = {
   articleId: string;
@@ -124,10 +143,62 @@ export async function runCitationGuardForArticle(
 ): Promise<CitationCheckResult[]> {
   const check = deps.checkCitationItems ?? checkCitationItems;
   const putLog = deps.putCitationCheckLog ?? putCitationCheckLog;
+  const lookup = deps.lookupCourtCitations ?? lookupCourtCitations;
+  const register = deps.registerCitationSources ?? registerCitationSources;
   let results: CitationCheckResult[] = [];
 
   try {
-    results = check(args.items, args.sourcesForRun);
+    let items = args.items;
+    let sources = args.sourcesForRun;
+    const courtItems = args.items.filter((item) => item.kind === 'court');
+    if (courtItems.length > 0) {
+      const token = process.env.COURTLISTENER_API_TOKEN?.trim() || null;
+      try {
+        const { attachments } = await lookup(courtItems, {
+          runId: args.runId,
+          now: args.now,
+          articleId: args.articleId,
+          token,
+        });
+        const courtSources: CitationSourceRecord[] = [];
+        for (const attachment of Object.values(attachments)) {
+          if (attachment.status !== 'resolved' || !attachment.url || !attachment.text) continue;
+          const contentHash = citationSourceContentHash(attachment.text);
+          courtSources.push({
+            id: citationSourceRecordId(contentHash, args.runId),
+            url: attachment.url,
+            text: attachment.text,
+            fetchedAt: args.now.toISOString(),
+            runId: args.runId,
+            contentHash,
+            articleId: args.articleId,
+            procedural: attachment.procedural,
+          });
+        }
+        if (courtSources.length > 0) {
+          await register(courtSources);
+          sources = [...sources, ...courtSources];
+        }
+        items = args.items.map((item) => {
+          if (item.kind !== 'court') return item;
+          const key = courtItemKey(item);
+          const attachment = key ? attachments[key] : undefined;
+          if (!attachment) return item;
+          return {
+            ...item,
+            courtAttachment: {
+              status: attachment.status,
+              courtRecordUrl: attachment.courtRecordUrl,
+              procedural: attachment.procedural,
+            },
+          };
+        });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.warn('[citation-guard] court lookup failed; court items unverified:', redactToken(message));
+      }
+    }
+    results = check(items, sources);
   } catch (err) {
     console.warn('[citation-guard] check failed; marking items unverified', err);
     results = failClosedResults(args.items);
