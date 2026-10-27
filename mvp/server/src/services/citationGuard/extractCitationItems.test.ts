@@ -100,3 +100,85 @@ test('extractCitationItems does not invent claims without a URL', () => {
   });
   assert.equal(items.filter((i) => i.kind === 'claim').length, 0);
 });
+
+test('extractCitationItems pulls a reporter cite from summary text', () => {
+  const items = extractCitationItems({
+    summaryText:
+      'The Court held in 598 U.S. 651 that the program fell. See https://publisher.example/a',
+  });
+  const court = items.filter((i) => i.kind === 'court');
+  assert.equal(court.length, 1);
+  assert.equal(court[0]!.citation, '598 U.S. 651');
+  assert.equal(court[0]!.volume, '598');
+  assert.equal(court[0]!.reporter, 'U.S.');
+  assert.equal(court[0]!.page, '651');
+  assert.equal(items.filter((i) => i.kind === 'claim').length, 0);
+  const urls = items.filter((i) => i.kind === 'url');
+  assert.deepEqual(urls.map((i) => i.url), ['https://publisher.example/a']);
+});
+
+test('extractCitationItems matches F.3d and F. Supp. 2d cites and dedupes whitespace', () => {
+  const items = extractCitationItems({
+    summaryText: 'See 123 F.3d 456, 78 F. Supp. 2d 910, 576 U.S. 644 and 576  U.S.  644.',
+  });
+  assert.deepEqual(
+    items.filter((i) => i.kind === 'court').map((i) => [i.citation, i.reporter]),
+    [
+      ['123 F.3d 456', 'F.3d'],
+      ['78 F. Supp. 2d 910', 'F. Supp. 2d'],
+      ['576 U.S. 644', 'U.S.'],
+    ],
+  );
+});
+
+test('extractCitationItems ignores case names without a reporter cite', () => {
+  const items = extractCitationItems({
+    summaryText: 'Students for Fair Admissions v. Harvard',
+  });
+  assert.equal(items.filter((i) => i.kind === 'court').length, 0);
+});
+
+test('extractCitationItems treats CourtListener docket/opinion/recap URLs as court items', () => {
+  const docket =
+    'https://www.courtlistener.com/docket/67590963/students-for-fair-admissions-v-harvard/';
+  const opinion = 'https://www.courtlistener.com/opinion/2812209/obergefell-v-hodges/';
+  const recap = 'https://courtlistener.com/recap/gov.uscourts.mad.1/';
+  const items = extractCitationItems({
+    summaryText: `See ${docket}. Also ${opinion} and ${recap} but not https://example.com/docket/1`,
+  });
+  assert.deepEqual(
+    items.filter((i) => i.kind === 'court').map((i) => i.url),
+    [docket, opinion, recap],
+  );
+  const urls = items.filter((i) => i.kind === 'url').map((i) => i.url);
+  assert.ok(urls.includes(docket));
+  assert.ok(urls.includes('https://example.com/docket/1'));
+});
+
+test('extractCitationItems scans court cites in every full-story surface', () => {
+  const items = extractCitationItems({
+    fullStory: {
+      enrichment: {
+        talking_points: ['Ruling at 10 F.4th 20.'],
+        timeline: [{ content: 'Filed under 5 Cal. App. 99.' }],
+        suggested_qna: [],
+      },
+      deterministic: {
+        quote: { quote: 'x', quote_source_url: null },
+        perspectives: [{ text: 'Cited 7 So. 2d 8.', sources: [] }],
+      },
+      changeSummary: 'Now cites 1 N.Y.3d 2.',
+    },
+  });
+  assert.deepEqual(
+    items.filter((i) => i.kind === 'court').map((i) => i.citation),
+    ['7 So. 2d 8', '10 F.4th 20', '5 Cal. App. 99', '1 N.Y.3d 2'],
+  );
+});
+
+test('extractCitationItems yields no court item for non-court text', () => {
+  const items = extractCitationItems({
+    summaryText: 'Talks resumed in 2024 at https://publisher.example/x with 12 delegates.',
+  });
+  assert.equal(items.filter((i) => i.kind === 'court').length, 0);
+});

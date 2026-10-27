@@ -46,6 +46,11 @@ export type CitationCheckItem = {
   claimText?: string | null;
   /** Optional stable id for logging later */
   id?: string;
+  /** For kind court: normalized reporter cite, e.g. `598 U.S. 651` */
+  citation?: string | null;
+  volume?: string | null;
+  reporter?: string | null;
+  page?: string | null;
 };
 
 export type CitationCheckResult = {
