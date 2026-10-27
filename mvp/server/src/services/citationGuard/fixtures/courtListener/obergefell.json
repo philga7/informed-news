@@ -1,0 +1,23 @@
+[
+  {
+    "citation": "576 U.S. 644",
+    "normalized_citations": ["576 U.S. 644"],
+    "status": 200,
+    "error_message": "",
+    "clusters": [
+      {
+        "id": 2812209,
+        "absolute_url": "/opinion/2812209/obergefell-v-hodges/",
+        "case_name": "Obergefell v. Hodges",
+        "syllabus": "The judgment is affirmed."
+      }
+    ]
+  },
+  {
+    "citation": "1 U.S. 200",
+    "normalized_citations": ["1 U.S. 200"],
+    "status": 404,
+    "error_message": "Citation not found: '1 U.S. 200'",
+    "clusters": []
+  }
+]

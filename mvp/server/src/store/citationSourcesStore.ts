@@ -67,6 +67,7 @@ function normalizeRecord(key: string, raw: unknown): CitationSourceRecord | null
     runId: raw.runId,
     contentHash: raw.contentHash,
     articleId: raw.articleId,
+    ...(typeof raw.procedural === 'boolean' ? { procedural: raw.procedural } : {}),
   };
 }
 

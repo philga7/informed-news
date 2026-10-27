@@ -18,6 +18,28 @@ export type CitationSourceRecord = {
   contentHash: string;
   /** Article or cluster-member id when known */
   articleId: string | null;
+  /** Court records only: the record is a procedural disposition (NEWS-173). */
+  procedural?: boolean;
+};
+
+/** Parsed CourtListener record kept in the 7-day cache (never headers or raw bodies). */
+export type CourtCacheHit = {
+  url: string;
+  text: string;
+  procedural: boolean;
+};
+
+export type CourtCacheEntry = {
+  /** Normalized cite or normalized court URL */
+  key: string;
+  fetchedAt: string;
+  /** null = CourtListener definitively has no such record */
+  hit: CourtCacheHit | null;
+};
+
+export type CourtCacheStore = {
+  entries: Record<string, CourtCacheEntry>;
+  updatedAt: string | null;
 };
 
 export type CitationSourcesStore = {

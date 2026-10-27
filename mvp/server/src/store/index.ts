@@ -80,6 +80,13 @@ export {
   readCitationCheckLogs,
   updateCitationCheckLog,
 } from './citationCheckLogStore.js';
+export {
+  CITATION_COURT_CACHE_RETENTION_DAYS,
+  isCourtCacheEntryFresh,
+  pruneCitationCourtCacheOlderThan,
+  putCitationCourtCacheEntries,
+  readCitationCourtCache,
+} from './citationCourtCacheStore.js';
 export { acceptClaim, readClaimMembership, unacceptClaim } from './claimMembershipStore.js';
 export type { ClaimMembership } from './claimMembershipStore.js';
 export {
@@ -110,6 +117,7 @@ export {
   BRIEF_SEEN_PATH,
   BRIEF_SUMMARIES_PATH,
   CITATION_CHECK_LOG_PATH,
+  CITATION_COURT_CACHE_PATH,
   CITATION_SOURCES_PATH,
   CLAIM_EXTRACT_PROCESSED_PATH,
   CLAIM_ENRICHMENTS_PATH,

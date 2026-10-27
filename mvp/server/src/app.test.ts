@@ -130,6 +130,7 @@ function refreshSteps(overrides: Partial<RefreshSteps> = {}): RefreshSteps {
       fullStories: 0,
       citationSources: 0,
       citationCheckLogs: 0,
+      citationCourtCache: 0,
       errors: [],
     }),
     pruneArticleStore: async () => ({ articles: 0, errors: [] }),
