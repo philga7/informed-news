@@ -123,6 +123,11 @@ export interface Story {
 	informed_full_story_status?: 'missing' | 'ok' | 'unavailable' | 'error';
 	/** Plain-language note about a regenerated rich story. */
 	informed_full_story_updated?: string;
+	/** NEWS-167 advisory triage layer. */
+	informed_verdict?: 'approved' | 'filtered';
+	informed_confidence?: number;
+	informed_reason_text?: string;
+	informed_criteria_ref?: string;
 }
 
 export interface Category {

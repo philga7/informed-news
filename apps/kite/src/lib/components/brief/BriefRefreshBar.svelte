@@ -1,5 +1,10 @@
 <script lang="ts">
 	import { onMount, untrack } from 'svelte';
+	import {
+		BRIEF_VERDICT_VIEWS,
+		BRIEF_VERDICT_VIEW_LABEL,
+		type BriefVerdictView,
+	} from '$lib/briefVerdictView';
 	import { filteredOutLinkLabel } from '$lib/filteredOut';
 	import { dataReloadService } from '$lib/services/dataService';
 	import {
@@ -23,9 +28,18 @@
 		refresh: BriefOverviewRefresh;
 		notices?: string[];
 		filteredOut?: number | null;
+		/** NEWS-167: Approved / Filtered / All (ephemeral; parent owns state) */
+		verdictView?: BriefVerdictView;
+		onVerdictViewChange?: (view: BriefVerdictView) => void;
 	}
 
-	let { refresh, notices = [], filteredOut = null }: Props = $props();
+	let {
+		refresh,
+		notices = [],
+		filteredOut = null,
+		verdictView = 'approved',
+		onVerdictViewChange,
+	}: Props = $props();
 
 	let now = $state(new Date());
 	let refreshing = $state(false);
@@ -165,15 +179,38 @@
 				{filteredLabel}
 			</a>
 		</p>
-		<button
-			type="button"
-			class="rounded-md border border-gray-300 px-3 py-1 text-xs font-medium text-gray-700 transition-colors hover:border-gray-400 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:text-gray-200 dark:hover:border-gray-500 dark:hover:bg-gray-800"
-			disabled={busy}
-			aria-busy={busy}
-			onclick={handleRefresh}
-		>
-			{busy ? BRIEF_REFRESHING_LABEL : BRIEF_REFRESH_LABEL}
-		</button>
+		<div class="flex flex-wrap items-center gap-2">
+			<div
+				class="inline-flex rounded-md border border-gray-300 dark:border-gray-600"
+				role="group"
+				aria-label="Brief verdict view"
+				data-testid="brief-verdict-view"
+			>
+				{#each BRIEF_VERDICT_VIEWS as view (view)}
+					<button
+						type="button"
+						aria-pressed={verdictView === view}
+						class="px-2.5 py-1 text-xs font-medium transition-colors first:rounded-l-md last:rounded-r-md {verdictView ===
+						view
+							? 'bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900'
+							: 'text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800'}"
+						data-testid={`brief-verdict-view-${view}`}
+						onclick={() => onVerdictViewChange?.(view)}
+					>
+						{BRIEF_VERDICT_VIEW_LABEL[view]}
+					</button>
+				{/each}
+			</div>
+			<button
+				type="button"
+				class="rounded-md border border-gray-300 px-3 py-1 text-xs font-medium text-gray-700 transition-colors hover:border-gray-400 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:text-gray-200 dark:hover:border-gray-500 dark:hover:bg-gray-800"
+				disabled={busy}
+				aria-busy={busy}
+				onclick={handleRefresh}
+			>
+				{busy ? BRIEF_REFRESHING_LABEL : BRIEF_REFRESH_LABEL}
+			</button>
+		</div>
 	</div>
 
 	{#if currentNotices.length > 0}

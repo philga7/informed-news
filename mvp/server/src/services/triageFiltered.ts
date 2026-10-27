@@ -58,6 +58,11 @@ export type FilteredOutItem = {
   topics: { id: string; name: string }[];
   duplicateOf: { articleId: string; title: string | null; url: string | null } | null;
   triagedAt: string;
+  /** NEWS-167 advisory; null when absent on the record */
+  verdict: 'approved' | 'filtered' | null;
+  confidence: number | null;
+  reasonText: string | null;
+  criteriaRef: string | null;
 };
 
 export type FilteredOut = {
@@ -184,6 +189,10 @@ export function buildFilteredOut(input: {
             }
           : null,
       triagedAt: rec.triagedAt,
+      verdict: rec.verdict ?? null,
+      confidence: rec.confidence ?? null,
+      reasonText: rec.reasonText ?? null,
+      criteriaRef: rec.criteriaRef ?? null,
     });
   }
   items.sort(compareItems);

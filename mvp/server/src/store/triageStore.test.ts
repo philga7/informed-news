@@ -152,6 +152,42 @@ test('a manual-stage seed record round-trips', async () => {
   assert.deepEqual(await readTriage(triagePath), { records: { 'seed-1': seed }, updatedAt: null });
 });
 
+test('NEWS-167 advisory fields survive write/read; old rows without them still load', async () => {
+  const triagePath = tempTriagePath();
+  const withAdvisory: TriageRecord = {
+    ...keptRecord('with'),
+    verdict: 'approved',
+    confidence: 0.9,
+    reasonText: 'Relevant to topic-a.',
+    criteriaRef: 'topic:topic-a',
+  };
+  const legacy = keptRecord('legacy');
+  await writeTriage(
+    { records: { with: withAdvisory, legacy }, updatedAt: '2026-10-27T12:00:00.000Z' },
+    triagePath,
+  );
+  assert.deepEqual(await readTriage(triagePath), {
+    records: { with: withAdvisory, legacy },
+    updatedAt: '2026-10-27T12:00:00.000Z',
+  });
+});
+
+test('NEWS-167 omits incomplete advisory fields but keeps the machine record', async () => {
+  const triagePath = tempTriagePath();
+  const base = keptRecord('partial');
+  await writeRaw(triagePath, {
+    records: {
+      partial: { ...base, verdict: 'approved', confidence: 0.5 },
+      badVerdict: { ...base, articleId: 'badVerdict', verdict: 'maybe', confidence: 1, reasonText: 'x', criteriaRef: 'global' },
+    },
+    updatedAt: null,
+  });
+  const loaded = await readTriage(triagePath);
+  assert.deepEqual(loaded.records.partial, base);
+  assert.equal(loaded.records.partial?.verdict, undefined);
+  assert.deepEqual(loaded.records.badVerdict, { ...base, articleId: 'badVerdict' });
+});
+
 test('updateTriage applies concurrent updates one after another; neither is lost', async () => {
   const triagePath = tempTriagePath();
   await writeTriage({ records: { a1: keptRecord('a1') }, updatedAt: null }, triagePath);
