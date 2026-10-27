@@ -143,12 +143,14 @@ describe('NEWS-165 vision and decisions', () => {
 
 		const currentNext = agents.slice(agents.indexOf('**Current next:**'));
 		const at = (key) => currentNext.indexOf(key);
-		const next = currentNext.slice(currentNext.indexOf('**Current next**'));
+		// The "Current next is …" clause (after the Done list) — not the bold label that opens the paragraph.
+		const nextClause = '**Current next** is';
+		const next = currentNext.slice(currentNext.indexOf(nextClause));
 		const nextAt = (key) => next.indexOf(key);
-		assert.ok(nextAt('NEWS-167') !== -1 && nextAt('NEWS-167') < nextAt('NEWS-172'));
-		assert.ok(nextAt('NEWS-172') < nextAt('NEWS-173'));
+		assert.ok(at('NEWS-167') !== -1 && at('NEWS-167') < at(nextClause), 'NEWS-167 is Done before Current next');
+		assert.ok(nextAt('NEWS-172') !== -1 && nextAt('NEWS-172') < nextAt('NEWS-173'));
 		assert.ok(nextAt('NEWS-173') < nextAt('NEWS-168'));
-		assert.ok(at('NEWS-131') < at('**Current next**'), 'NEWS-131 is listed as Done before Current next');
+		assert.ok(at('NEWS-131') < at(nextClause), 'NEWS-131 is listed as Done before Current next');
 	});
 
 	it('keeps relative links alive and does not contradict docs/TRIAGE.md', () => {
