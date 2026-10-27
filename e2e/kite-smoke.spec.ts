@@ -280,6 +280,119 @@ test.describe('Topic Brief (NEWS-88)', () => {
 	});
 });
 
+test.describe('Brief verdict view — Approved / Filtered / All (NEWS-167)', () => {
+	test.beforeEach(() => useScenario('topics'));
+
+	test('toggle shows Approved topics, Filtered last-run drops, and All as sections plus filtered list', async ({
+		page,
+	}) => {
+		await logIn(page);
+		await page.goto('/');
+		await expect(page).toHaveTitle(/Informed News/i, { timeout: 60_000 });
+
+		const view = page.getByTestId('brief-verdict-view');
+		await expect(view).toBeVisible({ timeout: 60_000 });
+		await expect(view).toHaveAttribute('role', 'group');
+		await expect(view.getByRole('button', { name: 'Approved', pressed: true })).toBeVisible();
+
+		const sections = page.getByTestId('topic-brief-section');
+		await expect(sections).toHaveCount(2);
+		await expect(page.getByTestId('brief-filtered-verdict-list')).toHaveCount(0);
+		await expect(
+			page.getByRole('heading', { name: TOPIC_SCENARIO.sections[0]!.name, exact: true }),
+		).toBeVisible();
+		// Approved cards can open the advisory reason expander (kept rows carry reasonText).
+		const approvedExpander = sections.first().getByTestId('verdict-reason-expander').first();
+		await expect(approvedExpander).toBeVisible();
+		await approvedExpander.locator('summary').click();
+		await expect(approvedExpander).toHaveAttribute('open');
+
+		await view.getByRole('button', { name: 'Filtered', pressed: false }).click();
+		await expect(view.getByRole('button', { name: 'Filtered', pressed: true })).toBeVisible();
+		await expect(page.getByTestId('topic-brief-section')).toHaveCount(0);
+		const filteredList = page.getByTestId('brief-filtered-verdict-list');
+		await expect(filteredList).toBeVisible();
+		const filteredCards = filteredList.getByTestId('brief-filtered-verdict-card');
+		await expect(filteredCards).toHaveCount(TOPIC_SCENARIO.filtered.length);
+		for (const { title } of TOPIC_SCENARIO.filtered) {
+			await expect(filteredCards.filter({ hasText: title })).toHaveCount(1);
+		}
+		await expect(filteredList.getByText(TOPIC_SCENARIO.filteredEarlier.title)).toHaveCount(0);
+
+		await view.getByRole('button', { name: 'All', pressed: false }).click();
+		await expect(page.getByTestId('topic-brief-section')).toHaveCount(2);
+		await expect(page.getByTestId('brief-filtered-verdict-list')).toBeVisible();
+		await expect(
+			page.getByTestId('brief-filtered-verdict-list').getByTestId('brief-filtered-verdict-card'),
+		).toHaveCount(TOPIC_SCENARIO.filtered.length);
+	});
+
+	test('reason expander opens by keyboard and exposes an advisory accessible name', async ({
+		page,
+	}) => {
+		await logIn(page);
+		await page.goto('/');
+		await expect(page).toHaveTitle(/Informed News/i, { timeout: 60_000 });
+
+		const view = page.getByTestId('brief-verdict-view');
+		await expect(view).toBeVisible({ timeout: 60_000 });
+		await view.getByRole('button', { name: 'Filtered', pressed: false }).click();
+
+		const firstCard = page.getByTestId('brief-filtered-verdict-card').first();
+		await expect(firstCard).toBeVisible();
+		const expander = firstCard.getByTestId('verdict-reason-expander');
+		await expect(expander).toBeVisible();
+		await expect(expander).not.toHaveAttribute('open');
+
+		const summary = expander.locator('summary');
+		await summary.focus();
+		await page.keyboard.press('Enter');
+		await expect(expander).toHaveAttribute('open');
+		await expect(
+			expander.getByRole('region', { name: 'Advisory triage reason' }),
+		).toBeVisible();
+		await expect(expander.getByTestId('verdict-reason-advisory')).toContainText('Advisory');
+	});
+
+	test('Filtered view with no session fetches once and shows the login hint (no loop)', async ({
+		page,
+	}) => {
+		const filteredRequests: string[] = [];
+		page.on('request', (req) => {
+			if (req.url().includes('/api/triage/filtered')) filteredRequests.push(req.url());
+		});
+
+		await page.goto('/');
+		await expect(page).toHaveTitle(/Informed News/i, { timeout: 60_000 });
+
+		const view = page.getByTestId('brief-verdict-view');
+		await expect(view).toBeVisible({ timeout: 60_000 });
+		await view.getByRole('button', { name: 'Filtered', pressed: false }).click();
+
+		const list = page.getByTestId('brief-filtered-verdict-list');
+		await expect(list).toBeVisible();
+		await expect(
+			list.getByRole('link', { name: 'Log in on Topics to see filtered stories' }),
+		).toBeVisible({ timeout: 15_000 });
+		expect(filteredRequests.length).toBe(1);
+
+		await page.waitForTimeout(1500);
+		expect(filteredRequests.length).toBe(1);
+	});
+
+	test('/filtered link stays beside the toggle and still opens the Filtered out page', async ({
+		page,
+	}) => {
+		await logIn(page);
+		await page.goto('/');
+		await expect(page.getByTestId('brief-verdict-view')).toBeVisible({ timeout: 60_000 });
+		await expect(page.getByTestId('brief-filtered-link')).toBeVisible();
+		await page.getByTestId('brief-filtered-link').click();
+		await expect(page).toHaveURL(/\/filtered\/?$/);
+		await expect(page.getByRole('heading', { name: 'Filtered out', exact: true })).toBeVisible();
+	});
+});
+
 test.describe('Filtered out + Less like this (NEWS-90)', () => {
 	test.beforeEach(() => useScenario('topics'));
 

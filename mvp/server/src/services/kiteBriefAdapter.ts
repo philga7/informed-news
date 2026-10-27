@@ -91,6 +91,11 @@ export type KiteBriefStory = {
   informed_publisher_domain?: string;
   /** Operator-added seed (NEWS-98); omitted for found stories. */
   informed_added_by_you?: true;
+  /** NEWS-167 advisory triage layer; omitted when absent on the record. */
+  informed_verdict?: 'approved' | 'filtered';
+  informed_confidence?: number;
+  informed_reason_text?: string;
+  informed_criteria_ref?: string;
 };
 
 export type KiteBatchInfo = {
@@ -727,6 +732,12 @@ function topicStoryToKite(
   }
   if (story.manualSeed) {
     kite.informed_added_by_you = true;
+  }
+  if (story.verdict !== undefined) {
+    kite.informed_verdict = story.verdict;
+    if (story.confidence !== undefined) kite.informed_confidence = story.confidence;
+    if (story.reasonText !== undefined) kite.informed_reason_text = story.reasonText;
+    if (story.criteriaRef !== undefined) kite.informed_criteria_ref = story.criteriaRef;
   }
   const imageUrl = story.imageUrl?.trim();
   if (imageUrl) {

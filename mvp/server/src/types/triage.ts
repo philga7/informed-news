@@ -35,6 +35,9 @@ export type TriageStage =
   | 'manual';
 export type TriageLabel = 'official';
 
+/** Advisory keep/drop for the Brief (NEWS-167). Mirrors machine status when present. */
+export type TriageAdvisoryVerdict = 'approved' | 'filtered';
+
 export type TriageRecord = {
   articleId: string;
   status: TriageStatus;
@@ -60,6 +63,17 @@ export type TriageRecord = {
   jevCalls: number;
   /** ISO */
   triagedAt: string;
+  /**
+   * Advisory layer (NEWS-167). Absent on pre-NEWS-167 rows — no backfill.
+   * Machine `status` / `reason` remain the live triage record.
+   */
+  verdict?: TriageAdvisoryVerdict;
+  /** 0–1 when present */
+  confidence?: number;
+  /** Prose reason (≤300); never the machine drop code */
+  reasonText?: string;
+  /** One driving rule: `global` | `topic:<id>` | `source:<id>` | `rule:mute:<id>` | `rule:duplicate` | `rule:budget` */
+  criteriaRef?: string;
 };
 
 export type TriageStore = { records: Record<string, TriageRecord>; updatedAt: string | null };

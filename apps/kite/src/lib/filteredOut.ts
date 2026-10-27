@@ -116,6 +116,11 @@ export type FilteredOutItem = {
 	topics: { id: string; name: string }[];
 	duplicateOf: { articleId: string; title: string | null; url: string | null } | null;
 	triagedAt: string;
+	/** NEWS-167 advisory; null when absent */
+	verdict?: 'approved' | 'filtered' | null;
+	confidence?: number | null;
+	reasonText?: string | null;
+	criteriaRef?: string | null;
 };
 
 export type FilteredOut = {

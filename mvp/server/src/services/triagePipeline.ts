@@ -43,6 +43,12 @@ import {
 import { judgeTriage, type TriageJevContext, type TriageVerdict } from './triageJev.js';
 import { candidateTopicIds, isOutletOnlyTopic, muteReason } from './triageKeywords.js';
 import { prepareSurvivor, writeBackSurvivors } from './triageSurvivor.js';
+import {
+  advisoryForKeep,
+  advisoryFromJev,
+  advisoryFromMachineDrop,
+  type TriageAdvisory,
+} from './triageVerdict.js';
 import { getTypeSafeClient } from './typesafeClient.js';
 
 export type TriageResult = TriageRunMeta & { keptIds: string[] };
@@ -87,6 +93,8 @@ type RecordFields = {
   outletCount?: number | null;
   significance?: number | null;
   bodyChecked?: boolean;
+  /** NEWS-167 advisory; when omitted, derived from machine reason */
+  advisory?: TriageAdvisory;
 };
 
 type MemberOutcome =
@@ -136,8 +144,20 @@ function inWindow(article: Article, now: Date): boolean {
   return timeInWindow(articleTime(article), now);
 }
 
+function defaultAdvisory(fields: RecordFields): TriageAdvisory {
+  if (fields.advisory) return fields.advisory;
+  if (fields.reason !== null) return advisoryFromMachineDrop(fields.reason);
+  const primary = fields.topicIds[0];
+  return advisoryForKeep({
+    confidence: 1,
+    reasonText: primary ? `Kept for topic ${primary}.` : 'Kept.',
+    criteriaRef: primary ? `topic:${primary}` : 'global',
+  });
+}
+
 function record(run: TriageRun, articleId: string, fields: RecordFields): void {
   const reason = fields.reason;
+  const advisory = defaultAdvisory(fields);
   run.records.set(articleId, {
     articleId,
     status: reason === null ? 'kept' : 'dropped',
@@ -153,6 +173,10 @@ function record(run: TriageRun, articleId: string, fields: RecordFields): void {
     bodyChecked: fields.bodyChecked ?? false,
     jevCalls: (run.prior[articleId]?.jevCalls ?? 0) + (run.calls.get(articleId) ?? 0),
     triagedAt: run.at,
+    verdict: advisory.verdict,
+    confidence: advisory.confidence,
+    reasonText: advisory.reasonText,
+    criteriaRef: advisory.criteriaRef,
   });
 }
 
@@ -196,16 +220,24 @@ function dropFrom(
   verdict: Extract<TriageVerdict, { decision: 'drop' }>,
   stage: TriageStage,
   significance: number,
+  advisory?: TriageAdvisory,
 ): MemberOutcome {
   return {
     kind: 'drop',
-    fields: { reason: verdict.reason, stage, topicIds: verdict.topicIds, significance },
+    fields: {
+      reason: verdict.reason,
+      stage,
+      topicIds: verdict.topicIds,
+      significance,
+      advisory,
+    },
   };
 }
 
 async function triageMember(member: DedupeCandidate, run: TriageRun): Promise<MemberOutcome> {
   const id = member.article.id;
   const ctx = contextFor(run, member.topicIds);
+  const topicsById = run.desiredById;
 
   if (!reserve(run, id)) return { kind: 'unscored', reason: 'not_scored_budget', stage: 'budget' };
   const headline = await judgeSafely(run, 'headline', member.article, ctx);
@@ -213,8 +245,17 @@ async function triageMember(member: DedupeCandidate, run: TriageRun): Promise<Me
     jevFailed(run, headline.error);
     return { kind: 'unscored', reason: 'not_scored_error', stage: 'headline' };
   }
-  const { verdict } = headline;
-  if (verdict.decision === 'drop') return dropFrom(verdict, 'headline', verdict.significance);
+  const { verdict, answers } = headline;
+  const undesiredById = new Map(ctx.undesired.map((t) => [t.id, t]));
+  const allTopics = new Map<string, Topic>([...topicsById, ...undesiredById]);
+  if (verdict.decision === 'drop') {
+    return dropFrom(
+      verdict,
+      'headline',
+      verdict.significance,
+      advisoryFromJev(verdict, answers, allTopics),
+    );
+  }
 
   const prepared = await run.prepare(member.article, run.now);
   if (prepared.changed) run.changed.set(id, prepared.article);
@@ -231,15 +272,22 @@ async function triageMember(member: DedupeCandidate, run: TriageRun): Promise<Me
   }
 
   let cleared = verdict;
+  let clearedAnswers = answers;
   let bodyChecked = false;
   if (prepared.article.bodyStatus === 'ok' && reserve(run, id)) {
     const body = await judgeSafely(run, 'body', prepared.article, ctx);
     if (!body.ok) {
       jevFailed(run, body.error);
     } else if (body.verdict.decision === 'drop') {
-      return dropFrom(body.verdict, 'body', verdict.significance);
+      return dropFrom(
+        body.verdict,
+        'body',
+        verdict.significance,
+        advisoryFromJev(body.verdict, body.answers, allTopics),
+      );
     } else {
       cleared = body.verdict;
+      clearedAnswers = body.answers;
       bodyChecked = true;
     }
   }
@@ -254,6 +302,7 @@ async function triageMember(member: DedupeCandidate, run: TriageRun): Promise<Me
       labels: cleared.labels,
       significance: verdict.significance,
       bodyChecked,
+      advisory: advisoryFromJev(cleared, clearedAnswers, allTopics),
     },
   };
 }

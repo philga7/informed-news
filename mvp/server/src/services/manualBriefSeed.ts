@@ -343,6 +343,10 @@ export async function createManualSeed(
     bodyChecked: false,
     jevCalls: 0,
     triagedAt: now,
+    verdict: 'approved',
+    confidence: 1,
+    reasonText: `Added by you under ${topic.name}.`,
+    criteriaRef: `topic:${topic.id}`,
   };
   // Re-checked under the triage write lock, against records kept since the first read and
   // articles read under that same lock.
