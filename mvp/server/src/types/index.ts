@@ -77,6 +77,9 @@ export type {
 
 export type {
   CitationCheckItem,
+  CitationCheckLogEntry,
+  CitationCheckLogRecord,
+  CitationCheckLogStore,
   CitationCheckResult,
   CitationCheckStatus,
   CitationKind,

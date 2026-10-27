@@ -105,7 +105,13 @@ test('pruneBriefStores drops records whose article is no longer kept and keeps k
 
   assert.deepEqual(ids(h.summaries), ['keep']);
   assert.deepEqual(ids(h.fullStories), ['keep']);
-  assert.deepEqual(result, { summaries: 2, fullStories: 2, errors: [] });
+  assert.deepEqual(result, {
+    summaries: 2,
+    fullStories: 2,
+    citationSources: 0,
+    citationCheckLogs: 0,
+    errors: [],
+  });
 });
 
 test('pruneBriefStores drops kept records generated more than 7 days ago', async () => {
@@ -124,7 +130,13 @@ test('pruneBriefStores drops kept records generated more than 7 days ago', async
 
   assert.deepEqual(ids(h.summaries), ['edge', 'fresh']);
   assert.deepEqual(ids(h.fullStories), ['edge', 'fresh']);
-  assert.deepEqual(result, { summaries: 2, fullStories: 1, errors: [] });
+  assert.deepEqual(result, {
+    summaries: 2,
+    fullStories: 1,
+    citationSources: 0,
+    citationCheckLogs: 0,
+    errors: [],
+  });
 });
 
 test('pruneBriefStores prunes nothing when triage is unreadable', async () => {
@@ -141,6 +153,8 @@ test('pruneBriefStores prunes nothing when triage is unreadable', async () => {
   assert.deepEqual(result, {
     summaries: 0,
     fullStories: 0,
+    citationSources: 0,
+    citationCheckLogs: 0,
     errors: ['triage: triage.json must contain a JSON object'],
   });
 });
@@ -155,7 +169,13 @@ test('a failing summaries prune does not stop the full-stories prune', async () 
   const result = await pruneBriefStores({ now: NOW }, h.deps);
 
   assert.deepEqual(h.fullStories, []);
-  assert.deepEqual(result, { summaries: 0, fullStories: 1, errors: ['summaries prune: EACCES'] });
+  assert.deepEqual(result, {
+    summaries: 0,
+    fullStories: 1,
+    citationSources: 0,
+    citationCheckLogs: 0,
+    errors: ['summaries prune: EACCES'],
+  });
 });
 
 test('a failing full-stories prune is reported after the summaries prune', async () => {
@@ -168,5 +188,57 @@ test('a failing full-stories prune is reported after the summaries prune', async
   const result = await pruneBriefStores({ now: NOW }, h.deps);
 
   assert.deepEqual(h.summaries, []);
-  assert.deepEqual(result, { summaries: 1, fullStories: 0, errors: ['full stories prune: disk full'] });
+  assert.deepEqual(result, {
+    summaries: 1,
+    fullStories: 0,
+    citationSources: 0,
+    citationCheckLogs: 0,
+    errors: ['full stories prune: disk full'],
+  });
+});
+
+test('pruneBriefStores also prunes citation sources and check logs older than 7 days', async () => {
+  let sourcesRemoved = 0;
+  let logsRemoved = 0;
+  const h = harness({ keep: 'kept' }, [summary('keep', DAYS_AGO(1))], [fullStory('keep', DAYS_AGO(1))], {
+    pruneCitationSourcesOlderThan: async () => {
+      sourcesRemoved = 2;
+      return 2;
+    },
+    pruneCitationCheckLogsOlderThan: async () => {
+      logsRemoved = 3;
+      return 3;
+    },
+  });
+
+  const result = await pruneBriefStores({ now: NOW }, h.deps);
+
+  assert.equal(sourcesRemoved, 2);
+  assert.equal(logsRemoved, 3);
+  assert.deepEqual(result, {
+    summaries: 0,
+    fullStories: 0,
+    citationSources: 2,
+    citationCheckLogs: 3,
+    errors: [],
+  });
+});
+
+test('citation prune failures are reported and never fail the brief prune', async () => {
+  const h = harness({ keep: 'kept' }, [summary('keep', DAYS_AGO(1))], [fullStory('keep', DAYS_AGO(1))], {
+    pruneCitationSourcesOlderThan: async () => {
+      throw new Error('sources EACCES');
+    },
+    pruneCitationCheckLogsOlderThan: async () => {
+      throw new Error('logs EACCES');
+    },
+  });
+
+  const result = await pruneBriefStores({ now: NOW }, h.deps);
+
+  assert.deepEqual(ids(h.summaries), ['keep']);
+  assert.deepEqual(result.errors, [
+    'citation sources prune: sources EACCES',
+    'citation check logs prune: logs EACCES',
+  ]);
 });

@@ -70,7 +70,7 @@ function harness(overrides: Partial<RefreshRunnerDeps> = {}, meta?: StoreMeta): 
     },
     pruneBriefStores: async (options) => {
       h.pruneCalls.push(options);
-      return { summaries: 0, fullStories: 0, errors: [] };
+      return { summaries: 0, fullStories: 0, citationSources: 0, citationCheckLogs: 0, errors: [] };
     },
     pruneArticleStore: async () => ({ articles: 0, errors: [] }),
     readMeta: async () => h.meta,
@@ -242,7 +242,7 @@ test('run: one run calls fetchAll → generateSummaries → generateFullStories 
     pruneBriefStores: async ({ now }) => {
       order.push('pruneBriefStores');
       pruneNows.push(now);
-      return { summaries: 0, fullStories: 0, errors: [] };
+      return { summaries: 0, fullStories: 0, citationSources: 0, citationCheckLogs: 0, errors: [] };
     },
     pruneArticleStore: async ({ now }) => {
       order.push('pruneArticleStore');
@@ -303,7 +303,13 @@ test('run: a throwing Brief prune still runs the article prune; a throwing artic
 
 test('run: prune errors are logged and do not fail the run or change brief meta', async () => {
   const h = harness({
-    pruneBriefStores: async () => ({ summaries: 0, fullStories: 3, errors: ['summaries prune: EACCES'] }),
+    pruneBriefStores: async () => ({
+      summaries: 0,
+      fullStories: 3,
+      citationSources: 0,
+      citationCheckLogs: 0,
+      errors: ['summaries prune: EACCES'],
+    }),
   });
   const runner = createRefreshRunner(h.deps);
 

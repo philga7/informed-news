@@ -70,6 +70,15 @@ export {
   registerCitationSources,
   updateCitationSources,
 } from './citationSourcesStore.js';
+export {
+  CITATION_CHECK_LOG_RETENTION_DAYS,
+  pruneCitationCheckLogs,
+  pruneCitationCheckLogsOlderThan,
+  putCitationCheckLog,
+  readCitationCheckLog,
+  readCitationCheckLogs,
+  updateCitationCheckLog,
+} from './citationCheckLogStore.js';
 export { acceptClaim, readClaimMembership, unacceptClaim } from './claimMembershipStore.js';
 export type { ClaimMembership } from './claimMembershipStore.js';
 export {
@@ -99,6 +108,7 @@ export {
   BRIEF_FULL_STORIES_PATH,
   BRIEF_SEEN_PATH,
   BRIEF_SUMMARIES_PATH,
+  CITATION_CHECK_LOG_PATH,
   CITATION_SOURCES_PATH,
   CLAIM_EXTRACT_PROCESSED_PATH,
   CLAIM_ENRICHMENTS_PATH,

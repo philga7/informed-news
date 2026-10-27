@@ -28,11 +28,17 @@ import type { Topic } from '../types/topic.js';
 import type { TriageStore } from '../types/triage.js';
 import { BRIEF_TOP_N, ON_DEMAND_SUMMARY_MAX_PER_HOUR, SUMMARY_CONCURRENCY } from './briefConfig.js';
 import { OLLAMA_NOT_CONFIGURED, summarizeSource } from './briefSummary.js';
+import { extractCitationItems } from './citationGuard/extractCitationItems.js';
+import {
+  citationGuardRunId,
+  registerSourcesAndRunCitationGuard,
+  type RegisterAndGuardDeps,
+} from './citationGuard/runCitationGuard.js';
 import { getOllamaClient } from './ollamaFraming.js';
 import { composeTopicBrief, summarySourceFor, type BriefStory, type SummarySource, type TopicBrief } from './topicBrief.js';
 import { resolveTriageBudgets } from './triageConfig.js';
 
-export type BriefSummaryDeps = {
+export type BriefSummaryDeps = RegisterAndGuardDeps & {
   readTopics?: () => Promise<{ topics: Topic[] }>;
   readMuteRules?: () => Promise<{ rules: MuteRule[] }>;
   readArticles?: () => Promise<Article[]>;
@@ -44,6 +50,8 @@ export type BriefSummaryDeps = {
   updateMeta?: (patch: Partial<StoreMeta>) => Promise<unknown>;
   summarize?: typeof summarizeSource;
   ollamaAvailable?: () => boolean;
+  /** Injectable citation guard; defaults to registerSourcesAndRunCitationGuard. */
+  runCitationGuard?: typeof registerSourcesAndRunCitationGuard;
 };
 
 export type OnDemandLimiter = { tryAcquire(): boolean };
@@ -156,6 +164,45 @@ function sourceForStory(loaded: LoadedBriefInputs, articleId: string): SummarySo
   return summarySourceFor(record, loaded.articlesById, loaded.triage);
 }
 
+function articleLink(article: Article): string {
+  return article.publisherUrl || article.canonicalUrl;
+}
+
+/**
+ * Register summary source text for this run and check citation items in the
+ * summary. Never throws — guard failures must not fail refresh / generate.
+ */
+async function runSummaryCitationGuard(
+  articleId: string,
+  summaryText: string | null | undefined,
+  source: SummarySource,
+  loaded: LoadedBriefInputs,
+  runId: string,
+  now: Date,
+  deps: BriefSummaryDeps,
+): Promise<void> {
+  if (typeof summaryText !== 'string' || !summaryText.trim()) return;
+  try {
+    const sourceArticle = loaded.articlesById.get(source.sourceArticleId);
+    const url = sourceArticle ? articleLink(sourceArticle).trim() || null : null;
+    const runGuard = deps.runCitationGuard ?? registerSourcesAndRunCitationGuard;
+    await runGuard(
+      {
+        articleId,
+        runId,
+        now,
+        sourceCandidates: [
+          { url, text: source.text, articleId: source.sourceArticleId },
+        ],
+        items: extractCitationItems({ summaryText }),
+      },
+      deps,
+    );
+  } catch {
+    // Guard must never fail generate / refresh.
+  }
+}
+
 function cachedOk(
   summaries: BriefSummariesStore,
   articleId: string,
@@ -241,6 +288,8 @@ export async function generateRefreshSummaries(
 ): Promise<BriefRunMeta> {
   const now = options.now ?? new Date();
   const at = now.toISOString();
+  /** Shared citation-guard run id for this refresh (boundaryAt = refresh startedAt). */
+  const runId = citationGuardRunId(now, options.boundaryAt);
   const budget = resolveTriageBudgets(options.env ?? process.env).summaries;
   const summaries: BriefRunMeta['summaries'] = {
     budget,
@@ -266,19 +315,26 @@ export async function generateRefreshSummaries(
     const loaded = await loadBriefInputs(deps, options.boundaryAt === undefined, errors);
     if (!loaded) return await finish();
 
-  const brief = composeBriefFromInputs(loaded, now, options.boundaryAt);
+    const brief = composeBriefFromInputs(loaded, now, options.boundaryAt);
     const records: BriefSummaryRecord[] = [];
     const pending: Pending[] = [];
+    const reusedForGuard: Array<{ articleId: string; source: SummarySource; text: string }> = [];
     for (const section of brief.sections) {
       for (const story of section.stories.slice(0, BRIEF_TOP_N)) {
         const source = sourceForStory(loaded, story.articleId);
         if (!source) {
           summaries.unavailable += 1;
           records.push(unavailableRecord(story.articleId, at, 'refresh'));
-        } else if (cachedOk(loaded.summaries, story.articleId, source)) {
-          summaries.reused += 1;
         } else {
-          pending.push({ story, source });
+          const cached = cachedOk(loaded.summaries, story.articleId, source);
+          if (cached) {
+            summaries.reused += 1;
+            if (cached.text) {
+              reusedForGuard.push({ articleId: story.articleId, source, text: cached.text });
+            }
+          } else {
+            pending.push({ story, source });
+          }
         }
       }
     }
@@ -303,6 +359,33 @@ export async function generateRefreshSummaries(
       } catch (err) {
         addStoreError(errors, `summaries write: ${errorMessage(err)}`);
       }
+    }
+
+    // Citation guard after successful summary writes / cache reuse (never fails refresh).
+    for (const reused of reusedForGuard) {
+      await runSummaryCitationGuard(
+        reused.articleId,
+        reused.text,
+        reused.source,
+        loaded,
+        runId,
+        now,
+        deps,
+      );
+    }
+    for (const record of records) {
+      if (record.status !== 'ok' || !record.text || !record.sourceArticleId) continue;
+      const source = sourceForStory(loaded, record.articleId);
+      if (!source) continue;
+      await runSummaryCitationGuard(
+        record.articleId,
+        record.text,
+        source,
+        loaded,
+        runId,
+        now,
+        deps,
+      );
     }
   } catch (err) {
     addError(errors, errorMessage(err));
@@ -352,6 +435,7 @@ async function summarizeBriefStoryOnce(
   if (!story) return { ok: false, code: 'not_in_brief', error: 'Story is not in the current Brief' };
 
   const at = now.toISOString();
+  const runId = citationGuardRunId(now);
   const source = sourceForStory(loaded, articleId);
   if (!source) {
     const record = unavailableRecord(articleId, at, 'on_demand');
@@ -359,7 +443,10 @@ async function summarizeBriefStoryOnce(
     return { ok: true, summary: record };
   }
   const cached = cachedOk(loaded.summaries, articleId, source);
-  if (cached) return { ok: true, summary: cached };
+  if (cached) {
+    await runSummaryCitationGuard(articleId, cached.text, source, loaded, runId, now, deps);
+    return { ok: true, summary: cached };
+  }
 
   if (!(deps.ollamaAvailable ?? defaultOllamaAvailable)()) {
     return { ok: false, code: 'error', error: OLLAMA_NOT_CONFIGURED };
@@ -375,7 +462,11 @@ async function summarizeBriefStoryOnce(
   const result = await summarizeSafely(deps.summarize ?? summarizeSource, story, source);
   const record = resultRecord(articleId, source, result, at, 'on_demand');
   await writeOnDemand(deps, record);
-  return result.ok ? { ok: true, summary: record } : { ok: false, code: 'error', error: result.error };
+  if (result.ok) {
+    await runSummaryCitationGuard(articleId, record.text, source, loaded, runId, now, deps);
+    return { ok: true, summary: record };
+  }
+  return { ok: false, code: 'error', error: result.error };
 }
 
 /**

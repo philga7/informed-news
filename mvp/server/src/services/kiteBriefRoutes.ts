@@ -6,6 +6,7 @@ import {
   readBriefSeen,
   readBriefFullStories,
   readBriefSummaries,
+  readCitationCheckLogs,
   readClaimEnrichments,
   readClaimMembership,
   readClaims,
@@ -19,6 +20,7 @@ import {
 import type { Article, StoreMeta } from '../types/article.js';
 import type { BriefSeenStore, BriefSummariesStore } from '../types/brief.js';
 import type { BriefFullStoriesStore } from '../types/briefFullStory.js';
+import type { CitationCheckLogStore } from '../types/citationGuard.js';
 import {
   OWNED_BATCH_ID,
   type BriefDegradedStore,
@@ -48,6 +50,7 @@ export type CreateKiteBriefRouterDeps = {
   readBriefSeen?: typeof readBriefSeen;
   readBriefSummaries?: typeof readBriefSummaries;
   readBriefFullStories?: typeof readBriefFullStories;
+  readCitationCheckLogs?: typeof readCitationCheckLogs;
   readMeta?: typeof readMeta;
   readBriefMembership?: typeof readBriefMembership;
   readClusterEnrichments?: typeof readClusterEnrichments;
@@ -68,6 +71,7 @@ type OwnedBrief =
     fixture: false;
     brief: TopicBrief;
     fullStories: BriefFullStoriesStore;
+    citationCheckLogs: CitationCheckLogStore;
     meta: StoreMeta;
     degraded: BriefDegradedStore[];
   };
@@ -95,6 +99,7 @@ export function createKiteBriefRouter(
   const readSeen = deps.readBriefSeen ?? readBriefSeen;
   const readSummaries = deps.readBriefSummaries ?? readBriefSummaries;
   const readFullStories = deps.readBriefFullStories ?? readBriefFullStories;
+  const readCheckLogs = deps.readCitationCheckLogs ?? readCitationCheckLogs;
   const readServerMeta = deps.readMeta ?? readMeta;
   const readMembership = deps.readBriefMembership ?? readBriefMembership;
   const readEnrichments = deps.readClusterEnrichments ?? readClusterEnrichments;
@@ -116,24 +121,27 @@ export function createKiteBriefRouter(
     }
 
     const degraded: BriefDegradedStore[] = [];
-    const [triage, topics, mutes, seen, summaries, fullStories, meta] = await Promise.all([
-      readTriageStore(),
-      readTopicList(),
-      readMutes(),
-      readSeen().catch((): BriefSeenStore => {
-        degraded.push('seen');
-        return { seen: {}, updatedAt: null };
-      }),
-      readSummaries().catch((): BriefSummariesStore => {
-        degraded.push('summaries');
-        return { summaries: {}, updatedAt: null };
-      }),
-      readFullStories().catch((): BriefFullStoriesStore => {
-        degraded.push('fullStories');
-        return { fullStories: {}, updatedAt: null };
-      }),
-      readServerMeta(),
-    ]);
+    const [triage, topics, mutes, seen, summaries, fullStories, citationCheckLogs, meta] =
+      await Promise.all([
+        readTriageStore(),
+        readTopicList(),
+        readMutes(),
+        readSeen().catch((): BriefSeenStore => {
+          degraded.push('seen');
+          return { seen: {}, updatedAt: null };
+        }),
+        readSummaries().catch((): BriefSummariesStore => {
+          degraded.push('summaries');
+          return { summaries: {}, updatedAt: null };
+        }),
+        readFullStories().catch((): BriefFullStoriesStore => {
+          degraded.push('fullStories');
+          return { fullStories: {}, updatedAt: null };
+        }),
+        // Missing / unreadable citation log → empty; old stories without a log still load.
+        readCheckLogs().catch((): CitationCheckLogStore => ({ logs: {}, updatedAt: null })),
+        readServerMeta(),
+      ]);
     degraded.sort();
     const brief = composeTopicBrief({
       topics: topics.topics,
@@ -145,7 +153,7 @@ export function createKiteBriefRouter(
       refresh: meta.refresh ?? null,
       now: at,
     });
-    return { fixture: false, brief, fullStories, meta, degraded };
+    return { fixture: false, brief, fullStories, citationCheckLogs, meta, degraded };
   }
 
   async function loadEnrichments() {
@@ -206,6 +214,7 @@ export function createKiteBriefRouter(
           now: at,
           lastSuccess: owned.meta.refresh?.lastSuccess ?? null,
           fullStories: owned.fullStories.fullStories,
+          citationCheckLogs: owned.citationCheckLogs.logs,
         });
       }
       if (!body) {

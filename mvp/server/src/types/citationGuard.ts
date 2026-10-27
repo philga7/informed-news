@@ -60,3 +60,30 @@ export type CitationCheckResult = {
   claimText?: string | null;
   id?: string;
 };
+
+/** One checked citation item persisted for a story (NEWS-172). */
+export type CitationCheckLogEntry = {
+  kind: CitationKind;
+  status: CitationCheckStatus;
+  display: 'ok' | 'unverified' | 'unconfirmed';
+  /** Stable identity: normalized url, quote hash, or claim id */
+  itemId: string;
+  url?: string | null;
+  quote?: string | null;
+  refutingUrl?: string | null;
+  checkedAt: string; // ISO
+  runId: string;
+};
+
+/** Per-article citation check log (keyed by articleId in the store). */
+export type CitationCheckLogRecord = {
+  articleId: string;
+  entries: CitationCheckLogEntry[];
+  updatedAt: string;
+  runId: string;
+};
+
+export type CitationCheckLogStore = {
+  logs: Record<string, CitationCheckLogRecord>; // key = articleId
+  updatedAt: string | null;
+};
