@@ -23,9 +23,9 @@ function source(
   };
 }
 
-test('citationResolvers registers the url resolver', () => {
+test('citationResolvers registers the url and quote resolvers', () => {
   assert.equal(typeof citationResolvers.url, 'function');
-  assert.equal(citationResolvers.quote, undefined);
+  assert.equal(typeof citationResolvers.quote, 'function');
   assert.equal(citationResolvers.claim, undefined);
   assert.equal(citationResolvers.court, undefined);
 });
@@ -59,16 +59,57 @@ test('checkCitationItems: url items resolve via the registry (match + missing)',
   ]);
 });
 
-test('checkCitationItems: non-url kinds without a resolver → missing-source + unverified', () => {
+test('checkCitationItems: quote items resolve via the registry (match + mismatch)', () => {
+  const sourcesForRun = [
+    source({
+      url: 'https://publisher.example/story',
+      runId: 'run-a',
+      text: 'The panel endorsed the draft language yesterday.',
+    }),
+  ];
   const results = checkCitationItems(
-    [{ kind: 'quote', id: 'q-1' }],
+    [
+      {
+        kind: 'quote',
+        quote: 'endorsed the draft language',
+        id: 'q-ok',
+      },
+      {
+        kind: 'quote',
+        quote: 'rejected the draft language',
+        id: 'q-miss',
+      },
+    ],
+    sourcesForRun,
+  );
+  assert.deepEqual(results, [
+    {
+      kind: 'quote',
+      status: 'match',
+      display: 'ok',
+      quote: 'endorsed the draft language',
+      id: 'q-ok',
+    },
+    {
+      kind: 'quote',
+      status: 'mismatch',
+      display: 'unverified',
+      quote: 'rejected the draft language',
+      id: 'q-miss',
+    },
+  ]);
+});
+
+test('checkCitationItems: unregistered kinds without a resolver → missing-source', () => {
+  const results = checkCitationItems(
+    [{ kind: 'court', id: 'c-1' }],
     [source({ url: 'https://publisher.example/story', runId: 'run-a' })],
   );
   assert.equal(results.length, 1);
-  assert.equal(results[0]?.kind, 'quote');
+  assert.equal(results[0]?.kind, 'court');
   assert.equal(results[0]?.status, 'missing-source');
   assert.equal(results[0]?.display, 'unverified');
-  assert.equal(results[0]?.id, 'q-1');
+  assert.equal(results[0]?.id, 'c-1');
 });
 
 test('filterCitationSourcesForRun keeps only the requested runId', () => {

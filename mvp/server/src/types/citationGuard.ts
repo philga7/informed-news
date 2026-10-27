@@ -36,6 +36,8 @@ export type CitationCheckItem = {
   kind: CitationKind;
   /** For kind url: the outbound href being checked */
   url?: string | null;
+  /** For kind quote: the raw quote text being checked */
+  quote?: string | null;
   /** Optional stable id for logging later */
   id?: string;
 };
@@ -46,5 +48,7 @@ export type CitationCheckResult = {
   /** Display hint for later UI: unverified for url miss; unused for match */
   display: 'ok' | 'unverified' | 'unconfirmed';
   url?: string | null;
+  /** Echo of checked quote text (optional, for the check log) */
+  quote?: string | null;
   id?: string;
 };
