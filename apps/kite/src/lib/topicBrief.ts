@@ -5,7 +5,7 @@
 
 import { shownServerError } from '$lib/serverError';
 import { parseKeywordsInput } from '$lib/topics';
-import type { Story } from '$lib/types';
+import type { InformedCitationMark, Story } from '$lib/types';
 
 /** The owned Brief category slug served by mvp/server (named "Brief"). */
 export const TOPIC_BRIEF_CATEGORY_ID = 'world';
@@ -39,6 +39,57 @@ export const BRIEF_REMOVE_ERROR = 'Could not remove this story. Try again.';
 export const BRIEF_REMOVE_LOGIN_HINT = 'Log in on Topics to remove stories';
 
 export const BRIEF_AI_SUMMARY_NOTE = 'AI summary — not ground truth';
+
+/** NEWS-172 citation guard advisory UI copy. */
+export const CITATION_MARK_SUMMARY = 'Citation checks';
+export const CITATION_MARK_REGION_LABEL = 'Advisory citation marks';
+export const CITATION_MARK_UNVERIFIED_LINK = 'Unverified link';
+export const CITATION_MARK_UNVERIFIED_QUOTE = 'Unverified quote';
+export const CITATION_MARK_UNCONFIRMED = 'Unconfirmed';
+export const CITATION_MARK_ADVISORY_SUFFIX = '(advisory)';
+
+/** Server already omits ok; still filter so a stray ok mark never renders. */
+export function visibleCitationMarks(
+	marks: InformedCitationMark[] | null | undefined,
+): InformedCitationMark[] {
+	if (!marks?.length) return [];
+	return marks.filter((m) => m.display === 'unverified' || m.display === 'unconfirmed');
+}
+
+/** Visible label for a citation mark (no advisory suffix). */
+export function citationMarkVisibleLabel(mark: InformedCitationMark): string | null {
+	switch (mark.display) {
+		case 'ok':
+			return null;
+		case 'unverified':
+			switch (mark.kind) {
+				case 'url':
+				case 'court':
+					return CITATION_MARK_UNVERIFIED_LINK;
+				case 'quote':
+					return CITATION_MARK_UNVERIFIED_QUOTE;
+				case 'claim':
+					return CITATION_MARK_UNCONFIRMED;
+				default: {
+					const _exhaustive: never = mark.kind;
+					return _exhaustive;
+				}
+			}
+		case 'unconfirmed':
+			return CITATION_MARK_UNCONFIRMED;
+		default: {
+			const _exhaustive: never = mark.display;
+			return _exhaustive;
+		}
+	}
+}
+
+/** Screen-reader accessible name including advisory wording. */
+export function citationMarkAccessibleName(mark: InformedCitationMark): string | null {
+	const label = citationMarkVisibleLabel(mark);
+	if (!label) return null;
+	return `${label} ${CITATION_MARK_ADVISORY_SUFFIX}`;
+}
 
 export const BRIEF_SUMMARY_UNAVAILABLE = 'Full text unavailable';
 

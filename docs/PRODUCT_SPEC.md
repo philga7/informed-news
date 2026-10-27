@@ -86,6 +86,14 @@ A full story can include talking points, a timeline, and questions about what to
 
 When the underlying articles change in a meaningful way, an updated full story can show **Updated: …**.
 
+Links, quoted lines, and link-backed claims on a card or full story are checked against sources fetched for that run. A link or quote that does not match a fetched source stays on the card and shows as **Unverified** (advisory). A claim that would have been called “debunked” without a linked refuting source among those fetched sources shows as **Unconfirmed** (advisory) — not a verified, false, or debunked badge. Items that match a fetched source show no mark. The marks are keyboard-reachable and polite for screen readers. Failed checks never stop a refresh.
+
+**Scenario:** Given a quote or link on a card matches a source fetched that run, when you view the card, then no unverified mark appears for that item.
+
+**Scenario:** Given a quote was paraphrased or a linked URL was not among fetched sources, when you view the card, then an Unverified quote or Unverified link mark appears and is reachable from the keyboard.
+
+**Scenario:** Given a claim has no linked refuting source among fetched sources, when you view the card, then an Unconfirmed mark appears (advisory), not a false or debunked badge.
+
 **Scenario:** Given you are signed in and the story has readable text, when you open the card, then the full story loads and a later visit reuses it while the text is unchanged.
 
 **Scenario:** Given the story has no readable text, when you open the card, then it says “Full story unavailable — no readable text.”
@@ -147,11 +155,19 @@ While the server is running, the Brief refreshes on a timer. The bar above the s
 
 The bar links to Filtered out. It says **N filtered out** when the last refresh dropped stories, and **Filtered out** otherwise.
 
+Beside that link, an **Approved / Filtered / All** toggle chooses what the Brief shows. Every load starts on **Approved**. The choice is not remembered across reloads. **Approved** is today’s topic Brief (kept stories). **Filtered** lists stories the last refresh dropped, each with a short advisory reason you can open — separate from the Filtered out page, which stays for spot checks. **All** shows the Approved topic sections, then the Filtered list below (Filtered cards are not mixed into topic ranks).
+
 The bar also says, in plain language, when a search source failed, when stories could not be scored, when summaries could not be written, or when the last refresh failed.
 
 **Scenario:** Given you are signed in and no refresh is running, when you press Refresh, then the button shows “Refreshing…” and the Brief reloads when the run finishes.
 
 **Scenario:** Given a refresh is already running, when you press Refresh, then you join that run instead of starting a second one.
+
+**Scenario:** Given you open the Brief, when the page loads, then Approved is selected and you see topic sections, not the Filtered list.
+
+**Scenario:** Given the last refresh dropped stories, when you choose Filtered, then you see those drops with an advisory reason expander, and topic sections are hidden.
+
+**Scenario:** Given you choose All, when the Brief updates, then Approved topic sections appear above the Filtered list.
 
 Refresh collects stories from the configured news feeds and from search for your desired topics. It does not collect new posts from X. Posts that were already saved can still appear. It does not ask you to accept stories.
 

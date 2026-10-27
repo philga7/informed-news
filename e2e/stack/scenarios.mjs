@@ -64,6 +64,16 @@ export const TOPIC_SCENARIO = {
 	lessLikeThisSubject: {
 		title: 'Transmission upgrade approved for northern corridor',
 	},
+	/**
+	 * NEWS-172 citation-guard seeds (hermetic check log; no live network).
+	 * Match story has only display:ok entries → no mark on the card.
+	 */
+	citationGuard: {
+		matchTitle: 'Operators add battery storage before winter peak',
+		unverifiedQuoteTitle: 'Transmission upgrade approved for northern corridor',
+		unverifiedLinkTitle: 'Demand response program expands to small businesses',
+		unconfirmedTitle: 'Port workers reach tentative agreement',
+	},
 };
 
 function topic(def, now, keywords, kind = 'desired') {
@@ -368,6 +378,11 @@ function topicsScenario(now, imageBaseUrl) {
 	droppedStories.push(earlier);
 
 	const lead = gridStories[0];
+	const quoteStory = gridStories[1];
+	const linkStory = gridStories[2];
+	const claimStory = portLead;
+	const checkedAt = hoursAgo(now, 0.95);
+	const runId = refreshRunId(now);
 	const refreshRun = {
 		trigger: 'manual',
 		startedAt: hoursAgo(now, 1),
@@ -437,6 +452,85 @@ function topicsScenario(now, imageBaseUrl) {
 			},
 			updatedAt: hoursAgo(now, 0.95),
 		},
+		// NEWS-172: recorded citation-check-log only (no live network / guard run).
+		'citation-check-log.json': {
+			logs: {
+				[lead.id]: {
+					articleId: lead.id,
+					runId,
+					updatedAt: checkedAt,
+					entries: [
+						{
+							kind: 'url',
+							status: 'match',
+							display: 'ok',
+							itemId: lead.canonicalUrl,
+							url: lead.canonicalUrl,
+							checkedAt,
+							runId,
+						},
+						{
+							kind: 'quote',
+							status: 'match',
+							display: 'ok',
+							itemId: 'quote:match-storage',
+							quote: 'battery storage',
+							checkedAt,
+							runId,
+						},
+					],
+				},
+				[quoteStory.id]: {
+					articleId: quoteStory.id,
+					runId,
+					updatedAt: checkedAt,
+					entries: [
+						{
+							kind: 'quote',
+							status: 'mismatch',
+							display: 'unverified',
+							itemId: 'quote:paraphrase-transmission',
+							quote: 'Operators quietly approved a northern corridor upgrade yesterday.',
+							checkedAt,
+							runId,
+						},
+					],
+				},
+				[linkStory.id]: {
+					articleId: linkStory.id,
+					runId,
+					updatedAt: checkedAt,
+					entries: [
+						{
+							kind: 'url',
+							status: 'missing-source',
+							display: 'unverified',
+							itemId: 'https://missing.example/demand-response',
+							url: 'https://missing.example/demand-response',
+							checkedAt,
+							runId,
+						},
+					],
+				},
+				[claimStory.id]: {
+					articleId: claimStory.id,
+					runId,
+					updatedAt: checkedAt,
+					entries: [
+						{
+							kind: 'claim',
+							status: 'missing-source',
+							display: 'unconfirmed',
+							itemId: 'claim:tariff-refute',
+							refutingUrl: null,
+							checkedAt,
+							runId,
+						},
+					],
+				},
+			},
+			updatedAt: checkedAt,
+		},
 		'meta.json': {
 			lastFetchAt: hoursAgo(now, 1),
 			lastError: null,
@@ -444,6 +538,10 @@ function topicsScenario(now, imageBaseUrl) {
 			triage: triageRun(now, records),
 		},
 	};
+}
+
+function refreshRunId(now) {
+	return hoursAgo(now, 1);
 }
 
 function emptyScenario() {
@@ -458,7 +556,8 @@ function emptyScenario() {
  * - `topics`: the topic Brief (NEWS-88) — 2 sections, 1 quiet topic, a "More" story,
  *   a duplicate-member story and one cached summary; the last triage run also dropped
  *   muted / off-topic / clickbait / duplicate / not_scored_budget (NEWS-90/105), plus one
- *   earlier-in-window opinion drop for the Last 48 hours toggle (NEWS-105).
+ *   earlier-in-window opinion drop for the Last 48 hours toggle (NEWS-105); citation-check-log
+ *   seeds for match / unverified quote / unverified link / unconfirmed (NEWS-172).
  * - `empty`: empty article store → the owned-brief fixture stories (NEWS-44/51).
  * Files not starting with "." are removed first; the generated env file survives.
  */
