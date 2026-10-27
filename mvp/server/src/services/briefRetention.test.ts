@@ -139,10 +139,20 @@ test('pruneBriefStores drops kept records generated more than 7 days ago', async
   });
 });
 
-test('pruneBriefStores prunes nothing when triage is unreadable', async () => {
+test('pruneBriefStores skips keep-predicate prunes when triage is unreadable but still age-prunes citations', async () => {
+  let sourcesPruned = false;
+  let logsPruned = false;
   const h = harness({}, [summary('a', DAYS_AGO(1))], [fullStory('a', DAYS_AGO(1))], {
     readTriage: async () => {
       throw new Error('triage.json must contain a JSON object');
+    },
+    pruneCitationSourcesOlderThan: async () => {
+      sourcesPruned = true;
+      return 4;
+    },
+    pruneCitationCheckLogsOlderThan: async () => {
+      logsPruned = true;
+      return 5;
     },
   });
 
@@ -150,11 +160,13 @@ test('pruneBriefStores prunes nothing when triage is unreadable', async () => {
 
   assert.deepEqual(ids(h.summaries), ['a']);
   assert.deepEqual(ids(h.fullStories), ['a']);
+  assert.equal(sourcesPruned, true);
+  assert.equal(logsPruned, true);
   assert.deepEqual(result, {
     summaries: 0,
     fullStories: 0,
-    citationSources: 0,
-    citationCheckLogs: 0,
+    citationSources: 4,
+    citationCheckLogs: 5,
     errors: ['triage: triage.json must contain a JSON object'],
   });
 });

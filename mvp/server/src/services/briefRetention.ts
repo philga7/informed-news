@@ -38,9 +38,10 @@ function errorMessage(err: unknown): string {
 
 /**
  * Keep a record only while its article is a kept triage record and it was
- * generated within BRIEF_CACHE_RETENTION_DAYS. Unreadable triage → nothing is
- * pruned. Never throws; failures are returned in `errors`.
- * Citation sources / check logs use the same 7-day window by fetchedAt / updatedAt.
+ * generated within BRIEF_CACHE_RETENTION_DAYS. Unreadable triage → skip
+ * summary/full-story keep-predicate prunes, but still age-prune citation
+ * sources and check logs (no triage needed). Never throws; failures go in
+ * `errors`.
  */
 export async function pruneBriefStores(
   options: { now: Date },
@@ -53,31 +54,35 @@ export async function pruneBriefStores(
     citationCheckLogs: 0,
     errors: [],
   };
-  let triage: TriageStore;
+  let triage: TriageStore | null = null;
   try {
     triage = await (deps.readTriage ?? (() => readTriage()))();
   } catch (err) {
     result.errors.push(`triage: ${errorMessage(err)}`);
-    return result;
   }
-  const cutoff = options.now.getTime() - BRIEF_CACHE_RETENTION_DAYS * 24 * 60 * 60 * 1000;
-  const keep = (record: { articleId: string; generatedAt: string }) => {
-    const time = Date.parse(record.generatedAt);
-    return (
-      triage.records[record.articleId]?.status === 'kept' && !Number.isNaN(time) && time >= cutoff
-    );
-  };
 
-  try {
-    result.summaries = await (deps.pruneBriefSummaries ?? ((k) => pruneBriefSummaries(k)))(keep);
-  } catch (err) {
-    result.errors.push(`summaries prune: ${errorMessage(err)}`);
+  if (triage) {
+    const cutoff = options.now.getTime() - BRIEF_CACHE_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+    const keep = (record: { articleId: string; generatedAt: string }) => {
+      const time = Date.parse(record.generatedAt);
+      return (
+        triage.records[record.articleId]?.status === 'kept' && !Number.isNaN(time) && time >= cutoff
+      );
+    };
+
+    try {
+      result.summaries = await (deps.pruneBriefSummaries ?? ((k) => pruneBriefSummaries(k)))(keep);
+    } catch (err) {
+      result.errors.push(`summaries prune: ${errorMessage(err)}`);
+    }
+    try {
+      result.fullStories = await (deps.pruneBriefFullStories ?? ((k) => pruneBriefFullStories(k)))(keep);
+    } catch (err) {
+      result.errors.push(`full stories prune: ${errorMessage(err)}`);
+    }
   }
-  try {
-    result.fullStories = await (deps.pruneBriefFullStories ?? ((k) => pruneBriefFullStories(k)))(keep);
-  } catch (err) {
-    result.errors.push(`full stories prune: ${errorMessage(err)}`);
-  }
+
+  // Age-only citation prunes always run (no triage dependency).
   try {
     result.citationSources = await (
       deps.pruneCitationSourcesOlderThan ??

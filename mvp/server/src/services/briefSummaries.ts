@@ -353,15 +353,18 @@ export async function generateRefreshSummaries(
       });
     }
 
+    let summariesWriteOk = records.length === 0;
     if (records.length > 0) {
       try {
         await (deps.putBriefSummaries ?? ((r: BriefSummaryRecord[]) => putBriefSummaries(r)))(records);
+        summariesWriteOk = true;
       } catch (err) {
         addStoreError(errors, `summaries write: ${errorMessage(err)}`);
       }
     }
 
-    // Citation guard after successful summary writes / cache reuse (never fails refresh).
+    // Cache-hit / reuse guard always runs. New-record guard only after a
+    // successful putBriefSummaries (never fails refresh).
     for (const reused of reusedForGuard) {
       await runSummaryCitationGuard(
         reused.articleId,
@@ -373,19 +376,21 @@ export async function generateRefreshSummaries(
         deps,
       );
     }
-    for (const record of records) {
-      if (record.status !== 'ok' || !record.text || !record.sourceArticleId) continue;
-      const source = sourceForStory(loaded, record.articleId);
-      if (!source) continue;
-      await runSummaryCitationGuard(
-        record.articleId,
-        record.text,
-        source,
-        loaded,
-        runId,
-        now,
-        deps,
-      );
+    if (summariesWriteOk) {
+      for (const record of records) {
+        if (record.status !== 'ok' || !record.text || !record.sourceArticleId) continue;
+        const source = sourceForStory(loaded, record.articleId);
+        if (!source) continue;
+        await runSummaryCitationGuard(
+          record.articleId,
+          record.text,
+          source,
+          loaded,
+          runId,
+          now,
+          deps,
+        );
+      }
     }
   } catch (err) {
     addError(errors, errorMessage(err));

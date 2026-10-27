@@ -122,12 +122,34 @@ export async function readCitationCheckLog(
   return store.logs[articleId] ?? null;
 }
 
+/**
+ * Merge incoming entries into any prior log for the same articleId by itemId:
+ * new entry replaces the same itemId; unrelated prior entries are kept.
+ */
+export function mergeCitationCheckLogEntries(
+  prior: CitationCheckLogEntry[] | undefined,
+  incoming: CitationCheckLogEntry[],
+): CitationCheckLogEntry[] {
+  const byId = new Map<string, CitationCheckLogEntry>();
+  for (const entry of prior ?? []) {
+    byId.set(entry.itemId, entry);
+  }
+  for (const entry of incoming) {
+    byId.set(entry.itemId, entry);
+  }
+  return [...byId.values()];
+}
+
 async function mergeAndWrite(
   record: CitationCheckLogRecord,
   logPath: string,
 ): Promise<CitationCheckLogStore> {
   const store = await readCitationCheckLogs(logPath);
-  store.logs[record.articleId] = record;
+  const prior = store.logs[record.articleId];
+  store.logs[record.articleId] = {
+    ...record,
+    entries: mergeCitationCheckLogEntries(prior?.entries, record.entries),
+  };
   store.updatedAt = new Date().toISOString();
   await writeJsonAtomic(logPath, store);
   return store;
@@ -135,6 +157,8 @@ async function mergeAndWrite(
 
 /**
  * Upsert one article's check log (read-merge-write, atomic).
+ * Entries are merged by `itemId` with any existing log for that article
+ * (summary + full-story runs accumulate marks).
  */
 export async function putCitationCheckLog(
   record: CitationCheckLogRecord,

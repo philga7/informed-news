@@ -72,6 +72,7 @@ export {
 } from './citationSourcesStore.js';
 export {
   CITATION_CHECK_LOG_RETENTION_DAYS,
+  mergeCitationCheckLogEntries,
   pruneCitationCheckLogs,
   pruneCitationCheckLogsOlderThan,
   putCitationCheckLog,

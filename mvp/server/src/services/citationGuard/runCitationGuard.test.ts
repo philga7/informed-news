@@ -97,6 +97,98 @@ test('runCitationGuardForArticle writes log and returns match / missing-source /
   assert.equal(log!.entries[0]!.itemId, `quote:${hash16('talks resumed today')}`);
 });
 
+test('runCitationGuardForArticle merges new entries with prior log by itemId', async () => {
+  const dir = tempDir();
+  const logPath = path.join(dir, 'citation-check-log.json');
+  const t1 = new Date('2026-10-27T12:00:00.000Z');
+  const t2 = new Date('2026-10-27T12:05:00.000Z');
+
+  // Summary pass: url mark only.
+  await runCitationGuardForArticle(
+    {
+      articleId: 'art-merge',
+      runId: 'run-summary',
+      now: t1,
+      sourcesForRun: [],
+      items: [{ kind: 'url', url: 'https://missing.example/from-summary' }],
+    },
+    { putCitationCheckLog: (record) => putCitationCheckLog(record, logPath) },
+  );
+
+  // Full-story pass: quote mark + refresh of a different url; prior url kept.
+  await runCitationGuardForArticle(
+    {
+      articleId: 'art-merge',
+      runId: 'run-full',
+      now: t2,
+      sourcesForRun: [],
+      items: [
+        { kind: 'quote', quote: 'a quoted line' },
+        { kind: 'url', url: 'https://missing.example/from-full' },
+      ],
+    },
+    { putCitationCheckLog: (record) => putCitationCheckLog(record, logPath) },
+  );
+
+  const log = await readCitationCheckLog('art-merge', logPath);
+  assert.ok(log);
+  assert.equal(log!.runId, 'run-full');
+  assert.equal(log!.updatedAt, t2.toISOString());
+  const itemIds = log!.entries.map((e) => e.itemId).sort();
+  assert.deepEqual(itemIds, [
+    'https://missing.example/from-full',
+    'https://missing.example/from-summary',
+    `quote:${hash16('a quoted line')}`,
+  ].sort());
+});
+
+test('runCitationGuardForArticle replaces an existing entry with the same itemId', async () => {
+  const dir = tempDir();
+  const logPath = path.join(dir, 'citation-check-log.json');
+  const url = 'https://publisher.example/story';
+  const body = 'Publisher body with enough text.';
+  const sourcesForRun: CitationSourceRecord[] = [
+    {
+      id: `${hash16(body)}:run-a`,
+      url,
+      text: body,
+      fetchedAt: '2026-10-27T12:00:00.000Z',
+      runId: 'run-a',
+      contentHash: hash16(body),
+      articleId: 'art-replace',
+    },
+  ];
+
+  await runCitationGuardForArticle(
+    {
+      articleId: 'art-replace',
+      runId: 'run-a',
+      now: new Date('2026-10-27T12:00:00.000Z'),
+      sourcesForRun: [],
+      items: [{ kind: 'url', url }],
+    },
+    { putCitationCheckLog: (record) => putCitationCheckLog(record, logPath) },
+  );
+  let log = await readCitationCheckLog('art-replace', logPath);
+  assert.equal(log!.entries[0]!.status, 'missing-source');
+
+  await runCitationGuardForArticle(
+    {
+      articleId: 'art-replace',
+      runId: 'run-b',
+      now: new Date('2026-10-27T12:10:00.000Z'),
+      sourcesForRun,
+      items: [{ kind: 'url', url }],
+    },
+    { putCitationCheckLog: (record) => putCitationCheckLog(record, logPath) },
+  );
+  log = await readCitationCheckLog('art-replace', logPath);
+  assert.equal(log!.entries.length, 1);
+  assert.equal(log!.entries[0]!.status, 'match');
+  assert.equal(log!.entries[0]!.display, 'ok');
+  assert.equal(log!.runId, 'run-b');
+});
+
 test('runCitationGuardForArticle swallows put errors and still returns check results', async () => {
   const results = await runCitationGuardForArticle(
     {

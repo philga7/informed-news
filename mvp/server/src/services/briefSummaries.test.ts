@@ -355,6 +355,46 @@ test('summaries write failure is caught and recorded', async () => {
   assert.equal(h.metaPatches.length, 1);
 });
 
+test('new-record citation guard runs only after a successful summaries write; reuse still runs', async () => {
+  const world = standardWorld();
+  const cachedText = 'Cached summary with https://cached.example/x.';
+  const hash = sourceHash(makeArticle('a1'));
+  world.summaries = {
+    a1: {
+      articleId: 'a1',
+      status: 'ok',
+      text: cachedText,
+      sourceArticleId: 'a1',
+      sourceHash: hash,
+      model: 'test-model',
+      error: null,
+      generatedAt: BOUNDARY,
+      trigger: 'refresh',
+    },
+  };
+  const guarded: string[] = [];
+  const h = harness(world, {
+    putBriefSummaries: async () => {
+      throw new Error('disk full');
+    },
+    runCitationGuard: async (args) => {
+      guarded.push(args.articleId);
+      return [];
+    },
+  });
+
+  const brief = await generateRefreshSummaries(
+    { now: NOW, env: ENV_BUDGET(60), boundaryAt: BOUNDARY },
+    h.deps,
+  );
+
+  assert.ok(brief.summaries.errors.includes('summaries write: disk full'));
+  // Cache-hit a1 still guarded; newly generated a2/a3/b1/b2 must not be.
+  assert.deepEqual(guarded, ['a1']);
+  assert.equal(brief.summaries.reused, 1);
+  assert.ok(brief.summaries.generated >= 1);
+});
+
 test('meta write failure is caught and returned in errors', async () => {
   const h = harness(standardWorld(), {
     updateMeta: async () => {
