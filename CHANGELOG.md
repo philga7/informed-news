@@ -1,3 +1,9 @@
+## [0.27.0](https://github.com/philga7/informed-news/compare/v0.26.31...v0.27.0) (2026-10-27)
+
+### Features
+
+* **NEWS-167:** triage verdict fields and Approved/Filtered/All Brief view ([#208](https://github.com/philga7/informed-news/issues/208)) ([94af33a](https://github.com/philga7/informed-news/commit/94af33ae148ebda142b15226d2ff98876e3e338a))
+
 ## [0.26.31](https://github.com/philga7/informed-news/compare/v0.26.30...v0.26.31) (2026-10-27)
 
 ### Bug Fixes
