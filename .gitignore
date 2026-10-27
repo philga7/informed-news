@@ -39,3 +39,6 @@ informed_news.pub
 
 # SDD / agent scratch (never commit)
 .superpowers/
+
+# Cloud Agent install lockfile hash (written by .cursor/install-deps.sh)
+.cursor/.install-lock-hash

@@ -35,6 +35,12 @@ import {
   type OnDemandLimiter,
 } from './briefSummaries.js';
 import { selectAutoFullStoryTargets } from './briefFullStoryAuto.js';
+import { extractCitationItems } from './citationGuard/extractCitationItems.js';
+import {
+  citationGuardRunId,
+  registerSourcesAndRunCitationGuard,
+  type RegisterAndGuardDeps,
+} from './citationGuard/runCitationGuard.js';
 import { pickStoryQuote, storyPerspectives } from './kiteBriefAdapter.js';
 import { getOllamaClient, getOllamaModelName } from './ollamaFraming.js';
 
@@ -42,12 +48,14 @@ export type GenerateFullStoryResult =
   | { ok: true; record: BriefFullStoryRecord }
   | { ok: false; code: 'not_in_brief' | 'rate_limited' | 'error'; error: string };
 
-export type BriefFullStoryDeps = BriefSummaryDeps & {
+export type BriefFullStoryDeps = BriefSummaryDeps & RegisterAndGuardDeps & {
   readBriefFullStories?: () => Promise<BriefFullStoriesStore>;
   putBriefFullStories?: (records: BriefFullStoryRecord[]) => Promise<void>;
   enrich?: typeof enrichFullStory;
   modelName?: () => string;
   rateLimiter?: OnDemandLimiter;
+  /** Injectable citation guard; defaults to registerSourcesAndRunCitationGuard. */
+  runCitationGuard?: typeof registerSourcesAndRunCitationGuard;
 };
 
 export type GenerateFullStoryOptions = {
@@ -56,6 +64,12 @@ export type GenerateFullStoryOptions = {
   skipRateLimit?: boolean;
   /** Significant automatic updates may need regeneration despite unchanged text. */
   forceRegenerate?: boolean;
+  /**
+   * Shared citation-guard run id. Refresh should pass the refresh `startedAt`
+   * so summaries and full stories share one source set; on-demand defaults to
+   * `now.toISOString()`.
+   */
+  runId?: string;
 };
 
 export type RefreshFullStoriesDeps = BriefFullStoryDeps & {
@@ -144,6 +158,56 @@ function inputForMembers(members: Article[]): FullStoryMemberInput[] {
       ...(framingSummary ? { framingSummary } : {}),
     }];
   });
+}
+
+/** Citation source candidates from cluster members (same bodies generate already uses). */
+function citationCandidatesForMembers(members: Article[]): Array<{
+  url: string | null;
+  text: string;
+  articleId: string | null;
+}> {
+  return members.flatMap((article) => {
+    const text = textForMember(article);
+    if (!text) return [];
+    const url = articleLink(article).trim() || null;
+    return [{ url, text, articleId: article.id }];
+  });
+}
+
+/**
+ * Register sources for this run and persist citation check marks.
+ * Never throws / never changes the generate result (NEWS-172).
+ */
+async function runFullStoryCitationGuard(
+  articleId: string,
+  record: BriefFullStoryRecord,
+  members: Article[],
+  runId: string,
+  now: Date,
+  deps: BriefFullStoryDeps,
+): Promise<void> {
+  if (record.status !== 'ok') return;
+  try {
+    const runGuard = deps.runCitationGuard ?? registerSourcesAndRunCitationGuard;
+    await runGuard(
+      {
+        articleId,
+        runId,
+        now,
+        sourceCandidates: citationCandidatesForMembers(members),
+        items: extractCitationItems({
+          fullStory: {
+            enrichment: record.enrichment,
+            deterministic: record.deterministic,
+            changeSummary: record.changeSummary,
+          },
+        }),
+      },
+      deps,
+    );
+  } catch {
+    // Guard must never fail generate / refresh.
+  }
 }
 
 function requestedSections(sections: TopicSection[]): FullStoryRequestedSection[] {
@@ -319,6 +383,7 @@ async function generateFullStoryOnce(
   }
 
   const sourceHash = sourceHashForMembers(inputs, sections);
+  const runId = citationGuardRunId(now, options.runId);
   let store: BriefFullStoriesStore;
   try {
     store = await (deps.readBriefFullStories ?? readBriefFullStories)();
@@ -327,6 +392,8 @@ async function generateFullStoryOnce(
   }
   const prior = store.fullStories[articleId];
   if (prior?.status === 'ok' && prior.sourceHash === sourceHash && !options.forceRegenerate) {
+    // Cache hit: still register sources for this runId and re-check (cheap).
+    await runFullStoryCitationGuard(articleId, prior, members, runId, now, deps);
     return { ok: true, record: prior };
   }
 
@@ -372,9 +439,11 @@ async function generateFullStoryOnce(
     };
     const merged = prior?.status === 'ok' ? mergeLivingFullStory(prior, next) : next;
     const writeError = await putSafely(deps, merged);
-    return writeError
-      ? { ok: false, code: 'error', error: `full story write: ${writeError}` }
-      : { ok: true, record: merged };
+    if (writeError) {
+      return { ok: false, code: 'error', error: `full story write: ${writeError}` };
+    }
+    await runFullStoryCitationGuard(articleId, merged, members, runId, now, deps);
+    return { ok: true, record: merged };
   } catch (err) {
     const failed = errorRecord(articleId, at, trigger, sections, sourceHash, errorMessage(err));
     const writeError = await putSafely(deps, failed);
@@ -457,6 +526,8 @@ export async function generateRefreshFullStories(
           // The shared generator compares source hashes. Do not regenerate an
           // existing story merely because the auto selector chose it again.
           forceRegenerate: false,
+          // One citation-guard runId per refresh (boundaryAt = refresh startedAt).
+          runId: options.boundaryAt ?? now.toISOString(),
         });
         if (!result.ok) {
           addError(fullStories.errors, result.error);

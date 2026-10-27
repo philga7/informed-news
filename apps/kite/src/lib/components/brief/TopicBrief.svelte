@@ -29,6 +29,7 @@ const requestedSummaries = new Set<string>();
 	import BriefRefreshBar from './BriefRefreshBar.svelte';
 	import LessLikeThis from './LessLikeThis.svelte';
 	import SeedRemove from './SeedRemove.svelte';
+	import CitationGuardMarks from './CitationGuardMarks.svelte';
 	import VerdictReasonExpander from './VerdictReasonExpander.svelte';
 	import {
 		BRIEF_ADDED_BY_YOU_LABEL,
@@ -459,7 +460,7 @@ const requestedSummaries = new Set<string>();
 	{@const fullStoryRequest = story.id ? fullStoryRequests[story.id] : undefined}
 	{@const expanded = Boolean(expandedStories[key])}
 	{@const actionId = expanded && isTopicBriefStory(story) ? story.informed_article_id : undefined}
-	{#if badge || official || addedByYou || line || (expanded && fullStoryRequest) || (expanded && fullLine) || actionId || story.informed_reason_text}
+	{#if badge || official || addedByYou || line || (expanded && fullStoryRequest) || (expanded && fullLine) || actionId || story.informed_reason_text || story.informed_citation_marks?.length}
 		<div class="mb-2 space-y-1">
 			{#if badge || official || addedByYou}
 				<div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-gray-500 dark:text-gray-400">
@@ -530,6 +531,9 @@ const requestedSummaries = new Set<string>();
 					reasonText={story.informed_reason_text}
 					criteriaRef={story.informed_criteria_ref}
 				/>
+			{/if}
+			{#if story.informed_citation_marks?.length}
+				<CitationGuardMarks marks={story.informed_citation_marks} />
 			{/if}
 		</div>
 	{/if}

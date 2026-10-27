@@ -393,6 +393,61 @@ test.describe('Brief verdict view — Approved / Filtered / All (NEWS-167)', () 
 	});
 });
 
+test.describe('Citation guard marks (NEWS-172)', () => {
+	test.beforeEach(() => useScenario('topics'));
+
+	test('unverified and unconfirmed marks appear; match case has no mark; keyboard focuses advisory control', async ({
+		page,
+	}) => {
+		const { matchTitle, unverifiedQuoteTitle, unverifiedLinkTitle, unconfirmedTitle } =
+			TOPIC_SCENARIO.citationGuard;
+
+		await logIn(page);
+		await page.goto('/');
+		await expect(page).toHaveTitle(/Informed News/i, { timeout: 60_000 });
+		await expect(page.getByTestId('topic-brief-section').first()).toBeVisible({ timeout: 60_000 });
+
+		const matchCard = page.getByRole('article', { name: `News story: ${matchTitle}`, exact: true });
+		await expect(matchCard).toBeVisible();
+		await expect(matchCard.getByTestId('citation-guard-marks')).toHaveCount(0);
+
+		const quoteCard = page.getByRole('article', {
+			name: `News story: ${unverifiedQuoteTitle}`,
+			exact: true,
+		});
+		await expect(quoteCard).toBeVisible();
+		const quoteMarks = quoteCard.getByTestId('citation-guard-marks');
+		await expect(quoteMarks).toBeVisible();
+		await quoteMarks.locator('summary').click();
+		await expect(quoteMarks).toHaveAttribute('open');
+		const quoteButton = quoteMarks.getByRole('button', { name: 'Unverified quote (advisory)' });
+		await expect(quoteButton).toBeVisible();
+		await quoteButton.focus();
+		await expect(quoteButton).toBeFocused();
+		await expect(
+			quoteMarks.getByRole('region', { name: 'Advisory citation marks' }),
+		).toBeVisible();
+
+		const linkCard = page.getByRole('article', {
+			name: `News story: ${unverifiedLinkTitle}`,
+			exact: true,
+		});
+		await expect(linkCard.getByTestId('citation-guard-marks')).toBeVisible();
+		await linkCard.getByTestId('citation-guard-marks').locator('summary').click();
+		await expect(
+			linkCard.getByRole('button', { name: 'Unverified link (advisory)' }),
+		).toBeVisible();
+
+		const claimCard = page.getByRole('article', {
+			name: `News story: ${unconfirmedTitle}`,
+			exact: true,
+		});
+		await expect(claimCard.getByTestId('citation-guard-marks')).toBeVisible();
+		await claimCard.getByTestId('citation-guard-marks').locator('summary').click();
+		await expect(claimCard.getByRole('button', { name: 'Unconfirmed (advisory)' })).toBeVisible();
+	});
+});
+
 test.describe('Filtered out + Less like this (NEWS-90)', () => {
 	test.beforeEach(() => useScenario('topics'));
 

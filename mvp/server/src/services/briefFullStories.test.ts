@@ -142,6 +142,8 @@ function harness(
         suggested_qna: [{ question: 'What to verify?', answer: 'Check sources.' }],
       };
     },
+    // Default: no-op guard so unit tests do not write citation stores under MVP_DATA_DIR.
+    runCitationGuard: async () => [],
     ...override,
   };
   return {
@@ -325,6 +327,7 @@ test('refresh full stories selects targets and invokes the shared generator with
       trigger: 'refresh',
       skipRateLimit: true,
       forceRegenerate: false,
+      runId: NOW.toISOString(),
     },
   }]);
   assert.deepEqual(meta, {
@@ -370,8 +373,62 @@ test('refresh reuses an unchanged selected full story instead of forcing Ollama'
       trigger: 'refresh',
       skipRateLimit: true,
       forceRegenerate: false,
+      runId: NOW.toISOString(),
     },
   }]);
   assert.equal(meta.reused, 1);
   assert.equal(meta.generated, 0);
+});
+
+test('citation guard errors are swallowed and generate still returns ok', async () => {
+  let guardCalls = 0;
+  const h = harness(undefined, undefined, {
+    runCitationGuard: async () => {
+      guardCalls += 1;
+      throw new Error('guard boom');
+    },
+  });
+  const result = await generateFullStory('main', { now: NOW }, h.deps);
+  assert.equal(result.ok, true);
+  if (result.ok) assert.equal(result.record.status, 'ok');
+  assert.equal(guardCalls, 1);
+  assert.equal(h.puts.length, 1);
+});
+
+test('citation guard still runs on cache-hit reuse', async () => {
+  const h = harness();
+  const hash = sourceHashForMembers([
+    {
+      title: 'Headline main',
+      publisherDomain: 'main.example.com',
+      publishedAt: ISO,
+      bodyOrSnippet: 'Publisher body for main.',
+      framingSummary: 'Framing context.',
+    },
+    {
+      title: 'Headline duplicate',
+      publisherDomain: 'duplicate.example.com',
+      publishedAt: ISO,
+      bodyOrSnippet: 'Publisher body for duplicate.',
+      framingSummary: 'Framing context.',
+    },
+  ], ['business']);
+  const cached: BriefFullStoryRecord = {
+    articleId: 'main', status: 'ok', enrichment: { talking_points: ['Cached'], timeline: [], suggested_qna: [] },
+    deterministic: {}, sourceHash: hash, topicSections: ['business'], model: 'm', error: null,
+    generatedAt: ISO, trigger: 'refresh',
+  };
+  h.store.fullStories.main = cached;
+  let guardCalls = 0;
+  const result = await generateFullStory('main', { now: NOW }, {
+    ...h.deps,
+    rateLimiter: { tryAcquire: () => false },
+    runCitationGuard: async () => {
+      guardCalls += 1;
+      return [];
+    },
+  });
+  assert.deepEqual(result, { ok: true, record: cached });
+  assert.equal(guardCalls, 1);
+  assert.equal(h.calls, 0);
 });

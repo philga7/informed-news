@@ -8,7 +8,8 @@ This is not the release log. Releases are recorded in `CHANGELOG.md` by semantic
 
 ## 2026-10-27
 
-No user-visible change.
+- The Brief refresh bar has an **Approved / Filtered / All** toggle beside Filtered out. Every visit starts on Approved. Filtered lists what the last refresh dropped, with a short advisory reason you can open. All shows Approved topics and then that Filtered list. The Filtered out page is unchanged.
+- Cards can show **Unverified** for a link or quote that did not match a source from that run, or **Unconfirmed** for a claim without a linked refuting source. These are advisory marks only — not verified, false, or debunked badges. Matching items show no mark.
 
 ## 2026-10-16
 

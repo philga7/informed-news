@@ -58,6 +58,28 @@ export {
   writeBriefFullStories,
 } from './briefFullStoryStore.js';
 export { readBriefSeen, updateBriefSeen, writeBriefSeen } from './briefSeenStore.js';
+export {
+  CITATION_SOURCES_RETENTION_DAYS,
+  citationSourceContentHash,
+  citationSourceRecordId,
+  isRejectableCitationSource,
+  isUnresolvedGoogleNewsUrl,
+  pruneCitationSources,
+  pruneCitationSourcesOlderThan,
+  readCitationSources,
+  registerCitationSources,
+  updateCitationSources,
+} from './citationSourcesStore.js';
+export {
+  CITATION_CHECK_LOG_RETENTION_DAYS,
+  mergeCitationCheckLogEntries,
+  pruneCitationCheckLogs,
+  pruneCitationCheckLogsOlderThan,
+  putCitationCheckLog,
+  readCitationCheckLog,
+  readCitationCheckLogs,
+  updateCitationCheckLog,
+} from './citationCheckLogStore.js';
 export { acceptClaim, readClaimMembership, unacceptClaim } from './claimMembershipStore.js';
 export type { ClaimMembership } from './claimMembershipStore.js';
 export {
@@ -87,6 +109,8 @@ export {
   BRIEF_FULL_STORIES_PATH,
   BRIEF_SEEN_PATH,
   BRIEF_SUMMARIES_PATH,
+  CITATION_CHECK_LOG_PATH,
+  CITATION_SOURCES_PATH,
   CLAIM_EXTRACT_PROCESSED_PATH,
   CLAIM_ENRICHMENTS_PATH,
   CLAIM_MEMBERSHIP_PATH,

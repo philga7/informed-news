@@ -128,7 +128,18 @@ export interface Story {
 	informed_confidence?: number;
 	informed_reason_text?: string;
 	informed_criteria_ref?: string;
+	/** NEWS-172 citation guard marks (non-ok only from the server; filter defensively). */
+	informed_citation_marks?: InformedCitationMark[];
 }
+
+/** Slim citation-guard mark on a Brief story (NEWS-172). */
+export type InformedCitationMark = {
+	kind: 'url' | 'quote' | 'claim' | 'court';
+	status: 'match' | 'mismatch' | 'missing-source';
+	display: 'ok' | 'unverified' | 'unconfirmed';
+	itemId: string;
+	url?: string | null;
+};
 
 export interface Category {
 	name: string;

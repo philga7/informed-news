@@ -808,6 +808,66 @@ test('topicBriefToKiteStories hydrates cached full stories and reports cache sta
   assert.equal(stories[2]!.informed_full_story_status, 'missing');
 });
 
+test('topicBriefToKiteStories includes non-ok citation marks and omits the field without a log', () => {
+  const stories = topicBriefToKiteStories(
+    topicBrief(),
+    {},
+    {
+      a1: {
+        articleId: 'a1',
+        runId: 'run-1',
+        updatedAt: '2026-10-27T12:00:00.000Z',
+        entries: [
+          {
+            kind: 'url',
+            status: 'match',
+            display: 'ok',
+            itemId: 'https://ok.example/a',
+            url: 'https://ok.example/a',
+            checkedAt: '2026-10-27T12:00:00.000Z',
+            runId: 'run-1',
+          },
+          {
+            kind: 'url',
+            status: 'missing-source',
+            display: 'unverified',
+            itemId: 'https://missing.example/x',
+            url: 'https://missing.example/x',
+            checkedAt: '2026-10-27T12:00:00.000Z',
+            runId: 'run-1',
+          },
+          {
+            kind: 'claim',
+            status: 'missing-source',
+            display: 'unconfirmed',
+            itemId: 'claim:abc',
+            refutingUrl: null,
+            checkedAt: '2026-10-27T12:00:00.000Z',
+            runId: 'run-1',
+          },
+        ],
+      },
+    },
+  );
+
+  assert.deepEqual(stories[0]!.informed_citation_marks, [
+    {
+      kind: 'url',
+      status: 'missing-source',
+      display: 'unverified',
+      itemId: 'https://missing.example/x',
+      url: 'https://missing.example/x',
+    },
+    {
+      kind: 'claim',
+      status: 'missing-source',
+      display: 'unconfirmed',
+      itemId: 'claim:abc',
+    },
+  ]);
+  assert.equal('informed_citation_marks' in stories[1]!, false);
+});
+
 test('topic Brief categories/stories/batch responses: one world "Brief" category, all stories', () => {
   const now = new Date('2026-09-30T12:00:00.000Z');
   const lastSuccess = refreshRun('2026-09-30T11:00:00.000Z');

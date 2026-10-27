@@ -2,6 +2,11 @@ import type { Article, StoreMeta } from '../types/article.js';
 import type { RefreshRun } from '../types/brief.js';
 import type { ClusterEnrichmentPayload } from '../types/clusterEnrichment.js';
 import type { BriefFullStoryRecord } from '../types/briefFullStory.js';
+import type {
+  CitationCheckLogRecord,
+  CitationCheckStatus,
+  CitationKind,
+} from '../types/citationGuard.js';
 import type { TriageLabel } from '../types/triage.js';
 import type { MuteRule } from '../store/muteRulesStore.js';
 import { briefClusterKey } from './briefClusterKey.js';
@@ -14,6 +19,15 @@ import {
   type TopicBrief,
 } from './topicBrief.js';
 import { isHostnameLike, normalizeOutletDomain } from './triageKeywords.js';
+
+/** Slim non-ok citation marks folded into Brief story payloads (NEWS-172). */
+export type InformedCitationMark = {
+  kind: CitationKind;
+  status: CitationCheckStatus;
+  display: 'ok' | 'unverified' | 'unconfirmed';
+  itemId: string;
+  url?: string | null;
+};
 
 /** Stable batch id for the live owned brief (not a Kagi UUID). */
 export const OWNED_BATCH_ID = 'owned-latest';
@@ -96,6 +110,11 @@ export type KiteBriefStory = {
   informed_confidence?: number;
   informed_reason_text?: string;
   informed_criteria_ref?: string;
+  /**
+   * NEWS-172 citation guard marks. Omitted when no log exists.
+   * Only non-ok entries (`unverified` / `unconfirmed`) to keep the payload slim.
+   */
+  informed_citation_marks?: InformedCitationMark[];
 };
 
 export type KiteBatchInfo = {
@@ -692,11 +711,31 @@ export function resolveOwnedBriefArticles(
   };
 }
 
+/** Prefer non-ok marks only so Brief payloads stay slim. */
+export function citationMarksForStory(
+  log: CitationCheckLogRecord | null | undefined,
+): InformedCitationMark[] | undefined {
+  if (!log?.entries?.length) return undefined;
+  const marks: InformedCitationMark[] = [];
+  for (const entry of log.entries) {
+    if (entry.display === 'ok') continue;
+    marks.push({
+      kind: entry.kind,
+      status: entry.status,
+      display: entry.display,
+      itemId: entry.itemId,
+      ...(entry.url !== undefined ? { url: entry.url } : {}),
+    });
+  }
+  return marks.length > 0 ? marks : undefined;
+}
+
 function topicStoryToKite(
   story: BriefStory,
   topic: BriefTopicRef,
   clusterNumber: number,
   fullStory?: BriefFullStoryRecord,
+  citationLog?: CitationCheckLogRecord | null,
 ): KiteBriefStory {
   const articles: KiteBriefArticle[] = story.links.map((link) => ({
     title: link.title,
@@ -723,6 +762,8 @@ function topicStoryToKite(
     informed_summary_status: story.summary.status,
     informed_full_story_status: fullStory?.status ?? 'missing',
   };
+  const marks = citationMarksForStory(citationLog);
+  if (marks) kite.informed_citation_marks = marks;
   if (domains.length > 0) {
     kite.domains = domains.map((name) => ({ name }));
   }
@@ -777,11 +818,18 @@ function topicStoryToKite(
 export function topicBriefToKiteStories(
   brief: TopicBrief,
   fullStories: Readonly<Record<string, BriefFullStoryRecord>> = {},
+  citationCheckLogs: Readonly<Record<string, CitationCheckLogRecord>> = {},
 ): KiteBriefStory[] {
   return brief.sections
     .flatMap((section) => section.stories.map((story) => ({ topic: section.topic, story })))
     .map(({ topic, story }, index) =>
-      topicStoryToKite(story, topic, index + 1, fullStories[story.articleId]),
+      topicStoryToKite(
+        story,
+        topic,
+        index + 1,
+        fullStories[story.articleId],
+        citationCheckLogs[story.articleId],
+      ),
     );
 }
 
@@ -799,6 +847,8 @@ export type TopicBriefResponseOptions = {
   now?: Date;
   lastSuccess?: RefreshRun | null;
   fullStories?: Readonly<Record<string, BriefFullStoryRecord>>;
+  /** Per-article citation check logs; missing article → no marks field. */
+  citationCheckLogs?: Readonly<Record<string, CitationCheckLogRecord>>;
 };
 
 export function buildTopicBriefBatchInfo(
@@ -839,7 +889,11 @@ export function buildTopicBriefStoriesResponse(
 ): KiteBatchStoriesResponse | null {
   if (!isOwnedCategoryId(categoryId)) return null;
   const now = options.now ?? new Date();
-  const stories = topicBriefToKiteStories(brief, options.fullStories);
+  const stories = topicBriefToKiteStories(
+    brief,
+    options.fullStories,
+    options.citationCheckLogs,
+  );
   const domains = [
     ...new Set(stories.flatMap((s) => s.articles.map((a) => a.domain))),
   ].map((name) => ({ name }));
