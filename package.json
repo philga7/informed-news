@@ -2,7 +2,7 @@
   "name": "informed-news",
   "private": true,
   "license": "UNLICENSED",
-  "version": "0.26.30",
+  "version": "0.26.31",
   "type": "module",
   "scripts": {
     "dev": "concurrently -n server,kite -c blue,magenta \"npm run server\" \"npm run kite\"",

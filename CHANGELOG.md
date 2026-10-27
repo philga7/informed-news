@@ -1,3 +1,9 @@
+## [0.26.31](https://github.com/philga7/informed-news/compare/v0.26.30...v0.26.31) (2026-10-27)
+
+### Bug Fixes
+
+* **NEWS-131, NEWS-155, NEWS-174:** ship-loop links, Conventional Commit PR titles, Topics copy ([#207](https://github.com/philga7/informed-news/issues/207)) ([e7b2a56](https://github.com/philga7/informed-news/commit/e7b2a56ff5aa6bf00f9bfa4b7287d4ddaa23f1e9)), closes [#191](https://github.com/philga7/informed-news/issues/191) [#205](https://github.com/philga7/informed-news/issues/205)
+
 ## [0.26.30](https://github.com/philga7/informed-news/compare/v0.26.29...v0.26.30) (2026-10-22)
 
 ### Bug Fixes
