@@ -54,6 +54,8 @@ export type LookupCourtCitationsOptions = {
   fetchImpl?: CourtFetch;
   sleep?: (ms: number) => Promise<void>;
   cachePath?: string;
+  /** Per-request timeout (headers + body); default 10s. */
+  timeoutMs?: number;
 };
 
 export type LookupCourtCitationsResult = {
@@ -167,45 +169,60 @@ function isOpinionUrl(url: string): boolean {
   }
 }
 
+type CourtResponse = { status: number; body: unknown };
+
 class Requester {
   constructor(
     private readonly token: string,
     private readonly fetchImpl: CourtFetch,
     private readonly sleep: (ms: number) => Promise<void>,
     private readonly now: Date,
+    private readonly timeoutMs: number,
   ) {}
 
-  private async once(url: string, init: RequestInit): Promise<Response> {
+  /** Headers and body are both read under one timeout; a stalled body rejects. */
+  private async once(url: string, init: RequestInit): Promise<CourtResponse> {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-    try {
-      return await this.fetchImpl(url, {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timedOut = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        controller.abort();
+        reject(new Error(`request timed out after ${this.timeoutMs}ms`));
+      }, this.timeoutMs);
+    });
+    const work = (async (): Promise<CourtResponse> => {
+      const res = await this.fetchImpl(url, {
         ...init,
         headers: { ...(init.headers as Record<string, string>), Authorization: `Token ${this.token}` },
         signal: controller.signal,
       });
+      let body: unknown = null;
+      try {
+        body = await res.json();
+      } catch (err) {
+        if (controller.signal.aborted) throw err;
+      }
+      return { status: res.status, body };
+    })();
+    work.catch(() => {});
+    try {
+      return await Promise.race([work, timedOut]);
     } finally {
       clearTimeout(timer);
     }
   }
 
   /** One retry after a short `wait_until` / `wait_util` backoff on HTTP 429. */
-  async request(url: string, init: RequestInit): Promise<Response> {
+  async request(url: string, init: RequestInit): Promise<CourtResponse> {
     const res = await this.once(url, init);
     if (res.status !== 429) return res;
-    const wait = await this.waitMs(res);
+    const wait = this.waitMs(res.body);
     if (wait === null) return res;
     await this.sleep(wait);
     return this.once(url, init);
   }
 
-  private async waitMs(res: Response): Promise<number | null> {
-    let body: unknown;
-    try {
-      body = await res.json();
-    } catch {
-      return null;
-    }
+  private waitMs(body: unknown): number | null {
     if (!isRecord(body)) return null;
     const until = str(body.wait_until) ?? str(body.wait_util);
     if (!until) return null;
@@ -237,7 +254,7 @@ async function lookupCites(
     body: new URLSearchParams({ text: fit.join('\n') }).toString(),
   });
   if (res.status !== 200) return out;
-  const body: unknown = await res.json();
+  const body = res.body;
   if (!Array.isArray(body)) return out;
 
   for (const row of body) {
@@ -266,7 +283,7 @@ async function lookupDocket(url: string, id: string, requester: Requester): Prom
   const res = await requester.request(`${COURT_ORIGIN}/api/rest/v4/dockets/${id}/`, { method: 'GET' });
   if (res.status === 404) return { hit: null, cacheable: true };
   if (res.status !== 200) return { hit: null, cacheable: false };
-  const body: unknown = await res.json();
+  const body = res.body;
   if (!isRecord(body)) return { hit: null, cacheable: false };
   const absolute = str(body.absolute_url);
   const cause = str(body.cause);
@@ -329,7 +346,7 @@ export async function lookupCourtCitations(
     }
   }
 
-  const requester = new Requester(token, opts.fetchImpl ?? productionFetch, opts.sleep ?? defaultSleep, opts.now);
+  const requester = new Requester(token, opts.fetchImpl ?? productionFetch, opts.sleep ?? defaultSleep, opts.now, opts.timeoutMs ?? REQUEST_TIMEOUT_MS);
   const fresh = new Map<string, Lookup>();
 
   if (cites.length > 0) {

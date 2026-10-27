@@ -261,3 +261,18 @@ test('the cache file never contains the token', async () => {
     assert.ok(!readFileSync(cachePath, 'utf8').includes(TOKEN));
   });
 });
+
+test('a response whose body never arrives times out as unresolved', async () => {
+  await withCache(async (cachePath) => {
+    const warn = captureWarn();
+    try {
+      const fetchImpl: CourtFetch = async () =>
+        new Response(new ReadableStream({ start() {} }), { status: 200 });
+      const r = await lookupCourtCitations([OBER], base(cachePath, fetchImpl, { timeoutMs: 50 }));
+      assert.equal(r.attachments['576 U.S. 644'].status, 'unresolved');
+      assert.ok(warn.lines.length > 0);
+    } finally {
+      warn.restore();
+    }
+  });
+});
