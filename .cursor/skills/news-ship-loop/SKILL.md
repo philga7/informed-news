@@ -65,7 +65,7 @@ gate ticket ready
 
 ### 1. Start work on a NEWS story
 
-0. If the user did not name a key, pick from [docs/ROADMAP.md](../../docs/ROADMAP.md) (not from open To Do alone).
+0. If the user did not name a key, pick from [docs/ROADMAP.md](../../../docs/ROADMAP.md) (not from open To Do alone).
 1. Fetch the issue (`searchJiraIssuesUsingJql` / `getJiraIssue`) — confirm summary, acceptance, parent epic.
 2. Transition to **In Progress** (`transitionJiraIssue` with transition id `21`, or looked-up equivalent).
 3. Sync `main`, create `feat/news-<N>-…` (never implement on `main` without explicit consent).
@@ -88,7 +88,7 @@ After SDD final review is clean (or a focused build is ready to ship), **before*
    - Infra / process gaps found while shipping (e.g. CI not gating merges)
 2. Present a short list: proposed issue type (Bug / Task / Story), parent epic (prefer Epic **K** [NEWS-83](https://informedcrew.atlassian.net/browse/NEWS-83) for bugs/intake; Epic **L** [NEWS-84](https://informedcrew.atlassian.net/browse/NEWS-84) or the active epic for in-epic follow-ups), one-line summary, and why — or explicitly **None**.
 3. **Do not create issues until the user confirms** which items (all / some / none).
-4. After confirmation: create in **NEWS** only, link **Relates** to the shipped key, update [docs/ROADMAP.md](../../docs/ROADMAP.md) (and `AGENTS.md` / `.cursor/rules/news-roadmap.mdc` when Current next changes). Commit those docs on the feat branch before PR; if discovered after merge, land them in a small `docs(NEWS-N)` PR (direct pushes to `main` are rejected; see § `main` requires CI).
+4. After confirmation: create in **NEWS** only, link **Relates** to the shipped key, update [docs/ROADMAP.md](../../../docs/ROADMAP.md) (and `AGENTS.md` / `.cursor/rules/news-roadmap.mdc` when Current next changes). Commit those docs on the feat branch before PR; if discovered after merge, land them in a small `docs(NEWS-N)` PR (direct pushes to `main` are rejected; see § `main` requires CI).
 
 Skipping the *ask* is the defect. “None” after an honest triage is success.
 
