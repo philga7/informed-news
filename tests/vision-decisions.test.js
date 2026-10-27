@@ -69,6 +69,12 @@ describe('NEWS-165 vision and decisions', () => {
 			assert.match(entry, /\*\*Why:\*\*/);
 			assert.match(entry, /\*\*What it rules out:\*\*/);
 		}
+		assert.ok(oct23.length >= 9, `expected the Oct 23 set, got ${oct23.length}`);
+		const trial = entries.find((entry) => entry.startsWith('2026-10-26 — Product spec'));
+		assert.ok(trial, 'product spec trial decision missing');
+		assert.match(trial, /PRODUCT_SPEC\.md/);
+		assert.match(trial, /WHATS_NEW\.md/);
+		assert.match(trial, /5 tickets have merged since it landed/);
 		assert.match(decisions, /NEWS-167/);
 		assert.match(decisions, /NEWS-168/);
 		assert.match(decisions, /NEWS-169/);
