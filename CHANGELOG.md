@@ -1,3 +1,9 @@
+## [0.28.0](https://github.com/philga7/informed-news/compare/v0.27.0...v0.28.0) (2026-10-27)
+
+### Features
+
+* **NEWS-172:** guard Brief links, quotes and claims against per-run sources ([#210](https://github.com/philga7/informed-news/issues/210)) ([0ce26a6](https://github.com/philga7/informed-news/commit/0ce26a6a8447d0746492352a70ae466abe2a61d9))
+
 ## [0.27.0](https://github.com/philga7/informed-news/compare/v0.26.31...v0.27.0) (2026-10-27)
 
 ### Features
