@@ -188,6 +188,18 @@ test('acceptance: off-topic, muted, and trash never reach survivor prep; only al
   assert.equal(records.good!.status, 'kept');
   assert.deepEqual(result.keptIds, ['good']);
   assert.deepEqual(result.byReason, { muted: 2, off_topic: 1, clickbait: 1 });
+  // NEWS-167: non-AI mute/off_topic carry advisory shape; Jev keep/drop too
+  assert.equal(records.muted!.verdict, 'filtered');
+  assert.equal(records.muted!.confidence, 1);
+  assert.equal(records.muted!.criteriaRef, 'rule:mute:r1');
+  assert.ok((records.muted!.reasonText?.length ?? 0) > 0);
+  assert.equal(records.undesired!.criteriaRef, 'rule:mute:sports');
+  assert.equal(records.offtopic!.criteriaRef, 'global');
+  assert.equal(records.offtopic!.confidence, 1);
+  assert.equal(records.trash!.verdict, 'filtered');
+  assert.equal(records.trash!.criteriaRef, 'global');
+  assert.equal(records.good!.verdict, 'approved');
+  assert.ok(records.good!.criteriaRef?.startsWith('topic:'));
 });
 
 test('outlet-only undesired topics skip the Jev undesired slots but still mute by domain', async () => {
@@ -317,6 +329,9 @@ test('acceptance: budget cap respected and reported; over-budget items are non-f
     assert.equal(rec.stage, 'budget');
     assert.equal(rec.final, false);
     assert.equal(rec.jevCalls, 0);
+    assert.equal(rec.verdict, 'filtered');
+    assert.equal(rec.confidence, 1);
+    assert.equal(rec.criteriaRef, 'rule:budget');
   }
   assert.equal(first.byReason.not_scored_budget, 2);
   assert.equal(state.meta.at(-1)!.triage!.jev.used, 2);

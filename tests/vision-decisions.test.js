@@ -59,18 +59,22 @@ describe('NEWS-165 vision and decisions', () => {
 	it('records the Oct 23 decisions with a decision, a why, and what each rules out', () => {
 		const decisions = read('docs/DECISIONS.md');
 		const entries = decisions.split(/^## /m).slice(1);
-		assert.ok(entries.length >= 5, `expected several dated entries, got ${entries.length}`);
+		const oct23 = entries.filter((entry) => entry.startsWith('2026-10-23'));
+		assert.ok(oct23.length >= 5, `expected several Oct 23 entries, got ${oct23.length}`);
+		const dates = entries.map((entry) => entry.slice(0, 10));
+		assert.deepEqual(dates, [...dates].sort().reverse(), 'entries are newest first');
 		for (const entry of entries) {
+			assert.match(entry, /^\d{4}-\d{2}-\d{2} — /);
 			assert.match(entry, /\*\*Decision:\*\*/);
 			assert.match(entry, /\*\*Why:\*\*/);
 			assert.match(entry, /\*\*What it rules out:\*\*/);
 		}
-		const oct23 = entries.filter((entry) => entry.startsWith('2026-10-23'));
 		assert.ok(oct23.length >= 9, `expected the Oct 23 set, got ${oct23.length}`);
-		assert.match(entries[0], /^2026-10-26 — Product spec/);
-		assert.match(entries[0], /PRODUCT_SPEC\.md/);
-		assert.match(entries[0], /WHATS_NEW\.md/);
-		assert.match(entries[0], /5 tickets have merged since it landed/);
+		const trial = entries.find((entry) => entry.startsWith('2026-10-26 — Product spec'));
+		assert.ok(trial, 'product spec trial decision missing');
+		assert.match(trial, /PRODUCT_SPEC\.md/);
+		assert.match(trial, /WHATS_NEW\.md/);
+		assert.match(trial, /5 tickets have merged since it landed/);
 		assert.match(decisions, /NEWS-167/);
 		assert.match(decisions, /NEWS-168/);
 		assert.match(decisions, /NEWS-169/);
@@ -119,9 +123,12 @@ describe('NEWS-165 vision and decisions', () => {
 		assert.deepEqual(keys, [
 			'NEWS-131',
 			'NEWS-155',
+			'NEWS-174',
 			'NEWS-165',
 			'NEWS-171',
 			'NEWS-167',
+			'NEWS-172',
+			'NEWS-173',
 			'NEWS-168',
 			'NEWS-169',
 			'NEWS-109',
@@ -142,9 +149,14 @@ describe('NEWS-165 vision and decisions', () => {
 
 		const currentNext = agents.slice(agents.indexOf('**Current next:**'));
 		const at = (key) => currentNext.indexOf(key);
-		assert.ok(at('NEWS-131') !== -1 && at('NEWS-131') < at('NEWS-155'));
-		assert.ok(at('NEWS-155') < at('NEWS-165'));
-		assert.ok(at('NEWS-165') < at('NEWS-171'));
+		// The "Current next is …" clause (after the Done list) — not the bold label that opens the paragraph.
+		const nextClause = '**Current next** is';
+		const next = currentNext.slice(currentNext.indexOf(nextClause));
+		const nextAt = (key) => next.indexOf(key);
+		assert.ok(at('NEWS-167') !== -1 && at('NEWS-167') < at(nextClause), 'NEWS-167 is Done before Current next');
+		assert.ok(nextAt('NEWS-172') !== -1 && nextAt('NEWS-172') < nextAt('NEWS-173'));
+		assert.ok(nextAt('NEWS-173') < nextAt('NEWS-168'));
+		assert.ok(at('NEWS-131') < at(nextClause), 'NEWS-131 is listed as Done before Current next');
 	});
 
 	it('keeps relative links alive and does not contradict docs/TRIAGE.md', () => {

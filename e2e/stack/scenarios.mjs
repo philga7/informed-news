@@ -111,6 +111,49 @@ function article(now, { slug, title, domain, topicId, hours, body, imageBaseUrl 
 	};
 }
 
+function keptAdvisory(topicId) {
+	return {
+		verdict: 'approved',
+		confidence: 0.85,
+		reasonText: `Kept for topic ${topicId}.`,
+		criteriaRef: `topic:${topicId}`,
+	};
+}
+
+function droppedAdvisory(reason) {
+	if (reason.startsWith('muted:')) {
+		const id = reason.slice('muted:'.length);
+		return {
+			verdict: 'filtered',
+			confidence: 1,
+			reasonText: `Muted by rule or undesired topic ${id}.`,
+			criteriaRef: `rule:mute:${id}`,
+		};
+	}
+	if (reason === 'duplicate') {
+		return {
+			verdict: 'filtered',
+			confidence: 1,
+			reasonText: 'Duplicate of another story already kept in this window.',
+			criteriaRef: 'rule:duplicate',
+		};
+	}
+	if (reason === 'not_scored_budget') {
+		return {
+			verdict: 'filtered',
+			confidence: 1,
+			reasonText: 'Not scored: this refresh’s Jev budget ran out.',
+			criteriaRef: 'rule:budget',
+		};
+	}
+	return {
+		verdict: 'filtered',
+		confidence: 1,
+		reasonText: `Filtered as ${reason.replace(/_/g, ' ')}.`,
+		criteriaRef: 'global',
+	};
+}
+
 function kept(now, a, { topicId, significance, memberIds = [] }) {
 	return {
 		articleId: a.id,
@@ -127,6 +170,7 @@ function kept(now, a, { topicId, significance, memberIds = [] }) {
 		bodyChecked: false,
 		jevCalls: 1,
 		triagedAt: hoursAgo(now, 1),
+		...keptAdvisory(topicId),
 	};
 }
 
@@ -146,6 +190,7 @@ function duplicate(now, a, { topicId, of }) {
 		bodyChecked: false,
 		jevCalls: 0,
 		triagedAt: hoursAgo(now, 1),
+		...droppedAdvisory('duplicate'),
 	};
 }
 
@@ -165,6 +210,7 @@ function dropped(now, a, { topicId, reason, stage, jevCalls, final = true, triag
 		bodyChecked: false,
 		jevCalls,
 		triagedAt: hoursAgo(now, triagedHoursAgo),
+		...droppedAdvisory(reason),
 	};
 }
 

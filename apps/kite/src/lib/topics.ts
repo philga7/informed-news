@@ -41,7 +41,7 @@ export const TOPICS_LOGIN_INTRO =
 	'Topics are currently limited to the MVP operator session. Enter the same password used for the local API to manage topics.';
 
 export const TOPICS_INTRO_HELP =
-	'Desired topics tell the Brief what to look for: Core topics get top stories every refresh; Watch topics surface only significant developments. Undesired topics describe what to filter out. Topics are saved now and take effect once topic search and triage ship. Mute rules already apply and always win.';
+	'Desired topics tell the Brief what to look for: each refresh searches them, and triage keeps the stories that match. Core topics get top stories every refresh; Watch topics surface only significant developments. Undesired topics describe what to filter out. Changes apply from the next refresh, and the Brief hides stories that match a new undesired topic or mute rule the next time it loads. Mute rules always win.';
 
 export const TOPICS_CORE_TITLE = 'Core';
 

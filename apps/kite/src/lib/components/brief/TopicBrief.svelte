@@ -5,8 +5,18 @@ const requestedSummaries = new Set<string>();
 
 <script lang="ts">
 	import { untrack, type Snippet } from 'svelte';
+	import {
+		DEFAULT_BRIEF_VERDICT_VIEW,
+		showsApproved,
+		showsFiltered,
+		type BriefVerdictView,
+	} from '$lib/briefVerdictView';
 	import { s } from '$lib/client/localization.svelte';
 	import { kiteDB } from '$lib/db/dexie';
+	import {
+		fetchFilteredOut,
+		type FilteredOutItem,
+	} from '$lib/filteredOut';
 	import { blurredStories } from '$lib/stores/blurredStories.svelte';
 	import { contentFilter } from '$lib/stores/contentFilter.svelte';
 	import { keyboardNavigation } from '$lib/stores/keyboardNavigation.svelte';
@@ -15,9 +25,11 @@ const requestedSummaries = new Set<string>();
 	import { shouldFilterStory } from '$lib/utils/contentFilter';
 	import StoryCard from '$lib/components/story/StoryCard.svelte';
 	import StoryCardSkeleton from '$lib/components/story/StoryCardSkeleton.svelte';
+	import BriefFilteredVerdictList from './BriefFilteredVerdictList.svelte';
 	import BriefRefreshBar from './BriefRefreshBar.svelte';
 	import LessLikeThis from './LessLikeThis.svelte';
 	import SeedRemove from './SeedRemove.svelte';
+	import VerdictReasonExpander from './VerdictReasonExpander.svelte';
 	import {
 		BRIEF_ADDED_BY_YOU_LABEL,
 		BRIEF_ALL_FILTERED,
@@ -112,6 +124,13 @@ const requestedSummaries = new Set<string>();
 	/** True after this mount has seen at least one open card (NEWS-154 vs remount fallback). */
 	let filterSessionSawOpen = $state(false);
 	let overviewSequence = 0;
+	/** NEWS-167: Approved / Filtered / All — ephemeral; resets to Approved each load. */
+	let verdictView = $state<BriefVerdictView>(DEFAULT_BRIEF_VERDICT_VIEW);
+	let filteredItems = $state<FilteredOutItem[] | null>(null);
+	let filteredLoading = $state(false);
+	let filteredError = $state<string | null>(null);
+	let filteredUnauthenticated = $state(false);
+	let filteredLoadSequence = 0;
 
 	const useSections = $derived(overviewLoaded && overview !== null && !overview.fixture);
 	// Fresh match each call: open cards keep their decision via openFilterCarry (NEWS-150),
@@ -181,9 +200,11 @@ const requestedSummaries = new Set<string>();
 		new Set(stories.filter(isTopicBriefStory).map((story) => story.id as string)),
 	);
 	const visibleStories = $derived(
-		sections.flatMap((section) =>
-			openMore[section.topicId] ? [...section.top, ...section.more] : section.top,
-		),
+		showsApproved(verdictView)
+			? sections.flatMap((section) =>
+					openMore[section.topicId] ? [...section.top, ...section.more] : section.top,
+				)
+			: [],
 	);
 	const visibleOrder = $derived(
 		!overviewLoaded
@@ -274,6 +295,32 @@ const requestedSummaries = new Set<string>();
 		if (sequence !== overviewSequence) return;
 		overview = next;
 		overviewLoaded = true;
+		// A new overview means triage may have changed; refresh Filtered list if visible.
+		if (showsFiltered(verdictView)) void loadFilteredOut();
+	}
+
+	async function loadFilteredOut(): Promise<void> {
+		const sequence = ++filteredLoadSequence;
+		filteredLoading = true;
+		filteredError = null;
+		filteredUnauthenticated = false;
+		const result = await fetchFilteredOut('last');
+		if (sequence !== filteredLoadSequence) return;
+		filteredLoading = false;
+		if (result.ok) {
+			filteredItems = result.data.items;
+			return;
+		}
+		filteredItems = null;
+		filteredUnauthenticated = result.unauthenticated;
+		filteredError = result.error;
+	}
+
+	function setVerdictView(view: BriefVerdictView): void {
+		verdictView = view;
+		if (showsFiltered(view) && filteredItems === null && !filteredLoading) {
+			void loadFilteredOut();
+		}
 	}
 
 	$effect(() => {
@@ -412,7 +459,7 @@ const requestedSummaries = new Set<string>();
 	{@const fullStoryRequest = story.id ? fullStoryRequests[story.id] : undefined}
 	{@const expanded = Boolean(expandedStories[key])}
 	{@const actionId = expanded && isTopicBriefStory(story) ? story.informed_article_id : undefined}
-	{#if badge || official || addedByYou || line || (expanded && fullStoryRequest) || (expanded && fullLine) || actionId}
+	{#if badge || official || addedByYou || line || (expanded && fullStoryRequest) || (expanded && fullLine) || actionId || story.informed_reason_text}
 		<div class="mb-2 space-y-1">
 			{#if badge || official || addedByYou}
 				<div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-gray-500 dark:text-gray-400">
@@ -478,6 +525,12 @@ const requestedSummaries = new Set<string>();
 			{:else if actionId}
 				<LessLikeThis {story} articleId={actionId} />
 			{/if}
+			{#if story.informed_reason_text}
+				<VerdictReasonExpander
+					reasonText={story.informed_reason_text}
+					criteriaRef={story.informed_criteria_ref}
+				/>
+			{/if}
 		</div>
 	{/if}
 {/snippet}
@@ -529,92 +582,105 @@ const requestedSummaries = new Set<string>();
 			refresh={overview.refresh}
 			notices={overview.notices}
 			filteredOut={overview.filteredOut}
+			{verdictView}
+			onVerdictViewChange={setVerdictView}
 		/>
 
-		{#if sections.length === 0 && afterHide.hiddenCount > 0}
-			<p class="py-6 text-sm text-gray-600 dark:text-gray-400">
-				{BRIEF_ALL_FILTERED}
-				<a
-					href="#settings/filters"
-					class="font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
-				>
-					{s('contentFilter.adjustFilters') || 'Adjust filters'}
-				</a>
-			</p>
-		{:else if sections.length === 0}
-			<p class="py-6 text-sm text-gray-600 dark:text-gray-400">
-				{#if overview.quiet.length === 0}
-					No topics yet.
+		{#if showsApproved(verdictView)}
+			{#if sections.length === 0 && afterHide.hiddenCount > 0}
+				<p class="py-6 text-sm text-gray-600 dark:text-gray-400">
+					{BRIEF_ALL_FILTERED}
 					<a
-						href="/topics"
+						href="#settings/filters"
 						class="font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
 					>
-						Add topics
+						{s('contentFilter.adjustFilters') || 'Adjust filters'}
 					</a>
-					to build your Brief.
-				{:else}
-					No new stories for your topics.
-				{/if}
-			</p>
-		{/if}
-
-		{#each sections as section (section.topicId)}
-			{@const headingId = `topic-brief-${section.topicId}`}
-			<section class="mt-10 first-of-type:mt-0" aria-labelledby={headingId} data-testid="topic-brief-section">
-				<header class="mb-2 flex items-baseline gap-2 border-b border-gray-800 pb-1.5 dark:border-gray-300">
-					<h3 id={headingId} class="text-lg font-semibold tracking-tight text-gray-900 dark:text-gray-100" dir="auto">
-						{section.name}
-					</h3>
-					<span class="text-[10px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-						{BRIEF_LEVEL_LABEL[section.level]}
-					</span>
-				</header>
-
-				{#each section.top as story (storyKey(story))}
-					{@render card(story)}
-				{/each}
-
-				{#if section.more.length > 0}
-					{#if openMore[section.topicId]}
-						{#each section.more as story (storyKey(story))}
-							{@render card(story)}
-						{/each}
+				</p>
+			{:else if sections.length === 0}
+				<p class="py-6 text-sm text-gray-600 dark:text-gray-400">
+					{#if overview.quiet.length === 0}
+						No topics yet.
+						<a
+							href="/topics"
+							class="font-medium text-blue-600 underline underline-offset-2 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+						>
+							Add topics
+						</a>
+						to build your Brief.
+					{:else}
+						No new stories for your topics.
 					{/if}
+				</p>
+			{/if}
+
+			{#each sections as section (section.topicId)}
+				{@const headingId = `topic-brief-${section.topicId}`}
+				<section class="mt-10 first-of-type:mt-0" aria-labelledby={headingId} data-testid="topic-brief-section">
+					<header class="mb-2 flex items-baseline gap-2 border-b border-gray-800 pb-1.5 dark:border-gray-300">
+						<h3 id={headingId} class="text-lg font-semibold tracking-tight text-gray-900 dark:text-gray-100" dir="auto">
+							{section.name}
+						</h3>
+						<span class="text-[10px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+							{BRIEF_LEVEL_LABEL[section.level]}
+						</span>
+					</header>
+
+					{#each section.top as story (storyKey(story))}
+						{@render card(story)}
+					{/each}
+
+					{#if section.more.length > 0}
+						{#if openMore[section.topicId]}
+							{#each section.more as story (storyKey(story))}
+								{@render card(story)}
+							{/each}
+						{/if}
+						<button
+							type="button"
+							class="mt-2 text-xs font-medium text-gray-600 underline-offset-2 hover:text-gray-900 hover:underline dark:text-gray-400 dark:hover:text-gray-100"
+							aria-expanded={Boolean(openMore[section.topicId])}
+							onclick={() => toggleMore(section.topicId)}
+						>
+							{openMore[section.topicId] ? BRIEF_LESS_LABEL : moreLabel(section.more.length)}
+						</button>
+					{/if}
+				</section>
+			{/each}
+
+			{#if filteredCount > 0 && contentFilter.showFilteredCount}
+				<p class="mt-4 text-center text-sm text-gray-500 dark:text-gray-400">
+					{s(filteredCountKey(contentFilter.filterMode, filteredCount), {
+						count: filteredCount.toString(),
+					})}
+				</p>
+			{/if}
+
+			{#if quiet}
+				<p class="mt-10 border-t border-gray-200 pt-3 text-xs text-gray-500 dark:border-gray-700 dark:text-gray-400" data-testid="topic-brief-quiet">
+					{quiet}
+				</p>
+			{/if}
+
+			{#if !allVisibleRead && visibleStories.length > 0}
+				<div class="mt-6 w-full text-center">
 					<button
-						type="button"
-						class="mt-2 text-xs font-medium text-gray-600 underline-offset-2 hover:text-gray-900 hover:underline dark:text-gray-400 dark:hover:text-gray-100"
-						aria-expanded={Boolean(openMore[section.topicId])}
-						onclick={() => toggleMore(section.topicId)}
+						onclick={markAllAsRead}
+						class="w-full rounded-lg bg-gray-100 px-6 py-3 text-gray-800 transition-colors duration-200 hover:bg-gray-200 md:w-auto dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
 					>
-						{openMore[section.topicId] ? BRIEF_LESS_LABEL : moreLabel(section.more.length)}
+						{s('article.markAllAsRead') || 'Mark all as read'}
 					</button>
-				{/if}
-			</section>
-		{/each}
-
-		{#if filteredCount > 0 && contentFilter.showFilteredCount}
-			<p class="mt-4 text-center text-sm text-gray-500 dark:text-gray-400">
-				{s(filteredCountKey(contentFilter.filterMode, filteredCount), {
-					count: filteredCount.toString(),
-				})}
-			</p>
+				</div>
+			{/if}
 		{/if}
 
-		{#if quiet}
-			<p class="mt-10 border-t border-gray-200 pt-3 text-xs text-gray-500 dark:border-gray-700 dark:text-gray-400" data-testid="topic-brief-quiet">
-				{quiet}
-			</p>
-		{/if}
-
-		{#if !allVisibleRead && visibleStories.length > 0}
-			<div class="mt-6 w-full text-center">
-				<button
-					onclick={markAllAsRead}
-					class="w-full rounded-lg bg-gray-100 px-6 py-3 text-gray-800 transition-colors duration-200 hover:bg-gray-200 md:w-auto dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
-				>
-					{s('article.markAllAsRead') || 'Mark all as read'}
-				</button>
-			</div>
+		{#if showsFiltered(verdictView)}
+			<BriefFilteredVerdictList
+				items={filteredItems}
+				loading={filteredLoading}
+				error={filteredError}
+				unauthenticated={filteredUnauthenticated}
+			/>
 		{/if}
 	</div>
 {/if}

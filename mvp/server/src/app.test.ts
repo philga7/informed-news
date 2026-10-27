@@ -2860,6 +2860,10 @@ test('GET /api/triage/filtered defaults to scope last: dropped records of the la
             topics: [{ id: 't1', name: 'Iran' }],
             duplicateOf: null,
             triagedAt: FILTERED_RUN.at,
+            verdict: null,
+            confidence: null,
+            reasonText: null,
+            criteriaRef: null,
           },
           {
             articleId: 'o1',
@@ -2876,6 +2880,10 @@ test('GET /api/triage/filtered defaults to scope last: dropped records of the la
             topics: [],
             duplicateOf: null,
             triagedAt: FILTERED_RUN.at,
+            verdict: null,
+            confidence: null,
+            reasonText: null,
+            criteriaRef: null,
           },
         ],
       }, query);

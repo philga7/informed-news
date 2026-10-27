@@ -291,6 +291,10 @@ test('article fields joined; url prefers publisherUrl; gone article → null fie
     topics: [],
     duplicateOf: null,
     triagedAt: RUN_AT,
+    verdict: null,
+    confidence: null,
+    reasonText: null,
+    criteriaRef: null,
   });
   assert.equal(cfpOnly!.url, 'https://cfp.example/cfpOnly');
   assert.equal(gone!.articleId, 'gone');

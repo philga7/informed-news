@@ -571,6 +571,10 @@ test('createManualSeed writes the seed triage record and returns the article and
       bodyChecked: false,
       jevCalls: 0,
       triagedAt: FIXED_NOW,
+      verdict: 'approved',
+      confidence: 1,
+      reasonText: 'Added by you under Topic t1.',
+      criteriaRef: 'topic:t1',
     },
   });
 });

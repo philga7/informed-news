@@ -63,6 +63,11 @@ export type BriefStory = {
   imageUrl: string | null;
   imageCaption: string | null;
   imageCredit: string | null;
+  /** NEWS-167 advisory; absent on pre-NEWS-167 records */
+  verdict?: 'approved' | 'filtered';
+  confidence?: number;
+  reasonText?: string;
+  criteriaRef?: string;
 };
 
 export type BriefTopicRef = { id: string; name: string; level: 'core' | 'watch' };
@@ -376,6 +381,14 @@ export function composeTopicBrief(input: ComposeTopicBriefInput): TopicBrief {
         imageUrl: article.imageUrl,
         imageCaption: article.imageCaption,
         imageCredit: article.imageCredit,
+        ...(record.verdict !== undefined
+          ? {
+              verdict: record.verdict,
+              confidence: record.confidence,
+              reasonText: record.reasonText,
+              criteriaRef: record.criteriaRef,
+            }
+          : {}),
       })),
     });
   });

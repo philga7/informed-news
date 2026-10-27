@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import type {
+  TriageAdvisoryVerdict,
   TriageLabel,
   TriageReason,
   TriageRecord,
@@ -11,6 +12,10 @@ import { enqueueFileWrite, writeJsonAtomic } from './jsonFileQueue.js';
 import { TRIAGE_PATH } from './paths.js';
 
 const STATUSES: ReadonlySet<string> = new Set<TriageStatus>(['kept', 'dropped']);
+const ADVISORY_VERDICTS: ReadonlySet<string> = new Set<TriageAdvisoryVerdict>([
+  'approved',
+  'filtered',
+]);
 const STAGES: ReadonlySet<string> = new Set<TriageStage>([
   'keyword',
   'dedupe',
@@ -56,7 +61,7 @@ function normalizeRecord(key: string, raw: unknown): TriageRecord | null {
   if (!isNumber(raw.jevCalls)) return null;
   if (typeof raw.triagedAt !== 'string') return null;
 
-  return {
+  const record: TriageRecord = {
     articleId: key,
     status: raw.status as TriageStatus,
     reason: raw.reason as TriageReason | null,
@@ -72,6 +77,29 @@ function normalizeRecord(key: string, raw: unknown): TriageRecord | null {
     jevCalls: raw.jevCalls,
     triagedAt: raw.triagedAt,
   };
+
+  // NEWS-167 advisory layer: all four present and valid → keep; otherwise omit (old rows / bad partials).
+  const hasAnyAdvisory =
+    'verdict' in raw || 'confidence' in raw || 'reasonText' in raw || 'criteriaRef' in raw;
+  if (hasAnyAdvisory) {
+    const verdictOk =
+      typeof raw.verdict === 'string' && ADVISORY_VERDICTS.has(raw.verdict);
+    const confidenceOk =
+      typeof raw.confidence === 'number' &&
+      Number.isFinite(raw.confidence) &&
+      raw.confidence >= 0 &&
+      raw.confidence <= 1;
+    const reasonTextOk = typeof raw.reasonText === 'string';
+    const criteriaRefOk = typeof raw.criteriaRef === 'string' && raw.criteriaRef.length > 0;
+    if (verdictOk && confidenceOk && reasonTextOk && criteriaRefOk) {
+      record.verdict = raw.verdict as TriageAdvisoryVerdict;
+      record.confidence = raw.confidence as number;
+      record.reasonText = raw.reasonText as string;
+      record.criteriaRef = raw.criteriaRef as string;
+    }
+  }
+
+  return record;
 }
 
 function normalizeTriage(parsed: unknown): TriageStore {

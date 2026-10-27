@@ -66,7 +66,7 @@ gate ticket ready
 
 ### 1. Start work on a NEWS story
 
-0. If the user did not name a key, pick from [docs/ROADMAP.md](../../docs/ROADMAP.md) (not from open To Do alone).
+0. If the user did not name a key, pick from [docs/ROADMAP.md](../../../docs/ROADMAP.md) (not from open To Do alone).
 1. Fetch the issue (`searchJiraIssuesUsingJql` / `getJiraIssue`) — confirm summary, acceptance, parent epic.
 2. Transition to **In Progress** (`transitionJiraIssue` with transition id `21`, or looked-up equivalent).
 3. Sync `main`, create `feat/news-<N>-…` (never implement on `main` without explicit consent).
@@ -90,7 +90,7 @@ After SDD final review is clean (or a focused build is ready to ship), **before*
    - Infra / process gaps found while shipping (e.g. CI not gating merges)
 2. Present a short list: proposed issue type (Bug / Task / Story), parent epic (prefer Epic **K** [NEWS-83](https://informedcrew.atlassian.net/browse/NEWS-83) for bugs/intake; Epic **L** [NEWS-84](https://informedcrew.atlassian.net/browse/NEWS-84) or the active epic for in-epic follow-ups), one-line summary, and why — or explicitly **None**.
 3. **Do not create issues until the user confirms** which items (all / some / none).
-4. After confirmation: create in **NEWS** only, link **Relates** to the shipped key, update [docs/ROADMAP.md](../../docs/ROADMAP.md) (and `AGENTS.md` / `.cursor/rules/news-roadmap.mdc` when Current next changes). Commit those docs on the feat branch before PR; if discovered after merge, land them in a small `docs(NEWS-N)` PR (direct pushes to `main` are rejected; see § `main` requires CI).
+4. After confirmation: create in **NEWS** only, link **Relates** to the shipped key, update [docs/ROADMAP.md](../../../docs/ROADMAP.md) (and `AGENTS.md` / `.cursor/rules/news-roadmap.mdc` when Current next changes). Commit those docs on the feat branch before PR; if discovered after merge, land them in a small `docs(NEWS-N)` PR (direct pushes to `main` are rejected; see § `main` requires CI).
 
 Skipping the *ask* is the defect. “None” after an honest triage is success.
 
@@ -133,8 +133,9 @@ The PR test plan includes both items. Tick them only when the diff actually cont
 2. Confirm `docs/PRODUCT_SPEC.md` and `docs/WHATS_NEW.md` are updated on this branch (see § Product spec and what's new).
 3. `git push -u origin HEAD`.
 4. `gh pr create` with:
-   - Title referencing NEWS-N
-   - Body: Summary + Test plan + `Closes NEWS-N` when the PR fully completes the story
+   - **Title:** a Conventional Commit listing every ticket key in the scope, e.g. `fix(NEWS-131, NEWS-155, NEWS-174): …`. Use the highest bump type in the batch: breaking (`!`) > `feat` > `fix` / `perf` > no-release types; if every ticket is a no-release type, use the first ticket's type. The **PR title** check (`scripts/check-pr-title.mjs`) fails anything else. A key-less title is allowed only for an untracked `docs` / `chore` / `ci` / `test` / `style` / `build` change. See [CONTRIBUTING.md § Squash merges](../../../CONTRIBUTING.md#squash-merges-and-semantic-release-harn-10).
+   - **Why every key:** a multi-ticket PR squashes to one subject on `main`. The per-ticket commits stay in the PR, but semantic-release and the changelog see only the title, so a key missing from the title is missing from `main`. PR #205 squashed as `docs(NEWS-165): …` and lost the NEWS-171 subject that way.
+   - Body: Summary + Test plan + `Closes NEWS-N` when the PR fully completes the story. When the prompt asked for a grill, record each question and the user's answer in the body.
    - Test plan includes:
      - [ ] `docs/PRODUCT_SPEC.md` updated in this PR (scenarios edited, or **Last checked** bumped when behavior did not change)
      - [ ] `docs/WHATS_NEW.md` has a new entry for the reader-visible change, or states **No user-visible change.**
@@ -144,7 +145,7 @@ The PR test plan includes both items. Tick them only when the diff actually cont
    1. **CI green** — invoke `/fix-ci` and/or the `ci-watcher` agent (do not improvise a parallel check ritual). Required check: **MVP build & typecheck** (see `main` requires CI). Watch until settled; on failure, `/fix-ci` applies the smallest fix and re-checks.
    2. **Link the green run before ticking CI** — from `gh pr checks` / `gh run view`, record the passing GitHub Actions run URL in the ship notes (and the PR body test-plan CI item). Do **not** mark the CI test-plan box until that green run link is present.
    3. **Refuse merge on red/pending** — do not run `gh pr merge` while a required check is failing, cancelled, or still pending. Tell the user the blocking check names/status and stop. GitHub rejects the merge anyway.
-   4. **Only merge when required checks are green** and the green run is linked, then `gh pr merge <n> --squash --delete-branch`.
+   4. **Only merge when required checks are green** and the green run is linked, then `gh pr merge <n> --squash --delete-branch --subject "$(gh pr view <n> --json title -q .title) (#<n>)"`. Passing `--subject` keeps the checked PR title as the squash subject even when the PR has one commit (GitHub otherwise uses that commit's subject).
    5. No override path: nobody can bypass the ruleset except deploy keys (the release job). Merging on red needs the user to change the ruleset themselves; do not do it for them.
 7. `git checkout main && git pull --ff-only origin main`
 

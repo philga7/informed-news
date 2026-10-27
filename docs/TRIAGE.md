@@ -34,7 +34,9 @@ When a story is kept, the untried members of its group become `duplicate` of it.
 
 ## Drop reasons
 
-Every candidate ends **kept** (`reason: null`) or **dropped** with one reason. Final records are not looked at again; non-final ones are re-triaged on the next refresh while the story is still in the window.
+Every candidate ends **kept** (`reason: null`) or **dropped** with one machine reason. Final records are not looked at again; non-final ones are re-triaged on the next refresh while the story is still in the window.
+
+Machine `status` / `reason` are still the live triage record. New writes also carry an optional **advisory** layer (NEWS-167) — see [Advisory verdict](#advisory-verdict-news-167).
 
 | Reason | Final | Meaning |
 |--------|-------|---------|
@@ -70,6 +72,24 @@ These are AI-assisted judgments, not ground truth.
 
 When Jev says (with confidence 0.6 or higher) that a kept story is an official or primary statement — government, court, company filing, press release, or reporting that is mainly that statement — the record gets `labels: ['official']`. The label only appears on kept stories. It does **not** bypass relevance, undesired, or significance checks.
 
+## Advisory verdict (NEWS-167)
+
+Ticket: [NEWS-167](https://informedcrew.atlassian.net/browse/NEWS-167). Beside the machine keep/drop fields, each **new** triage write may include an advisory layer used by the Brief's Approved / Filtered / All view ([BRIEF.md](BRIEF.md#refresh)):
+
+| Field | Meaning |
+|-------|---------|
+| `verdict` | `approved` (kept) or `filtered` (dropped) |
+| `confidence` | 0–1 |
+| `reasonText` | Short prose (≤300 characters); never the machine drop code |
+| `criteriaRef` | One driving rule id (string) |
+
+All four are present together, or all absent. **Pre-NEWS-167 rows omit them** (no backfill); the Brief's Approved view still uses `status: 'kept'`. The advisory text is derived from the same Jev answers / non-AI rules that already drove the machine decision — no extra Jev questions.
+
+- **Non-AI drops** (mute, undesired keyword, off-topic keyword miss, duplicate, undated, stale, budget, unscored error): `confidence: 1` and a rule id in `criteriaRef` (`rule:mute:<id>`, `rule:duplicate`, `rule:budget`, or `global` for keyword off-topic / unscored error).
+- **Jev keeps / drops:** `criteriaRef` is `global`, `topic:<id>`, or `source:<id>`; confidence comes from the driving quality / relevance judgment. The advisory is derived from the typed Jev answers (no free-text model output to parse); `parseAdvisoryVerdict` is a coercion helper for tests and callers that still hold a string.
+
+These fields are advisory — AI-assisted judgments, not ground truth. Fixture token baseline (acceptance candidate set, fake `systemOne` at 120 input + 40 output per call): **before 480 / after 480** (delta 0, 0%); 3 Jev calls; `TRIAGE_JEV_BUDGET` default **300** unchanged. Prompts/`buildTriageQuestions` fingerprint identical to `main`.
+
 ## Budget priority
 
 Groups are scheduled round-robin across topics — core topics first, then watch topics, each in topics-list order — newest story first within a topic, so one busy topic can't eat the budget. A Jev call is reserved before it is made, so concurrent groups never overspend. When the budget runs out, the current story and the rest of its group get `not_scored_budget` and are retried on the next refresh.
@@ -93,7 +113,7 @@ Other limits are constants in `mvp/server/src/services/triageConfig.ts` (48h win
 
 ## What's stored where
 
-- **`mvp/data/triage.json`** (gitignored) — `{ records, updatedAt }`, one record per article id: `status` (`kept` \| `dropped`), `reason`, `stage` (`keyword` \| `dedupe` \| `headline` \| `survivor` \| `body` \| `budget` \| `manual` — an operator seed, written by Add story rather than a run), `final`, `topicIds` (kept: the topics Jev confirmed; dropped: the candidate topics considered), `labels`, `duplicateOf`, `memberIds` and `outletCount` (kept only), `significance`, `bodyChecked`, `jevCalls` (total across refreshes), `triagedAt`. Records for articles no longer in the article store are pruned on write; for seed records, only once they are older than the window ([Seeds and concurrent refreshes](#seeds-and-concurrent-refreshes)).
+- **`mvp/data/triage.json`** (gitignored) — `{ records, updatedAt }`, one record per article id: `status` (`kept` \| `dropped`), `reason`, `stage` (`keyword` \| `dedupe` \| `headline` \| `survivor` \| `body` \| `budget` \| `manual` — an operator seed, written by Add story rather than a run), `final`, `topicIds` (kept: the topics Jev confirmed; dropped: the candidate topics considered), `labels`, `duplicateOf`, `memberIds` and `outletCount` (kept only), `significance`, `bodyChecked`, `jevCalls` (total across refreshes), `triagedAt`, and optional advisory `verdict` / `confidence` / `reasonText` / `criteriaRef` ([Advisory verdict](#advisory-verdict-news-167)). Records for articles no longer in the article store are pruned on write; for seed records, only once they are older than the window ([Seeds and concurrent refreshes](#seeds-and-concurrent-refreshes)).
 - **Article store** — survivors that were resolved or scraped are written back: `publisherUrl`, `publisherDomain`, an added publisher citation, `bodyText`, `bodyStatus`, `publisherTitle`, image fields, and `publishedAt` when it was empty. `id` and `canonicalUrl` never change. This write comes before the run's triage write, so a kept record never points at an unresolved article. If it fails, the triage write is skipped (`triage write: skipped because the article write failed`): both stores stay as they were (article writes are atomic, [BRIEF.md](BRIEF.md#retention)), and the stories are triaged again next refresh, spending Jev calls again. After each successful refresh, articles with a triage record are pruned 14 days after they were last seen and articles without one after the 48-hour window, which in turn drops their triage records at the next triage write ([BRIEF.md](BRIEF.md#retention), [NEWS-117](https://informedcrew.atlassian.net/browse/NEWS-117)).
 - **`mvp/data/meta.json` → `triage`** — the last run summary: `{ at, skipped, candidates, kept, dropped, byReason, jev: { budget, used, errors }, summaryBudget, errors }`. `byReason` counts this run's drops, with every `muted:<id>` counted under `muted`. `errors` holds at most 5 messages, plus any store-write errors (triage, articles, meta), which are always appended.
 
