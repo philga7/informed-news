@@ -26,6 +26,7 @@ export const TRIAGE_PATH = path.join(DATA_DIR, 'triage.json');
 export const BRIEF_SUMMARIES_PATH = path.join(DATA_DIR, 'brief-summaries.json');
 export const BRIEF_SEEN_PATH = path.join(DATA_DIR, 'brief-seen.json');
 export const BRIEF_FULL_STORIES_PATH = path.join(DATA_DIR, 'brief-full-stories.json');
+export const CITATION_SOURCES_PATH = path.join(DATA_DIR, 'citation-sources.json');
 
 export const CLAIMS_PATH = path.join(DATA_DIR, 'claims.json');
 export const EVIDENCE_LINKS_PATH = path.join(DATA_DIR, 'evidence-links.json');
