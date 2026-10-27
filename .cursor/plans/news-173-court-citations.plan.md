@@ -113,6 +113,16 @@ Failing tests first:
 
 `RunCitationGuardArgs` requires `scope`. Thread it onto each log entry inside `citationCheckResultToLogEntry` via the args (the result itself need not carry scope). Call sites in the summary and full-story services pass the scopes above. Existing `runCitationGuardForArticle` tests must pass a scope so they typecheck; use `'story'` unless the test is about summary.
 
+`normalizeEntry` in `citationCheckLogStore.ts` must persist `scope` (`'summary' | 'story'`). Drop a stored entry whose `scope` is anything else. Missing `scope` on old rows still loads (leave it undefined).
+
+Claim `itemId` is `claim:` plus the first 16 hex chars of sha256 of `normalizedRefutingUrl + "\n" + claimText`. Use an empty string for a missing part. `normalizedRefutingUrl` is `normalizeCitationUrl` of `refutingUrl`.
+
+`normalizeCitationUrl` comparison key: trim; unparseable strings stay trimmed; `http` and `https` compare as `https`; drop a trailing slash on a non-root path; drop query keys whose names start with `utm_` (case-insensitive); keep every other query key. `https://publisher.example/story/` and `http://publisher.example/story?utm_source=brief` both become `https://publisher.example/story`. URL `itemId`s use this key. `displayForUrlStatus` maps both `mismatch` and `missing-source` to `unverified`. The URL resolver still returns only `match` or `missing-source`.
+
+Merge in `mergeCitationCheckLogEntries`: drop a prior entry when its `scope` is present in the incoming batch and its `itemId` is not incoming. Keep prior entries from other scopes. An incoming entry replaces the same `itemId`. Prior entries with no `scope` stay unless that `itemId` is replaced.
+
+Fail closed: if `checkCitationItems` throws, `console.warn` and return one `missing-source` result per input item (`unconfirmed` when `kind` is `claim`, otherwise `unverified`), and persist that log. Do not return `[]`. If `registerCitationSources` throws, `console.warn` and still run the check with the sources already loaded (or none). Do not return `[]`.
+
 Do not change court resolution in this task. The court stub stays.
 
 Commit: `fix(NEWS-173): citation guard identity, URL key, fail-closed, and stale marks`.
@@ -167,6 +177,8 @@ Commit: `feat(NEWS-173): CourtListener citation lookup client and 7-day cache`.
 ## Task 4: court resolver and procedural claims
 
 Files: `mvp/server/src/services/citationGuard/resolvers/courtResolver.ts` and its test, `registry.ts` if the court resolver signature must accept the attachment, `resolvers/claimResolver.ts` and its test, `runCitationGuard.ts` and its test. Use `lookupCourtCitations` from Task 3. No UI.
+
+Extend `normalizeEntry` so a log entry keeps optional `procedural` (boolean), `courtRecordUrl`, `citation`, `volume`, `reporter`, and `page`. `CitationSourceRecord` gains optional `procedural`. `normalizeRecord` in the sources store keeps that boolean and treats anything else as absent.
 
 `resolveCourtCitation` is still synchronous and does no I/O.
 
