@@ -18,6 +18,7 @@ import {
 	parseKeywordLines,
 	parseKeywordsInput,
 	removeConfirmMessage,
+	TOPICS_INTRO_HELP,
 	topicToForm,
 	type Topic,
 } from '$lib/topics';
@@ -225,6 +226,17 @@ describe('removeConfirmMessage', () => {
 	it('fills the template with the topic name', () => {
 		expect(removeConfirmMessage('Ford Super Duty')).toBe('Remove topic "Ford Super Duty"?');
 		expect(removeConfirmMessage('A$&B')).toBe('Remove topic "A$&B"?');
+	});
+});
+
+describe('Topics intro copy (NEWS-174)', () => {
+	it('describes what topics do now, not a future search and triage ship', () => {
+		expect(TOPICS_INTRO_HELP).not.toMatch(/once .*search and triage ship/i);
+		expect(TOPICS_INTRO_HELP).not.toMatch(/saved now/i);
+		expect(TOPICS_INTRO_HELP).toMatch(/each refresh searches/i);
+		expect(TOPICS_INTRO_HELP).toMatch(/Watch topics surface only significant developments/);
+		expect(TOPICS_INTRO_HELP).toMatch(/next refresh/i);
+		expect(TOPICS_INTRO_HELP).toMatch(/Mute rules always win/);
 	});
 });
 
