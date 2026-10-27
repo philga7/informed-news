@@ -174,6 +174,8 @@ function harness(
       return respond(id);
     },
     ollamaAvailable: () => true,
+    // Default: no-op guard so unit tests do not write citation stores under MVP_DATA_DIR.
+    runCitationGuard: async () => [],
     ...overrides,
   };
   return { deps, calls, puts, metaPatches };

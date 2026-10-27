@@ -142,6 +142,8 @@ function harness(
         suggested_qna: [{ question: 'What to verify?', answer: 'Check sources.' }],
       };
     },
+    // Default: no-op guard so unit tests do not write citation stores under MVP_DATA_DIR.
+    runCitationGuard: async () => [],
     ...override,
   };
   return {
