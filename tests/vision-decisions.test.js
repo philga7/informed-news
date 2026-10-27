@@ -59,9 +59,12 @@ describe('NEWS-165 vision and decisions', () => {
 	it('records the Oct 23 decisions with a decision, a why, and what each rules out', () => {
 		const decisions = read('docs/DECISIONS.md');
 		const entries = decisions.split(/^## /m).slice(1);
-		assert.ok(entries.length >= 5, `expected several dated entries, got ${entries.length}`);
+		const oct23 = entries.filter((entry) => entry.startsWith('2026-10-23'));
+		assert.ok(oct23.length >= 5, `expected several Oct 23 entries, got ${oct23.length}`);
+		const dates = entries.map((entry) => entry.slice(0, 10));
+		assert.deepEqual(dates, [...dates].sort().reverse(), 'entries are newest first');
 		for (const entry of entries) {
-			assert.match(entry, /2026-10-23/);
+			assert.match(entry, /^\d{4}-\d{2}-\d{2} — /);
 			assert.match(entry, /\*\*Decision:\*\*/);
 			assert.match(entry, /\*\*Why:\*\*/);
 			assert.match(entry, /\*\*What it rules out:\*\*/);
@@ -114,9 +117,12 @@ describe('NEWS-165 vision and decisions', () => {
 		assert.deepEqual(keys, [
 			'NEWS-131',
 			'NEWS-155',
+			'NEWS-174',
 			'NEWS-165',
 			'NEWS-171',
 			'NEWS-167',
+			'NEWS-172',
+			'NEWS-173',
 			'NEWS-168',
 			'NEWS-169',
 			'NEWS-109',
@@ -137,9 +143,12 @@ describe('NEWS-165 vision and decisions', () => {
 
 		const currentNext = agents.slice(agents.indexOf('**Current next:**'));
 		const at = (key) => currentNext.indexOf(key);
-		assert.ok(at('NEWS-131') !== -1 && at('NEWS-131') < at('NEWS-155'));
-		assert.ok(at('NEWS-155') < at('NEWS-165'));
-		assert.ok(at('NEWS-165') < at('NEWS-171'));
+		const next = currentNext.slice(currentNext.indexOf('**Current next**'));
+		const nextAt = (key) => next.indexOf(key);
+		assert.ok(nextAt('NEWS-167') !== -1 && nextAt('NEWS-167') < nextAt('NEWS-172'));
+		assert.ok(nextAt('NEWS-172') < nextAt('NEWS-173'));
+		assert.ok(nextAt('NEWS-173') < nextAt('NEWS-168'));
+		assert.ok(at('NEWS-131') < at('**Current next**'), 'NEWS-131 is listed as Done before Current next');
 	});
 
 	it('keeps relative links alive and does not contradict docs/TRIAGE.md', () => {

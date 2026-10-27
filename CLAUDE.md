@@ -55,7 +55,7 @@ The full ritual is in `.cursor/skills/news-ship-loop/SKILL.md`. Repo skills win 
 
 - **Order:** take the current next item in `docs/ROADMAP.md` and confirm it in Jira. If they disagree, Jira wins; fix ROADMAP in the same change.
 - **Approach** per ticket (`ticket → approach → reason`). TDD for one module/seam, no new public interfaces or dependencies, about 3 tasks or fewer; otherwise SDD. An explicit `Approach:` in the prompt overrides.
-- Branch `feat/news-<N>-…` (or `ci/news-<N>-…` for tooling) from `main`. One Conventional Commit per ticket on `main`: the squash title, e.g. `feat(NEWS-N): …`.
+- Branch `feat/news-<N>-…` (or `ci/news-<N>-…` for tooling) from `main`. One Conventional Commit per ticket on the branch; the PR title is the squash subject on `main` and names every key, e.g. `fix(NEWS-131, NEWS-155): …`.
 - PR body: Summary, a Test plan with every item ticked, and `Closes NEWS-N` when the PR fully completes the story. Tick the CI item only with the green Actions run link.
 - Propose discovered tickets (type, epic, one line, why) or "None". File them in NEWS only after Phil confirms.
 - **PR flow:** open the PR → Claude Code reviews it → resolve findings (push re-runs the review) → Phil decides. **Never merge** without Phil's ship request.
@@ -65,7 +65,7 @@ The full ritual is in `.cursor/skills/news-ship-loop/SKILL.md`. Repo skills win 
 
 Claude reports findings. It never approves or merges.
 
-- PR title is a Conventional Commit with the right type and a `NEWS` key.
+- PR title is a Conventional Commit with every `NEWS` key in the scope and the highest bump type in the batch (the **PR title** check enforces the shape; CONTRIBUTING § Squash merges).
 - Approach (TDD/SDD) fits the ticket; SDD has a plan file if required.
 - Every test-plan item is ticked and backed by evidence.
 - CI is green with a GitHub Actions run link (do not tick CI without the link).
