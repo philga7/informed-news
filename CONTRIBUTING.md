@@ -57,6 +57,10 @@ semantic-release analyzes the **commit subject on `main`**. With squash merges, 
 
 Bot commits `chore(release): … [skip ci]` are intentional so Release does not loop on its own bump.
 
+**The PR title is the squash subject.** Write it as a Conventional Commit with every ticket key in the scope, e.g. `fix(NEWS-131, NEWS-155, NEWS-174): …`, and the highest bump type in the batch (breaking `!` > `feat` > `fix` / `perf` > no-release types). A multi-ticket PR squashes to one subject on `main`. The per-ticket commits stay in the PR only, so a key that is not in the title is not on `main`. PR #205 squashed as `docs(NEWS-165): …` and lost the NEWS-171 subject this way. PR #191 (`NEWS-119, NEWS-120: …`) was not a Conventional Commit at all and cut no release.
+
+The **PR title** workflow (`.github/workflows/pr-title.yml`, running `scripts/check-pr-title.mjs`) fails a PR whose title breaks that rule. It re-runs when the title is edited. A title without a key passes only for an untracked `docs`, `chore`, `ci`, `test`, `style`, or `build` change, because those cut no release. `feat`, `fix`, `perf`, `refactor`, `revert`, and any breaking `!` title always need keys. Merge with `gh pr merge <n> --squash --subject "<PR title> (#<n>)"`, or set the repo's squash default to the PR title (Settings → General → Pull Requests). A one-commit PR otherwise squashes to that commit's subject instead of the checked title.
+
 ## Why both CI and Release?
 
 - **CI** (`.github/workflows/ci.yml`): every PR into `main` and every push to `main` — install (root, `mvp/server`, `apps/kite`), MVP server typecheck + `npm test`, `npm run test:kite`, Kite `bun run test:unit` + `bun run check`, and product-path `bun run build` in `apps/kite`. No secrets. Fast review feedback; no publish.
@@ -82,6 +86,8 @@ gh repo deploy-key list            # delete the old key: gh repo deploy-key dele
 rm -P release_key release_key.pub
 ```
 
+**PR title** (NEWS-155) reports on every PR. It blocks merges only once it is added to the ruleset as a second required check, which needs an admin. Add it only after `pr-title.yml` is on `main`, or every PR waits on a check that never reports.
+
 Inspect or change the ruleset with an admin token: `gh api repos/philga7/informed-news/rulesets`. If the CI job is renamed, update the required check's context in the ruleset in the same change, or every merge blocks on a check that never reports.
 
 ## Release ≠ cloud deploy
@@ -105,8 +111,8 @@ While the version is 0.x, `.releaserc.json` maps a breaking change (`feat!:` or 
 1. Branch from `main`
 2. Use Conventional Commits locally
 3. Ensure `npm run typecheck`, `npm test`, and `npm run build` pass
-4. Open a PR into `main`; set the PR title to the intended conventional type (it often becomes the squash title)
-5. Reference Jira (`NEWS-…`) when applicable
+4. Open a PR into `main`; the PR title is a Conventional Commit naming every key and becomes the squash subject (see [Squash merges](#squash-merges-and-semantic-release-harn-10))
+5. Reference Jira (`NEWS-…`) in the title scope; one Conventional Commit per ticket on the branch
 
 ## Questions?
 
