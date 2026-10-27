@@ -5,6 +5,8 @@ import type {
   CitationKind,
   CitationSourceRecord,
 } from '../../types/citationGuard.js';
+import { resolveClaimCitation } from './resolvers/claimResolver.js';
+import { resolveCourtCitation } from './resolvers/courtResolver.js';
 import { resolveQuoteCitation } from './resolvers/quoteResolver.js';
 import { resolveUrlCitation } from './resolvers/urlResolver.js';
 
@@ -69,17 +71,29 @@ function resolveQuoteItem(
   });
 }
 
+function resolveClaimItem(
+  item: CitationCheckItem,
+  sourcesForRun: CitationSourceRecord[],
+): CitationCheckResult {
+  return resolveClaimCitation(item.refutingUrl, sourcesForRun, {
+    ...(item.id !== undefined ? { id: item.id } : {}),
+    ...(item.claimText !== undefined ? { claimText: item.claimText } : {}),
+  });
+}
+
 /**
- * Kind → resolver map. Task 3 registers `url` and `quote`; claim/court plug in later.
+ * Kind → resolver map. `url`, `quote`, `claim`, and `court` (NEWS-173 stub) registered.
  */
 export const citationResolvers: Partial<Record<CitationKind, CitationResolver>> = {
   url: resolveUrlItem,
   quote: resolveQuoteItem,
+  claim: resolveClaimItem,
+  court: resolveCourtCitation,
 };
 
 /**
  * Run citation checks for items against the current run's sources.
- * `url` and `quote` are handled; other kinds without a resolver return
+ * Registered kinds resolve via the map; unknown kinds without a resolver return
  * missing-source (display unverified / unconfirmed by kind).
  * Structured results only — never mutates the input payload.
  */
@@ -98,6 +112,8 @@ export function checkCitationItems(
       display: displayForUnresolvedKind(item.kind, status),
       ...(item.url !== undefined ? { url: item.url } : {}),
       ...(item.quote !== undefined ? { quote: item.quote } : {}),
+      ...(item.refutingUrl !== undefined ? { refutingUrl: item.refutingUrl } : {}),
+      ...(item.claimText !== undefined ? { claimText: item.claimText } : {}),
       ...(item.id !== undefined ? { id: item.id } : {}),
     };
   });

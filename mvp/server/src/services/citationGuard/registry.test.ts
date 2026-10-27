@@ -23,11 +23,11 @@ function source(
   };
 }
 
-test('citationResolvers registers the url and quote resolvers', () => {
+test('citationResolvers registers url, quote, claim, and court resolvers', () => {
   assert.equal(typeof citationResolvers.url, 'function');
   assert.equal(typeof citationResolvers.quote, 'function');
-  assert.equal(citationResolvers.claim, undefined);
-  assert.equal(citationResolvers.court, undefined);
+  assert.equal(typeof citationResolvers.claim, 'function');
+  assert.equal(typeof citationResolvers.court, 'function');
 });
 
 test('checkCitationItems: url items resolve via the registry (match + missing)', () => {
@@ -100,9 +100,50 @@ test('checkCitationItems: quote items resolve via the registry (match + mismatch
   ]);
 });
 
-test('checkCitationItems: unregistered kinds without a resolver → missing-source', () => {
+test('checkCitationItems: claim items resolve via the registry (match + unconfirmed)', () => {
+  const sourcesForRun = [
+    source({ url: 'https://publisher.example/refute', runId: 'run-a' }),
+  ];
   const results = checkCitationItems(
-    [{ kind: 'court', id: 'c-1' }],
+    [
+      {
+        kind: 'claim',
+        refutingUrl: 'https://publisher.example/refute',
+        claimText: 'The measure failed.',
+        id: 'claim-ok',
+      },
+      {
+        kind: 'claim',
+        refutingUrl: 'https://publisher.example/missing',
+        claimText: 'The measure passed.',
+        id: 'claim-miss',
+      },
+    ],
+    sourcesForRun,
+  );
+  assert.deepEqual(results, [
+    {
+      kind: 'claim',
+      status: 'match',
+      display: 'ok',
+      refutingUrl: 'https://publisher.example/refute',
+      claimText: 'The measure failed.',
+      id: 'claim-ok',
+    },
+    {
+      kind: 'claim',
+      status: 'missing-source',
+      display: 'unconfirmed',
+      refutingUrl: 'https://publisher.example/missing',
+      claimText: 'The measure passed.',
+      id: 'claim-miss',
+    },
+  ]);
+});
+
+test('checkCitationItems: court stub returns missing-source without throwing', () => {
+  const results = checkCitationItems(
+    [{ kind: 'court', id: 'c-1', url: 'https://courtlistener.example/docket/1' }],
     [source({ url: 'https://publisher.example/story', runId: 'run-a' })],
   );
   assert.equal(results.length, 1);
@@ -110,6 +151,7 @@ test('checkCitationItems: unregistered kinds without a resolver → missing-sour
   assert.equal(results[0]?.status, 'missing-source');
   assert.equal(results[0]?.display, 'unverified');
   assert.equal(results[0]?.id, 'c-1');
+  assert.equal(results[0]?.url, 'https://courtlistener.example/docket/1');
 });
 
 test('filterCitationSourcesForRun keeps only the requested runId', () => {

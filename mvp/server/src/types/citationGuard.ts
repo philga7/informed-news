@@ -38,6 +38,10 @@ export type CitationCheckItem = {
   url?: string | null;
   /** For kind quote: the raw quote text being checked */
   quote?: string | null;
+  /** For kind claim: URL of the source that supposedly refutes the claim */
+  refutingUrl?: string | null;
+  /** Optional claim text identity for later logging */
+  claimText?: string | null;
   /** Optional stable id for logging later */
   id?: string;
 };
@@ -45,10 +49,14 @@ export type CitationCheckItem = {
 export type CitationCheckResult = {
   kind: CitationKind;
   status: CitationCheckStatus;
-  /** Display hint for later UI: unverified for url miss; unused for match */
+  /** Display hint for later UI: unverified for url/quote miss; unconfirmed for claim miss */
   display: 'ok' | 'unverified' | 'unconfirmed';
   url?: string | null;
   /** Echo of checked quote text (optional, for the check log) */
   quote?: string | null;
+  /** For kind claim: URL of the source that supposedly refutes the claim */
+  refutingUrl?: string | null;
+  /** Optional claim text identity for later logging */
+  claimText?: string | null;
   id?: string;
 };
