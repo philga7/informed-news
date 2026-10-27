@@ -61,11 +61,16 @@ describe('NEWS-165 vision and decisions', () => {
 		const entries = decisions.split(/^## /m).slice(1);
 		assert.ok(entries.length >= 5, `expected several dated entries, got ${entries.length}`);
 		for (const entry of entries) {
-			assert.match(entry, /2026-10-23/);
 			assert.match(entry, /\*\*Decision:\*\*/);
 			assert.match(entry, /\*\*Why:\*\*/);
 			assert.match(entry, /\*\*What it rules out:\*\*/);
 		}
+		const oct23 = entries.filter((entry) => entry.startsWith('2026-10-23'));
+		assert.ok(oct23.length >= 9, `expected the Oct 23 set, got ${oct23.length}`);
+		assert.match(entries[0], /^2026-10-26 — Product spec/);
+		assert.match(entries[0], /PRODUCT_SPEC\.md/);
+		assert.match(entries[0], /WHATS_NEW\.md/);
+		assert.match(entries[0], /5 tickets have merged since it landed/);
 		assert.match(decisions, /NEWS-167/);
 		assert.match(decisions, /NEWS-168/);
 		assert.match(decisions, /NEWS-169/);

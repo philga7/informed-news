@@ -116,7 +116,7 @@ Focus on why/what, not implementation. Do not invent architecture in the ticket 
 
 ### Product spec and what's new
 
-Trial approved 2026-10-26. Review after 5 tickets have merged since it landed. Recorded in [docs/DECISIONS.md](../../../docs/DECISIONS.md) and [docs/ROADMAP.md](../../../docs/ROADMAP.md).
+Trial approved 2026-10-26. Review after 5 tickets have merged since it landed, including whether a **Last checked** bump on an unchanged spec is worth the diff. Recorded in [docs/DECISIONS.md](../../../docs/DECISIONS.md) and [docs/ROADMAP.md](../../../docs/ROADMAP.md).
 
 Every ship-loop pull request updates both files **in the same PR as the code**:
 
