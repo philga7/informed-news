@@ -25,3 +25,26 @@ export type CitationSourcesStore = {
   sources: Record<string, CitationSourceRecord>;
   updatedAt: string | null;
 };
+
+/** Citation item kinds (court reserved for NEWS-173). */
+export type CitationKind = 'url' | 'quote' | 'claim' | 'court';
+
+/** Shared terminal check states. */
+export type CitationCheckStatus = 'match' | 'mismatch' | 'missing-source';
+
+export type CitationCheckItem = {
+  kind: CitationKind;
+  /** For kind url: the outbound href being checked */
+  url?: string | null;
+  /** Optional stable id for logging later */
+  id?: string;
+};
+
+export type CitationCheckResult = {
+  kind: CitationKind;
+  status: CitationCheckStatus;
+  /** Display hint for later UI: unverified for url miss; unused for match */
+  display: 'ok' | 'unverified' | 'unconfirmed';
+  url?: string | null;
+  id?: string;
+};

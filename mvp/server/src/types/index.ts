@@ -75,4 +75,11 @@ export type {
   SummaryTrigger,
 } from './brief.js';
 
-export type { CitationSourceRecord, CitationSourcesStore } from './citationGuard.js';
+export type {
+  CitationCheckItem,
+  CitationCheckResult,
+  CitationCheckStatus,
+  CitationKind,
+  CitationSourceRecord,
+  CitationSourcesStore,
+} from './citationGuard.js';
