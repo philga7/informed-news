@@ -14,6 +14,7 @@ import {
   pruneCitationSourcesOlderThan,
   readCitationSources,
   registerCitationSources,
+  updateCitationSources,
 } from './citationSourcesStore.js';
 
 function tempSourcesPath(): string {
@@ -237,4 +238,18 @@ test('readCitationSources drops malformed records', async () => {
   const store = await readCitationSources(sourcesPath);
   assert.deepEqual(Object.keys(store.sources), [good.id]);
   assert.deepEqual(store.sources[good.id], good);
+});
+
+test('updateCitationSources does not persist an unresolved Google News source', async () => {
+  const sourcesPath = tempSourcesPath();
+  const gn = record({ text: 'gn body', runId: 'run-gn', url: 'https://news.google.com/rss/articles/abc' });
+  const ok = record({ text: 'ok body', runId: 'run-gn' });
+  await updateCitationSources((store) => {
+    store.sources[gn.id] = gn;
+    store.sources[ok.id] = ok;
+    return store;
+  }, sourcesPath);
+  const store = await readCitationSources(sourcesPath);
+  assert.equal(store.sources[gn.id], undefined);
+  assert.ok(store.sources[ok.id]);
 });

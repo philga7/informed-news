@@ -48,24 +48,46 @@ export const CITATION_MARK_UNVERIFIED_QUOTE = 'Unverified quote';
 export const CITATION_MARK_UNCONFIRMED = 'Unconfirmed';
 export const CITATION_MARK_ADVISORY_SUFFIX = '(advisory)';
 
-/** Server already omits ok; still filter so a stray ok mark never renders. */
+export const CITATION_MARK_UNVERIFIED_CITATION = 'Unverified citation';
+export const CITATION_MARK_PROCEDURAL = 'Dismissed on procedure, not on the merits';
+export const CITATION_MARK_DETAIL_UNVERIFIED = 'This did not match a source from this run.';
+export const CITATION_MARK_DETAIL_UNCONFIRMED = 'No linked refuting source from this run.';
+export const CITATION_MARK_COURT_RECORD_LINK = 'CourtListener record';
+
+/** A court mark whose CourtListener record page differs from the original link. */
+export function hasCourtRecordLink(mark: InformedCitationMark): boolean {
+	return mark.kind === 'court' && citationMarkCourtRecordUrl(mark) !== null;
+}
+
+/**
+ * Unverified, unconfirmed, and procedural marks (even when display is ok), plus
+ * court marks that offer a CourtListener record link. Other ok marks stay hidden.
+ */
 export function visibleCitationMarks(
 	marks: InformedCitationMark[] | null | undefined,
 ): InformedCitationMark[] {
 	if (!marks?.length) return [];
-	return marks.filter((m) => m.display === 'unverified' || m.display === 'unconfirmed');
+	return marks.filter(
+		(m) =>
+			m.procedural === true ||
+			m.display === 'unverified' ||
+			m.display === 'unconfirmed' ||
+			hasCourtRecordLink(m),
+	);
 }
 
 /** Visible label for a citation mark (no advisory suffix). */
 export function citationMarkVisibleLabel(mark: InformedCitationMark): string | null {
+	if (mark.procedural === true) return CITATION_MARK_PROCEDURAL;
 	switch (mark.display) {
 		case 'ok':
-			return null;
+			return hasCourtRecordLink(mark) ? CITATION_MARK_COURT_RECORD_LINK : null;
 		case 'unverified':
 			switch (mark.kind) {
 				case 'url':
-				case 'court':
 					return CITATION_MARK_UNVERIFIED_LINK;
+				case 'court':
+					return CITATION_MARK_UNVERIFIED_CITATION;
 				case 'quote':
 					return CITATION_MARK_UNVERIFIED_QUOTE;
 				case 'claim':
@@ -89,6 +111,30 @@ export function citationMarkAccessibleName(mark: InformedCitationMark): string |
 	const label = citationMarkVisibleLabel(mark);
 	if (!label) return null;
 	return `${label} ${CITATION_MARK_ADVISORY_SUFFIX}`;
+}
+
+/** Expander detail sentence, or null when the label already says everything. */
+export function citationMarkDetail(mark: InformedCitationMark): string | null {
+	if (mark.procedural === true) return CITATION_MARK_PROCEDURAL;
+	switch (mark.display) {
+		case 'ok':
+			return null;
+		case 'unverified':
+			return CITATION_MARK_DETAIL_UNVERIFIED;
+		case 'unconfirmed':
+			return CITATION_MARK_DETAIL_UNCONFIRMED;
+		default: {
+			const _exhaustive: never = mark.display;
+			return _exhaustive;
+		}
+	}
+}
+
+/** Extra CourtListener link only when it points somewhere other than `url`. */
+export function citationMarkCourtRecordUrl(mark: InformedCitationMark): string | null {
+	const record = mark.courtRecordUrl?.trim();
+	if (!record || record === mark.url) return null;
+	return record;
 }
 
 export const BRIEF_SUMMARY_UNAVAILABLE = 'Full text unavailable';

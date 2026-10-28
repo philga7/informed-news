@@ -82,4 +82,98 @@ describe('CitationGuardMarks (NEWS-172)', () => {
 		mark.focus();
 		expect(mark).toHaveFocus();
 	});
+
+	describe('court marks (NEWS-173)', () => {
+		const unresolvedCourt: InformedCitationMark = {
+			kind: 'court',
+			status: 'missing-source',
+			display: 'unverified',
+			itemId: 'court:1',
+			url: 'https://www.courtlistener.com/opinion/1/a-v-b/',
+		};
+		const procedural: InformedCitationMark = {
+			kind: 'court',
+			status: 'match',
+			display: 'ok',
+			itemId: 'court:2',
+			url: 'https://www.courtlistener.com/opinion/2/c-v-d/',
+			procedural: true,
+		};
+
+		async function openPanel() {
+			await fireEvent.click(screen.getByText('Citation checks'));
+			await tick();
+		}
+
+		it('labels an unresolved court cite Unverified citation with an advisory name', async () => {
+			render(CitationGuardMarks, { props: { marks: [unresolvedCourt] } });
+			await openPanel();
+			const btn = screen.getByRole('button', { name: 'Unverified citation (advisory)' });
+			expect(btn).toHaveTextContent('Unverified citation');
+		});
+
+		it('shows the procedural note even when display is ok, visible and in the name', async () => {
+			render(CitationGuardMarks, { props: { marks: [procedural] } });
+			await openPanel();
+			const btn = screen.getByRole('button', {
+				name: 'Dismissed on procedure, not on the merits (advisory)',
+			});
+			expect(btn).toHaveTextContent('Dismissed on procedure, not on the merits');
+		});
+
+		const resolvedDocket: InformedCitationMark = {
+			kind: 'court',
+			status: 'match',
+			display: 'ok',
+			itemId: 'court:4',
+			url: 'https://www.courtlistener.com/docket/9/x/',
+			courtRecordUrl: 'https://www.courtlistener.com/docket/9/x-v-y/',
+		};
+
+		it('shows a resolved docket with a different record link as CourtListener record, not Unverified', async () => {
+			render(CitationGuardMarks, { props: { marks: [resolvedDocket] } });
+			await openPanel();
+			const btn = screen.getByRole('button', { name: 'CourtListener record (advisory)' });
+			expect(btn).toHaveTextContent('CourtListener record');
+			expect(screen.queryByText(/unverified/i)).not.toBeInTheDocument();
+			await fireEvent.click(btn);
+			const link = screen.getByRole('link', { name: 'CourtListener record' });
+			expect(link).toHaveAttribute('href', 'https://www.courtlistener.com/docket/9/x-v-y/');
+		});
+
+		it('hides a resolved court mark whose record link equals the url', () => {
+			render(CitationGuardMarks, {
+				props: { marks: [{ ...resolvedDocket, courtRecordUrl: resolvedDocket.url }] },
+			});
+			expect(screen.queryByTestId('citation-guard-marks')).not.toBeInTheDocument();
+		});
+
+		it('keeps the procedural label and offers the record link on a procedural docket', async () => {
+			render(CitationGuardMarks, {
+				props: { marks: [{ ...resolvedDocket, procedural: true }] },
+			});
+			await openPanel();
+			const btn = screen.getByRole('button', {
+				name: 'Dismissed on procedure, not on the merits (advisory)',
+			});
+			await fireEvent.click(btn);
+			expect(screen.getByRole('link', { name: 'CourtListener record' })).toHaveAttribute(
+				'href',
+				'https://www.courtlistener.com/docket/9/x-v-y/',
+			);
+		});
+
+		it('exposes aria-expanded that flips on click and shows the detail sentence', async () => {
+			render(CitationGuardMarks, { props: { marks: [unresolvedCourt] } });
+			await openPanel();
+			const btn = screen.getByRole('button', { name: 'Unverified citation (advisory)' });
+			expect(btn).toHaveAttribute('aria-expanded', 'false');
+			expect(btn).toHaveAttribute('aria-controls');
+			await fireEvent.click(btn);
+			expect(btn).toHaveAttribute('aria-expanded', 'true');
+			expect(
+				screen.getByText('This did not match a source from this run.'),
+			).toBeVisible();
+		});
+	});
 });

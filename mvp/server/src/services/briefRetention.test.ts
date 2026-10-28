@@ -110,6 +110,7 @@ test('pruneBriefStores drops records whose article is no longer kept and keeps k
     fullStories: 2,
     citationSources: 0,
     citationCheckLogs: 0,
+    citationCourtCache: 0,
     errors: [],
   });
 });
@@ -135,6 +136,7 @@ test('pruneBriefStores drops kept records generated more than 7 days ago', async
     fullStories: 1,
     citationSources: 0,
     citationCheckLogs: 0,
+    citationCourtCache: 0,
     errors: [],
   });
 });
@@ -154,6 +156,7 @@ test('pruneBriefStores skips keep-predicate prunes when triage is unreadable but
       logsPruned = true;
       return 5;
     },
+    pruneCitationCourtCacheOlderThan: async () => 6,
   });
 
   const result = await pruneBriefStores({ now: NOW }, h.deps);
@@ -167,6 +170,7 @@ test('pruneBriefStores skips keep-predicate prunes when triage is unreadable but
     fullStories: 0,
     citationSources: 4,
     citationCheckLogs: 5,
+    citationCourtCache: 6,
     errors: ['triage: triage.json must contain a JSON object'],
   });
 });
@@ -186,6 +190,7 @@ test('a failing summaries prune does not stop the full-stories prune', async () 
     fullStories: 1,
     citationSources: 0,
     citationCheckLogs: 0,
+    citationCourtCache: 0,
     errors: ['summaries prune: EACCES'],
   });
 });
@@ -205,6 +210,7 @@ test('a failing full-stories prune is reported after the summaries prune', async
     fullStories: 0,
     citationSources: 0,
     citationCheckLogs: 0,
+    citationCourtCache: 0,
     errors: ['full stories prune: disk full'],
   });
 });
@@ -221,6 +227,7 @@ test('pruneBriefStores also prunes citation sources and check logs older than 7 
       logsRemoved = 3;
       return 3;
     },
+    pruneCitationCourtCacheOlderThan: async () => 7,
   });
 
   const result = await pruneBriefStores({ now: NOW }, h.deps);
@@ -232,6 +239,7 @@ test('pruneBriefStores also prunes citation sources and check logs older than 7 
     fullStories: 0,
     citationSources: 2,
     citationCheckLogs: 3,
+    citationCourtCache: 7,
     errors: [],
   });
 });
@@ -244,6 +252,9 @@ test('citation prune failures are reported and never fail the brief prune', asyn
     pruneCitationCheckLogsOlderThan: async () => {
       throw new Error('logs EACCES');
     },
+    pruneCitationCourtCacheOlderThan: async () => {
+      throw new Error('cache EACCES');
+    },
   });
 
   const result = await pruneBriefStores({ now: NOW }, h.deps);
@@ -252,5 +263,6 @@ test('citation prune failures are reported and never fail the brief prune', asyn
   assert.deepEqual(result.errors, [
     'citation sources prune: sources EACCES',
     'citation check logs prune: logs EACCES',
+    'citation court cache prune: cache EACCES',
   ]);
 });

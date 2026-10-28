@@ -1,12 +1,13 @@
 /**
  * Brief cache retention (NEWS-99, NEWS-100): after each successful refresh,
  * drop saved summaries and full stories that the Brief can no longer show.
- * NEWS-172: also prune citation sources + check logs older than 7 days.
+ * NEWS-172/173: also prune citation sources, check logs, + court cache older than 7 days.
  */
 import {
   pruneBriefFullStories,
   pruneBriefSummaries,
   pruneCitationCheckLogsOlderThan,
+  pruneCitationCourtCacheOlderThan,
   pruneCitationSourcesOlderThan,
   readTriage,
 } from '../store/index.js';
@@ -21,6 +22,7 @@ export type BriefRetentionDeps = {
   pruneBriefFullStories?: (keep: (record: BriefFullStoryRecord) => boolean) => Promise<number>;
   pruneCitationSourcesOlderThan?: (now: Date, retentionDays?: number) => Promise<number>;
   pruneCitationCheckLogsOlderThan?: (now: Date, retentionDays?: number) => Promise<number>;
+  pruneCitationCourtCacheOlderThan?: (now: Date, retentionDays?: number) => Promise<number>;
 };
 
 export type BriefRetentionResult = {
@@ -29,6 +31,7 @@ export type BriefRetentionResult = {
   fullStories: number;
   citationSources: number;
   citationCheckLogs: number;
+  citationCourtCache: number;
   errors: string[];
 };
 
@@ -52,6 +55,7 @@ export async function pruneBriefStores(
     fullStories: 0,
     citationSources: 0,
     citationCheckLogs: 0,
+    citationCourtCache: 0,
     errors: [],
   };
   let triage: TriageStore | null = null;
@@ -98,6 +102,14 @@ export async function pruneBriefStores(
     )(options.now, BRIEF_CACHE_RETENTION_DAYS);
   } catch (err) {
     result.errors.push(`citation check logs prune: ${errorMessage(err)}`);
+  }
+  try {
+    result.citationCourtCache = await (
+      deps.pruneCitationCourtCacheOlderThan ??
+      ((now, days) => pruneCitationCourtCacheOlderThan(now, days))
+    )(options.now, BRIEF_CACHE_RETENTION_DAYS);
+  } catch (err) {
+    result.errors.push(`citation court cache prune: ${errorMessage(err)}`);
   }
   return result;
 }

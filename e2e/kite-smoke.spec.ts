@@ -446,6 +446,69 @@ test.describe('Citation guard marks (NEWS-172)', () => {
 		await claimCard.getByTestId('citation-guard-marks').locator('summary').click();
 		await expect(claimCard.getByRole('button', { name: 'Unconfirmed (advisory)' })).toBeVisible();
 	});
+
+	test('court marks: unverified citation, procedural note by keyboard, record link, no-token skip', async ({
+		page,
+	}) => {
+		const {
+			courtUnresolvedTitle,
+			courtProceduralTitle,
+			courtDocketTitle,
+			courtNoTokenTitle,
+			courtRecordLabel,
+		} = TOPIC_SCENARIO.citationGuard;
+		const procedural = 'Dismissed on procedure, not on the merits';
+
+		await logIn(page);
+		await page.goto('/');
+		await expect(page.getByTestId('topic-brief-section').first()).toBeVisible({ timeout: 60_000 });
+
+		const cardMarks = (title: string) =>
+			page.getByRole('article', { name: `News story: ${title}`, exact: true }).getByTestId(
+				'citation-guard-marks',
+			);
+
+		const unresolved = cardMarks(courtUnresolvedTitle);
+		await unresolved.locator('summary').click();
+		await expect(
+			unresolved.getByRole('button', { name: 'Unverified citation (advisory)' }),
+		).toBeVisible();
+
+		const proceduralMarks = cardMarks(courtProceduralTitle);
+		await proceduralMarks.locator('summary').click();
+		const proceduralButton = proceduralMarks.getByRole('button', {
+			name: `${procedural} (advisory)`,
+		});
+		await expect(proceduralButton).toHaveText(procedural);
+		await proceduralButton.focus();
+		await expect(proceduralButton).toBeFocused();
+		await expect(proceduralButton).toHaveAttribute('aria-expanded', 'false');
+		await page.keyboard.press('Enter');
+		await expect(proceduralButton).toHaveAttribute('aria-expanded', 'true');
+		await expect(
+			proceduralMarks.getByTestId('citation-guard-detail').filter({ hasText: procedural }),
+		).toBeVisible();
+
+		const docketMarks = cardMarks(courtDocketTitle);
+		const docketOpen = await docketMarks.evaluate((el) => (el as HTMLDetailsElement).open);
+		if (!docketOpen) await docketMarks.locator('summary').click();
+		const docketButton = docketMarks.getByRole('button', {
+			name: `${courtRecordLabel} (advisory)`,
+		});
+		await expect(docketButton).toBeVisible();
+		await expect(docketButton).toHaveText(courtRecordLabel);
+		await docketButton.click();
+		await expect(docketMarks.getByRole('link', { name: courtRecordLabel })).toHaveAttribute(
+			'href',
+			'https://www.courtlistener.com/docket/900003/acme-v-grid/?order_by=desc',
+		);
+
+		const noToken = cardMarks(courtNoTokenTitle);
+		await noToken.locator('summary').click();
+		await expect(
+			noToken.getByRole('button', { name: 'Unverified citation (advisory)' }),
+		).toBeVisible();
+	});
 });
 
 test.describe('Filtered out + Less like this (NEWS-90)', () => {

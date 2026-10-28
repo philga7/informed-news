@@ -67,6 +67,7 @@ function normalizeRecord(key: string, raw: unknown): CitationSourceRecord | null
     runId: raw.runId,
     contentHash: raw.contentHash,
     articleId: raw.articleId,
+    ...(typeof raw.procedural === 'boolean' ? { procedural: raw.procedural } : {}),
   };
 }
 
@@ -150,7 +151,12 @@ export async function updateCitationSources(
 ): Promise<CitationSourcesStore> {
   return enqueueFileWrite(sourcesPath, async () => {
     const current = await readCitationSources(sourcesPath);
-    const next = await mutate(current);
+    const mutated = await mutate(current);
+    const sources: Record<string, CitationSourceRecord> = {};
+    for (const [id, record] of Object.entries(mutated.sources)) {
+      if (!isRejectableCitationSource(record)) sources[id] = record;
+    }
+    const next = { ...mutated, sources };
     await writeJsonAtomic(sourcesPath, next);
     return next;
   });

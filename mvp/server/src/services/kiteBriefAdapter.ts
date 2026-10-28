@@ -27,6 +27,8 @@ export type InformedCitationMark = {
   display: 'ok' | 'unverified' | 'unconfirmed';
   itemId: string;
   url?: string | null;
+  courtRecordUrl?: string | null;
+  procedural?: boolean;
 };
 
 /** Stable batch id for the live owned brief (not a Kagi UUID). */
@@ -711,20 +713,27 @@ export function resolveOwnedBriefArticles(
   };
 }
 
-/** Prefer non-ok marks only so Brief payloads stay slim. */
+/**
+ * Non-ok marks, resolved procedural dismissals, and court marks with a CourtListener
+ * record link that differs from the original link; other ok marks stay out so payloads stay slim.
+ */
 export function citationMarksForStory(
   log: CitationCheckLogRecord | null | undefined,
 ): InformedCitationMark[] | undefined {
   if (!log?.entries?.length) return undefined;
   const marks: InformedCitationMark[] = [];
   for (const entry of log.entries) {
-    if (entry.display === 'ok') continue;
+    const recordUrl = entry.courtRecordUrl?.trim();
+    const hasRecordLink = entry.kind === 'court' && !!recordUrl && recordUrl !== entry.url;
+    if (entry.display === 'ok' && entry.procedural !== true && !hasRecordLink) continue;
     marks.push({
       kind: entry.kind,
       status: entry.status,
       display: entry.display,
       itemId: entry.itemId,
       ...(entry.url !== undefined ? { url: entry.url } : {}),
+      ...(entry.courtRecordUrl ? { courtRecordUrl: entry.courtRecordUrl } : {}),
+      ...(entry.procedural === true ? { procedural: true } : {}),
     });
   }
   return marks.length > 0 ? marks : undefined;

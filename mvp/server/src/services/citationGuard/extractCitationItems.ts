@@ -28,6 +28,72 @@ export type ExtractCitationItemsInput = {
 /** http(s) URLs; trailing sentence punctuation is stripped. */
 const URL_RE = /https?:\/\/[^\s<>"'`)\]}]+/gi;
 
+/** Reporters a court cite may use (longest first so `F. Supp. 2d` beats `F. Supp.`). */
+const COURT_REPORTERS = [
+  'U.S.', 'S. Ct.', 'L. Ed. 2d', 'L. Ed.', 'F.2d', 'F.3d', 'F.4th',
+  'F. Supp. 3d', 'F. Supp. 2d', 'F. Supp.', 'S.E.2d', 'N.E.2d', 'N.E.3d',
+  'P.2d', 'P.3d', 'So. 2d', 'So. 3d', 'A.2d', 'A.3d',
+  'Cal. App.', 'Cal. 5th', 'Cal. 4th', 'Cal. 3d', 'Cal. 2d', 'Cal.',
+  'N.Y.2d', 'N.Y.3d', 'N.Y.',
+];
+
+function reporterPattern(reporter: string): string {
+  return reporter
+    .split(' ')
+    .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    .join('\\s+');
+}
+
+const COURT_CITE_RE = new RegExp(
+  `(?<![\\w.])(\\d{1,4})\\s+(${COURT_REPORTERS.map(reporterPattern).join('|')})\\s+(\\d{1,5})(?!\\d)`,
+  'g',
+);
+
+const COURT_URL_PATH_RE = /^\/(?:docket|recap|opinion)\//;
+
+function isCourtUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.toLowerCase();
+    return (
+      (host === 'courtlistener.com' || host === 'www.courtlistener.com') &&
+      COURT_URL_PATH_RE.test(parsed.pathname)
+    );
+  } catch {
+    return false;
+  }
+}
+
+function normalizeSpace(value: string): string {
+  return value.replace(/\s+/g, ' ').trim();
+}
+
+function pushCourtUrl(url: string, items: CitationCheckItem[], seen: Set<string>): void {
+  if (!isCourtUrl(url)) return;
+  pushUnique(items, seen, { kind: 'court', url }, `court-url:${url}`);
+}
+
+function extractCourtCitesFromText(
+  text: string,
+  items: CitationCheckItem[],
+  seen: Set<string>,
+): void {
+  COURT_CITE_RE.lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = COURT_CITE_RE.exec(text)) !== null) {
+    const volume = match[1]!;
+    const reporter = normalizeSpace(match[2]!);
+    const page = match[3]!;
+    const citation = `${volume} ${reporter} ${page}`;
+    pushUnique(
+      items,
+      seen,
+      { kind: 'court', citation, volume, reporter, page },
+      `court:${citation}`,
+    );
+  }
+}
+
 /** Straight, curly, or single-quoted spans used as quotes. */
 const QUOTE_RE =
   /"([^"\n]{1,500})"|'([^'\n]{1,500})'|\u201c([^\u201d\n]{1,500})\u201d|\u2018([^\u2019\n]{1,500})\u2019/g;
@@ -57,6 +123,7 @@ function extractUrlsFromText(text: string, items: CitationCheckItem[], seen: Set
     const url = trimUrl(match[0]!);
     if (!url) continue;
     pushUnique(items, seen, { kind: 'url', url }, `url:${url}`);
+    pushCourtUrl(url, items, seen);
   }
 }
 
@@ -78,6 +145,7 @@ function extractFromPlainText(
   if (typeof text !== 'string' || !text.trim()) return;
   extractUrlsFromText(text, items, seen);
   extractQuotesFromText(text, items, seen);
+  extractCourtCitesFromText(text, items, seen);
 }
 
 /**
@@ -129,17 +197,21 @@ export function extractCitationItems(input: ExtractCitationItemsInput): Citation
       `quote:${quote.quote.trim()}`,
     );
   }
+  if (quote?.quote?.trim()) extractCourtCitesFromText(quote.quote, items, seen);
   if (typeof quote?.quote_source_url === 'string' && quote.quote_source_url.trim()) {
     const url = trimUrl(quote.quote_source_url.trim());
     pushUnique(items, seen, { kind: 'url', url }, `url:${url}`);
+    pushCourtUrl(url, items, seen);
   }
 
   for (const perspective of fullStory.deterministic?.perspectives ?? []) {
     extractQuotesFromText(perspective.text ?? '', items, seen);
+    extractCourtCitesFromText(perspective.text ?? '', items, seen);
     for (const source of perspective.sources ?? []) {
       if (typeof source.url === 'string' && source.url.trim()) {
         const url = trimUrl(source.url.trim());
         pushUnique(items, seen, { kind: 'url', url }, `url:${url}`);
+        pushCourtUrl(url, items, seen);
       }
     }
   }

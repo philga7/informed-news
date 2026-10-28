@@ -74,7 +74,7 @@ When Jev says (with confidence 0.6 or higher) that a kept story is an official o
 
 ## Citation guard timing (NEWS-172)
 
-Ticket: [NEWS-172](https://informedcrew.atlassian.net/browse/NEWS-172). After triage keeps stories and Brief summaries / full stories are written (or reused), the citation guard registers fetched source text for that run and checks links, quotes, and link-backed claims. Results land in `citation-check-log.json` and fold into Brief payloads as advisory marks ([BRIEF.md](BRIEF.md#citation-guard-news-172)). On-demand summary / full-story generation runs the same guard. A failed or partial check **never** fails the triage write or the refresh; marks are advisory only. Court checks are deferred to [NEWS-173](https://informedcrew.atlassian.net/browse/NEWS-173).
+Ticket: [NEWS-172](https://informedcrew.atlassian.net/browse/NEWS-172). After triage keeps stories and Brief summaries / full stories are written (or reused), the citation guard registers fetched source text for that run and checks links, quotes, and link-backed claims. Results land in `citation-check-log.json` and fold into Brief payloads as advisory marks ([BRIEF.md](BRIEF.md#citation-guard-news-172)). On-demand summary / full-story generation runs the same guard. A failed or partial check **never** fails the triage write or the refresh; marks are advisory only. Court checks ([NEWS-173](https://informedcrew.atlassian.net/browse/NEWS-173)) run in this same guard step and never block a refresh; the pipeline order is unchanged.
 
 ## Advisory verdict (NEWS-167)
 

@@ -94,6 +94,16 @@ Links, quoted lines, and link-backed claims on a card or full story are checked 
 
 **Scenario:** Given a claim has no linked refuting source among fetched sources, when you view the card, then an Unconfirmed mark appears (advisory), not a false or debunked badge.
 
+**Scenario:** Given a card cites a court case that could not be found, or links to a CourtListener opinion page (which is not confirmed), when you view the card, then an Unverified citation mark appears (advisory). If court lookups are switched off or unavailable, the same mark appears.
+
+**Scenario:** Given a cited court record was found and it was dismissed on procedure, when you view the card, then a note reads “Dismissed on procedure, not on the merits.” It is a note, not a judgment that the claim is false, and you can reach it and open it from the keyboard.
+
+**Scenario:** Given a court docket was matched and CourtListener has its own record page, when you view the card, then the original link stays and a “CourtListener record” mark also appears; open it to follow the CourtListener record link. It is advisory, not a verification badge.
+
+**Scenario:** Given a link points to the same page as a fetched source and differs only by a trailing slash, http versus https, or a tracking tag, when you view the card, then it is not marked Unverified for that difference alone.
+
+**Scenario:** Given a citation mark no longer applies after a later check, when you view the card, then the old mark is gone.
+
 **Scenario:** Given you are signed in and the story has readable text, when you open the card, then the full story loads and a later visit reuses it while the text is unchanged.
 
 **Scenario:** Given the story has no readable text, when you open the card, then it says “Full story unavailable — no readable text.”

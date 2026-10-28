@@ -18,6 +18,35 @@ export type CitationSourceRecord = {
   contentHash: string;
   /** Article or cluster-member id when known */
   articleId: string | null;
+  /** Court records only: the record is a procedural disposition (NEWS-173). */
+  procedural?: boolean;
+};
+
+/** Resolved CourtListener lookup handed to the court resolver (NEWS-173). */
+export type CourtItemAttachment = {
+  status: 'resolved' | 'unresolved';
+  courtRecordUrl: string | null;
+  procedural: boolean;
+};
+
+/** Parsed CourtListener record kept in the 7-day cache (never headers or raw bodies). */
+export type CourtCacheHit = {
+  url: string;
+  text: string;
+  procedural: boolean;
+};
+
+export type CourtCacheEntry = {
+  /** Normalized cite or normalized court URL */
+  key: string;
+  fetchedAt: string;
+  /** null = CourtListener definitively has no such record */
+  hit: CourtCacheHit | null;
+};
+
+export type CourtCacheStore = {
+  entries: Record<string, CourtCacheEntry>;
+  updatedAt: string | null;
 };
 
 export type CitationSourcesStore = {
@@ -28,6 +57,8 @@ export type CitationSourcesStore = {
 
 /** Citation item kinds (court reserved for NEWS-173). */
 export type CitationKind = 'url' | 'quote' | 'claim' | 'court';
+
+export type CitationScope = 'summary' | 'story';
 
 /** Shared terminal check states. */
 export type CitationCheckStatus = 'match' | 'mismatch' | 'missing-source';
@@ -44,6 +75,13 @@ export type CitationCheckItem = {
   claimText?: string | null;
   /** Optional stable id for logging later */
   id?: string;
+  /** For kind court: normalized reporter cite, e.g. `598 U.S. 651` */
+  citation?: string | null;
+  volume?: string | null;
+  reporter?: string | null;
+  page?: string | null;
+  /** Set by the guard run before checking; never by callers. */
+  courtAttachment?: CourtItemAttachment;
 };
 
 export type CitationCheckResult = {
@@ -59,6 +97,14 @@ export type CitationCheckResult = {
   /** Optional claim text identity for later logging */
   claimText?: string | null;
   id?: string;
+  citation?: string | null;
+  volume?: string | null;
+  reporter?: string | null;
+  page?: string | null;
+  /** Court kind, matched only: the CourtListener record URL. */
+  courtRecordUrl?: string | null;
+  /** Court kind, matched only: the record is a procedural disposition. */
+  procedural?: boolean;
 };
 
 /** One checked citation item persisted for a story (NEWS-172). */
@@ -71,6 +117,14 @@ export type CitationCheckLogEntry = {
   url?: string | null;
   quote?: string | null;
   refutingUrl?: string | null;
+  courtRecordUrl?: string | null;
+  procedural?: boolean;
+  citation?: string | null;
+  volume?: string | null;
+  reporter?: string | null;
+  page?: string | null;
+  /** Which generate pass produced this mark; absent on old rows. */
+  scope?: CitationScope;
   checkedAt: string; // ISO
   runId: string;
 };

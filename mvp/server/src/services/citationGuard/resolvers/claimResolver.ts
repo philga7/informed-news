@@ -51,6 +51,7 @@ export function resolveClaimCitation(
 
   const normalized = normalizeCitationUrl(raw);
   const matched = sourcesForRun.some((source) => {
+    if (source.procedural === true) return false;
     if (typeof source.url !== 'string' || !source.url.trim()) return false;
     return normalizeCitationUrl(source.url) === normalized;
   });

@@ -6,20 +6,31 @@ import type {
 } from '../../../types/citationGuard.js';
 
 /**
- * Normalize a URL for citation matching: trim, then absolute `URL.href`
- * when parseable; otherwise the trimmed string.
+ * Comparison key for citation URLs: trim; http compares as https; trailing
+ * slash dropped on non-root paths; `utm_*` query keys dropped, others kept.
+ * Unparseable strings stay trimmed.
  */
 export function normalizeCitationUrl(url: string): string {
   const trimmed = url.trim();
   if (!trimmed) return '';
   try {
-    return new URL(trimmed).href;
+    const parsed = new URL(trimmed);
+    if (parsed.protocol === 'http:') parsed.protocol = 'https:';
+    if (parsed.pathname.length > 1 && parsed.pathname.endsWith('/')) {
+      parsed.pathname = parsed.pathname.replace(/\/+$/, '') || '/';
+    }
+    const kept = [...parsed.searchParams.entries()].filter(
+      ([key]) => !key.toLowerCase().startsWith('utm_'),
+    );
+    parsed.search = '';
+    for (const [key, value] of kept) parsed.searchParams.append(key, value);
+    return parsed.href;
   } catch {
     return trimmed;
   }
 }
 
-function displayForUrlStatus(status: CitationCheckStatus): CitationCheckResult['display'] {
+export function displayForUrlStatus(status: CitationCheckStatus): CitationCheckResult['display'] {
   switch (status) {
     case 'match':
       return 'ok';

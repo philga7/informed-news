@@ -139,6 +139,10 @@ export type InformedCitationMark = {
 	display: 'ok' | 'unverified' | 'unconfirmed';
 	itemId: string;
 	url?: string | null;
+	/** NEWS-173: CourtListener record page when it differs from `url`. */
+	courtRecordUrl?: string | null;
+	/** NEWS-173: the matched court record is a procedural disposition. */
+	procedural?: boolean;
 };
 
 export interface Category {
