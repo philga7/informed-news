@@ -446,6 +446,59 @@ test.describe('Citation guard marks (NEWS-172)', () => {
 		await claimCard.getByTestId('citation-guard-marks').locator('summary').click();
 		await expect(claimCard.getByRole('button', { name: 'Unconfirmed (advisory)' })).toBeVisible();
 	});
+
+	test('court marks: unverified citation, procedural note by keyboard, record link, no-token skip', async ({
+		page,
+	}) => {
+		const {
+			courtUnresolvedTitle,
+			courtProceduralTitle,
+			courtDocketTitle,
+			courtNoTokenTitle,
+			courtRecordLabel,
+		} = TOPIC_SCENARIO.citationGuard;
+		const procedural = 'Dismissed on procedure, not on the merits';
+
+		await logIn(page);
+		await page.goto('/');
+		await expect(page.getByTestId('topic-brief-section').first()).toBeVisible({ timeout: 60_000 });
+
+		const cardMarks = (title: string) =>
+			page.getByRole('article', { name: `News story: ${title}`, exact: true }).getByTestId(
+				'citation-guard-marks',
+			);
+
+		const unresolved = cardMarks(courtUnresolvedTitle);
+		await unresolved.locator('summary').click();
+		await expect(
+			unresolved.getByRole('button', { name: 'Unverified citation (advisory)' }),
+		).toBeVisible();
+
+		const proceduralMarks = cardMarks(courtProceduralTitle);
+		await proceduralMarks.locator('summary').click();
+		const proceduralButton = proceduralMarks.getByRole('button', {
+			name: `${procedural} (advisory)`,
+		});
+		await expect(proceduralButton).toHaveText(procedural);
+		await proceduralButton.focus();
+		await expect(proceduralButton).toBeFocused();
+		await expect(proceduralButton).toHaveAttribute('aria-expanded', 'false');
+		await page.keyboard.press('Enter');
+		await expect(proceduralButton).toHaveAttribute('aria-expanded', 'true');
+		await expect(
+			proceduralMarks.getByTestId('citation-guard-detail').filter({ hasText: procedural }),
+		).toBeVisible();
+
+		const docketMarks = cardMarks(courtDocketTitle);
+		await docketMarks.getByRole('button', { name: 'Unverified citation (advisory)' }).click();
+		await expect(docketMarks.getByRole('link', { name: courtRecordLabel })).toBeVisible();
+
+		const noToken = cardMarks(courtNoTokenTitle);
+		await noToken.locator('summary').click();
+		await expect(
+			noToken.getByRole('button', { name: 'Unverified citation (advisory)' }),
+		).toBeVisible();
+	});
 });
 
 test.describe('Filtered out + Less like this (NEWS-90)', () => {

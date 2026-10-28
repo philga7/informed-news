@@ -8,6 +8,8 @@ This is not the release log. Releases are recorded in `CHANGELOG.md` by semantic
 
 ## 2026-10-27
 
+- Court citations on a card are now checked. A case or court-record link that cannot be found shows **Unverified citation**, and a case that was dismissed on procedure carries the note **Dismissed on procedure, not on the merits**. Open a mark for a short explanation and, where there is one, a CourtListener record link. These are advisory notes, not verdicts.
+- Fewer false **Unverified** links: the same page with or without a trailing slash, http versus https, or a tracking tag no longer counts as a mismatch. A mark that no longer applies after a later check is cleared from the card.
 - The Brief refresh bar has an **Approved / Filtered / All** toggle beside Filtered out. Every visit starts on Approved. Filtered lists what the last refresh dropped, with a short advisory reason you can open. All shows Approved topics and then that Filtered list. The Filtered out page is unchanged.
 - Cards can show **Unverified** for a link or quote that did not match a source from that run, or **Unconfirmed** for a claim without a linked refuting source. These are advisory marks only — not verified, false, or debunked badges. Matching items show no mark.
 

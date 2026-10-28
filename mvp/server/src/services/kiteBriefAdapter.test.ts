@@ -845,6 +845,17 @@ test('topicBriefToKiteStories includes non-ok citation marks and omits the field
             checkedAt: '2026-10-27T12:00:00.000Z',
             runId: 'run-1',
           },
+          {
+            kind: 'court',
+            status: 'match',
+            display: 'ok',
+            itemId: 'court:proc',
+            url: 'https://www.courtlistener.com/opinion/2/c-v-d/',
+            courtRecordUrl: 'https://www.courtlistener.com/docket/2/c-v-d/',
+            procedural: true,
+            checkedAt: '2026-10-27T12:00:00.000Z',
+            runId: 'run-1',
+          },
         ],
       },
     },
@@ -863,6 +874,15 @@ test('topicBriefToKiteStories includes non-ok citation marks and omits the field
       status: 'missing-source',
       display: 'unconfirmed',
       itemId: 'claim:abc',
+    },
+    {
+      kind: 'court',
+      status: 'match',
+      display: 'ok',
+      itemId: 'court:proc',
+      url: 'https://www.courtlistener.com/opinion/2/c-v-d/',
+      courtRecordUrl: 'https://www.courtlistener.com/docket/2/c-v-d/',
+      procedural: true,
     },
   ]);
   assert.equal('informed_citation_marks' in stories[1]!, false);

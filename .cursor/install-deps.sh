@@ -49,10 +49,8 @@ fi
 
 if [[ -f "$ROOT/apps/kite/bun.lock" ]]; then
   if ! command -v bun >/dev/null 2>&1; then
-    echo "install-deps: bun not on PATH; installing bun 1.4.3" >&2
-    curl -fsSL https://bun.sh/install | bash -s "bun-v1.4.3"
-    export BUN_INSTALL="${BUN_INSTALL:-$HOME/.bun}"
-    export PATH="$BUN_INSTALL/bin:$PATH"
+    echo "install bun 1.4.3" >&2
+    exit 1
   fi
   bun install --frozen-lockfile --cwd apps/kite
 fi
