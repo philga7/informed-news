@@ -206,12 +206,16 @@ export async function runCitationGuardForArticle(
 
   try {
     const checkedAt = args.now.toISOString();
-    await putLog({
-      articleId: args.articleId,
-      entries: results.map((r) => citationCheckResultToLogEntry(r, checkedAt, args.runId, args.scope)),
-      updatedAt: checkedAt,
-      runId: args.runId,
-    });
+    await putLog(
+      {
+        articleId: args.articleId,
+        entries: results.map((r) => citationCheckResultToLogEntry(r, checkedAt, args.runId, args.scope)),
+        updatedAt: checkedAt,
+        runId: args.runId,
+      },
+      undefined,
+      args.scope,
+    );
   } catch (err) {
     console.warn('[citation-guard] could not persist check log', err);
   }

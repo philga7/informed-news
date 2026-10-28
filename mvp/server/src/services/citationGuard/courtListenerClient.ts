@@ -296,7 +296,7 @@ async function lookupDocket(url: string, id: string, requester: Requester): Prom
 }
 
 /**
- * Look up court items (reporter cites, docket / opinion URLs) on CourtListener,
+ * Look up court items (reporter cites, docket / recap URLs; opinion URLs stay unresolved) on CourtListener,
  * through a 7-day parsed-hit cache. Never throws on network failure; failures
  * leave the item unresolved. Does not register sources.
  */
@@ -336,6 +336,7 @@ export async function lookupCourtCitations(
     if (item.kind === 'court' && key) itemByKey.set(key, item);
   }
   for (const key of keys) {
+    if (isOpinionUrl(key)) continue;
     const entry = cached[key];
     if (entry && isCourtCacheEntryFresh(entry, opts.now)) {
       results.set(key, { hit: entry.hit, cacheable: false });
@@ -357,10 +358,6 @@ export async function lookupCourtCitations(
     }
   }
   for (const key of urls) {
-    if (isOpinionUrl(key)) {
-      fresh.set(key, { hit: { url: key, text: key, procedural: false }, cacheable: true });
-      continue;
-    }
     const id = docketId(key);
     if (!id) continue;
     try {

@@ -54,13 +54,25 @@ export const CITATION_MARK_DETAIL_UNVERIFIED = 'This did not match a source from
 export const CITATION_MARK_DETAIL_UNCONFIRMED = 'No linked refuting source from this run.';
 export const CITATION_MARK_COURT_RECORD_LINK = 'CourtListener record';
 
-/** Unverified, unconfirmed, and procedural marks (even when display is ok). ok without procedural stays hidden. */
+/** A court mark whose CourtListener record page differs from the original link. */
+export function hasCourtRecordLink(mark: InformedCitationMark): boolean {
+	return mark.kind === 'court' && citationMarkCourtRecordUrl(mark) !== null;
+}
+
+/**
+ * Unverified, unconfirmed, and procedural marks (even when display is ok), plus
+ * court marks that offer a CourtListener record link. Other ok marks stay hidden.
+ */
 export function visibleCitationMarks(
 	marks: InformedCitationMark[] | null | undefined,
 ): InformedCitationMark[] {
 	if (!marks?.length) return [];
 	return marks.filter(
-		(m) => m.procedural === true || m.display === 'unverified' || m.display === 'unconfirmed',
+		(m) =>
+			m.procedural === true ||
+			m.display === 'unverified' ||
+			m.display === 'unconfirmed' ||
+			hasCourtRecordLink(m),
 	);
 }
 
@@ -69,7 +81,7 @@ export function citationMarkVisibleLabel(mark: InformedCitationMark): string | n
 	if (mark.procedural === true) return CITATION_MARK_PROCEDURAL;
 	switch (mark.display) {
 		case 'ok':
-			return null;
+			return hasCourtRecordLink(mark) ? CITATION_MARK_COURT_RECORD_LINK : null;
 		case 'unverified':
 			switch (mark.kind) {
 				case 'url':

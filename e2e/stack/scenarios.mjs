@@ -539,8 +539,8 @@ function topicsScenario(now, imageBaseUrl) {
 						},
 						{
 							kind: 'court',
-							status: 'missing-source',
-							display: 'unverified',
+							status: 'match',
+							display: 'ok',
 							itemId: 'court:docket-1',
 							url: 'https://www.courtlistener.com/docket/900003/acme-v-grid/',
 							courtRecordUrl: 'https://www.courtlistener.com/docket/900003/acme-v-grid/?order_by=desc',

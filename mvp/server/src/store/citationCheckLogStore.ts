@@ -143,14 +143,18 @@ export async function readCitationCheckLog(
  * Merge incoming entries into any prior log for the same articleId by itemId:
  * new entry replaces the same itemId. A prior entry whose scope appears in the
  * incoming batch is dropped when its itemId is not incoming (stale mark); prior
- * entries from other scopes, or with no scope, are kept.
+ * entries from other scopes, or with no scope, are kept. When the caller knows
+ * the run's `scope`, it counts as incoming even for an empty batch, so a run
+ * with no items clears that scope's prior marks.
  */
 export function mergeCitationCheckLogEntries(
   prior: CitationCheckLogEntry[] | undefined,
   incoming: CitationCheckLogEntry[],
+  scope?: CitationScope,
 ): CitationCheckLogEntry[] {
   const incomingIds = new Set(incoming.map((entry) => entry.itemId));
   const incomingScopes = new Set<CitationScope>();
+  if (scope) incomingScopes.add(scope);
   for (const entry of incoming) {
     if (entry.scope) incomingScopes.add(entry.scope);
   }
@@ -171,12 +175,13 @@ export function mergeCitationCheckLogEntries(
 async function mergeAndWrite(
   record: CitationCheckLogRecord,
   logPath: string,
+  scope?: CitationScope,
 ): Promise<CitationCheckLogStore> {
   const store = await readCitationCheckLogs(logPath);
   const prior = store.logs[record.articleId];
   store.logs[record.articleId] = {
     ...record,
-    entries: mergeCitationCheckLogEntries(prior?.entries, record.entries),
+    entries: mergeCitationCheckLogEntries(prior?.entries, record.entries, scope),
   };
   store.updatedAt = new Date().toISOString();
   await writeJsonAtomic(logPath, store);
@@ -191,8 +196,9 @@ async function mergeAndWrite(
 export async function putCitationCheckLog(
   record: CitationCheckLogRecord,
   logPath: string = CITATION_CHECK_LOG_PATH,
+  scope?: CitationScope,
 ): Promise<CitationCheckLogStore> {
-  return enqueueFileWrite(logPath, () => mergeAndWrite(record, logPath));
+  return enqueueFileWrite(logPath, () => mergeAndWrite(record, logPath, scope));
 }
 
 /**

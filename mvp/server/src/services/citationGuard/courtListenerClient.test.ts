@@ -188,7 +188,7 @@ test('a docket URL does one GET and is procedural from cause', async () => {
   });
 });
 
-test('an opinion URL does not fetch and is not procedural', async () => {
+test('an opinion URL does not fetch and stays unresolved with no source', async () => {
   await withCache(async (cachePath) => {
     const url = 'https://www.courtlistener.com/opinion/2812209/obergefell-v-hodges/';
     let called = false;
@@ -200,9 +200,11 @@ test('an opinion URL does not fetch and is not procedural', async () => {
       }),
     );
     assert.equal(called, false);
-    assert.equal(r.attachments[url].status, 'resolved');
+    assert.equal(r.attachments[url].status, 'unresolved');
+    assert.equal(r.attachments[url].courtRecordUrl, null);
     assert.equal(r.attachments[url].procedural, false);
-    assert.equal(r.attachments[url].text, url);
+    assert.equal(r.attachments[url].text, null);
+    assert.deepEqual(r.sources, []);
   });
 });
 

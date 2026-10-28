@@ -713,14 +713,19 @@ export function resolveOwnedBriefArticles(
   };
 }
 
-/** Non-ok marks plus resolved procedural dismissals; plain ok stays out so payloads stay slim. */
+/**
+ * Non-ok marks, resolved procedural dismissals, and court marks with a CourtListener
+ * record link that differs from the original link; other ok marks stay out so payloads stay slim.
+ */
 export function citationMarksForStory(
   log: CitationCheckLogRecord | null | undefined,
 ): InformedCitationMark[] | undefined {
   if (!log?.entries?.length) return undefined;
   const marks: InformedCitationMark[] = [];
   for (const entry of log.entries) {
-    if (entry.display === 'ok' && entry.procedural !== true) continue;
+    const recordUrl = entry.courtRecordUrl?.trim();
+    const hasRecordLink = entry.kind === 'court' && !!recordUrl && recordUrl !== entry.url;
+    if (entry.display === 'ok' && entry.procedural !== true && !hasRecordLink) continue;
     marks.push({
       kind: entry.kind,
       status: entry.status,

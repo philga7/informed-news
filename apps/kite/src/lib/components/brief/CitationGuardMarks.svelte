@@ -5,6 +5,7 @@
 	 */
 	import type { InformedCitationMark } from '$lib/types';
 	import {
+		CITATION_MARK_COURT_RECORD_LINK,
 		CITATION_MARK_REGION_LABEL,
 		CITATION_MARK_SUMMARY,
 		citationMarkAccessibleName,
@@ -70,7 +71,7 @@
 								href={recordUrl}
 								class="ml-1 underline"
 								target="_blank"
-								rel="noopener noreferrer">CourtListener record</a
+								rel="noopener noreferrer">{CITATION_MARK_COURT_RECORD_LINK}</a
 							>
 						{/if}
 					</span>

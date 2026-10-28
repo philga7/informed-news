@@ -13,8 +13,8 @@ Binding choices for Informed News. Newest first. When one of these changes, upda
 5. **Cache:** `citation-court-cache.json` under `mvp/data/`, retained 7 days with the other citation stores.
 6. **URL equivalence:** Trailing slash, http vs https, and `utm_*` tags are equivalent. A mismatch and a missing source both still show unverified.
 7. **Fail closed:** Timeouts, errors, and a missing token leave items unverified and never block a refresh.
-8. **T8, bun:** `.cursor/install-deps.sh` no longer downloads bun; it exits with `install bun 1.4.3` when bun is missing.
-9. **T4 deferred:** Not part of this ticket.
+8. **Install script and bun:** The install script does not download bun. If bun is missing it exits and says to install bun 1.4.3.
+9. **Wider Google News hostname matching deferred:** Matching Google News hosts other than news.google.com is not part of this ticket.
 
 **Why:** A court mark should say what we could not confirm without implying a ruling on the merits.
 

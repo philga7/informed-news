@@ -490,8 +490,18 @@ test.describe('Citation guard marks (NEWS-172)', () => {
 		).toBeVisible();
 
 		const docketMarks = cardMarks(courtDocketTitle);
-		await docketMarks.getByRole('button', { name: 'Unverified citation (advisory)' }).click();
-		await expect(docketMarks.getByRole('link', { name: courtRecordLabel })).toBeVisible();
+		const docketOpen = await docketMarks.evaluate((el) => (el as HTMLDetailsElement).open);
+		if (!docketOpen) await docketMarks.locator('summary').click();
+		const docketButton = docketMarks.getByRole('button', {
+			name: `${courtRecordLabel} (advisory)`,
+		});
+		await expect(docketButton).toBeVisible();
+		await expect(docketButton).toHaveText(courtRecordLabel);
+		await docketButton.click();
+		await expect(docketMarks.getByRole('link', { name: courtRecordLabel })).toHaveAttribute(
+			'href',
+			'https://www.courtlistener.com/docket/900003/acme-v-grid/?order_by=desc',
+		);
 
 		const noToken = cardMarks(courtNoTokenTitle);
 		await noToken.locator('summary').click();

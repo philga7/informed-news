@@ -291,6 +291,33 @@ test('second story run omitting an item drops it and keeps summary entries', asy
   assert.deepEqual(log!.entries.map((e) => e.scope).sort(), ['story', 'summary']);
 });
 
+test('an empty summary run removes that scope\'s marks and keeps the story marks', async () => {
+  const dir = tempDir();
+  const logPath = path.join(dir, 'citation-check-log.json');
+  const deps = {
+    putCitationCheckLog: (
+      r: Parameters<typeof putCitationCheckLog>[0],
+      _path: string | undefined,
+      scope: Parameters<typeof putCitationCheckLog>[2],
+    ) => putCitationCheckLog(r, logPath, scope),
+  };
+  const base = { articleId: 'art-empty', sourcesForRun: [] as CitationSourceRecord[] };
+  await runCitationGuardForArticle(
+    { ...base, scope: 'summary', runId: 'r1', now: new Date('2026-10-27T12:00:00.000Z'), items: [{ kind: 'url', url: 'https://s.example/a' }] },
+    deps,
+  );
+  await runCitationGuardForArticle(
+    { ...base, scope: 'story', runId: 'r1', now: new Date('2026-10-27T12:01:00.000Z'), items: [{ kind: 'url', url: 'https://f.example/a' }] },
+    deps,
+  );
+  await runCitationGuardForArticle(
+    { ...base, scope: 'summary', runId: 'r2', now: new Date('2026-10-27T12:02:00.000Z'), items: [] },
+    deps,
+  );
+  const log = await readCitationCheckLog('art-empty', logPath);
+  assert.deepEqual(log!.entries.map((e) => [e.itemId, e.scope]), [['https://f.example/a', 'story']]);
+});
+
 test('registerSourcesAndRunCitationGuard still checks when registering throws', async () => {
   const originalWarn = console.warn;
   console.warn = () => {};

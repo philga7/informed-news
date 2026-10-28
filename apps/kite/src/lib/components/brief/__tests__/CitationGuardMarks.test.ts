@@ -121,27 +121,46 @@ describe('CitationGuardMarks (NEWS-172)', () => {
 			expect(btn).toHaveTextContent('Dismissed on procedure, not on the merits');
 		});
 
-		it('renders the CourtListener record link only when it differs from the url', async () => {
-			const withRecord: InformedCitationMark = {
-				...unresolvedCourt,
-				courtRecordUrl: 'https://www.courtlistener.com/docket/9/x/',
-			};
-			const same: InformedCitationMark = {
-				...unresolvedCourt,
-				itemId: 'court:3',
-				courtRecordUrl: unresolvedCourt.url,
-			};
-			const { unmount } = render(CitationGuardMarks, { props: { marks: [withRecord] } });
-			await openPanel();
-			await fireEvent.click(screen.getByRole('button', { name: 'Unverified citation (advisory)' }));
-			const link = screen.getByRole('link', { name: 'CourtListener record' });
-			expect(link).toHaveAttribute('href', 'https://www.courtlistener.com/docket/9/x/');
-			unmount();
+		const resolvedDocket: InformedCitationMark = {
+			kind: 'court',
+			status: 'match',
+			display: 'ok',
+			itemId: 'court:4',
+			url: 'https://www.courtlistener.com/docket/9/x/',
+			courtRecordUrl: 'https://www.courtlistener.com/docket/9/x-v-y/',
+		};
 
-			render(CitationGuardMarks, { props: { marks: [same] } });
+		it('shows a resolved docket with a different record link as CourtListener record, not Unverified', async () => {
+			render(CitationGuardMarks, { props: { marks: [resolvedDocket] } });
 			await openPanel();
-			await fireEvent.click(screen.getByRole('button', { name: 'Unverified citation (advisory)' }));
-			expect(screen.queryByRole('link', { name: 'CourtListener record' })).not.toBeInTheDocument();
+			const btn = screen.getByRole('button', { name: 'CourtListener record (advisory)' });
+			expect(btn).toHaveTextContent('CourtListener record');
+			expect(screen.queryByText(/unverified/i)).not.toBeInTheDocument();
+			await fireEvent.click(btn);
+			const link = screen.getByRole('link', { name: 'CourtListener record' });
+			expect(link).toHaveAttribute('href', 'https://www.courtlistener.com/docket/9/x-v-y/');
+		});
+
+		it('hides a resolved court mark whose record link equals the url', () => {
+			render(CitationGuardMarks, {
+				props: { marks: [{ ...resolvedDocket, courtRecordUrl: resolvedDocket.url }] },
+			});
+			expect(screen.queryByTestId('citation-guard-marks')).not.toBeInTheDocument();
+		});
+
+		it('keeps the procedural label and offers the record link on a procedural docket', async () => {
+			render(CitationGuardMarks, {
+				props: { marks: [{ ...resolvedDocket, procedural: true }] },
+			});
+			await openPanel();
+			const btn = screen.getByRole('button', {
+				name: 'Dismissed on procedure, not on the merits (advisory)',
+			});
+			await fireEvent.click(btn);
+			expect(screen.getByRole('link', { name: 'CourtListener record' })).toHaveAttribute(
+				'href',
+				'https://www.courtlistener.com/docket/9/x-v-y/',
+			);
 		});
 
 		it('exposes aria-expanded that flips on click and shows the detail sentence', async () => {
