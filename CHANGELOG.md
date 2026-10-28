@@ -1,3 +1,9 @@
+## [0.29.0](https://github.com/philga7/informed-news/compare/v0.28.0...v0.29.0) (2026-10-28)
+
+### Features
+
+* **NEWS-173:** check court citations against CourtListener and RECAP ([#211](https://github.com/philga7/informed-news/issues/211)) ([eee3871](https://github.com/philga7/informed-news/commit/eee3871d7b0fa43547303b70f850c3798aee0d74))
+
 ## [0.28.0](https://github.com/philga7/informed-news/compare/v0.27.0...v0.28.0) (2026-10-27)
 
 ### Features
