@@ -4,7 +4,7 @@ Plain-language list of what Informed News does now. Features and scenarios only.
 
 Each ship-loop pull request updates this file in the same pull request as the code. If what a reader can do changed, edit the scenarios. If it did not, bump **Last checked** so the file is still part of the pull request, and say so in [WHATS_NEW.md](WHATS_NEW.md).
 
-**Last checked:** 2026-10-27
+**Last checked:** 2026-10-29
 
 The home page is the Brief. Your topics decide what is searched for and what is left out. There is no review queue and no step where you accept a story onto the Brief.
 
