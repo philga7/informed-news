@@ -6,6 +6,10 @@ Each ship-loop pull request adds an entry for what changed for that reader, or w
 
 This is not the release log. Releases are recorded in `CHANGELOG.md` by semantic-release. Do not hand-edit `CHANGELOG.md` to mirror these notes.
 
+## 2026-10-29
+
+**No user-visible change.** Cloud-agent setup now installs bun 1.4.3 when it is missing instead of failing.
+
 ## 2026-10-27
 
 - Court citations on a card are now checked. A case that cannot be found, or a link to a CourtListener opinion page, shows **Unverified citation**, and a case that was dismissed on procedure carries the note **Dismissed on procedure, not on the merits**. A matched court docket keeps the original link and also offers the CourtListener record. Open a mark for a short explanation and, where there is one, that record link. These are advisory notes, not verdicts.
