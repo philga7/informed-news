@@ -8,6 +8,8 @@ This is not the release log. Releases are recorded in `CHANGELOG.md` by semantic
 
 ## 2026-10-29
 
+Stories can stay saved on an always-on copy of the Brief, and search still runs from Google News when the extra search service is missing. You cannot open that copy from another device yet.
+
 **No user-visible change.** Cloud-agent setup now installs bun 1.4.3 when it is missing instead of failing.
 
 ## 2026-10-27

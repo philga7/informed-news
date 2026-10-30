@@ -181,6 +181,16 @@ The bar also says, in plain language, when a search source failed, when stories 
 
 Refresh collects stories from the configured news feeds and from search for your desired topics. It does not collect new posts from X. Posts that were already saved can still appear. It does not ask you to accept stories.
 
+## Always-on copy
+
+The Brief can keep running while this computer is off. Stories already saved are still there after a restart. If the extra search service is not set up, new stories still come from Google News. Opening that always-on copy from another device is not available yet.
+
+**Scenario:** Given stories were saved on the always-on copy, when it restarts, then those stories are still there.
+
+**Scenario:** Given the extra search service is not set up, when refresh runs, then new stories still come from Google News.
+
+**Scenario:** Given you are on another device, when you try to open the always-on copy, then that is not available yet.
+
 ## Filtered out
 
 Filtered out (`/filtered`) lists stories the last refresh dropped, and why. It is for spot checks. There is no action to put a story back. You must be signed in; otherwise the page says “Log in on Topics to see filtered stories.”

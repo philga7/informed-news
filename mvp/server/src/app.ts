@@ -1,6 +1,6 @@
 import cors from 'cors';
 import express from 'express';
-import type { Express, Response } from 'express';
+import type { Express, RequestHandler, Response } from 'express';
 import {
   createAuthRouter,
   createSessionMiddleware,
@@ -125,6 +125,11 @@ export type CreateAppDeps = {
   summarizeBriefStory?: typeof summarizeBriefStory;
   generateFullStory?: typeof generateFullStory;
   now?: () => Date;
+  /**
+   * Built Kite app handler (NEWS-109). When present, mounted after every API
+   * route and `GET /` is not the JSON message — the handler serves the UI.
+   */
+  kiteHandler?: RequestHandler;
 };
 
 const SEEN_IDS_MAX = 100;
@@ -283,9 +288,15 @@ export function createApp(deps: CreateAppDeps = {}): Express {
     res.json({ status: 'ok', app: 'mvp-server' });
   });
 
-  app.get('/', (_req, res) => {
-    res.json({ message: 'Informed News MVP server' });
+  app.get('/healthz', (_req, res) => {
+    res.json({ status: 'ok' });
   });
+
+  if (!deps.kiteHandler) {
+    app.get('/', (_req, res) => {
+      res.json({ message: 'Informed News MVP server' });
+    });
+  }
 
   // Public Kite brief adapter (NEWS-44) — must stay before requireApiSession.
   app.use(
@@ -1312,6 +1323,12 @@ export function createApp(deps: CreateAppDeps = {}): Express {
       res.status(500).json({ ok: false, error: message });
     }
   });
+
+  // Built Kite UI (NEWS-109): mounted last so every API route above (and
+  // /healthz) stays on Express; the handler only sees what Express didn't.
+  if (deps.kiteHandler) {
+    app.use(deps.kiteHandler);
+  }
 
   return app;
 }

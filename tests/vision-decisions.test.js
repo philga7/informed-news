@@ -101,7 +101,7 @@ describe('NEWS-165 vision and decisions', () => {
 		assert.match(decisions, /NEWS-109/);
 	});
 
-	it('orders the roadmap as the Oct 23 combined sequence and points agents at the new docs', () => {
+	it('orders the roadmap as the combined sequence and points agents at the new docs', () => {
 		const roadmap = read('docs/ROADMAP.md');
 		const agents = read('AGENTS.md');
 		assert.match(roadmap, /\[VISION\.md\]\(VISION\.md\)/);
@@ -129,14 +129,18 @@ describe('NEWS-165 vision and decisions', () => {
 			'NEWS-167',
 			'NEWS-172',
 			'NEWS-173',
-			'NEWS-168',
-			'NEWS-169',
 			'NEWS-109',
 			'NEWS-110',
 			'NEWS-111',
 			'NEWS-112',
+			'NEWS-168',
+			'NEWS-169',
 			'NEWS-170',
 		]);
+		assert.match(
+			combined,
+			/Reordered 2026-10-27: hosting pulled ahead of NEWS-168\/169, approved by Phil\./,
+		);
 		assert.match(combined, /NEWS-139/);
 		assert.match(combined, /NEWS-128/);
 		assert.match(combined, /NEWS-121/);
