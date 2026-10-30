@@ -13,7 +13,7 @@
     "install:kite": "bun install --frozen-lockfile --cwd apps/kite",
     "typecheck": "npm run typecheck --prefix mvp/server",
     "test": "npm test --prefix mvp/server",
-    "test:kite": "node --test tests/kite-upstream.test.js tests/dev-entrypoint.test.js tests/branding.test.js tests/kagi-service-cleanup.test.js tests/nav-shell.test.js tests/transparency.test.js tests/mvp-api-compat.test.js tests/retire-mvp-web.test.js tests/ci-green-merge.test.js tests/claude-review.test.js tests/vision-decisions.test.js tests/release-0x-breaking.test.js tests/skill-links.test.js tests/pr-title.test.js",
+    "test:kite": "node --test tests/kite-upstream.test.js tests/dev-entrypoint.test.js tests/branding.test.js tests/kagi-service-cleanup.test.js tests/nav-shell.test.js tests/transparency.test.js tests/mvp-api-compat.test.js tests/retire-mvp-web.test.js tests/ci-green-merge.test.js tests/claude-review.test.js tests/vision-decisions.test.js tests/release-0x-breaking.test.js tests/skill-links.test.js tests/pr-title.test.js tests/dockerignore.test.js tests/compose-contract.test.js tests/container-ci.test.js",
     "test:e2e:kite": "playwright test e2e/kite-smoke.spec.ts",
     "build": "npm run build --prefix _legacy/mvp-web",
     "release": "semantic-release",

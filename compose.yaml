@@ -1,0 +1,47 @@
+# Informed News. Separate from Nanobot.
+# Local or VPS, after the env file and the nanobot-mem0 network exist:
+#   docker compose up -d --build
+# SEARXNG_URL and TOPIC_SEARCH_ENABLED come from the env file only.
+# Unset SEARXNG_URL stays unset (Google News RSS only). Do not default it to localhost.
+# VPS env file value: SEARXNG_URL=http://searxng:8080 on Docker network nanobot-mem0.
+name: informed-news
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: informed-news:ci
+    env_file:
+      - ${INFORMED_NEWS_ENV_FILE:-/opt/informed-news/.env}
+    environment:
+      MVP_DATA_DIR: /app/mvp/data
+      PORT: "3001"
+    ports:
+      - "127.0.0.1:${INFORMED_NEWS_PORT:-3001}:3001"
+    volumes:
+      - informed-news-data:/app/mvp/data
+    networks:
+      - nanobot-mem0
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3001/healthz').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  informed-news-data:
+    name: informed-news-data
+
+networks:
+  nanobot-mem0:
+    external: true
+    name: nanobot-mem0

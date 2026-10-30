@@ -2,6 +2,27 @@
 
 Binding choices for Informed News. Newest first. When one of these changes, update this file in the same change as [ROADMAP.md](ROADMAP.md) and Jira. What the product does now, in plain language, is [PRODUCT_SPEC.md](PRODUCT_SPEC.md). Pipeline detail remains in [NEWS-84](https://informedcrew.atlassian.net/browse/NEWS-84), [TRIAGE.md](TRIAGE.md), and [BRIEF.md](BRIEF.md). The target is [VISION.md](VISION.md).
 
+## 2026-10-29 — Hosting ahead of NEWS-168/169; container grill (NEWS-109, NEWS-110)
+
+**Decision:** On 2026-10-27 Phil reordered hosting ([NEWS-109](https://informedcrew.atlassian.net/browse/NEWS-109)–[NEWS-112](https://informedcrew.atlassian.net/browse/NEWS-112)) ahead of [NEWS-168](https://informedcrew.atlassian.net/browse/NEWS-168) and [NEWS-169](https://informedcrew.atlassian.net/browse/NEWS-169). [VISION.md](VISION.md)'s direction did not change: still the topic Brief until the SPA; hosting is how that Brief stays up. Ship NEWS-109 and NEWS-110 from these grill answers:
+
+1. **Image:** multi-stage `node:22-bookworm-slim`, `npm ci` in the build stage, non-root `node` at runtime.
+2. **One port in the image:** Kite is built in the image and served by Express on one port. `npm run dev` stays two processes.
+3. **Data volume:** Named volume `informed-news-data` mounted at `/app/mvp/data`. The Dockerfile creates that directory and `chown`s it to `node`.
+4. **Health:** `GET /healthz` returns 200, no auth, no outside calls. Compose healthcheck `30s` / `5s` / `3` / `20s`.
+5. **SearXNG URL:** SearXNG is reached only via `SEARXNG_URL` on the shared Docker network. Never default to localhost inside the container.
+6. **SearXNG soft-fail:** `SEARXNG_URL` unset → Google News RSS only, one startup warning. An error or timeout skips SearXNG with one warning per refresh. The refresh still finishes.
+7. **Topic search default:** Topic search stays on unless `TOPIC_SEARCH_ENABLED` says otherwise. Compose does not set that variable; the env file passes it through.
+8. **Secrets:** Secrets only in the local env file, GitHub secrets, or the VPS env file. `.dockerignore` excludes `.env*` except `.env.example`, plus `mvp/data`, `node_modules`, and `.git`.
+9. **Bind:** The published port is bound to `127.0.0.1` on the host. Inside the container the process listens on `0.0.0.0` so the published port works. Tailscale is NEWS-111.
+10. **Compose isolation:** Compose project `name: informed-news`. Nothing is shared with Nanobot except the external network `nanobot-mem0`.
+11. **CI timing:** CI builds and starts the container with no `timeout-minutes` and records build and start seconds.
+12. **Deploy gate:** Deploy only after CI is green, and only when `VPS_HOST`, `VPS_SSH_KEY`, and `TS_AUTHKEY` are all set. Never print secret values. Deploying does not merge. If any secret is missing, the PR body lists the commands instead.
+
+**Why:** An always-on Brief needs a container and a soft SearXNG path before Tailscale and the runbook; the citation-guard reorder had parked hosting after NEWS-169, and Phil pulled it forward.
+
+**What it rules out:** A second SearXNG, a public port, secrets in the image, and failing the refresh because SearXNG is down.
+
 ## 2026-10-27 — Court-record checks grill (NEWS-173)
 
 **Decision:** Ship [NEWS-173](https://informedcrew.atlassian.net/browse/NEWS-173) from the 2026-10-27 grill answers:

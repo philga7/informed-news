@@ -6,6 +6,8 @@ import {
   parseSearxngResults,
   resolveSearxngBaseUrl,
   searchSearxng,
+  SEARXNG_UNSET_WARNING,
+  warnIfSearxngUnset,
 } from './searxngSearch.js';
 import { SEARXNG_TIMEOUT_MS } from './topicSearchConfig.js';
 
@@ -65,11 +67,27 @@ function okFetch(body: unknown) {
   return { calls, fetchImpl };
 }
 
-test('resolveSearxngBaseUrl: unset → local default, empty → disabled, trailing slash trimmed', () => {
-  assert.equal(resolveSearxngBaseUrl({}), 'http://127.0.0.1:8888');
+test('resolveSearxngBaseUrl: unset/empty/whitespace → disabled, trailing slash trimmed', () => {
+  assert.equal(resolveSearxngBaseUrl({}), null);
   assert.equal(resolveSearxngBaseUrl({ SEARXNG_URL: '' }), null);
+  assert.equal(resolveSearxngBaseUrl({ SEARXNG_URL: '   ' }), null);
   assert.equal(resolveSearxngBaseUrl({ SEARXNG_URL: 'http://searx.local:8080/' }), 'http://searx.local:8080');
   assert.equal(resolveSearxngBaseUrl({ SEARXNG_URL: 'https://searx.example/sub//' }), 'https://searx.example/sub');
+});
+
+test('warnIfSearxngUnset warns only when SEARXNG_URL key is absent', () => {
+  const warnings: string[] = [];
+  const warn = (message: string) => {
+    warnings.push(message);
+  };
+
+  warnIfSearxngUnset({}, warn);
+  assert.deepEqual(warnings, [SEARXNG_UNSET_WARNING]);
+
+  warnings.length = 0;
+  warnIfSearxngUnset({ SEARXNG_URL: '' }, warn);
+  warnIfSearxngUnset({ SEARXNG_URL: 'http://searxng:8080' }, warn);
+  assert.deepEqual(warnings, []);
 });
 
 test('buildSearxngSearchUrl sets news/json/en-US params and never time_range', () => {
@@ -166,6 +184,19 @@ test('searchSearxng sends Accept header and the timeout signal', async (t) => {
   assert.equal(timeoutMock.mock.callCount(), 1);
   assert.deepEqual(timeoutMock.mock.calls[0]?.arguments, [SEARXNG_TIMEOUT_MS]);
   assert.equal(calls[0]?.init?.signal, timeoutMock.mock.calls[0]?.result);
+});
+
+test('searchSearxng uses the given baseUrl and parses fixture candidates', async () => {
+  const { calls, fetchImpl } = okFetch(FIXTURE);
+  const candidates = await searchSearxng(
+    'iran nuclear',
+    { baseUrl: 'http://searxng:8080', now: NOW },
+    { fetch: fetchImpl },
+  );
+
+  assert.equal(calls.length, 1);
+  assert.ok(calls[0]?.url.startsWith('http://searxng:8080/search'));
+  assert.equal(candidates[0]?.publisherUrl, 'https://www.reuters.com/world/iran-talks?id=7');
 });
 
 test('searchSearxng throws on non-2xx', async () => {

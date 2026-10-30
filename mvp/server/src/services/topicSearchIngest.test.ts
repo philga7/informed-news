@@ -8,6 +8,7 @@ import {
   buildSeenKeys,
   mergeCandidates,
   runTopicSearch,
+  SEARXNG_REFRESH_WARNING,
   selectNewForTopic,
   toArticleInput,
 } from './topicSearchIngest.js';
@@ -498,6 +499,23 @@ test('Google down leaves SearXNG-only results; one failing topic is partial', as
   );
 });
 
+test('omitted TOPIC_SEARCH_ENABLED defaults to enabled and still searches', async () => {
+  const h = harness({
+    topics: [makeTopic('t1', 'One')],
+    google: async () => [googleCandidate('Google story')],
+  });
+
+  const result = await runTopicSearch(
+    { now: NOW, env: { SEARXNG_URL: 'http://searxng:8080' } },
+    h.deps,
+  );
+
+  assert.equal(result.skipped, false);
+  assert.notEqual(result.providers.google_news.state, 'disabled');
+  assert.ok(h.googleQueries.length > 0);
+  assert.deepEqual(h.googleQueries, ['One']);
+});
+
 test('TOPIC_SEARCH_ENABLED=off skips with both providers disabled and no provider calls', async () => {
   const h = harness({ topics: [makeTopic('t1', 'One')] });
 
@@ -528,6 +546,130 @@ test('SEARXNG_URL empty disables SearXNG while Google runs', async () => {
   assert.equal(result.providers.google_news.state, 'ok');
   assert.deepEqual(h.searxQueries, []);
   assert.deepEqual(h.googleQueries, ['One']);
+});
+
+test('SEARXNG_URL unset disables SearXNG; refresh warning is not emitted', async () => {
+  const h = harness({
+    topics: [makeTopic('t1', 'One')],
+    google: async () => [googleCandidate('Google story')],
+  });
+  const warnings: string[] = [];
+  const originalWarn = console.warn;
+  console.warn = (...args: unknown[]) => {
+    warnings.push(String(args[0]));
+  };
+  try {
+    const result = await runTopicSearch({ now: NOW, env: {} }, h.deps);
+
+    assert.equal(result.skipped, false);
+    assert.equal(result.providers.searxng.state, 'disabled');
+    assert.equal(result.providers.google_news.state, 'ok');
+    assert.deepEqual(h.searxQueries, []);
+    assert.deepEqual(h.googleQueries, ['One']);
+    assert.equal(warnings.filter((w) => w === SEARXNG_REFRESH_WARNING).length, 0);
+  } finally {
+    console.warn = originalWarn;
+  }
+});
+
+test('SEARXNG_URL is passed through as searchSearxng baseUrl', async () => {
+  const recorded: string[] = [];
+  const h = harness({
+    topics: [makeTopic('t1', 'One')],
+    google: async () => [googleCandidate('Google story')],
+  });
+  h.deps.searchSearxng = async (query, options) => {
+    recorded.push(options.baseUrl);
+    h.searxQueries.push(query);
+    return [];
+  };
+
+  await runTopicSearch({ now: NOW, env: { SEARXNG_URL: 'http://searxng:8080' } }, h.deps);
+
+  assert.deepEqual(recorded, ['http://searxng:8080']);
+});
+
+test('SearXNG reject warns once with SEARXNG_REFRESH_WARNING and still upserts Google', async () => {
+  const h = harness({
+    topics: [makeTopic('t1', 'One')],
+    google: async () => [googleCandidate('Google story')],
+    searx: async () => {
+      throw new Error('SearXNG down');
+    },
+  });
+  const warnings: string[] = [];
+  const originalWarn = console.warn;
+  console.warn = (...args: unknown[]) => {
+    warnings.push(String(args[0]));
+  };
+  try {
+    const result = await runTopicSearch(
+      { now: NOW, env: { SEARXNG_URL: 'http://searxng:8080' } },
+      h.deps,
+    );
+
+    assert.equal(result.skipped, false);
+    assert.equal(result.providers.searxng.state, 'down');
+    assert.equal(result.upserted.length, 1);
+    assert.equal(warnings.filter((w) => w === SEARXNG_REFRESH_WARNING).length, 1);
+  } finally {
+    console.warn = originalWarn;
+  }
+});
+
+test('SearXNG TimeoutError warns once and still upserts Google', async () => {
+  const h = harness({
+    topics: [makeTopic('t1', 'One')],
+    google: async () => [googleCandidate('Google story')],
+    searx: async () => {
+      throw new DOMException('The operation was aborted due to timeout', 'TimeoutError');
+    },
+  });
+  const warnings: string[] = [];
+  const originalWarn = console.warn;
+  console.warn = (...args: unknown[]) => {
+    warnings.push(String(args[0]));
+  };
+  try {
+    const result = await runTopicSearch(
+      { now: NOW, env: { SEARXNG_URL: 'http://searxng:8080' } },
+      h.deps,
+    );
+
+    assert.equal(result.skipped, false);
+    assert.equal(result.providers.searxng.state, 'down');
+    assert.equal(result.upserted.length, 1);
+    assert.equal(warnings.filter((w) => w === SEARXNG_REFRESH_WARNING).length, 1);
+  } finally {
+    console.warn = originalWarn;
+  }
+});
+
+test('two topics with SearXNG rejects warn once, not twice', async () => {
+  const h = harness({
+    topics: [makeTopic('t1', 'One'), makeTopic('t2', 'Two')],
+    google: async (query) => [googleCandidate(`Google ${query}`)],
+    searx: async () => {
+      throw new Error('SearXNG down');
+    },
+  });
+  const warnings: string[] = [];
+  const originalWarn = console.warn;
+  console.warn = (...args: unknown[]) => {
+    warnings.push(String(args[0]));
+  };
+  try {
+    const result = await runTopicSearch(
+      { now: NOW, env: { SEARXNG_URL: 'http://searxng:8080' } },
+      h.deps,
+    );
+
+    assert.equal(result.providers.searxng.topicsFailed, 2);
+    assert.equal(result.upserted.length, 2);
+    assert.equal(warnings.filter((w) => w === SEARXNG_REFRESH_WARNING).length, 1);
+  } finally {
+    console.warn = originalWarn;
+  }
 });
 
 test('only desired topics are searched; empty searchQuery falls back to the name', async () => {

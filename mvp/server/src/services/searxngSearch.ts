@@ -3,8 +3,6 @@ import { publisherDomainFromUrl } from './publisherScrape.js';
 import { canonicalizeSearchUrl } from './searchUrl.js';
 import { SEARXNG_TIMEOUT_MS, TOPIC_SEARCH_WINDOW_HOURS } from './topicSearchConfig.js';
 
-const DEFAULT_SEARXNG_URL = 'http://127.0.0.1:8888';
-
 const MINUTE_MS = 60 * 1000;
 const HOUR_MS = 60 * MINUTE_MS;
 const DAY_MS = 24 * HOUR_MS;
@@ -36,10 +34,21 @@ type SearxngResult = {
   pubdate?: unknown;
 };
 
-/** `SEARXNG_URL` unset → local default; empty → null (disabled); trailing `/` trimmed. */
+export const SEARXNG_UNSET_WARNING =
+  'SearXNG disabled: SEARXNG_URL is unset; topic search is using Google News RSS only.';
+
+/** Warn once at startup when `SEARXNG_URL` is absent (empty string is an explicit disable). */
+export function warnIfSearxngUnset(
+  env: NodeJS.ProcessEnv = process.env,
+  warn: (message: string) => void = console.warn,
+): void {
+  if (!Object.prototype.hasOwnProperty.call(env, 'SEARXNG_URL')) warn(SEARXNG_UNSET_WARNING);
+}
+
+/** `SEARXNG_URL` unset/empty/whitespace → null (disabled); trailing `/` trimmed. */
 export function resolveSearxngBaseUrl(env: NodeJS.ProcessEnv = process.env): string | null {
   const raw = env.SEARXNG_URL;
-  if (raw === undefined) return DEFAULT_SEARXNG_URL;
+  if (raw === undefined) return null;
   const trimmed = raw.trim().replace(/\/+$/, '');
   return trimmed === '' ? null : trimmed;
 }
