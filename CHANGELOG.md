@@ -1,3 +1,9 @@
+## [0.30.0](https://github.com/philga7/informed-news/compare/v0.29.0...v0.30.0) (2026-10-30)
+
+### Features
+
+* **NEWS-109, NEWS-110:** containerize API and Kite with data volume; wire SearXNG ([#213](https://github.com/philga7/informed-news/issues/213)) ([850c5e8](https://github.com/philga7/informed-news/commit/850c5e860ad71fb040bdc8c7dbaa356c9a381f5c))
+
 ## [0.29.0](https://github.com/philga7/informed-news/compare/v0.28.0...v0.29.0) (2026-10-28)
 
 ### Features
