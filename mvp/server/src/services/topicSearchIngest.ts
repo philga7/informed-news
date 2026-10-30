@@ -73,6 +73,9 @@ type ArticleInput = Omit<Article, 'id'> & { id?: string };
 
 const DISABLED_VALUES = new Set(['false', '0', 'off', 'no']);
 
+export const SEARXNG_REFRESH_WARNING =
+  'SearXNG skipped for this refresh; topic search is continuing with the other source.';
+
 export function isTopicSearchEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
   const raw = env.TOPIC_SEARCH_ENABLED?.trim().toLowerCase();
   return raw === undefined || !DISABLED_VALUES.has(raw);
@@ -464,6 +467,9 @@ export async function runTopicSearch(
     return mergeCandidates(outcome.candidates);
   });
   for (const status of Object.values(result.providers)) finalizeState(status);
+  if (result.providers.searxng.topicsFailed > 0) {
+    console.warn(SEARXNG_REFRESH_WARNING);
+  }
 
   try {
     const idsBySeenKey = storedIdsBySeenKey(await (deps.readArticles ?? readArticles)());

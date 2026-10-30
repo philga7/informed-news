@@ -64,7 +64,7 @@ docker run -d --name informed-searxng --restart unless-stopped \
   searxng/searxng:2026.9.29-4e2c1ea7f
 ```
 
-- The port is bound to **localhost only** (`127.0.0.1:8888`) — do not expose it.
+- The port is bound to **localhost only** (`127.0.0.1:8888`) — do not expose it. This is an optional local container; the process only uses it when `SEARXNG_URL` is set to that URL (e.g. `http://127.0.0.1:8888`).
 - The image tag is pinned; bump it deliberately (tags on [Docker Hub](https://hub.docker.com/r/searxng/searxng/tags)) rather than using `latest`.
 - Logs warn about a missing `limiter.toml` and missing `X-Forwarded-For` / `X-Real-IP` headers; both are harmless with the limiter off.
 
@@ -87,16 +87,17 @@ In `mvp/.env` (see `mvp/.env.example`):
 | Variable | Behavior |
 |----------|----------|
 | `TOPIC_SEARCH_ENABLED` | Default on. `false` / `0` / `off` / `no` (case-insensitive) disables topic search entirely — both providers reported `disabled`. |
-| `SEARXNG_URL` | Unset → `http://127.0.0.1:8888`. Set to an empty string → SearXNG `disabled` (Google News still runs). Otherwise the base URL (trailing `/` trimmed). |
+| `SEARXNG_URL` | Unset → disabled (Google News still runs) plus one startup warning. Empty string → disabled with no startup warning. Otherwise the base URL (trailing `/` trimmed). |
 
 ## Failure behavior
 
 - Either provider down (container not running, timeout, non-2xx, bad JSON) → the error is recorded for that topic and the refresh continues. Topic search never fails `POST /api/fetch`; CFP failure still does, as before.
+- When SearXNG errors or times out for any topic in a refresh, the process prints one console warning for that refresh (`SearXNG skipped for this refresh; topic search is continuing with the other source.`) and the refresh still finishes.
 - A SearXNG that hangs (rather than refusing the connection) is cut off by the 20s timeout per topic, so it can add up to 20s × ceil(desired topics / 3) to `POST /api/fetch`.
 - Per-provider status is stored in `mvp/data/meta.json` under `topicSearch` (`{ at, providers }`) and returned in the `POST /api/fetch` response `topicSearch` block ([MVP_API_COMPAT.md](MVP_API_COMPAT.md)). Each provider reports `{ state, topicsAttempted, topicsFailed, items, errors }` with `state` one of `ok` \| `partial` (some topics failed) \| `down` (all attempted topics failed) \| `disabled`; `errors` holds at most 5 `"<topicId>: <message>"` entries.
 - `topicSearch.skipped` is `true` when no search ran: topic search disabled, no desired topics, or the topics file unreadable. With no desired topics, providers report `ok` with `topicsAttempted: 0`; with an unreadable topics file, enabled providers report `down`.
 - `topicSearch.errors` (top level) holds run-level errors that are not tied to one provider/topic: topics file unreadable, article store read or upsert failure, or an unexpected topic-search exception. Provider/topic failures go in each provider's `errors` instead.
-- `npm run dev` does **not** need SearXNG running — without it, SearXNG reports `down` (when desired topics exist; otherwise the run is skipped) and Google News results still land.
+- `npm run dev` does **not** need SearXNG running — without `SEARXNG_URL`, SearXNG is disabled (one startup warning) and Google News results still land. With `SEARXNG_URL` set but the container unreachable, SearXNG reports `down` (when desired topics exist) and Google News still lands.
 - The Brief refresh bar shows "SearXNG unavailable" / "Google News unavailable" when a provider is `down`, and "… partly failed" when it is `partial` ([BRIEF.md](BRIEF.md#refresh)).
 
 ## Trade-offs

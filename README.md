@@ -56,7 +56,7 @@ See `mvp/.env.example` for the API:
 
 ### Topic search (optional SearXNG)
 
-Each refresh searches desired topics on Google News RSS and a local SearXNG container (`TOPIC_SEARCH_ENABLED`, `SEARXNG_URL`). SearXNG is optional — `npm run dev` works without it. Setup, env, and failure behavior: [docs/TOPIC_SEARCH.md](docs/TOPIC_SEARCH.md).
+Each refresh searches desired topics on Google News RSS (`TOPIC_SEARCH_ENABLED`, `SEARXNG_URL`). SearXNG is optional and is used only when `SEARXNG_URL` is set; unset keeps Google News RSS and prints one startup warning. Setup, env, and failure behavior: [docs/TOPIC_SEARCH.md](docs/TOPIC_SEARCH.md).
 
 ### Triage
 
