@@ -1,3 +1,9 @@
+## [0.32.0](https://github.com/philga7/informed-news/compare/v0.31.0...v0.32.0) (2026-10-31)
+
+### Features
+
+* **NEWS-168:** pre-AI config blocklist and per-source criteria ([#216](https://github.com/philga7/informed-news/issues/216)) ([5013912](https://github.com/philga7/informed-news/commit/5013912da7830a4880bcec274c9094273acccaf5))
+
 ## [0.31.0](https://github.com/philga7/informed-news/compare/v0.30.0...v0.31.0) (2026-10-31)
 
 ### Features
