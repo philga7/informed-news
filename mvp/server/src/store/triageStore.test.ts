@@ -130,6 +130,20 @@ test('readTriage treats missing records / bad updatedAt as empty defaults', asyn
   assert.deepEqual(await readTriage(triagePath), { records: {}, updatedAt: null });
 });
 
+test('a blocklist-stage record survives normalize and read', async () => {
+  const triagePath = tempTriagePath();
+  const blocked: TriageRecord = {
+    ...droppedRecord('astro'),
+    reason: 'blocklist:horoscope',
+    stage: 'blocklist',
+  };
+  await writeTriage({ records: { astro: blocked }, updatedAt: null }, triagePath);
+  assert.deepEqual(await readTriage(triagePath), {
+    records: { astro: blocked },
+    updatedAt: null,
+  });
+});
+
 test('a manual-stage seed record round-trips', async () => {
   const triagePath = tempTriagePath();
   const seed: TriageRecord = {

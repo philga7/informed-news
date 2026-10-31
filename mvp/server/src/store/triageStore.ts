@@ -18,6 +18,7 @@ const ADVISORY_VERDICTS: ReadonlySet<string> = new Set<TriageAdvisoryVerdict>([
 ]);
 const STAGES: ReadonlySet<string> = new Set<TriageStage>([
   'keyword',
+  'blocklist',
   'dedupe',
   'headline',
   'survivor',

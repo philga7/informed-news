@@ -2,7 +2,7 @@
 
 Informed News is one OSINT product in [philga7/informed-news](https://github.com/philga7/informed-news). This file is the target. Binding choices live in [DECISIONS.md](DECISIONS.md). Ordering lives in [ROADMAP.md](ROADMAP.md).
 
-The product that is running, until [NEWS-170](https://informedcrew.atlassian.net/browse/NEWS-170), is the Kite Brief plus `mvp/server`. The operator's topics drive sources and filtering. Jev scores stories in triage. Ollama writes Brief verbiage for stories that are shown. There is no review queue. Today's triage order is [TRIAGE.md](TRIAGE.md): mute and keywords, duplicate grouping, a Jev headline check, survivor scrape, then a Jev body check. Nothing in that path calls Ollama.
+The product that is running, until [NEWS-170](https://informedcrew.atlassian.net/browse/NEWS-170), is the Kite Brief plus `mvp/server`. The operator's topics drive sources and filtering. Jev scores stories in triage. Ollama writes Brief verbiage for stories that are shown. There is no review queue. Today's triage order is [TRIAGE.md](TRIAGE.md): config blocklist, mute and keywords, duplicate grouping (including duplicate-of-already-kept) on the keyword survivors, a Jev headline check, survivor scrape, then a Jev body check. Nothing in that path calls Ollama.
 
 The shape of the target follows the [Menon Lab stack](https://themenonlab.blog/blog/osint-shadowbroker-crucix-thinkcreate-intel-stack) (raw, then scoring, then output).
 

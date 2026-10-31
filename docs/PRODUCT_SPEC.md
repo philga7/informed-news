@@ -195,7 +195,11 @@ The Brief can keep running while this computer is off. Stories already saved are
 
 Filtered out (`/filtered`) lists stories the last refresh dropped, and why. It is for spot checks. There is no action to put a story back. You must be signed in; otherwise the page says “Log in on Topics to see filtered stories.”
 
-You can switch between **Last refresh** and **Last 48 hours**. Stories are grouped by reason, including Muted, Off-topic, Clickbait, Opinion, Rewrite / roundup, Sponsored, Not significant, Duplicate, Undated, Too old, and Not scored. Items can show the outlet, when they were published, the topics, “Muted by: …”, “Duplicate of: …”, and “Retried next refresh” when the drop is not final. The page says these scoring reasons are AI-assisted judgments, not ground truth.
+You can switch between **Last refresh** and **Last 48 hours**. Stories are grouped by reason, including Muted, **Blocklist**, Off-topic, Clickbait, Opinion, Rewrite / roundup, Sponsored, Not significant, Duplicate, Undated, Too old, and Not scored. A configured junk term drops the story before scoring (before Jev). Filtered out shows that drop under **Blocklist** with the exact machine reason `blocklist:<term>` (the matched config term, not an AI judgment). The committed blocklist is empty (`"blocklist": []` in server config), so this group stays empty until terms are added in config. When a curated RSS source has a scoring note (`criteria`), Jev-driven keeps and drops on that outlet can show advisory `criteriaRef` as `source:<id>`; no source note is set in the shipped config. Items can show the outlet, when they were published, the topics, “Muted by: …”, “Duplicate of: …”, and “Retried next refresh” when the drop is not final. The page says these scoring reasons are AI-assisted judgments, not ground truth (blocklist drops are config, not AI).
+
+**Scenario:** Given a configured junk term matches a story on the last refresh, when you open Filtered out on **Last refresh**, then the story was dropped before scoring and appears under **Blocklist** with the exact reason `blocklist:<term>`.
+
+**Scenario:** Given a curated RSS source has a `criteria` note and Jev scored a story from that outlet, when you open the advisory reason on the Brief **Filtered** view or inspect triage records, then `criteriaRef` is `source:<id>` for that source.
 
 **Scenario:** Given you are signed in and the last refresh dropped nothing, when you open Filtered out, then it says “Nothing was filtered out.”
 

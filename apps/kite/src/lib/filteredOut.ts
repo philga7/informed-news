@@ -3,9 +3,10 @@
 import { PRODUCT_NAME } from '$lib/brand';
 import { shownServerError } from '$lib/serverError';
 
-/** Display order: `muted` covers every `muted:<id>` reason (mirrors mvp/server). */
+/** Display order: `muted` covers every `muted:<id>` reason; `blocklist` covers every `blocklist:<term>` (mirrors mvp/server). */
 export const FILTERED_REASON_GROUPS = [
 	'muted',
+	'blocklist',
 	'off_topic',
 	'clickbait',
 	'opinion',
@@ -22,6 +23,7 @@ export type FilteredReasonGroup = (typeof FILTERED_REASON_GROUPS)[number];
 
 export const FILTERED_REASON_LABEL: Record<FilteredReasonGroup, string> = {
 	muted: 'Muted',
+	blocklist: 'Blocklist',
 	off_topic: 'Off-topic',
 	clickbait: 'Clickbait',
 	opinion: 'Opinion',
@@ -174,6 +176,13 @@ export function showAllLabel(count: number): string {
 /** `Muted by: <label>` for muted items; null otherwise. */
 export function mutedByLine(item: Pick<FilteredOutItem, 'mutedBy'>): string | null {
 	return item.mutedBy ? `${FILTERED_MUTED_PREFIX} ${item.mutedBy.label}` : null;
+}
+
+/** Exact machine reason (`blocklist:<term>`) for blocklist items; null for every other group. */
+export function blocklistReasonLine(
+	item: Pick<FilteredOutItem, 'group' | 'reason'>,
+): string | null {
+	return item.group === 'blocklist' ? item.reason : null;
 }
 
 export function duplicateOfTitle(duplicateOf: NonNullable<FilteredOutItem['duplicateOf']>): string {

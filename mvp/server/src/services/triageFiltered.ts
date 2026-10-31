@@ -16,9 +16,10 @@ import type {
 } from '../types/triage.js';
 import { TRIAGE_WINDOW_HOURS } from './triageConfig.js';
 
-/** Display order: `muted` covers every `muted:<id>` reason. */
+/** Display order: `muted` covers every `muted:<id>` reason; `blocklist` covers every `blocklist:<term>`. */
 export const FILTERED_REASON_GROUPS = [
   'muted',
+  'blocklist',
   'off_topic',
   'clickbait',
   'opinion',
@@ -34,8 +35,11 @@ export const FILTERED_REASON_GROUPS = [
 export type FilteredReasonGroup = (typeof FILTERED_REASON_GROUPS)[number];
 
 type SameUnion<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
-/** Fails typecheck until every static triage reason (plus `muted`) has a display group. */
-const GROUPS_COVER_REASONS: SameUnion<FilteredReasonGroup, TriageStaticReason | 'muted'> = true;
+/** Fails typecheck until every static triage reason (plus `muted` and `blocklist`) has a display group. */
+const GROUPS_COVER_REASONS: SameUnion<
+  FilteredReasonGroup,
+  TriageStaticReason | 'muted' | 'blocklist'
+> = true;
 void GROUPS_COVER_REASONS;
 
 export type FilteredOutScope = 'last' | 'window';
@@ -79,7 +83,9 @@ const GROUP_RANK = new Map<FilteredReasonGroup, number>(
 );
 
 export function filteredReasonGroup(reason: TriageReason): FilteredReasonGroup {
-  return reason.startsWith('muted:') ? 'muted' : (reason as FilteredReasonGroup);
+  if (reason.startsWith('muted:')) return 'muted';
+  if (reason.startsWith('blocklist:')) return 'blocklist';
+  return reason as FilteredReasonGroup;
 }
 
 /** Unknown / missing → 'last'. */

@@ -17,7 +17,7 @@ export const TRIAGE_STATIC_REASONS = [
   'not_scored_error',
 ] as const;
 export type TriageStaticReason = (typeof TRIAGE_STATIC_REASONS)[number];
-export type TriageReason = TriageStaticReason | `muted:${string}`;
+export type TriageReason = TriageStaticReason | `muted:${string}` | `blocklist:${string}`;
 export const NON_FINAL_REASONS: ReadonlySet<TriageReason> = new Set<TriageReason>([
   'not_scored_budget',
   'not_scored_error',
@@ -26,6 +26,7 @@ export const NON_FINAL_REASONS: ReadonlySet<TriageReason> = new Set<TriageReason
 export type TriageStatus = 'kept' | 'dropped';
 export type TriageStage =
   | 'keyword'
+  | 'blocklist'
   | 'dedupe'
   | 'headline'
   | 'survivor'
@@ -72,7 +73,7 @@ export type TriageRecord = {
   confidence?: number;
   /** Prose reason (≤300); never the machine drop code */
   reasonText?: string;
-  /** One driving rule: `global` | `topic:<id>` | `source:<id>` | `rule:mute:<id>` | `rule:duplicate` | `rule:budget` */
+  /** One driving rule: `global` | `topic:<id>` | `source:<id>` | `rule:mute:<id>` | `rule:blocklist:<term>` | `rule:duplicate` | `rule:budget` */
   criteriaRef?: string;
 };
 
@@ -85,7 +86,7 @@ export type TriageRunMeta = {
   candidates: number;
   kept: number;
   dropped: number;
-  /** 'muted:<id>' counted under 'muted' */
+  /** 'muted:<id>' counted under 'muted'; 'blocklist:<term>' under 'blocklist' */
   byReason: Record<string, number>;
   jev: { budget: number; used: number; errors: number };
   summaryBudget: number;

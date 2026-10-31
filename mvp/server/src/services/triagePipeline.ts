@@ -1,8 +1,10 @@
 /**
- * Triage orchestrator (NEWS-87): runs at the end of every refresh. Cheapest
- * step first — mute/keyword → duplicate grouping → headline Jev → survivor prep
- * (resolve + scrape) → body Jev — and records keep/drop with a reason per
- * candidate in triage.json. Never calls Ollama; never throws.
+ * Triage orchestrator (NEWS-87, NEWS-168): runs at the end of every refresh.
+ * Config blocklist, then mute/keyword, then grouping (including
+ * duplicate-of-already-kept) on the keyword survivors → headline Jev →
+ * survivor prep (resolve + scrape) → body Jev.
+ * Records keep/drop with a reason per candidate in triage.json. Never calls
+ * Ollama; never throws.
  */
 import {
   readArticles,
@@ -14,6 +16,7 @@ import {
 } from '../store/index.js';
 import type { MuteRule } from '../store/muteRulesStore.js';
 import type { Article, SourceKind, StoreMeta } from '../types/article.js';
+import type { LoadedRadarSourcesFile, RadarSource } from '../types/radarSource.js';
 import type { Topic } from '../types/topic.js';
 import {
   NON_FINAL_REASONS,
@@ -24,6 +27,7 @@ import {
   type TriageStage,
   type TriageStore,
 } from '../types/triage.js';
+import { loadRadarSourcesFile } from './loadRadarSources.js';
 import {
   isTriageEnabled,
   resolveTriageBudgets,
@@ -33,6 +37,7 @@ import {
   TRIAGE_MAX_UNDESIRED_TOPICS,
   TRIAGE_WINDOW_HOURS,
 } from './triageConfig.js';
+import { matchBlocklist, matchingRssSource } from './triageBlocklist.js';
 import {
   groupCandidates,
   outletCount,
@@ -64,6 +69,8 @@ export type TriageDeps = {
   judge?: typeof judgeTriage;
   jevAvailable?: () => boolean;
   prepareSurvivor?: typeof prepareSurvivor;
+  /** Radar blocklist. Default reads the committed file. */
+  readRadarConfig?: () => LoadedRadarSourcesFile;
 };
 
 /** `GET /api/triage` returns at most this many records. */
@@ -117,6 +124,7 @@ type TriageRun = {
   undesired: Topic[];
   judge: typeof judgeTriage;
   prepare: typeof prepareSurvivor;
+  radarSources: readonly RadarSource[];
 };
 
 function errorMessage(err: unknown): string {
@@ -207,12 +215,24 @@ async function judgeSafely(
   }
 }
 
-function contextFor(run: TriageRun, topicIds: string[]): TriageJevContext {
+/** Per-source criteria only for an rss article on that source's domain. */
+function sourceCriteriaFor(
+  article: Article,
+  sources: readonly RadarSource[],
+): { sourceId: string; text: string } | undefined {
+  const source = matchingRssSource(article, sources);
+  if (source?.criteria === undefined) return undefined;
+  return { sourceId: source.id, text: source.criteria };
+}
+
+function contextFor(run: TriageRun, article: Article, topicIds: string[]): TriageJevContext {
+  const sourceCriteria = sourceCriteriaFor(article, run.radarSources);
   return {
     candidates: topicIds
       .map((id) => run.desiredById.get(id))
       .filter((t): t is Topic => t !== undefined),
     undesired: run.undesired,
+    ...(sourceCriteria ? { sourceCriteria } : {}),
   };
 }
 
@@ -236,8 +256,9 @@ function dropFrom(
 
 async function triageMember(member: DedupeCandidate, run: TriageRun): Promise<MemberOutcome> {
   const id = member.article.id;
-  const ctx = contextFor(run, member.topicIds);
+  const ctx = contextFor(run, member.article, member.topicIds);
   const topicsById = run.desiredById;
+  const sourceId = ctx.sourceCriteria?.sourceId;
 
   if (!reserve(run, id)) return { kind: 'unscored', reason: 'not_scored_budget', stage: 'budget' };
   const headline = await judgeSafely(run, 'headline', member.article, ctx);
@@ -253,7 +274,7 @@ async function triageMember(member: DedupeCandidate, run: TriageRun): Promise<Me
       verdict,
       'headline',
       verdict.significance,
-      advisoryFromJev(verdict, answers, allTopics),
+      advisoryFromJev(verdict, answers, allTopics, sourceId),
     );
   }
 
@@ -283,7 +304,7 @@ async function triageMember(member: DedupeCandidate, run: TriageRun): Promise<Me
         body.verdict,
         'body',
         verdict.significance,
-        advisoryFromJev(body.verdict, body.answers, allTopics),
+        advisoryFromJev(body.verdict, body.answers, allTopics, sourceId),
       );
     } else {
       cleared = body.verdict;
@@ -302,7 +323,7 @@ async function triageMember(member: DedupeCandidate, run: TriageRun): Promise<Me
       labels: cleared.labels,
       significance: verdict.significance,
       bodyChecked,
-      advisory: advisoryFromJev(cleared, clearedAnswers, allTopics),
+      advisory: advisoryFromJev(cleared, clearedAnswers, allTopics, sourceId),
     },
   };
 }
@@ -442,7 +463,9 @@ function mergeSeedRecords(
 }
 
 function reasonKey(reason: TriageReason): string {
-  return reason.startsWith('muted:') ? 'muted' : reason;
+  if (reason.startsWith('muted:')) return 'muted';
+  if (reason.startsWith('blocklist:')) return 'blocklist';
+  return reason;
 }
 
 /**
@@ -516,6 +539,7 @@ export async function runTriage(
     const desired = topics.filter((t) => t.kind === 'desired');
     const undesired = topics.filter((t) => t.kind === 'undesired');
     const articlesById = new Map(articles.map((a) => [a.id, a]));
+    const radarConfig = (deps.readRadarConfig ?? loadRadarSourcesFile)();
 
     const run: TriageRun = {
       now,
@@ -534,6 +558,7 @@ export async function runTriage(
         .slice(0, TRIAGE_MAX_UNDESIRED_TOPICS),
       judge: deps.judge ?? judgeTriage,
       prepare: deps.prepareSurvivor ?? prepareSurvivor,
+      radarSources: radarConfig.sources,
     };
     started = run;
 
@@ -545,18 +570,10 @@ export async function runTriage(
       (a) => a.sourceKind !== 'manual' && inWindow(a, now) && needsTriage(store.records[a.id]),
     );
 
-    const survivors: DedupeCandidate[] = [];
-    for (const article of candidates) {
-      const topicIds = candidateTopicIds(article, desired).slice(0, TRIAGE_MAX_CANDIDATE_TOPICS);
-      const muted = muteReason(article, muteRules, undesired);
-      if (muted) {
-        record(run, article.id, { reason: muted, stage: 'keyword', topicIds });
-      } else if (topicIds.length === 0) {
-        record(run, article.id, { reason: 'off_topic', stage: 'keyword', topicIds });
-      } else {
-        survivors.push({ article, topicIds });
-      }
-    }
+    const pending: DedupeCandidate[] = candidates.map((article) => ({
+      article,
+      topicIds: candidateTopicIds(article, desired).slice(0, TRIAGE_MAX_CANDIDATE_TOPICS),
+    }));
 
     const recentKept: DedupeCandidate[] = [];
     for (const rec of Object.values(store.records)) {
@@ -567,13 +584,7 @@ export async function runTriage(
     }
 
     const updatedKept = new Map<string, TriageRecord>();
-    const fresh: DedupeGroup[] = [];
-    for (const group of groupCandidates(survivors, recentKept)) {
-      const keptId = group.existingKeptId;
-      if (keptId === null) {
-        fresh.push(group);
-        continue;
-      }
+    const recordDuplicateOfKept = (group: DedupeGroup, keptId: string): void => {
       for (const m of group.ordered) {
         record(run, m.article.id, {
           reason: 'duplicate',
@@ -592,6 +603,42 @@ export async function runTriage(
           ? seedOutletCount(articlesById.get(keptId)!, members)
           : outletCount(members);
       updatedKept.set(keptId, { ...kept, memberIds, outletCount: folded });
+    };
+
+    const afterBlocklist: DedupeCandidate[] = [];
+    for (const member of pending) {
+      const blocked = matchBlocklist(member.article, radarConfig);
+      if (blocked) {
+        record(run, member.article.id, {
+          reason: `blocklist:${blocked.term}`,
+          stage: 'blocklist',
+          topicIds: member.topicIds,
+        });
+        continue;
+      }
+      afterBlocklist.push(member);
+    }
+
+    const survivors: DedupeCandidate[] = [];
+    for (const member of afterBlocklist) {
+      const muted = muteReason(member.article, muteRules, undesired);
+      if (muted) {
+        record(run, member.article.id, { reason: muted, stage: 'keyword', topicIds: member.topicIds });
+      } else if (member.topicIds.length === 0) {
+        record(run, member.article.id, { reason: 'off_topic', stage: 'keyword', topicIds: member.topicIds });
+      } else {
+        survivors.push(member);
+      }
+    }
+
+    const fresh: DedupeGroup[] = [];
+    for (const group of groupCandidates(survivors, recentKept)) {
+      const keptId = group.existingKeptId;
+      if (keptId === null) {
+        fresh.push(group);
+        continue;
+      }
+      recordDuplicateOfKept(group, keptId);
     }
 
     if (fresh.length > 0 && !(deps.jevAvailable ?? (() => getTypeSafeClient() !== null))()) {
