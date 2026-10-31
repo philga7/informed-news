@@ -6,6 +6,10 @@ Each ship-loop pull request adds an entry for what changed for that reader, or w
 
 This is not the release log. Releases are recorded in `CHANGELOG.md` by semantic-release. Do not hand-edit `CHANGELOG.md` to mirror these notes.
 
+## 2026-10-31
+
+The always-on Brief is running on the private machine, and it is not on the public internet. A laptop or phone cannot open it yet, until the private-network address is turned on. Once that address is on, reading the Brief does not ask for the password. Refresh, Topics, Filtered out, and other changes still do.
+
 ## 2026-10-29
 
 Stories can stay saved on an always-on copy of the Brief, and search still runs from Google News when the extra search service is missing. You cannot open that copy from another device yet.

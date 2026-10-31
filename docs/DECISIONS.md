@@ -2,6 +2,23 @@
 
 Binding choices for Informed News. Newest first. When one of these changes, update this file in the same change as [ROADMAP.md](ROADMAP.md) and Jira. What the product does now, in plain language, is [PRODUCT_SPEC.md](PRODUCT_SPEC.md). Pipeline detail remains in [NEWS-84](https://informedcrew.atlassian.net/browse/NEWS-84), [TRIAGE.md](TRIAGE.md), and [BRIEF.md](BRIEF.md). The target is [VISION.md](VISION.md).
 
+## 2026-10-31 — Private-network access and runbook (NEWS-111, NEWS-112, NEWS-181)
+
+**Decision:** [VISION.md](VISION.md)'s direction did not change: still the topic Brief until the SPA. Ship [NEWS-111](https://informedcrew.atlassian.net/browse/NEWS-111), [NEWS-112](https://informedcrew.atlassian.net/browse/NEWS-112), and [NEWS-181](https://informedcrew.atlassian.net/browse/NEWS-181) from these grill answers. Each one is "Recommended, adopted (Phil can override in review)."
+
+1. **Serve on the host:** Tailscale runs on the VPS host, not in the container, and serves the app with `tailscale serve`. Recommended, adopted (Phil can override in review).
+2. **MagicDNS URL:** The app is reached on one MagicDNS HTTPS URL on the tailnet. Recommended, adopted (Phil can override in review).
+3. **Cookie rule:** The session cookie is `Secure` only when the immediate peer is trusted and the request is HTTPS. Trusted means loopback or a non-public address (RFC1918, IPv4 link-local, IPv6 ULA), because Docker's proxy is the peer inside the container. A public address is ignored. Plain HTTP on localhost still logs in. `NODE_ENV` does not force `Secure`. Recommended, adopted (Phil can override in review).
+4. **Bind check:** The runbook's public-access checks include `ss -ltnp` showing port 3001 on `127.0.0.1` only, and a failed request to the VPS public IP on 3001. Phil runs them. Recommended, adopted (Phil can override in review).
+5. **Single env file:** One env file at `/opt/informed-news/.env`, mode `600`, owner `deploy:deploy`, outside the image. No Tailscale auth key in it. Recommended, adopted (Phil can override in review).
+6. **Repo path:** `/opt/informed-news`, branch `main`, owner `deploy`. Recommended, adopted (Phil can override in review).
+7. **No override file:** The laptop uses the same compose command with `INFORMED_NEWS_ENV_FILE=./mvp/.env`. Recommended, adopted (Phil can override in review).
+8. **Image tag:** The image defaults to `informed-news:local`; CI uses `informed-news:ci`. Recommended, adopted (Phil can override in review).
+
+**Why:** Anyone on Phil's private network can read the Brief, as on a laptop, and the public internet cannot. Refresh, Topics, Filtered out, and other changes still ask for the password. The runbook is [RUNBOOK.md](RUNBOOK.md). The container is up on the VPS and published on `127.0.0.1` only. Tailscale Serve is not configured: the deploy user cannot change it, so that command is Phil's. Laptop and phone checks remain his.
+
+**What it rules out:** A public URL, a public bind, a second compose override file, a Tailscale key in the app env file, and forcing `Secure` cookies by `NODE_ENV` (which would break plain-HTTP localhost login).
+
 ## 2026-10-29 — Hosting ahead of NEWS-168/169; container grill (NEWS-109, NEWS-110)
 
 **Decision:** On 2026-10-27 Phil reordered hosting ([NEWS-109](https://informedcrew.atlassian.net/browse/NEWS-109)–[NEWS-112](https://informedcrew.atlassian.net/browse/NEWS-112)) ahead of [NEWS-168](https://informedcrew.atlassian.net/browse/NEWS-168) and [NEWS-169](https://informedcrew.atlassian.net/browse/NEWS-169). [VISION.md](VISION.md)'s direction did not change: still the topic Brief until the SPA; hosting is how that Brief stays up. Ship NEWS-109 and NEWS-110 from these grill answers:

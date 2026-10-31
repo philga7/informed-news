@@ -11,7 +11,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: informed-news:ci
+    image: ${INFORMED_NEWS_IMAGE:-informed-news:local}
     env_file:
       - ${INFORMED_NEWS_ENV_FILE:-/opt/informed-news/.env}
     environment:

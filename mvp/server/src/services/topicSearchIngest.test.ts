@@ -473,6 +473,7 @@ test('SearXNG down for every topic keeps Google results; refresh not skipped', a
   assert.equal(result.providers.google_news.state, 'ok');
   assert.equal(result.providers.google_news.items, 2);
   assert.equal(result.upserted.length, 2);
+  assert.deepEqual(h.upserts[0]!.map((a) => a.title).sort(), ['Google One', 'Google Two']);
 });
 
 test('Google down leaves SearXNG-only results; one failing topic is partial', async () => {
