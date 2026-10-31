@@ -1,3 +1,9 @@
+## [0.31.0](https://github.com/philga7/informed-news/compare/v0.30.0...v0.31.0) (2026-10-31)
+
+### Features
+
+* **NEWS-111, NEWS-112, NEWS-181:** Tailscale-only access, VPS runbook, hosting hygiene ([#214](https://github.com/philga7/informed-news/issues/214)) ([c6c52b6](https://github.com/philga7/informed-news/commit/c6c52b6bd4b4fe9e940b516e508e3adb99716108))
+
 ## [0.30.0](https://github.com/philga7/informed-news/compare/v0.29.0...v0.30.0) (2026-10-30)
 
 ### Features
