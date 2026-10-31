@@ -10,9 +10,7 @@ This is not the release log. Releases are recorded in `CHANGELOG.md` by semantic
 
 The always-on Brief is running on the private machine, and it is not on the public internet. A laptop or phone can open it when Tailscale is installed on that device. Reading the Brief does not ask for the password. Refresh, Topics, Filtered out, and other changes still do.
 
-**No user-visible change.** Pre-AI blocklist plumbing and per-source criteria notes are in the server config only.
-
-**No user-visible change.** The writing rule for these notes, and container logs when a health check fails, do not change the Brief.
+**No user-visible change.** The junk list and per-source notes are server config only, and the writing rule for these notes plus container logs when a health check fails do not change the Brief.
 
 ## 2026-10-29
 
