@@ -116,16 +116,16 @@ Focus on why/what, not implementation. Do not invent architecture in the ticket 
 
 ### Product spec and what's new
 
-Trial approved 2026-10-26. Review after 5 tickets have merged since it landed, including whether a **Last checked** bump on an unchanged spec is worth the diff. Recorded in [docs/DECISIONS.md](../../../docs/DECISIONS.md) and [docs/ROADMAP.md](../../../docs/ROADMAP.md).
+The Oct 26, 2026 trial is over. The rule below is the standing rule ([docs/DECISIONS.md](../../../docs/DECISIONS.md), [docs/ROADMAP.md](../../../docs/ROADMAP.md)). Do not roll it out to other repos yet. Revisit after informed-news runs 5 more pull requests under this rule.
 
-Every ship-loop pull request updates both files **in the same PR as the code**:
+Every ship-loop pull request follows both steps in the same PR as the code:
 
-1. [docs/PRODUCT_SPEC.md](../../../docs/PRODUCT_SPEC.md) — plain-language list of what the product does now. Features and user scenarios. No implementation detail. If what a reader can do changed, edit the scenarios. If it did not, bump **Last checked** so the file is still in the diff.
-2. [docs/WHATS_NEW.md](../../../docs/WHATS_NEW.md) — one dated entry for what changed for a reader of the app, or the words **No user-visible change.** Newest first. No commit jargon and no ticket-key lists.
+1. [docs/PRODUCT_SPEC.md](../../../docs/PRODUCT_SPEC.md) — plain-language list of what the product does now. Features and user scenarios. No implementation detail. Update it only when what a reader can do changes, and edit the scenarios. If behavior did not change, leave the file unchanged. Do not bump **Last checked** on an unchanged spec.
+2. [docs/WHATS_NEW.md](../../../docs/WHATS_NEW.md) — one dated entry for what is true at merge for a reader of the app, or the one line **No user-visible change.** Newest first. Deploy steps and post-merge steps stay in the pull request body, not in this file. No commit jargon and no ticket-key lists. If a `WHATS_NEW` or `PRODUCT_SPEC` line is no longer true, correct it in this pull request and list that correction under "Also in this PR".
 
 Leave semantic-release's `CHANGELOG.md` and its config alone. Do not hand-edit `CHANGELOG.md` to mirror `WHATS_NEW.md`.
 
-The PR test plan includes both items. Tick them only when the diff actually contains the update. The CI item stays unticked until the green Actions run is linked.
+The PR test plan includes both items. Tick the spec item when scenarios changed, or when the file was left unchanged because behavior did not change. Tick the changelog item when the new entry is in the diff. The CI item stays unticked until the green Actions run is linked.
 
 ### 3. Ship to GitHub (only when asked)
 
@@ -137,8 +137,8 @@ The PR test plan includes both items. Tick them only when the diff actually cont
    - **Why every key:** a multi-ticket PR squashes to one subject on `main`. The per-ticket commits stay in the PR, but semantic-release and the changelog see only the title, so a key missing from the title is missing from `main`. PR #205 squashed as `docs(NEWS-165): …` and lost the NEWS-171 subject that way.
    - Body: Summary + Test plan + `Closes NEWS-N` when the PR fully completes the story. When the prompt asked for a grill, record each question and the user's answer in the body.
    - Test plan includes:
-     - [ ] `docs/PRODUCT_SPEC.md` updated in this PR (scenarios edited, or **Last checked** bumped when behavior did not change)
-     - [ ] `docs/WHATS_NEW.md` has a new entry for the reader-visible change, or states **No user-visible change.**
+     - [ ] `docs/PRODUCT_SPEC.md` updated in this PR when behavior changed (scenarios edited). Left unchanged when behavior did not change. No **Last checked** bump.
+     - [ ] `docs/WHATS_NEW.md` has a new entry for what is true at merge, or states **No user-visible change.** A line that is no longer true is corrected in this PR.
      - [ ] CI green (**MVP build & typecheck**), with the Actions run URL — tick only when that link is present
 5. Opening the PR starts **automatic Claude Code review** (`.github/workflows/claude-review.yml`, against `CLAUDE.md` "When reviewing a PR"); resolve findings (push re-runs it) before Phil's ship request — never merge without that request.
 6. When the user asks to **merge**:
@@ -170,8 +170,8 @@ The repository ruleset rejects any update to `main` without a passing **MVP buil
 | Done after user-requested merge | No |
 | Push/PR/merge without user ask | Yes — stop and ask |
 | Plan delete on the feat branch before merge | No (unless user says keep it) |
-| `docs/PRODUCT_SPEC.md` updated in the same PR as the code | No |
-| `docs/WHATS_NEW.md` entry (or "No user-visible change.") in that PR | No |
+| `docs/PRODUCT_SPEC.md` updated in the same PR when behavior changed; left unchanged when it did not. No **Last checked** bump | No |
+| `docs/WHATS_NEW.md` entry for what is true at merge (or "No user-visible change."). A line that is no longer true is corrected in that PR | No |
 | Hand-edit `CHANGELOG.md` for the reader-facing note | Yes — leave it to semantic-release |
 
 ## Examples

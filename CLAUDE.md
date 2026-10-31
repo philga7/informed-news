@@ -43,7 +43,7 @@ Set `REFRESH_INTERVAL_HOURS=off` when you need the server up without spending re
 | `mvp/data/` | Runtime JSON (never commit) |
 | `mvp/.env` | Secrets (never commit); see `mvp/.env.example` |
 | `docs/ROADMAP.md` | Preferred item order; Jira wins on disagreement |
-| `docs/PRODUCT_SPEC.md` | What the product does now, in plain language (updated on every ship-loop PR) |
+| `docs/PRODUCT_SPEC.md` | What the product does now, in plain language (updated when behavior changes) |
 | `docs/WHATS_NEW.md` | Reader-facing changelog (not semantic-release `CHANGELOG.md`) |
 | `docs/` | Brief, triage, owned-brief, birdclaw, etc. |
 | `.cursor/skills/` | Repo skills; `news-ship-loop` is the ship entry point |
@@ -58,7 +58,7 @@ The full ritual is in `.cursor/skills/news-ship-loop/SKILL.md`. Repo skills win 
 - **Order:** take the current next item in `docs/ROADMAP.md` and confirm it in Jira. If they disagree, Jira wins; fix ROADMAP in the same change.
 - **Approach** per ticket (`ticket → approach → reason`). TDD for one module/seam, no new public interfaces or dependencies, about 3 tasks or fewer; otherwise SDD. An explicit `Approach:` in the prompt overrides.
 - Branch `feat/news-<N>-…` (or `ci/news-<N>-…` for tooling) from `main`. One Conventional Commit per ticket on the branch; the PR title is the squash subject on `main` and names every key, e.g. `fix(NEWS-131, NEWS-155): …`.
-- PR body: Summary, a Test plan with every item ticked, and `Closes NEWS-N` when the PR fully completes the story. The test plan includes a `docs/PRODUCT_SPEC.md` update in the same PR (scenarios, or **Last checked** when behavior did not change) and a `docs/WHATS_NEW.md` entry for the reader-visible change, or **No user-visible change.** Tick the CI item only with the green Actions run link. Do not hand-edit semantic-release `CHANGELOG.md` for that note.
+- PR body: Summary, a Test plan with every item ticked, and `Closes NEWS-N` when the PR fully completes the story. The test plan includes a `docs/PRODUCT_SPEC.md` update when behavior changed (scenarios edited; leave the file unchanged when it did not; no **Last checked** bump) and a `docs/WHATS_NEW.md` entry for what is true at merge, or **No user-visible change.** Tick the CI item only with the green Actions run link. Do not hand-edit semantic-release `CHANGELOG.md` for that note.
 - Propose discovered tickets (type, epic, one line, why) or "None". File them in NEWS only after Phil confirms.
 - **PR flow:** open the PR → Claude Code reviews it → resolve findings (push re-runs the review) → Phil decides. **Never merge** without Phil's ship request.
 - Never commit `mvp/data/*.json`, `.env`, or secrets.
@@ -72,8 +72,8 @@ Claude reports findings. It never approves or merges.
 - Every test-plan item is ticked and backed by evidence.
 - CI is green with a GitHub Actions run link (do not tick CI without the link).
 - `docs/ROADMAP.md` row updated when the change touches ordering/status.
-- `docs/PRODUCT_SPEC.md` is updated in this PR so it still matches what the product does (scenarios edited, or **Last checked** bumped when behavior did not change).
-- `docs/WHATS_NEW.md` has a new dated entry for what a reader of the app would notice, or states **No user-visible change.** `CHANGELOG.md` is left to semantic-release.
+- `docs/PRODUCT_SPEC.md` is updated in this PR when behavior changed (scenarios edited). It is left unchanged when behavior did not change. There is no **Last checked** bump.
+- `docs/WHATS_NEW.md` has a new dated entry for what is true at merge, or states **No user-visible change.** A line that is no longer true is corrected in this PR. `CHANGELOG.md` is left to semantic-release.
 - No secrets, `.env`, or `mvp/data/*.json` in the diff.
 - Follow-up tickets proposed (or explicitly None).
 - Product path stays Kite + `mvp/server`; no `_legacy/` default, no Supabase on the live path.

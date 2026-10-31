@@ -2,9 +2,7 @@
 
 Plain-language list of what Informed News does now. Features and scenarios only. No implementation detail.
 
-Each ship-loop pull request updates this file in the same pull request as the code. If what a reader can do changed, edit the scenarios. If it did not, bump **Last checked** so the file is still part of the pull request, and say so in [WHATS_NEW.md](WHATS_NEW.md).
-
-**Last checked:** 2026-10-31
+A ship-loop pull request edits this file when what a reader can do changes. If behavior did not change, leave the file unchanged.
 
 The home page is the Brief. Your topics decide what is searched for and what is left out. There is no review queue and no step where you accept a story onto the Brief.
 
@@ -183,13 +181,13 @@ Refresh collects stories from the configured news feeds and from search for your
 
 ## Always-on copy
 
-The Brief can keep running while this computer is off. Stories already saved are still there after a restart. If the extra search service is not set up, new stories still come from Google News. The always-on copy is running on the private machine, and it is not on the public internet. Anyone on Phil's private network can read it once the private-network address is turned on. That address is not on yet, so a laptop or phone cannot open it until the one step in [the runbook](RUNBOOK.md). Refresh, Topics, Filtered out, and other changes still ask for the password.
+The Brief can keep running while this computer is off. Stories already saved are still there after a restart. If the extra search service is not set up, new stories still come from Google News. The always-on copy is running on the private machine, and it is not on the public internet. A laptop or phone can open it when Tailscale is installed on that device. Reading the Brief does not ask for the password. Refresh, Topics, Filtered out, and other changes still do. The steps are in [the runbook](RUNBOOK.md).
 
 **Scenario:** Given stories were saved on the always-on copy, when it restarts, then those stories are still there.
 
 **Scenario:** Given the extra search service is not set up, when refresh runs, then new stories still come from Google News.
 
-**Scenario:** Given the always-on copy is deployed and you are on Phil's laptop or phone on his private network, when you open it, then the Brief shows without a password, and refresh, Topics, Filtered out, and other changes ask for the password.
+**Scenario:** Given Tailscale is installed on your laptop or phone and you are on Phil's private network, when you open the always-on copy, then the Brief shows without a password, and refresh, Topics, Filtered out, and other changes ask for the password.
 
 **Scenario:** Given you are on the public internet, when you try to open the always-on copy, then it does not open.
 

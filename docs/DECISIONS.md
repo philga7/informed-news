@@ -2,6 +2,14 @@
 
 Binding choices for Informed News. Newest first. When one of these changes, update this file in the same change as [ROADMAP.md](ROADMAP.md) and Jira. What the product does now, in plain language, is [PRODUCT_SPEC.md](PRODUCT_SPEC.md). Pipeline detail remains in [NEWS-84](https://informedcrew.atlassian.net/browse/NEWS-84), [TRIAGE.md](TRIAGE.md), and [BRIEF.md](BRIEF.md). The target is [VISION.md](VISION.md).
 
+## 2026-10-31 — Spec and plain-English changelog stay, with a narrower rule (NEWS-175)
+
+**Decision:** Keep both steps. Update [PRODUCT_SPEC.md](PRODUCT_SPEC.md) only when what a reader can do changes. Do not bump Last checked when the spec is unchanged. Keep [WHATS_NEW.md](WHATS_NEW.md). Write what is true at merge, or one line **No user-visible change.** for a tooling change. Deploy steps and post-merge steps stay in the pull request body. The next ship-loop pull request corrects a WHATS_NEW or PRODUCT_SPEC line that is no longer true, and lists that correction under "Also in this PR". Do not roll this out to other repos yet. Revisit after informed-news runs 5 more pull requests under this rule. Phil was not in the grill. Each answer is "Recommended, adopted (Phil can override in review)."
+
+**Why:** Five pull requests merged after the Oct 26 trial landed on main (#210–#214). They carry seven ticket keys (NEWS-172, NEWS-173, NEWS-109, NEWS-110, NEWS-111, NEWS-112, NEWS-181) plus one keyless tooling pull request (#212). #207–#209 merged before that trial commit, so they are outside the count. Real scenario edits on #210, #211, #213, and #214 matched the product. The only Last checked bump with no scenario change was #212, which is the diff noise the trial asked about. #214's note said a laptop or phone could not open the Brief yet. That was true at merge and false later the same day, after Tailscale Serve was turned on. The failure was describing a post-merge step as the reader's present, not the changelog step itself.
+
+**What it rules out:** A Last checked bump on an unchanged spec, changelog lines that describe steps still to be done after merge, a separate ticket for every stale line, and copying this rule to other repos on this evidence alone.
+
 ## 2026-10-31 — Private-network access and runbook (NEWS-111, NEWS-112, NEWS-181)
 
 **Decision:** [VISION.md](VISION.md)'s direction did not change: still the topic Brief until the SPA. Ship [NEWS-111](https://informedcrew.atlassian.net/browse/NEWS-111), [NEWS-112](https://informedcrew.atlassian.net/browse/NEWS-112), and [NEWS-181](https://informedcrew.atlassian.net/browse/NEWS-181) from these grill answers. Each one is "Recommended, adopted (Phil can override in review)."
@@ -16,6 +24,8 @@ Binding choices for Informed News. Newest first. When one of these changes, upda
 8. **Image tag:** The image defaults to `informed-news:local`; CI uses `informed-news:ci`. Recommended, adopted (Phil can override in review).
 
 **Why:** Anyone on Phil's private network can read the Brief, as on a laptop, and the public internet cannot. Refresh, Topics, Filtered out, and other changes still ask for the password. The runbook is [RUNBOOK.md](RUNBOOK.md). The container is up on the VPS and published on `127.0.0.1` only. Tailscale Serve is not configured: the deploy user cannot change it, so that command is Phil's. Laptop and phone checks remain his.
+
+**Update (later on 2026-10-31):** Phil turned Tailscale Serve on after merge. It is tailnet only and proxies to the app on the machine. A laptop or phone needs Tailscale installed. The steps, including an SSH tunnel fallback, are in [RUNBOOK.md](RUNBOOK.md).
 
 **What it rules out:** A public URL, a public bind, a second compose override file, a Tailscale key in the app env file, and forcing `Secure` cookies by `NODE_ENV` (which would break plain-HTTP localhost login).
 

@@ -71,7 +71,7 @@ jobs:
         run: |
           set -euo pipefail
           docker network create nanobot-mem0
-          trap 'docker compose down || true' EXIT
+          trap 'status=$?; if [ "$status" -ne 0 ]; then docker compose logs || true; fi; docker compose down || true' EXIT
           env_file="$RUNNER_TEMP/informed-news-ci.env"
           (umask 077; cat > "$env_file" <<'EOF'
           MVP_PASSWORD=ci-dummy

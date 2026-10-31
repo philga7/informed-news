@@ -30,7 +30,18 @@ docker compose logs
 docker compose down
 ```
 
-The image defaults to `informed-news:local`. CI uses `informed-news:ci`. The port is published on `127.0.0.1` only.
+The image defaults to `informed-news:local`. CI uses `informed-news:ci`. The port is published on `127.0.0.1` only. The Compose service is named `app`.
+
+## Update
+
+The checkout may be a single-branch clone. Fetch `main` into the local `main` ref before checking it out.
+
+```bash
+git fetch origin main:main
+git checkout main
+git pull --ff-only origin main
+docker compose up -d --build
+```
 
 ## Health check
 
@@ -40,13 +51,27 @@ curl -fsS http://127.0.0.1:3001/healthz
 
 ## Tailscale
 
-Tailscale serves the app on one MagicDNS HTTPS URL. First run `tailscale serve status`. If something else already handles https on 443, stop and leave it. The script may need root, or a user allowed by `tailscale set --operator=deploy`. Then run:
+Tailscale Serve is on. It is tailnet only and proxies to the app on this machine. No Tailscale auth key goes in the app env file.
+
+A laptop or phone opens the Brief only when Tailscale is installed on that device.
+
+If Serve is off, check `tailscale serve status` first. If something else already handles https on 443, stop and leave it. The script may need root, or a user allowed by `tailscale set --operator=deploy`. Then run:
 
 ```bash
 scripts/tailscale-serve.sh
 ```
 
-Running it twice is safe. No Tailscale auth key goes in the app env file.
+Running it twice is safe.
+
+## SSH tunnel
+
+If Tailscale is not installed on the device, an SSH tunnel reaches the same loopback port. Placeholders only:
+
+```bash
+ssh -i <key> -N -L 3001:127.0.0.1:3001 <user>@<vps>
+```
+
+Then open `http://localhost:3001`.
 
 ## Laptop
 
@@ -66,7 +91,7 @@ With `SEARXNG_URL` set, one topic refresh shows SearXNG results in the Brief. To
 - `ss -ltnp` shows port 3001 on `127.0.0.1` only.
 - A request to the VPS public IP on port 3001 fails.
 - Anyone on the private network can read the Brief at the tailnet URL; the public internet cannot. Refresh, Topics, Filtered out, and other changes still ask for the password.
-- Laptop and phone checks are Phil's.
+- Laptop and phone checks need Tailscale installed on each device. They are Phil's to run.
 
 ## Out of scope
 

@@ -76,4 +76,21 @@ describe('NEWS-109 CI builds and starts the container', () => {
 		assert.ok(block.includes('docker compose down'), 'must run docker compose down');
 		assert.match(block, /trap[\s\S]*docker compose down/, 'must trap teardown');
 	});
+
+	it('prints docker compose logs from the EXIT trap before teardown when the step fails', () => {
+		const block = configureAndStartStep(
+			readFileSync(join(root, '.github/workflows/ci.yml'), 'utf8'),
+		);
+		const trap = block.indexOf("trap 'status=$?;");
+		const logs = block.indexOf('docker compose logs || true');
+		const down = block.indexOf('docker compose down || true');
+		assert.ok(trap !== -1, 'EXIT trap must record the status');
+		assert.ok(logs !== -1 && logs > trap, 'trap must print docker compose logs');
+		assert.ok(down !== -1 && down > logs, 'trap must tear down after printing logs');
+		assert.match(
+			block,
+			/if \[ "\$status" -ne 0 \]; then docker compose logs \|\| true; fi/,
+		);
+		assert.match(block, /curl -fsS http:\/\/127\.0\.0\.1:3001\/healthz/);
+	});
 });

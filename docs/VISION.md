@@ -16,7 +16,7 @@ The shape of the target follows the [Menon Lab stack](https://themenonlab.blog/b
 
 ## One API and one MCP
 
-One API (`mvp/server`) and one MCP server sit in front of all three layers. The SPA and the bots are clients of both. Hosting is Tailscale-only (private network: anyone on it can read the Brief; refresh, Topics, Filtered out, and other changes still ask for the password); the steps are in [RUNBOOK.md](RUNBOOK.md) and the 2026-10-31 entry in [DECISIONS.md](DECISIONS.md). How a bot reaches the MCP over that private network is decided when the MCP ships.
+One API (`mvp/server`) and one MCP server sit in front of all three layers. The SPA and the bots are clients of both. Hosting is Tailscale-only (private network: anyone on it can read the Brief; refresh, Topics, Filtered out, and other changes still ask for the password); the steps are in [RUNBOOK.md](RUNBOOK.md) and the 2026-10-31 private-network access entry in [DECISIONS.md](DECISIONS.md). How a bot reaches the MCP over that private network is decided when the MCP ships.
 
 ## SPA shell
 
