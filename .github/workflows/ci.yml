@@ -73,14 +73,14 @@ jobs:
           docker network create nanobot-mem0
           trap 'docker compose down || true' EXIT
           env_file="$RUNNER_TEMP/informed-news-ci.env"
-          umask 077
-          cat > "$env_file" <<'EOF'
+          (umask 077; cat > "$env_file" <<'EOF'
           MVP_PASSWORD=ci-dummy
           SESSION_SECRET=ci-dummy-secret
           REFRESH_INTERVAL_HOURS=off
           TOPIC_SEARCH_ENABLED=true
           SEARXNG_URL=http://searxng:8080
           EOF
+          )
           export INFORMED_NEWS_ENV_FILE="$env_file"
           export INFORMED_NEWS_IMAGE=informed-news:ci
           rendered=$(docker compose config)

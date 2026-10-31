@@ -41,11 +41,24 @@ describe('NEWS-109 CI builds and starts the container', () => {
 		const block = configureAndStartStep(
 			readFileSync(join(root, '.github/workflows/ci.yml'), 'utf8'),
 		);
-		const usesRestrictedUmask =
-			block.includes('umask 077') || block.includes('install -m 600');
+		const catWrite = block.indexOf('cat > "$env_file"');
+		assert.ok(catWrite !== -1, 'expected cat > "$env_file" in configure step');
+		const beforeCat = block.slice(0, catWrite);
+		const scopedUmaskWrite = /\(umask 077;\s*cat > "\$env_file"/.test(block);
+		const installMode600BeforeCat = /install -m 600/.test(beforeCat);
 		assert.ok(
-			usesRestrictedUmask,
-			'expected umask 077 or install -m 600 before writing the env file',
+			scopedUmaskWrite || installMode600BeforeCat,
+			'expected (umask 077; cat > ...) or install -m 600 before writing the env file',
+		);
+		assert.doesNotMatch(
+			block,
+			/\n\s*umask 077\s*\n\s*cat > "\$env_file"/,
+			'umask 077 must be scoped to the env file write, not left in effect for the whole step',
+		);
+		assert.doesNotMatch(
+			block,
+			/cat > "\$env_file"[\s\S]*EOF[\s\S]*\n\s*umask 077/,
+			'umask 077 must not appear after writing the env file',
 		);
 		assert.doesNotMatch(
 			block,

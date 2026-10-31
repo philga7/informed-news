@@ -42,7 +42,7 @@ describe('NEWS-109 compose.yaml contract', () => {
 		assert.doesNotMatch(contents, /SEARXNG_URL\s*:/, 'SEARXNG_URL must not appear as environment assignment');
 		assert.doesNotMatch(
 			contents,
-			/image:\s*informed-news:ci\s*$/,
+			/^\s*image:\s*informed-news:ci\s*$/m,
 			'must not hardcode image: informed-news:ci',
 		);
 
