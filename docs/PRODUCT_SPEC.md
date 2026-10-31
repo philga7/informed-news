@@ -4,7 +4,7 @@ Plain-language list of what Informed News does now. Features and scenarios only.
 
 Each ship-loop pull request updates this file in the same pull request as the code. If what a reader can do changed, edit the scenarios. If it did not, bump **Last checked** so the file is still part of the pull request, and say so in [WHATS_NEW.md](WHATS_NEW.md).
 
-**Last checked:** 2026-10-29
+**Last checked:** 2026-10-31
 
 The home page is the Brief. Your topics decide what is searched for and what is left out. There is no review queue and no step where you accept a story onto the Brief.
 
@@ -183,13 +183,15 @@ Refresh collects stories from the configured news feeds and from search for your
 
 ## Always-on copy
 
-The Brief can keep running while this computer is off. Stories already saved are still there after a restart. If the extra search service is not set up, new stories still come from Google News. Opening that always-on copy from another device is not available yet.
+The Brief can keep running while this computer is off. Stories already saved are still there after a restart. If the extra search service is not set up, new stories still come from Google News. The always-on Brief can be opened from Phil's laptop and phone on his private network, still behind the password, and not from the public internet. This copy is not running yet: deploy has not happened, so do not assume it is up. The steps are in [the runbook](RUNBOOK.md).
 
 **Scenario:** Given stories were saved on the always-on copy, when it restarts, then those stories are still there.
 
 **Scenario:** Given the extra search service is not set up, when refresh runs, then new stories still come from Google News.
 
-**Scenario:** Given you are on another device, when you try to open the always-on copy, then that is not available yet.
+**Scenario:** Given the always-on copy is deployed and you are on Phil's laptop or phone on his private network, when you open it, then it asks for the password.
+
+**Scenario:** Given you are on the public internet, when you try to open the always-on copy, then it does not open.
 
 ## Filtered out
 
