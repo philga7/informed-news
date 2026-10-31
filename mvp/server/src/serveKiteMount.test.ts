@@ -58,6 +58,7 @@ test('with kiteHandler: GET / is the handler, GET /healthz stays Express, POST /
     const root = await fetch(`${baseUrl}/`);
     assert.equal(root.status, 200);
     assert.equal(await root.text(), 'kite-page');
+    assert.equal(kiteRequestCount, 1);
 
     const healthz = await fetch(`${baseUrl}/healthz`);
     assert.equal(healthz.status, 200);

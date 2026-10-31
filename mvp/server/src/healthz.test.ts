@@ -69,6 +69,7 @@ test('GET /healthz is 200 with no session and no outside calls', async () => {
 
     const health = await realFetch(`${baseUrl}/health`);
     assert.equal(health.status, 200);
+    assert.deepEqual(await health.json(), { status: 'ok', app: 'mvp-server' });
   } finally {
     globalThis.fetch = realFetch;
     await close();
