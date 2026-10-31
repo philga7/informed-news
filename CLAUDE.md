@@ -63,6 +63,30 @@ The full ritual is in `.cursor/skills/news-ship-loop/SKILL.md`. Repo skills win 
 - **PR flow:** open the PR → Claude Code reviews it → resolve findings (push re-runs the review) → Phil decides. **Never merge** without Phil's ship request.
 - Never commit `mvp/data/*.json`, `.env`, or secrets.
 
+## Claude-eligible work
+
+Claude builds on GitHub only when someone mentions `@claude`, and only for tickets labeled `builder-claude`. The workflow is `.github/workflows/claude.yml`. It opens a pull request. It never merges. Phil merges.
+
+Which workflow runs:
+
+- A pull request opened, synchronized, reopened, or marked ready for review starts only `.github/workflows/claude-review.yml` job `review` (name `claude-review`). `claude.yml` does not listen to `pull_request`.
+- An issue comment or a pull request review comment that contains `@claude`, from an OWNER, MEMBER, or COLLABORATOR, starts both `claude.yml` job `build` (name `claude-build`) and `claude-review.yml` job `mention` (name `claude-mention`). They do not share a concurrency group, so neither cancels the other. `claude-mention` is the review follow-up: it answers and does not commit or push. `claude-build` is the builder and opens the pull request.
+- A submitted pull request review whose body contains `@claude` starts only `claude-build`.
+- An issue opened whose body contains `@claude` starts only `claude-build`. A mention in the title does not. There is no label trigger, assignee trigger, or schedule, and nothing in the workflow opens an issue or posts `@claude` on its own.
+
+Rules for `claude-build`:
+
+- Claude builds only tickets labeled `builder-claude`.
+- The label is on the NEWS ticket in Jira, which Claude cannot read from GitHub. The issue or comment that mentions `@claude` names the NEWS key, and that mention confirms the label. If no key is named, comment and stop.
+- Small means: one area, under about 300 lines, clear acceptance criteria and a test, no auth, secrets, CI, release config, migrations or deploys, and no design call.
+- If the work grows past Small, stop and comment instead of building.
+- TDD, with the failing test first.
+- One Conventional Commit per ticket, and a PR title that names every key.
+- CI green.
+- Update PRODUCT_SPEC and WHATS_NEW when the change is user-visible.
+- Follow the work-hours hold: on weekdays 9 AM–6 PM ET, do not commit, push, open or update pull requests, merge, or write to Jira. A GitHub run cannot queue work. On a weekday from 9 AM–6 PM ET, if the mention is not from Phil (`@philga7`, the repo owner), comment that the hold applies and stop. Mention `@claude` again after 6 PM ET. Phil's own mention counts as do it now. The workflow does not enforce the clock. Only an `@claude` mention starts a run.
+- Open a PR, and only Phil merges.
+
 ## When reviewing a PR
 
 Claude reports findings. It never approves or merges.

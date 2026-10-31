@@ -1,4 +1,11 @@
 name: Claude Review
+# @claude mentions from OWNER, MEMBER, or COLLABORATOR also start
+# .github/workflows/claude.yml job build (name claude-build).
+# This file's mention job (name claude-mention) still starts on those
+# issue_comment and pull_request_review_comment events. The two jobs do
+# not share a concurrency group. claude-mention is the review follow-up.
+# claude-build opens a pull request for Claude-eligible work. Automatic
+# review on pull_request stays this file's review job only.
 
 on:
   pull_request:
@@ -73,3 +80,5 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           claude_args: |
             --model claude-sonnet-5-5
+            --append-system-prompt "You are the review follow-up. Do not edit files, commit, push, or open a pull request. claude-build opens pull requests."
+            --disallowedTools "Bash(git add:*),Bash(git commit:*),Bash(git push:*),Bash(*git-push.sh:*),Bash(gh pr merge:*),Bash(gh pr review:*)"

@@ -2,6 +2,24 @@
 
 Binding choices for Informed News. Newest first. When one of these changes, update this file in the same change as [ROADMAP.md](ROADMAP.md) and Jira. What the product does now, in plain language, is [PRODUCT_SPEC.md](PRODUCT_SPEC.md). Pipeline detail remains in [NEWS-84](https://informedcrew.atlassian.net/browse/NEWS-84), [TRIAGE.md](TRIAGE.md), and [BRIEF.md](BRIEF.md). The target is [VISION.md](VISION.md).
 
+## 2026-10-31 — Claude builds Small builder-claude tickets on @claude mention via GitHub (NEWS-180)
+
+**Decision:** Claude builds Small `builder-claude` tickets on `@claude` mention via GitHub; never merges; no auto-opened issues. Phil answered the grill with the recommended answers (Saturday 2026-10-31; the work-hours hold did not apply).
+
+1. **Triggers:** `issue_comment`, `pull_request_review_comment`, and `pull_request_review` (`submitted`), plus `issues` (`opened`) only when the body contains `@claude`. No label or assignee triggers, so nothing auto-starts.
+2. **Model:** the action default. Do not pin it with `claude_args --model`.
+3. **Max turns:** `--max-turns 30`.
+4. **Allowed tools:** the repo's npm test, lint, typecheck, and build scripts, plus git. No network installs beyond `npm ci`.
+5. **Concurrency:** one run per issue or PR, with cancel-in-progress off.
+6. **CI reads:** `actions: read`, read-only, so Claude can see failing checks on its own pull requests.
+7. **Work-hours hold:** leave it to Phil. The hold is a guideline. The workflow has no time-guard step. Only an `@claude` mention from an owner, member, or collaborator starts a run.
+
+[VISION.md](VISION.md) is unchanged. This is dev tooling, not the product direction.
+
+**Why:** A collaborator can ask Claude to build a Small ticket and get a pull request, with the same OAuth secret as the review workflow, without a second automation that opens issues or merges.
+
+**What it rules out:** Label, assignee, and schedule triggers; auto-opened issues; merging, approving, pushing to `main`, or auto-merge from the workflow; pinning a model; a weekday time-guard step; `allowed_bots` and `allowed_non_write_users`; `pull_request_target`; checkout of an untrusted ref.
+
 ## 2026-10-31 — Pre-AI config blocklist and per-source criteria (NEWS-168)
 
 **Decision:** Ship [NEWS-168](https://informedcrew.atlassian.net/browse/NEWS-168) from these grill answers. Each one is "Recommended, adopted (Phil can override in review)."

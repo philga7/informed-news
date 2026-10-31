@@ -114,6 +114,10 @@ While the version is 0.x, `.releaserc.json` maps a breaking change (`feat!:` or 
 4. Open a PR into `main`; the PR title is a Conventional Commit naming every key and becomes the squash subject (see [Squash merges](#squash-merges-and-semantic-release-harn-10))
 5. Reference Jira (`NEWS-…`) in the title scope; one Conventional Commit per ticket on the branch
 
+## Claude-eligible work
+
+Claude builds only Small tickets labeled `builder-claude`, and only when an owner, member, or collaborator writes `@claude`. The rules are in [CLAUDE.md](CLAUDE.md#claude-eligible-work). Claude opens a pull request. Phil merges.
+
 ## Questions?
 
 Open an issue or contact the maintainers.
