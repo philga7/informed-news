@@ -20,11 +20,11 @@ Product direction: [VISION.md](VISION.md). Binding choices: [DECISIONS.md](DECIS
 5. [NEWS-173](https://informedcrew.atlassian.net/browse/NEWS-173) court-record checks via CourtListener citation lookup and RECAP (SDD) — **Done**.
 6. Hosting [NEWS-109](https://informedcrew.atlassian.net/browse/NEWS-109) — **Done**, [NEWS-110](https://informedcrew.atlassian.net/browse/NEWS-110) — **Done**, [NEWS-111](https://informedcrew.atlassian.net/browse/NEWS-111) — **Done**, and [NEWS-112](https://informedcrew.atlassian.net/browse/NEWS-112) — **Done**. Item 6 is **Done**. Gates the Story Desk MCP, Watchers, and Epics B and C.
 
-**Current next** is [NEWS-168](https://informedcrew.atlassian.net/browse/NEWS-168), then [NEWS-169](https://informedcrew.atlassian.net/browse/NEWS-169). [NEWS-175](https://informedcrew.atlassian.net/browse/NEWS-175) (spec and changelog rule) is **Done**. Reordered 2026-10-27: hosting pulled ahead of NEWS-168/169, approved by Phil.
+**Current next** is [NEWS-169](https://informedcrew.atlassian.net/browse/NEWS-169), then [NEWS-170](https://informedcrew.atlassian.net/browse/NEWS-170). [NEWS-168](https://informedcrew.atlassian.net/browse/NEWS-168) (pre-AI blocklist) is **Done**. [NEWS-175](https://informedcrew.atlassian.net/browse/NEWS-175) (spec and changelog rule) is **Done**. Reordered 2026-10-27: hosting pulled ahead of NEWS-168/169, approved by Phil.
 
 Hosting hygiene [NEWS-181](https://informedcrew.atlassian.net/browse/NEWS-181) (CI failure logs, env-file mode, test tightness, image tag) shipped with the runbook — **Done**.
 
-7. [NEWS-168](https://informedcrew.atlassian.net/browse/NEWS-168) pre-AI blocklist.
+7. [NEWS-168](https://informedcrew.atlassian.net/browse/NEWS-168) pre-AI blocklist — **Done**.
 8. [NEWS-169](https://informedcrew.atlassian.net/browse/NEWS-169) feedback loop.
 9. [NEWS-170](https://informedcrew.atlassian.net/browse/NEWS-170) SPA shell (candidate): Briefs, then Story Desk. Do not start until Phil approves.
 
@@ -127,7 +127,7 @@ Unscheduled: Watchers stay on [NEWS-84](https://informedcrew.atlassian.net/brows
 | 79 | [NEWS-111](https://informedcrew.atlassian.net/browse/NEWS-111) | Expose via Tailscale only (no public bind); keep `MVP_PASSWORD` — **Done** *(item 6)* ([docs/RUNBOOK.md](RUNBOOK.md)) |
 | 80 | [NEWS-112](https://informedcrew.atlassian.net/browse/NEWS-112) | Env-file layout + short Hostinger runbook — **Done** *(item 6)* ([docs/RUNBOOK.md](RUNBOOK.md)) |
 | 80a | [NEWS-181](https://informedcrew.atlassian.net/browse/NEWS-181) | Hosting hygiene: CI failure logs, env-file mode, test tightness, and image tag — **Done** |
-| 81 | [NEWS-168](https://informedcrew.atlassian.net/browse/NEWS-168) | Pre-AI blocklist, global and per source *(combined order item 7)* |
+| 81 | [NEWS-168](https://informedcrew.atlassian.net/browse/NEWS-168) | Pre-AI blocklist, global and per source — **Done** *(combined order item 7)* |
 | 82 | [NEWS-169](https://informedcrew.atlassian.net/browse/NEWS-169) | Like / Not relevant feedback into later triage prompts *(combined order item 8)* |
 | 83 | [NEWS-170](https://informedcrew.atlassian.net/browse/NEWS-170) | SPA shell in this repo (candidate): Briefs, then Story Desk. Do not start until Phil approves *(combined order item 9)* |
 | Checkpoint | [NEWS-175](https://informedcrew.atlassian.net/browse/NEWS-175) | Dev tooling ([NEWS-82](https://informedcrew.atlassian.net/browse/NEWS-82)): review the `PRODUCT_SPEC.md` / `WHATS_NEW.md` ship-loop step; record keep / change / drop in [DECISIONS.md](DECISIONS.md) — **Done** |

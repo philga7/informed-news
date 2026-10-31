@@ -13,6 +13,7 @@ import {
 	FILTERED_REASON_LABEL,
 	FILTERED_SCOPE_LABEL,
 	FILTERED_SKIPPED_RUN,
+	blocklistReasonLine,
 	duplicateOfTitle,
 	fetchFilteredOut,
 	filteredOutLinkLabel,
@@ -79,6 +80,7 @@ describe('filtered out copy', () => {
 	it('uses the exact reason labels in display order', () => {
 		expect(FILTERED_REASON_GROUPS.map((group) => FILTERED_REASON_LABEL[group])).toEqual([
 			'Muted',
+			'Blocklist',
 			'Off-topic',
 			'Clickbait',
 			'Opinion',
@@ -147,6 +149,15 @@ describe('reasonCounts', () => {
 });
 
 describe('item lines', () => {
+	it('blocklistReasonLine is the machine reason only for the blocklist group', () => {
+		expect(
+			blocklistReasonLine(makeItem('astro', 'blocklist', { reason: 'blocklist:horoscope' })),
+		).toBe('blocklist:horoscope');
+		expect(blocklistReasonLine(makeItem('b', 'muted', { reason: 'muted:rule-1' }))).toBeNull();
+		expect(blocklistReasonLine(makeItem('c', 'off_topic'))).toBeNull();
+		expect(blocklistReasonLine(makeItem('d', 'sponsored', { reason: 'sponsored' }))).toBeNull();
+	});
+
 	it('mutedByLine shows the rule or topic label', () => {
 		expect(
 			mutedByLine(

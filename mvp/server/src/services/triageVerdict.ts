@@ -91,6 +91,13 @@ export function advisoryFromMachineDrop(reason: TriageReason): TriageAdvisory {
       reasonText: `Muted by rule or undesired topic ${id}.`,
     });
   }
+  if (reason.startsWith('blocklist:')) {
+    const term = reason.slice('blocklist:'.length);
+    return advisoryForNonAiDrop({
+      criteriaRef: `rule:blocklist:${term}`,
+      reasonText: `Blocked by config term ${term}.`,
+    });
+  }
   switch (reason) {
     case 'duplicate':
       return advisoryForNonAiDrop({
@@ -132,7 +139,7 @@ export function advisoryFromMachineDrop(reason: TriageReason): TriageAdvisory {
         reasonText: `Filtered as ${reason.replace(/_/g, ' ')}.`,
       });
     default:
-      // `muted:*` handled above; keep a safe fallback for future static reasons.
+      // `muted:*` and `blocklist:*` handled above; keep a safe fallback for future static reasons.
       return advisoryForNonAiDrop({
         criteriaRef: 'global',
         reasonText: `Filtered (${reason}).`,
@@ -142,9 +149,21 @@ export function advisoryFromMachineDrop(reason: TriageReason): TriageAdvisory {
 
 /**
  * Build advisory fields from a Jev keep/drop decision. Uses the driving topic or
- * global criteria; confidence comes from the quality answer (or relevance floor).
+ * global criteria; when a source id is passed, criteriaRef is `source:<id>`.
+ * Confidence comes from the quality answer (or relevance floor).
  */
 export function advisoryFromJev(
+  verdict: TriageVerdict,
+  answers: TriageJevAnswers,
+  topicsById: ReadonlyMap<string, Topic>,
+  sourceId?: string,
+): TriageAdvisory {
+  const advisory = advisoryFromJevTopics(verdict, answers, topicsById);
+  if (sourceId === undefined) return advisory;
+  return { ...advisory, criteriaRef: `source:${sourceId}` };
+}
+
+function advisoryFromJevTopics(
   verdict: TriageVerdict,
   answers: TriageJevAnswers,
   topicsById: ReadonlyMap<string, Topic>,

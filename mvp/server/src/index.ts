@@ -4,6 +4,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import type { RequestHandler } from 'express';
 import { createApp } from './app.js';
 import { REFRESH_CHECK_MINUTES } from './services/briefConfig.js';
+import { exitIfRadarConfigInvalid } from './services/loadRadarSources.js';
 import { startRefreshScheduler } from './services/index.js';
 import { warnIfSearxngUnset } from './services/searxngSearch.js';
 import { kiteHandlerPath } from './serveKite.js';
@@ -12,6 +13,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const envFile = process.env.MVP_ENV_FILE?.trim() || path.resolve(__dirname, '../../.env');
 dotenv.config({ path: envFile, override: true });
 warnIfSearxngUnset();
+
+exitIfRadarConfigInvalid();
 
 const port = Number(process.env.PORT) || 3001;
 

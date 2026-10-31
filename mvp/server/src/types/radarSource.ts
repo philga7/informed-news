@@ -1,3 +1,8 @@
+export type BlocklistTerm = {
+  term: string;
+  substring: boolean;
+};
+
 export type RadarSource = {
   id: string;
   name: string;
@@ -8,8 +13,11 @@ export type RadarSource = {
   sourceTier?: 'primary' | 'sensor';
   /** Defaults to true when absent in config. */
   enabled?: boolean;
+  blocklist?: BlocklistTerm[];
+  criteria?: string;
 };
 
-export type RadarSourcesConfig = {
+export type LoadedRadarSourcesFile = {
+  blocklist: BlocklistTerm[];
   sources: RadarSource[];
 };

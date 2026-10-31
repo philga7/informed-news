@@ -6,9 +6,16 @@ import { test } from 'node:test';
 import { articleIdFromCanonicalUrl, readArticles, updateArticles } from '../store/index.js';
 import type { MuteRule } from '../store/muteRulesStore.js';
 import type { Article, FramingAnalysis, StoreMeta } from '../types/article.js';
+import type { LoadedRadarSourcesFile } from '../types/radarSource.js';
 import type { Topic } from '../types/topic.js';
 import type { TriageRecord, TriageStore } from '../types/triage.js';
-import { routeTriageAnswers, type judgeTriage, type TriageJevAnswers } from './triageJev.js';
+import { generateRefreshSummaries } from './briefSummaries.js';
+import {
+  routeTriageAnswers,
+  type judgeTriage,
+  type TriageJevAnswers,
+  type TriageJevContext,
+} from './triageJev.js';
 import { runTriage, type TriageDeps } from './triagePipeline.js';
 import { writeBackSurvivors, type SurvivorResult } from './triageSurvivor.js';
 
@@ -146,6 +153,7 @@ function harness(opts: HarnessOptions) {
       state.prepareCalls.push(a.id);
       return opts.prepare ? opts.prepare(a) : { article: a, changed: false, dateIssue: null };
     },
+    readRadarConfig: () => ({ blocklist: [], sources: [] }),
     ...opts.overrides,
   };
   return { deps, state };
@@ -1163,4 +1171,314 @@ test('a seed gaining coverage from one of its own save-time hosts keeps 2 outlet
   await run(deps);
 
   assert.deepEqual(state.store.records.seed, seedRecord('seed', { memberIds: ['dup'], outletCount: 2 }));
+});
+
+function radarConfig(terms: string[]): LoadedRadarSourcesFile {
+  return {
+    blocklist: terms.map((term) => ({ term, substring: false })),
+    sources: [],
+  };
+}
+
+const HOROSCOPE = topic('astrology', { name: 'Astrology', keywords: ['horoscope'] });
+
+/** Summarize calls for this triage result. A kept story with an ok body would be called. */
+async function countRefreshSummaries(
+  topics: Topic[],
+  articles: Article[],
+  triage: TriageStore,
+): Promise<number> {
+  let calls = 0;
+  await generateRefreshSummaries(
+    { now: NOW, env: { TRIAGE_SUMMARY_BUDGET: '10' } },
+    {
+      readTopics: async () => ({ topics }),
+      readMuteRules: async () => ({ rules: [] }),
+      readArticles: async () => articles,
+      readTriage: async () => triage,
+      readBriefSeen: async () => ({ seen: {}, updatedAt: null }),
+      readBriefSummaries: async () => ({ summaries: {}, updatedAt: null }),
+      readMeta: async () => ({ lastFetchAt: null, lastError: null, refresh: null }),
+      updateMeta: async () => undefined,
+      putBriefSummaries: async () => undefined,
+      ollamaAvailable: () => true,
+      summarize: async () => {
+        calls += 1;
+        return { ok: true, text: 'A neutral generated summary of the story.', model: 'fake' };
+      },
+      runCitationGuard: async () => [],
+    },
+  );
+  return calls;
+}
+
+test('a blocklisted story is dropped before scrape, Jev, and Ollama', async () => {
+  const articles = [
+    article('astro', 'Weekly horoscope', {
+      bodyText: 'The week ahead in the stars.',
+      bodyStatus: 'ok',
+    }),
+  ];
+  const { deps, state } = harness({
+    topics: [HOROSCOPE],
+    articles,
+    overrides: { readRadarConfig: () => radarConfig(['horoscope']) },
+  });
+
+  const result = await run(deps);
+
+  assert.equal(state.judgeCalls.length, 0);
+  assert.equal(state.prepareCalls.length, 0);
+  assert.equal(await countRefreshSummaries([HOROSCOPE], articles, state.store), 0);
+  const dropped = state.store.records.astro!;
+  assert.equal(dropped.reason, 'blocklist:horoscope');
+  assert.equal(dropped.stage, 'blocklist');
+  assert.equal(dropped.final, true);
+  assert.equal(dropped.criteriaRef, 'rule:blocklist:horoscope');
+  assert.equal(dropped.verdict, 'filtered');
+  assert.equal(dropped.confidence, 1);
+  assert.equal(dropped.reasonText, 'Blocked by config term horoscope.');
+  assert.equal(result.byReason.blocklist, 1);
+  assert.deepEqual(result.keptIds, []);
+});
+
+test('fixture refresh: blocklist saves 3 headline Jev calls', async () => {
+  const desk = topic('desk', {
+    name: 'Desk',
+    keywords: ['horoscope', 'agenda', 'roundup', 'tariff'],
+  });
+  const articles = [
+    article('horo', 'Weekly horoscope'),
+    article('promo', 'City council agenda', { snippet: 'a sponsored item' }),
+    article('roundup', 'Monday roundup'),
+    article('vote', 'Tariff vote passes'),
+  ];
+  const { deps, state } = harness({
+    topics: [desk],
+    articles,
+    overrides: {
+      readRadarConfig: () => ({
+        blocklist: [
+          { term: 'horoscope', substring: false },
+          { term: 'sponsored', substring: true },
+        ],
+        sources: [
+          {
+            id: 'roundup-wire',
+            name: 'Roundup Wire',
+            domain: 'roundup.example.com',
+            feedUrl: 'https://roundup.example.com/rss',
+            blocklist: [{ term: 'roundup', substring: false }],
+          },
+        ],
+      }),
+    },
+  });
+
+  const result = await run(deps);
+
+  assert.equal(state.judgeCalls.length, 1);
+  assert.deepEqual(state.judgeCalls[0], { stage: 'headline', id: 'vote' });
+  assert.equal(state.store.records.horo!.reason, 'blocklist:horoscope');
+  assert.equal(state.store.records.promo!.reason, 'blocklist:sponsored');
+  assert.equal(state.store.records.roundup!.reason, 'blocklist:roundup');
+  const headlineJevCallsSaved = articles.length - result.jev.used;
+  assert.equal(headlineJevCallsSaved, 3);
+});
+
+test('a second candidate with no blocklist hit still calls judge once', async () => {
+  const { deps, state } = harness({
+    topics: [HOROSCOPE, TARIFFS],
+    articles: [
+      article('astro', 'Weekly horoscope'),
+      article('vote', 'Tariff vote passes'),
+    ],
+    overrides: { readRadarConfig: () => radarConfig(['horoscope']) },
+  });
+
+  await run(deps);
+
+  assert.deepEqual(state.judgeCalls, [{ stage: 'headline', id: 'vote' }]);
+  assert.equal(state.store.records.astro!.reason, 'blocklist:horoscope');
+  assert.equal(state.store.records.vote!.status, 'kept');
+});
+
+test('a blocklisted story that also matches a mute rule is blocklist only', async () => {
+  const rule: MuteRule = { id: 'r1', keyword: 'celebrity', source: null, createdAt: hoursAgo(50) };
+  const { deps, state } = harness({
+    topics: [HOROSCOPE],
+    rules: [rule],
+    articles: [article('both', 'Celebrity horoscope column')],
+    overrides: { readRadarConfig: () => radarConfig(['horoscope']) },
+  });
+
+  await run(deps);
+
+  assert.equal(state.store.records.both!.reason, 'blocklist:horoscope');
+  assert.equal(state.judgeCalls.length, 0);
+});
+
+test('a blocklisted copy of an already-kept story is blocklist:horoscope and is not a member of the kept story', async () => {
+  const title = 'Weekly horoscope tariff briefing';
+  const kept = article('k1', title, { publishedAt: hoursAgo(5) });
+  const copy = article('n1', title);
+  const { deps, state } = harness({
+    topics: [TARIFFS],
+    articles: [kept, copy],
+    records: { k1: keptRecord('k1') },
+    overrides: { readRadarConfig: () => radarConfig(['horoscope']) },
+  });
+
+  await run(deps);
+
+  assert.equal(state.judgeCalls.length, 0);
+  assert.equal(state.store.records.n1!.reason, 'blocklist:horoscope');
+  assert.equal(state.store.records.n1!.stage, 'blocklist');
+  assert.equal(state.store.records.k1!.memberIds.includes('n1'), false);
+  assert.equal(state.store.records.k1!.outletCount, 1);
+});
+
+test('a muted-outlet copy of a kept story stays muted and is not a member of the kept story', async () => {
+  const title = 'Supreme Court strikes down steel tariff plan';
+  const outlet = topic('tabloid-outlet', {
+    name: 'dailymail.co.uk',
+    kind: 'undesired',
+    level: null,
+    keywords: ['dailymail.co.uk'],
+  });
+  const kept = article('k1', title, { publishedAt: hoursAgo(5) });
+  const copy = article('n1', title, { publisherDomain: 'www.dailymail.co.uk' });
+  const { deps, state } = harness({
+    topics: [TARIFFS, outlet],
+    articles: [kept, copy],
+    records: { k1: keptRecord('k1') },
+  });
+
+  await run(deps);
+
+  assert.equal(state.judgeCalls.length, 0);
+  assert.equal(state.store.records.n1!.reason, 'muted:tabloid-outlet');
+  assert.equal(state.store.records.n1!.stage, 'keyword');
+  assert.equal(state.store.records.k1!.memberIds.includes('n1'), false);
+  assert.equal(state.store.records.k1!.outletCount, 1);
+});
+
+test('readRadarConfig throwing skips the run and records the message', async () => {
+  const message = 'radar-sources.json: blocklist: term is empty';
+  const { deps } = harness({
+    topics: [TARIFFS],
+    articles: [article('a', 'Tariff ruling hits steel imports')],
+    overrides: {
+      readRadarConfig: () => {
+        throw new Error(message);
+      },
+    },
+  });
+
+  const result = await run(deps);
+
+  assert.equal(result.skipped, true);
+  assert.equal(result.errors.includes(message), true);
+});
+
+function filingsRadar(): LoadedRadarSourcesFile {
+  return {
+    blocklist: [],
+    sources: [
+      {
+        id: 'macrumors',
+        name: 'MacRumors',
+        domain: 'macrumors.com',
+        feedUrl: 'https://macrumors.com/rss',
+        criteria: 'Prefer filings.',
+      },
+    ],
+  };
+}
+
+function keepingJudge(
+  contexts: Map<string, TriageJevContext>,
+): NonNullable<TriageDeps['judge']> {
+  return async (_stage, a, ctx) => {
+    contexts.set(a.id, ctx);
+    const answers: TriageJevAnswers = {
+      relevance: Object.fromEntries(ctx.candidates.map((t) => [t.id, 1])),
+      undesired: Object.fromEntries(ctx.undesired.map((t) => [t.id, 0])),
+      quality: { choice: 'news', confidence: 0.9 },
+      significance: 2,
+    };
+    return { ok: true, answers, verdict: routeTriageAnswers(answers, ctx), model: 'fake' };
+  };
+}
+
+test('an rss story on a source with criteria is kept citing that source; another domain stays on the topic', async () => {
+  const contexts = new Map<string, TriageJevContext>();
+  const { deps, state } = harness({
+    topics: [TARIFFS],
+    articles: [
+      article('mac', 'Apple files a new tariff brief', {
+        publisherDomain: 'www.macrumors.com',
+      }),
+      article('other', 'Commerce sets a tariff schedule'),
+    ],
+    overrides: {
+      readRadarConfig: filingsRadar,
+      judge: keepingJudge(contexts),
+    },
+  });
+
+  await run(deps);
+
+  assert.equal(state.store.records.mac!.status, 'kept');
+  assert.equal(state.store.records.mac!.criteriaRef, 'source:macrumors');
+  assert.deepEqual(contexts.get('mac')?.sourceCriteria, {
+    sourceId: 'macrumors',
+    text: 'Prefer filings.',
+  });
+  assert.equal(state.store.records.other!.status, 'kept');
+  assert.equal(state.store.records.other!.criteriaRef, 'topic:tariffs');
+  assert.equal(contexts.get('other')?.sourceCriteria, undefined);
+});
+
+test('a Jev off-topic drop for a story with source criteria cites that source', async () => {
+  const { deps, state } = harness({
+    topics: [TARIFFS],
+    articles: [
+      article('mac', 'Tariff rumor with no filing', {
+        publisherDomain: 'macrumors.com',
+      }),
+    ],
+    script: { mac: { headline: { relevance: 0 } } },
+    overrides: { readRadarConfig: filingsRadar },
+  });
+
+  await run(deps);
+
+  assert.equal(state.judgeCalls.length, 1);
+  assert.equal(state.store.records.mac!.reason, 'off_topic');
+  assert.equal(state.store.records.mac!.criteriaRef, 'source:macrumors');
+});
+
+test('a search article that only shares the source domain does not get that criteria', async () => {
+  const contexts = new Map<string, TriageJevContext>();
+  const { deps, state } = harness({
+    topics: [TARIFFS],
+    articles: [
+      article('found', 'Tariff filing covered by search', {
+        sourceKind: 'search',
+        publisherDomain: 'www.macrumors.com',
+      }),
+    ],
+    overrides: {
+      readRadarConfig: filingsRadar,
+      judge: keepingJudge(contexts),
+    },
+  });
+
+  await run(deps);
+
+  assert.equal(contexts.size, 1);
+  assert.equal(contexts.get('found')?.sourceCriteria, undefined);
+  assert.equal(state.store.records.found!.status, 'kept');
+  assert.equal(state.store.records.found!.criteriaRef, 'topic:tariffs');
 });

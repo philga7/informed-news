@@ -56,7 +56,11 @@ const SIGNIFICANCE_RUBRIC = [
 const TOPIC_FALSE_CRITERION = 'Not about this topic, or only a passing mention.';
 
 /** Already capped by the caller. */
-export type TriageJevContext = { candidates: Topic[]; undesired: Topic[] };
+export type TriageJevContext = {
+  candidates: Topic[];
+  undesired: Topic[];
+  sourceCriteria?: { sourceId: string; text: string };
+};
 
 export type TriageJevAnswers = {
   /** topicId → noul */
@@ -77,6 +81,7 @@ export type TriageHeadlineState = {
   publisher: string | null;
   snippet: string;
   publishedAt: string | null;
+  sourceCriteria?: string;
 };
 
 export type TriageBodyState = TriageHeadlineState & { bodyExcerpt: string };
@@ -106,7 +111,11 @@ export function buildTriageQuestions(ctx: TriageJevContext): Questions {
       { true: describe(topic) },
     );
   });
-  questions.quality = choice('What kind of story is this?', QUALITY_CRITERIA);
+  const qualityPrompt =
+    ctx.sourceCriteria === undefined
+      ? 'What kind of story is this?'
+      : `What kind of story is this? Source criteria: ${ctx.sourceCriteria.text}`;
+  questions.quality = choice(qualityPrompt, QUALITY_CRITERIA);
   questions.significance = score(
     'How significant is this development for someone following the topic(s) this story is about?',
     SIGNIFICANCE_RUBRIC,
@@ -134,18 +143,23 @@ function publisherLabel(article: Article): string | null {
   return outlet?.label.trim() || article.publisherDomain || null;
 }
 
-export function buildHeadlineState(article: Article): TriageHeadlineState {
-  return {
+export function buildHeadlineState(
+  article: Article,
+  sourceCriteria?: string,
+): TriageHeadlineState {
+  const state: TriageHeadlineState = {
     headline: article.title,
     publisher: publisherLabel(article),
     snippet: article.snippet.trim().slice(0, HEADLINE_SNIPPET_MAX_CHARS),
     publishedAt: article.publishedAt,
   };
+  if (sourceCriteria !== undefined) state.sourceCriteria = sourceCriteria;
+  return state;
 }
 
-export function buildBodyState(article: Article): TriageBodyState {
+export function buildBodyState(article: Article, sourceCriteria?: string): TriageBodyState {
   return {
-    ...buildHeadlineState(article),
+    ...buildHeadlineState(article, sourceCriteria),
     bodyExcerpt: (article.bodyText ?? '').trim().slice(0, BODY_EXCERPT_MAX_CHARS),
   };
 }
@@ -241,7 +255,11 @@ export async function judgeTriage(
 ): Promise<TriageJudgeResult> {
   const call = deps.systemOne ?? systemOne;
   try {
-    const state = stage === 'body' ? buildBodyState(article) : buildHeadlineState(article);
+    const criteriaText = ctx.sourceCriteria?.text;
+    const state =
+      stage === 'body'
+        ? buildBodyState(article, criteriaText)
+        : buildHeadlineState(article, criteriaText);
     const res = await call<Questions>({
       state,
       questions: buildTriageQuestions(ctx),

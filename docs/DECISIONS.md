@@ -2,6 +2,22 @@
 
 Binding choices for Informed News. Newest first. When one of these changes, update this file in the same change as [ROADMAP.md](ROADMAP.md) and Jira. What the product does now, in plain language, is [PRODUCT_SPEC.md](PRODUCT_SPEC.md). Pipeline detail remains in [NEWS-84](https://informedcrew.atlassian.net/browse/NEWS-84), [TRIAGE.md](TRIAGE.md), and [BRIEF.md](BRIEF.md). The target is [VISION.md](VISION.md).
 
+## 2026-10-31 — Pre-AI config blocklist and per-source criteria (NEWS-168)
+
+**Decision:** Ship [NEWS-168](https://informedcrew.atlassian.net/browse/NEWS-168) from these grill answers. Each one is "Recommended, adopted (Phil can override in review)."
+
+1. **Placement:** On each candidate before the Topics mute pass, before duplicate grouping of the keyword survivors (including a duplicate of an already-kept story), and before scrape, Jev, and Brief-summary work. A blocklisted copy of a kept story is `blocklist:<term>`, not a duplicate. A muted copy stays `muted:<id>` and is not added to the kept story's members. Recommended, adopted (Phil can override in review).
+2. **Matching:** Case-insensitive on title plus snippet; word-boundary by default; `substring: true` opts into contains; no plural suffixes. Recommended, adopted (Phil can override in review).
+3. **Config:** `blocklist` array of strings or `{ term, substring }` at top level and per source in `mvp/server/config/radar-sources.json`; optional per-source `criteria` (≤500 characters). A bad entry throws with file path, JSON path, and reason. Recommended, adopted (Phil can override in review).
+4. **Topics mute stays separate.** Machine reason `blocklist:<term>`. Advisory `criteriaRef` for that drop is `rule:blocklist:<term>`. Recommended, adopted (Phil can override in review).
+5. **Per-source criteria** is in this change, capped at 500 characters, cited as `source:<id>` when it drove a Jev judgment (not on blocklist-only drops). Recommended, adopted (Phil can override in review).
+6. **Shipped list** is `"blocklist": []`. Example terms live in [TRIAGE.md](TRIAGE.md). No starter terms in the committed config. Recommended, adopted (Phil can override in review).
+7. **Approach** was SDD. Recommended, adopted (Phil can override in review).
+
+**Why:** Cheap junk can leave the pipeline before Jev and scraping spend. Topics mutes stay operator-driven; blocklist is config-only until a later UI. Per-source criteria gives curated RSS sources a short scoring note without changing topic keywords.
+
+**What it rules out:** In-app blocklist editing, learned or AI-suggested blocklists, changing how Topics mutes work ([NEWS-87](https://informedcrew.atlassian.net/browse/NEWS-87)), seeding blocklist terms without Phil, and folding Like / Not relevant ([NEWS-169](https://informedcrew.atlassian.net/browse/NEWS-169)) into this ticket.
+
 ## 2026-10-31 — Spec and plain-English changelog stay, with a narrower rule (NEWS-175)
 
 **Decision:** Keep both steps. Update [PRODUCT_SPEC.md](PRODUCT_SPEC.md) only when what a reader can do changes. Do not bump Last checked when the spec is unchanged. Keep [WHATS_NEW.md](WHATS_NEW.md). Write what is true at merge, or one line **No user-visible change.** for a tooling change. Deploy steps and post-merge steps stay in the pull request body. The next ship-loop pull request corrects a WHATS_NEW or PRODUCT_SPEC line that is no longer true, and lists that correction under "Also in this PR". Do not roll this out to other repos yet. Revisit after informed-news runs 5 more pull requests under this rule. Phil was not in the grill. Each answer is "Recommended, adopted (Phil can override in review)."

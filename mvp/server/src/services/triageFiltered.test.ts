@@ -7,6 +7,7 @@ import type { TriageRecord, TriageRunMeta, TriageStore } from '../types/triage.j
 import {
   buildFilteredOut,
   FILTERED_REASON_GROUPS,
+  filteredReasonGroup,
   parseFilteredOutScope,
   REMOVED_MUTE_LABEL,
 } from './triageFiltered.js';
@@ -182,6 +183,7 @@ test('every reason group appears in display order with matching counts', () => {
     'opinion',
     'clickbait',
     'off_topic',
+    'blocklist:horoscope',
     'muted:r1',
   ] as const;
   const out = build({
@@ -200,6 +202,15 @@ test('every reason group appears in display order with matching counts', () => {
     out.counts,
     Object.fromEntries(FILTERED_REASON_GROUPS.map((g) => [g, 1])),
   );
+});
+
+test('blocklist reasons group as blocklist', () => {
+  assert.equal(filteredReasonGroup('blocklist:horoscope'), 'blocklist');
+  const out = build({
+    records: [dropped('astro', { reason: 'blocklist:horoscope', stage: 'blocklist' })],
+  });
+  assert.equal(out.items[0]!.group, 'blocklist');
+  assert.equal(out.items[0]!.reason, 'blocklist:horoscope');
 });
 
 test('mutedBy: rule (with and without source), topic, and removed id', () => {

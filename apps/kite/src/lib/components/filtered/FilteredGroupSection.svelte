@@ -4,6 +4,7 @@
 		FILTERED_GROUP_PREVIEW,
 		FILTERED_NON_FINAL_NOTE,
 		FILTERED_SHOW_FEWER,
+		blocklistReasonLine,
 		duplicateOfTitle,
 		groupHeading,
 		itemTitle,
@@ -40,6 +41,7 @@
 		{#each visible as item (item.articleId)}
 			{@const published = item.publishedAt ? formatTimeAgoShort(item.publishedAt, now) : null}
 			{@const muted = mutedByLine(item)}
+			{@const blocklistReason = blocklistReasonLine(item)}
 			<li
 				class="rounded-md border border-gray-200 bg-white/70 px-3 py-2 text-xs shadow-sm backdrop-blur dark:border-gray-700 dark:bg-gray-900/60"
 				data-testid="filtered-item"
@@ -62,6 +64,11 @@
 				</p>
 				{#if muted}
 					<p class="mt-1 text-gray-600 dark:text-gray-300">{muted}</p>
+				{/if}
+				{#if blocklistReason}
+					<p class="mt-1 text-gray-600 dark:text-gray-300" data-testid="filtered-blocklist-reason">
+						{blocklistReason}
+					</p>
 				{/if}
 				{#if item.duplicateOf}
 					<p class="mt-1 text-gray-600 dark:text-gray-300">

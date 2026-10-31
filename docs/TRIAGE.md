@@ -18,19 +18,45 @@ Older articles that were never triaged are left alone and get no record; the art
 
 ## Pipeline order
 
-Cheapest step first. A story only moves on if it passes the step before, so off-topic, muted, and trash stories never reach scraping. Nothing in this path calls Ollama, and claims extraction is not part of it.
+Cheapest step first. A story only moves on if it passes the step before, so blocklisted, muted, off-topic, and trash stories never reach scraping. Nothing in this path calls Ollama, and claims extraction is not part of it.
 
-1. **Mute and keyword pass (free).**
-   - Shared mute rules (`/api/brief/mutes`) are checked first, then **undesired** topics. An undesired topic matches when its name or a keyword appears in the headline, publisher headline, or snippet. A keyword with a dot and no spaces (e.g. `dailymail.co.uk`) also blocks that outlet and its subdomains; a leading `www.` and a trailing `.` are ignored, and punycode TLDs (`xn--…`) count as hostnames. Match → `muted:<ruleOrTopicId>`. **Mute always wins** over desired topics.
+1. **Config blocklist (free).** Title plus snippet (case-insensitive) are checked against the global `blocklist` in `mvp/server/config/radar-sources.json`, then — for curated RSS rows only — the matching source's `blocklist`. Word-boundary match by default; `{ "term": "…", "substring": true }` opts into contains (no plural suffixes). First hit → `blocklist:<term>` at stage `blocklist` and the story stops, before mute rules, duplicate grouping, scrape, or Jev. **Blocklist wins over mute rules** when both would match. A blocklisted copy of an already-kept story is `blocklist:<term>`, not `duplicate`, and is not added to that story's `memberIds`. See [Blocklist config](#blocklist-config-news-168).
+2. **Mute and keyword pass (free).**
+   - Shared mute rules (`/api/brief/mutes`) are checked first, then **undesired** topics. An undesired topic matches when its name or a keyword appears in the headline, publisher headline, or snippet. A keyword with a dot and no spaces (e.g. `dailymail.co.uk`) also blocks that outlet and its subdomains; a leading `www.` and a trailing `.` are ignored, and punycode TLDs (`xn--…`) count as hostnames. Match → `muted:<ruleOrTopicId>` at stage `keyword`. **Mute always wins** over desired topics (but not over blocklist in step 1). A muted copy of an already-kept story stays `muted:<id>` and is not added to that story's `memberIds` or `outletCount`.
    - Then **desired** topics: a topic is a candidate when its name or a keyword appears in the same text. Topic search rows also keep the desired topics that found them. Other sources need a keyword hit — no hit → `off_topic`. At most 6 candidate topics per story.
    - Mute rules match as substrings; undesired-topic keywords match on word boundaries with plural endings only (`raid` mutes "raids", but `Ira` doesn't mute "Iran"); desired-topic keywords also accept inflections and demonyms.
    - Topic keywords match whole words. A keyword with no lowercase letters (`ICE`, `DOGE`, `F-250`) is case-sensitive, so `ICE` doesn't hit "ice cream"; others are case-insensitive. A keyword ending in a letter also matches endings: undesired topics only `s` / `es`; desired topics `s`, `es`, `n`, `an`, `ian`, `i`, each optionally followed by `s` (`tariff` matches "tariffs", `Israel` matches "Israeli" and "Israelis", `Iran` matches "Iranians").
-2. **Duplicate grouping (free).** Stories are grouped when they share a URL (or one links to the other), carry the same normalized headline on any outlet (syndication; headlines of 3+ words only, so "Live updates" doesn't merge), or have very similar headlines within a shared topic. If a group matches a story already kept earlier in the window, every new member becomes a `duplicate` of it with no Jev call. Otherwise the group picks a representative: primary-tier source first, then one with a direct publisher link, then one with a scraped body, then the longer snippet, then the earliest date.
-3. **Headline check (one Jev call).** The representative's headline, publisher, snippet (first 300 characters), and date go to Jev. See [Jev questions](#jev-questions).
-4. **Survivor prep.** Only stories that pass the headline check, and only rows still waiting for a scrape (`bodyStatus: 'pending'`, e.g. topic search rows) touch the network: a Google-only link is resolved to the publisher URL, the publisher page is scraped for the body (one 15-second deadline for the whole scrape, body read and retry included, so a page that stalls mid-body is cut off as unavailable), and an undated story gets its date from page metadata. A topic search story that is still undated → `undated`; a page date older than 48 hours → `stale`. Other sources fall back to `fetchedAt` and are never `undated`.
-5. **Body check (one more Jev call).** Only when the story has its body (`bodyStatus: 'ok'`, from this scrape or from ingest) and budget remains. Same questions, with the first 3,000 characters of the body added; a drop verdict here replaces the headline verdict. If the body is blocked or unavailable, the call fails, or the budget is spent, the story is **kept on the headline verdict** with `bodyChecked: false`. Its Brief summary is written from the kept story's body when it has one, else from a duplicate member's body, else — for a post with no page to scrape — from the post text when it is at least 120 characters; with none of these, the card shows "Full text unavailable" ([BRIEF.md](BRIEF.md#summaries)).
+3. **Duplicate grouping (free).** Keyword survivors are grouped when they share a URL (or one links to the other), carry the same normalized headline on any outlet (syndication; headlines of 3+ words only, so "Live updates" doesn't merge), or have very similar headlines within a shared topic. If a group matches a story already kept earlier in the window, every new member becomes a `duplicate` of it with no Jev call. Otherwise the group picks a representative: primary-tier source first, then one with a direct publisher link, then one with a scraped body, then the longer snippet, then the earliest date.
+4. **Headline check (one Jev call).** The representative's headline, publisher, snippet (first 300 characters), and date go to Jev. See [Jev questions](#jev-questions). When the article is curated RSS from a source with a `criteria` note, that note (≤500 characters) is included in the prompt; advisory `criteriaRef` for Jev-driven outcomes on that story is `source:<id>`.
+5. **Survivor prep.** Only stories that pass the headline check, and only rows still waiting for a scrape (`bodyStatus: 'pending'`, e.g. topic search rows) touch the network: a Google-only link is resolved to the publisher URL, the publisher page is scraped for the body (one 15-second deadline for the whole scrape, body read and retry included, so a page that stalls mid-body is cut off as unavailable), and an undated story gets its date from page metadata. A topic search story that is still undated → `undated`; a page date older than 48 hours → `stale`. Other sources fall back to `fetchedAt` and are never `undated`.
+6. **Body check (one more Jev call).** Only when the story has its body (`bodyStatus: 'ok'`, from this scrape or from ingest) and budget remains. Same questions, with the first 3,000 characters of the body added; a drop verdict here replaces the headline verdict. If the body is blocked or unavailable, the call fails, or the budget is spent, the story is **kept on the headline verdict** with `bodyChecked: false`. Its Brief summary is written from the kept story's body when it has one, else from a duplicate member's body, else — for a post with no page to scrape — from the post text when it is at least 120 characters; with none of these, the card shows "Full text unavailable" ([BRIEF.md](BRIEF.md#summaries)).
 
 When a story is kept, the untried members of its group become `duplicate` of it. If the representative is dropped as `clickbait`, `opinion`, `rewrite`, `sponsored`, `undated`, or `stale`, up to **2** alternates from the group are tried in turn. When an alternate is kept, members already tried and dropped keep their own reason; only untried members become `duplicate`. The kept record's `memberIds` lists the whole group (including dropped alternates), so read each member's own record for its status. `off_topic`, `muted:*`, and `not_significant` stop the group (same event, same answer). If nothing in the group is kept, the untried members become `duplicate` of the representative.
+
+## Blocklist config (NEWS-168)
+
+Ticket: [NEWS-168](https://informedcrew.atlassian.net/browse/NEWS-168). Global and per-source blocklists live in `mvp/server/config/radar-sources.json` (committed; shipped with `"blocklist": []`). Each entry is a string or `{ "term", "substring" }`. Optional per-source `criteria` is a non-empty string ≤500 characters for Jev prompts on curated RSS from that outlet (not used on blocklist-only drops). Invalid JSON, an empty term, an unexpected property, or criteria over the cap throws `RadarSourcesConfigError` with file path, JSON path, and reason. A bad config makes the server refuse to start (exit 1), and the curated fetch reports the error.
+
+Example shape (not shipped terms):
+
+```json
+{
+  "blocklist": ["horoscope", { "term": "sponsored", "substring": true }],
+  "sources": [
+    {
+      "id": "example-outlet",
+      "name": "Example outlet",
+      "domain": "example.com",
+      "feedUrl": "https://example.com/feed/",
+      "region": "national",
+      "sourceTier": "sensor",
+      "enabled": true,
+      "blocklist": [{ "term": "roundup", "substring": false }],
+      "criteria": "Prefer original reporting over wire rewrites."
+    }
+  ]
+}
+```
 
 ## Drop reasons
 
@@ -40,6 +66,7 @@ Machine `status` / `reason` are still the live triage record. New writes also ca
 
 | Reason | Final | Meaning |
 |--------|-------|---------|
+| `blocklist:<term>` | Yes | Matched a configured blocklist term (global or per-source). Not an AI judgment. `<term>` is the matched config term. |
 | `muted:<id>` | Yes | Matched a mute rule or undesired topic (by keyword, outlet, or Jev). `<id>` is the rule or topic id. |
 | `off_topic` | Yes | No desired topic matched, or Jev found it isn't really about any candidate topic. |
 | `duplicate` | Yes | Same story as another article; `duplicateOf` names it. |
@@ -60,7 +87,7 @@ Nothing unscored is ever kept, and nothing over budget is silently dropped.
 Each Jev call is one TypeSafe `systemOne` request (via the existing `TYPESAFE_API_KEY` / `TYPESAFE_MODEL`) that asks, in plain terms:
 
 - **Topic relevance**, per candidate topic: "Is this story substantively about <topic>?" — a passing mention counts as no. Needs 0.5 or higher.
-- **Undesired match**, per undesired topic (up to 10): "Is this story about <topic> (a subject the reader excluded)?" — judged on the topic's description, so it catches stories the keywords miss. 0.6 or higher → `muted:<topicId>`, even if it is also relevant. **Outlet-only** undesired topics — every keyword is a hostname such as `dailymail.co.uk` (dotted abbreviations like `U.S.` or `D.C.` don't count), e.g. the outlet blocks **Less like this** creates ([BRIEF.md](BRIEF.md#less-like-this)) — are not asked about here and don't use up the 10 slots; they still mute by outlet in step 1.
+- **Undesired match**, per undesired topic (up to 10): "Is this story about <topic> (a subject the reader excluded)?" — judged on the topic's description, so it catches stories the keywords miss. 0.6 or higher → `muted:<topicId>`, even if it is also relevant. **Outlet-only** undesired topics — every keyword is a hostname such as `dailymail.co.uk` (dotted abbreviations like `U.S.` or `D.C.` don't count), e.g. the outlet blocks **Less like this** creates ([BRIEF.md](BRIEF.md#less-like-this)) — are not asked about here and don't use up the 10 slots; they still mute by outlet in step 2.
 - **Story kind**: news, official statement, clickbait, opinion, rewrite, or sponsored. Clickbait / opinion / rewrite / sponsored with confidence 0.6 or higher → dropped with that reason; at lower confidence the story is not dropped for its kind.
 - **Significance** on a 0–2 scale (routine → notable → must-know). **Watch** topics below 1.4 are removed from the story's topics; if none are left → `not_significant`. **Core** topics are never significance-gated.
 
@@ -89,7 +116,7 @@ Ticket: [NEWS-167](https://informedcrew.atlassian.net/browse/NEWS-167). Beside t
 
 All four are present together, or all absent. **Pre-NEWS-167 rows omit them** (no backfill); the Brief's Approved view still uses `status: 'kept'`. The advisory text is derived from the same Jev answers / non-AI rules that already drove the machine decision — no extra Jev questions.
 
-- **Non-AI drops** (mute, undesired keyword, off-topic keyword miss, duplicate, undated, stale, budget, unscored error): `confidence: 1` and a rule id in `criteriaRef` (`rule:mute:<id>`, `rule:duplicate`, `rule:budget`, or `global` for keyword off-topic / unscored error).
+- **Non-AI drops** (blocklist, mute, undesired keyword, off-topic keyword miss, duplicate, undated, stale, budget, unscored error): `confidence: 1` and a rule id in `criteriaRef` (`rule:blocklist:<term>`, `rule:mute:<id>`, `rule:duplicate`, `rule:budget`, or `global` for keyword off-topic / unscored error).
 - **Jev keeps / drops:** `criteriaRef` is `global`, `topic:<id>`, or `source:<id>`; confidence comes from the driving quality / relevance judgment. The advisory is derived from the typed Jev answers (no free-text model output to parse); `parseAdvisoryVerdict` is a coercion helper for tests and callers that still hold a string.
 
 These fields are advisory — AI-assisted judgments, not ground truth. Fixture token baseline (acceptance candidate set, fake `systemOne` at 120 input + 40 output per call): **before 480 / after 480** (delta 0, 0%); 3 Jev calls; `TRIAGE_JEV_BUDGET` default **300** unchanged. Prompts/`buildTriageQuestions` fingerprint identical to `main`.
@@ -117,9 +144,9 @@ Other limits are constants in `mvp/server/src/services/triageConfig.ts` (48h win
 
 ## What's stored where
 
-- **`mvp/data/triage.json`** (gitignored) — `{ records, updatedAt }`, one record per article id: `status` (`kept` \| `dropped`), `reason`, `stage` (`keyword` \| `dedupe` \| `headline` \| `survivor` \| `body` \| `budget` \| `manual` — an operator seed, written by Add story rather than a run), `final`, `topicIds` (kept: the topics Jev confirmed; dropped: the candidate topics considered), `labels`, `duplicateOf`, `memberIds` and `outletCount` (kept only), `significance`, `bodyChecked`, `jevCalls` (total across refreshes), `triagedAt`, and optional advisory `verdict` / `confidence` / `reasonText` / `criteriaRef` ([Advisory verdict](#advisory-verdict-news-167)). Records for articles no longer in the article store are pruned on write; for seed records, only once they are older than the window ([Seeds and concurrent refreshes](#seeds-and-concurrent-refreshes)).
+- **`mvp/data/triage.json`** (gitignored) — `{ records, updatedAt }`, one record per article id: `status` (`kept` \| `dropped`), `reason`, `stage` (`keyword` \| `blocklist` \| `dedupe` \| `headline` \| `survivor` \| `body` \| `budget` \| `manual` — an operator seed, written by Add story rather than a run), `final`, `topicIds` (kept: the topics Jev confirmed; dropped: the candidate topics considered), `labels`, `duplicateOf`, `memberIds` and `outletCount` (kept only), `significance`, `bodyChecked`, `jevCalls` (total across refreshes), `triagedAt`, and optional advisory `verdict` / `confidence` / `reasonText` / `criteriaRef` ([Advisory verdict](#advisory-verdict-news-167)). Records for articles no longer in the article store are pruned on write; for seed records, only once they are older than the window ([Seeds and concurrent refreshes](#seeds-and-concurrent-refreshes)).
 - **Article store** — survivors that were resolved or scraped are written back: `publisherUrl`, `publisherDomain`, an added publisher citation, `bodyText`, `bodyStatus`, `publisherTitle`, image fields, and `publishedAt` when it was empty. `id` and `canonicalUrl` never change. This write comes before the run's triage write, so a kept record never points at an unresolved article. If it fails, the triage write is skipped (`triage write: skipped because the article write failed`): both stores stay as they were (article writes are atomic, [BRIEF.md](BRIEF.md#retention)), and the stories are triaged again next refresh, spending Jev calls again. After each successful refresh, articles with a triage record are pruned 14 days after they were last seen and articles without one after the 48-hour window, which in turn drops their triage records at the next triage write ([BRIEF.md](BRIEF.md#retention), [NEWS-117](https://informedcrew.atlassian.net/browse/NEWS-117)).
-- **`mvp/data/meta.json` → `triage`** — the last run summary: `{ at, skipped, candidates, kept, dropped, byReason, jev: { budget, used, errors }, summaryBudget, errors }`. `byReason` counts this run's drops, with every `muted:<id>` counted under `muted`. `errors` holds at most 5 messages, plus any store-write errors (triage, articles, meta), which are always appended.
+- **`mvp/data/meta.json` → `triage`** — the last run summary: `{ at, skipped, candidates, kept, dropped, byReason, jev: { budget, used, errors }, summaryBudget, errors }`. `byReason` counts this run's drops, with every `muted:<id>` counted under `muted` and every `blocklist:<term>` under `blocklist`. `errors` holds at most 5 messages, plus any store-write errors (triage, articles, meta), which are always appended.
 
 The same summary (without `at`) is returned by `POST /api/fetch` as `triage` ([MVP_API_COMPAT.md](MVP_API_COMPAT.md)).
 
@@ -146,6 +173,7 @@ The page shows a run line (`Last refresh 3:40 PM: 120 candidates, 18 kept, 102 d
 | Group | Label |
 |-------|-------|
 | `muted:<id>` (any) | Muted |
+| `blocklist:<term>` (any) | Blocklist |
 | `off_topic` | Off-topic |
 | `clickbait` | Clickbait |
 | `opinion` | Opinion |
@@ -162,6 +190,7 @@ Within a group, newest `publishedAt` first (undated last). A group shows 20 stor
 
 - **Muted by: …** — the mute rule's keyword (with ` (<source>)` when the rule has one) or the undesired topic's name; "Removed rule or topic" when neither exists any more.
 - **Duplicate of: …** — the story it duplicates (linked), or "Article no longer stored".
+- **`blocklist:<term>`** — the exact machine reason for blocklist drops (config term, not an AI judgment).
 - **Retried next refresh** — for the non-final reasons (`not_scored_budget`, `not_scored_error`).
 - A dropped record whose article is gone shows "Article no longer stored" as its headline.
 

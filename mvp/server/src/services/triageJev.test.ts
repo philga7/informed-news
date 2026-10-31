@@ -331,6 +331,52 @@ test('buildBodyState adds truncated bodyExcerpt', () => {
   assert.equal(buildBodyState(makeArticle({ bodyText: null })).bodyExcerpt, '');
 });
 
+const SOURCE_CRITERIA = {
+  sourceId: 'macrumors',
+  text: 'Prefer filings over commentary.',
+};
+
+test('buildTriageQuestions puts source criteria in the quality prompt', () => {
+  const qs = buildTriageQuestions({
+    candidates: [core],
+    undesired: [],
+    sourceCriteria: SOURCE_CRITERIA,
+  });
+  assert.equal(
+    qs.quality?.instructions,
+    'What kind of story is this? Source criteria: Prefer filings over commentary.',
+  );
+});
+
+test('buildTriageQuestions without source criteria keeps the plain quality prompt', () => {
+  const qs = buildTriageQuestions({ candidates: [core], undesired: [] });
+  assert.equal(qs.quality?.instructions, 'What kind of story is this?');
+});
+
+test('buildHeadlineState includes sourceCriteria text only when asked', () => {
+  const row = makeArticle();
+  const plain = buildHeadlineState(row);
+  assert.equal('sourceCriteria' in plain, false);
+
+  const withCriteria = buildHeadlineState(row, SOURCE_CRITERIA.text);
+  assert.equal(withCriteria.sourceCriteria, 'Prefer filings over commentary.');
+  assert.deepEqual(
+    { ...withCriteria, sourceCriteria: undefined },
+    { ...plain, sourceCriteria: undefined },
+  );
+});
+
+test('buildBodyState includes sourceCriteria text only when asked', () => {
+  const row = makeArticle({ bodyText: 'Body here.' });
+  const plain = buildBodyState(row);
+  assert.equal('sourceCriteria' in plain, false);
+  assert.equal(plain.bodyExcerpt, 'Body here.');
+
+  const withCriteria = buildBodyState(row, SOURCE_CRITERIA.text);
+  assert.equal(withCriteria.sourceCriteria, 'Prefer filings over commentary.');
+  assert.equal(withCriteria.bodyExcerpt, 'Body here.');
+});
+
 type FakeAnswer =
   | { type: 'noul'; noul: number }
   | { type: 'choice'; choice: string; confidence: number; probabilities: Record<string, number> }
@@ -419,6 +465,39 @@ test('judgeTriage body stage sends body state', async () => {
     ),
   });
   assert.deepEqual(calls[0]?.state, buildBodyState(article));
+});
+
+test('judgeTriage sends source criteria in the state and the quality prompt', async () => {
+  const calls: Array<SystemOneRequest<Questions>> = [];
+  const article = makeArticle();
+  const withCriteria: TriageJevContext = {
+    candidates: [core],
+    undesired: [],
+    sourceCriteria: SOURCE_CRITERIA,
+  };
+  await judgeTriage('headline', article, withCriteria, {
+    systemOne: fakeSystemOne(
+      () => ({
+        topic_0: noulA(0.9),
+        quality: { type: 'choice', choice: 'news', confidence: 0.9, probabilities: {} },
+        significance: { type: 'score', score: 1, confidence: 0.9, legend: {}, probabilities: {} },
+      }),
+      calls,
+    ),
+  });
+
+  assert.equal(calls.length, 1);
+  assert.deepEqual(calls[0]?.state, {
+    headline: 'Port strike enters second week',
+    publisher: 'Example News',
+    snippet: 'Dockworkers stayed off the job.',
+    publishedAt: '2026-09-30T12:00:00.000Z',
+    sourceCriteria: 'Prefer filings over commentary.',
+  });
+  assert.equal(
+    calls[0]?.questions.quality?.instructions,
+    'What kind of story is this? Source criteria: Prefer filings over commentary.',
+  );
 });
 
 test('judgeTriage passes failures through', async () => {
