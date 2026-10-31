@@ -183,7 +183,7 @@ Refresh collects stories from the configured news feeds and from search for your
 
 ## Always-on copy
 
-The Brief can keep running while this computer is off. Stories already saved are still there after a restart. If the extra search service is not set up, new stories still come from Google News. The always-on Brief can be read by anyone on Phil's private network, such as his laptop and phone, and not from the public internet. Refresh, Topics, Filtered out, and other changes still ask for the password. This copy is not running yet: deploy has not happened, so do not assume it is up. The steps are in [the runbook](RUNBOOK.md).
+The Brief can keep running while this computer is off. Stories already saved are still there after a restart. If the extra search service is not set up, new stories still come from Google News. The always-on copy is running on the private machine, and it is not on the public internet. Anyone on Phil's private network can read it once the private-network address is turned on. That address is not on yet, so a laptop or phone cannot open it until the one step in [the runbook](RUNBOOK.md). Refresh, Topics, Filtered out, and other changes still ask for the password.
 
 **Scenario:** Given stories were saved on the always-on copy, when it restarts, then those stories are still there.
 
