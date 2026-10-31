@@ -48,4 +48,21 @@ describe('NEWS-111 compose published ports bind to loopback only', () => {
 			assert.equal(host, '127.0.0.1');
 		}
 	});
+
+	it('fails closed on unrecognized ports lines in a second service', () => {
+		const good = '      - "127.0.0.1:3001:3001"\n';
+		const wrap = (ports) => `services:\n  app:\n    ports:\n${good}  other:\n    ports:\n${ports}`;
+		const bad = {
+			'trailing comment': '      - "9000:9000" # public\n',
+			'trailing comment unquoted': '      - 0.0.0.0:9000:9000 # public\n',
+			'long syntax': '      - target: 9000\n        published: 9000\n',
+			'host prefix only': '      - "127.0.0.10:9000:9000"\n',
+		};
+		for (const [name, ports] of Object.entries(bad)) {
+			assert.throws(() => parsePublishedHosts(wrap(ports)), undefined, name);
+		}
+		assert.throws(() => parsePublishedHosts(`services:\n  o:\n    ports: ["9000:9000"]\n`));
+		assert.throws(() => parsePublishedHosts(`services:\n  o:\n    ports: [\n      "9000:9000"\n    ]\n`));
+		assert.deepEqual(parsePublishedHosts(wrap('      - "127.0.0.1:9000:9000" # ok\n')), ['127.0.0.1', '127.0.0.1']);
+	});
 });

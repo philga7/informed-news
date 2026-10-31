@@ -15,7 +15,7 @@ Binding choices for Informed News. Newest first. When one of these changes, upda
 7. **No override file:** The laptop uses the same compose command with `INFORMED_NEWS_ENV_FILE=./mvp/.env`. Recommended, adopted (Phil can override in review).
 8. **Image tag:** The image defaults to `informed-news:local`; CI uses `informed-news:ci`. Recommended, adopted (Phil can override in review).
 
-**Why:** The Brief should open from Phil's laptop and phone on his private network, still behind the password, and never from the public internet. The runbook is [RUNBOOK.md](RUNBOOK.md). Deploy has not happened; the checks are Phil's.
+**Why:** Anyone on Phil's private network can read the Brief, as on a laptop, and the public internet cannot. Refresh, Topics, Filtered out, and other changes still ask for the password. The runbook is [RUNBOOK.md](RUNBOOK.md). Deploy has not happened; the checks are Phil's.
 
 **What it rules out:** A public URL, a public bind, a second compose override file, a Tailscale key in the app env file, and forcing `Secure` cookies by `NODE_ENV` (which would break plain-HTTP localhost login).
 

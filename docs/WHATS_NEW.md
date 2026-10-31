@@ -8,7 +8,7 @@ This is not the release log. Releases are recorded in `CHANGELOG.md` by semantic
 
 ## 2026-10-31
 
-The always-on Brief can be opened from Phil's laptop and phone on his private network, still behind the password, and not from the public internet. This copy is not running yet. The setup steps are written down in the runbook.
+The always-on Brief can be read by anyone on Phil's private network, such as his laptop and phone, and not from the public internet. Refresh, Topics, Filtered out, and other changes still ask for the password. This copy is not running yet. The setup steps are written down in the runbook.
 
 ## 2026-10-29
 
