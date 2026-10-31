@@ -62,7 +62,12 @@ describe('NEWS-165 vision and decisions', () => {
 		const oct23 = entries.filter((entry) => entry.startsWith('2026-10-23'));
 		assert.ok(oct23.length >= 5, `expected several Oct 23 entries, got ${oct23.length}`);
 		const dates = entries.map((entry) => entry.slice(0, 10));
-		assert.deepEqual(dates, [...dates].sort().reverse(), 'entries are newest first');
+		for (let i = 1; i < dates.length; i++) {
+			assert.ok(
+				dates[i - 1] >= dates[i],
+				`entries are newest first: ${dates[i - 1]} then ${dates[i]}`,
+			);
+		}
 		for (const entry of entries) {
 			assert.match(entry, /^\d{4}-\d{2}-\d{2} — /);
 			assert.match(entry, /\*\*Decision:\*\*/);
@@ -99,6 +104,14 @@ describe('NEWS-165 vision and decisions', () => {
 		assert.match(decisions, /query expansion/);
 		assert.match(decisions, /reachability is open/);
 		assert.match(decisions, /NEWS-109/);
+		const review = entries.find((entry) => entry.startsWith('2026-10-31 — Spec and plain-English changelog'));
+		assert.ok(review, 'NEWS-175 review decision missing');
+		assert.match(review, /NEWS-175/);
+		assert.match(review, /Do not bump Last checked/);
+		assert.match(review, /true at merge/);
+		assert.match(review, /other repos/);
+		assert.match(review, /\*\*Why:\*\*/);
+		assert.match(review, /\*\*What it rules out:\*\*/);
 	});
 
 	it('orders the roadmap as the combined sequence and points agents at the new docs', () => {
@@ -141,6 +154,10 @@ describe('NEWS-165 vision and decisions', () => {
 			combined,
 			/Reordered 2026-10-27: hosting pulled ahead of NEWS-168\/169, approved by Phil\./,
 		);
+		assert.match(combined, /\*\*Current next\*\* is \[NEWS-168\]/);
+		assert.match(roadmap, /NEWS-175[\s\S]{0,400}\*\*Done\*\*/);
+		assert.match(roadmap, /NEWS-182[\s\S]{0,200}\*\*Done\*\*/);
+		assert.doesNotMatch(roadmap, /Process trial \(approved 2026-10-26\)/);
 		assert.match(combined, /NEWS-139/);
 		assert.match(combined, /NEWS-128/);
 		assert.match(combined, /NEWS-121/);

@@ -2,17 +2,19 @@
 
 Plain-English notes for someone who reads the app. Newest first.
 
-Each ship-loop pull request adds an entry for what changed for that reader, or writes **No user-visible change.**
+Each ship-loop pull request adds an entry for what is true at merge for that reader, or writes **No user-visible change.** A later pull request corrects a line that is no longer true. Deploy steps stay out of these notes.
 
 This is not the release log. Releases are recorded in `CHANGELOG.md` by semantic-release. Do not hand-edit `CHANGELOG.md` to mirror these notes.
 
 ## 2026-10-31
 
-The always-on Brief is running on the private machine, and it is not on the public internet. A laptop or phone cannot open it yet, until the private-network address is turned on. Once that address is on, reading the Brief does not ask for the password. Refresh, Topics, Filtered out, and other changes still do.
+The always-on Brief is running on the private machine, and it is not on the public internet. A laptop or phone can open it when Tailscale is installed on that device. Reading the Brief does not ask for the password. Refresh, Topics, Filtered out, and other changes still do.
+
+**No user-visible change.** The writing rule for these notes, and container logs when a health check fails, do not change the Brief.
 
 ## 2026-10-29
 
-Stories can stay saved on an always-on copy of the Brief, and search still runs from Google News when the extra search service is missing. You cannot open that copy from another device yet.
+Stories can stay saved on an always-on copy of the Brief, and search still runs from Google News when the extra search service is missing. On this date, another device could not open that copy yet.
 
 **No user-visible change.** Cloud-agent setup now installs bun 1.4.3 when it is missing instead of failing.
 

@@ -50,4 +50,15 @@ describe('NEWS-131 skill links that leave their skill folder resolve', () => {
 		assert.match(skill, /\]\(\.\.\/\.\.\/\.\.\/docs\/ROADMAP\.md\)/);
 		assert.doesNotMatch(skill, /\]\(\.\.\/\.\.\/docs\//);
 	});
+
+	it('news-ship-loop updates the spec only when behavior changes', () => {
+		const skill = readFileSync(join(skillsDir, 'news-ship-loop/SKILL.md'), 'utf8');
+		assert.match(skill, /Update it only when what a reader can do changes/);
+		assert.match(skill, /Do not bump \*\*Last checked\*\*/);
+		assert.match(skill, /what is true at merge/);
+		assert.match(skill, /pull request body/);
+		assert.match(skill, /no longer true/);
+		assert.match(skill, /5 more pull requests/);
+		assert.doesNotMatch(skill, /bump \*\*Last checked\*\* so the file is still in the diff/);
+	});
 });
