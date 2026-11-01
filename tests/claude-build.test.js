@@ -112,6 +112,35 @@ describe('NEWS-180 claude build workflow', () => {
 		}
 	});
 
+	it('lets Claude run node --test and keeps broader node, git, npx, curl, and installs out', () => {
+		const allowed = claudeArgsToolString(workflow, '--allowedTools');
+		const disallowed = claudeArgsToolString(workflow, '--disallowedTools');
+		const tools = allowed.split(',');
+		for (const entry of ['Bash(node --test:*)', 'Bash(node --test)']) {
+			assert.ok(tools.includes(entry), `${entry} must be allowed`);
+		}
+		for (const banned of [
+			'Bash(node:*)',
+			'Bash(git:*)',
+			'Bash(npx:*)',
+			'Bash(curl:*)',
+			'Bash(npm install)',
+			'Bash(npm install:*)',
+			'Bash(bun install)',
+			'Bash(bun install:*)',
+			'Edit',
+			'Write',
+		]) {
+			assert.ok(!tools.includes(banned), `${banned} must stay out`);
+		}
+		assert.doesNotMatch(allowed, /Bash\(npx/);
+		assert.doesNotMatch(allowed, /Bash\(curl/);
+		assert.match(disallowed, /Bash\(npx:\*\)/);
+		assert.match(disallowed, /Bash\(curl:\*\)/);
+		assert.match(disallowed, /npm install/);
+		assert.match(disallowed, /bun install/);
+	});
+
 	it('installs bun 1.4.3 and Kite deps before Claude, and still denies bun install', () => {
 		const setup = workflow.indexOf('oven-sh/setup-bun@v2');
 		const install = workflow.indexOf('bun install --frozen-lockfile --cwd apps/kite');
