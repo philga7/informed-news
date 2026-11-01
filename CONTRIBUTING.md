@@ -59,7 +59,7 @@ Bot commits `chore(release): … [skip ci]` are intentional so Release does not 
 
 **The PR title is the squash subject.** Write it as a Conventional Commit with every ticket key in the scope, e.g. `fix(NEWS-131, NEWS-155, NEWS-174): …`, and the highest bump type in the batch (breaking `!` > `feat` > `fix` / `perf` > no-release types). A multi-ticket PR squashes to one subject on `main`. The per-ticket commits stay in the PR only, so a key that is not in the title is not on `main`. PR #205 squashed as `docs(NEWS-165): …` and lost the NEWS-171 subject this way. PR #191 (`NEWS-119, NEWS-120: …`) was not a Conventional Commit at all and cut no release.
 
-The **PR title** workflow (`.github/workflows/pr-title.yml`, running `scripts/check-pr-title.mjs`) fails a PR whose title breaks that rule. It re-runs when the title is edited. A title without a key passes only for an untracked `docs`, `chore`, `ci`, `test`, `style`, or `build` change, because those cut no release. `feat`, `fix`, `perf`, `refactor`, `revert`, and any breaking `!` title always need keys. Merge with `gh pr merge <n> --squash --subject "<PR title> (#<n>)"`, or set the repo's squash default to the PR title (Settings → General → Pull Requests). A one-commit PR otherwise squashes to that commit's subject instead of the checked title.
+The **PR title** workflow (`.github/workflows/pr-title.yml`, running `scripts/check-pr-title.mjs`) fails a PR whose title breaks that rule. It re-runs when the title is edited. A title without a key passes only for an untracked `docs`, `chore`, `ci`, `test`, `style`, or `build` change, because those cut no release. `feat`, `fix`, `perf`, `refactor`, `revert`, and any breaking `!` title always need keys. Merge with `gh pr merge <n> --squash --subject "<PR title> (#<n>)"`. The checked-in squash default is the pull request title (`squash_merge_commit_title: PR_TITLE`; the body is `PR_BODY`). Phil sets that with `scripts/apply-repo-settings.sh`. Until that apply has been run, pass `--subject` anyway, or a one-commit pull request squashes to its commit subject instead of the checked title.
 
 ## Why both CI and Release?
 
@@ -70,11 +70,17 @@ Overlap on validation is intentional: a green PR does not skip the final gate be
 
 ## `main` requires CI (ruleset)
 
-The repository ruleset **main requires CI** (Settings → Rules → Rulesets) requires the CI job **MVP build & typecheck**, reported by GitHub Actions, on every update to `main`:
+The repository ruleset **main requires CI** (Settings → Rules → Rulesets, id 24903925) targets the default branch. The checked-in copy is [`.github/rulesets/main-requires-ci.json`](.github/rulesets/main-requires-ci.json). GitHub enforces that file only after Phil applies it (below). The file requires:
 
-- A PR can't merge until that check passes on its head commit; pending or red blocks the merge button and `gh pr merge`.
-- Direct pushes to `main` are rejected (`push declined due to repository rule violations`), admins included. Land everything, including plan-file cleanups and doc fixes, through a PR.
-- The only bypass is **deploy keys**. The Release job checks out with the write deploy key **semantic-release (NEWS-124)**, whose private half is the Actions secret `RELEASE_DEPLOY_KEY`, so its `chore(release)` commit and tag push over SSH. GitHub does not allow the GitHub Actions app as a ruleset bypass on a personal-account repo, so `GITHUB_TOKEN` can't push the release commit.
+- The CI job **MVP build & typecheck** and the **PR title** check, both reported by GitHub Actions (`integration_id` 15368, the id the live ruleset already uses for the build check). **PR title** is required. A pull request cannot merge while either check is missing, pending, or red.
+- A pull request before any update to `main`. Direct pushes are rejected (`push declined due to repository rule violations`), admins included. Land everything, including plan-file cleanups and doc fixes, through a PR.
+- One approving review, and an approval of the latest push from someone other than the person who pushed it. A later push dismisses earlier approvals.
+- Squash as the only merge method onto `main`. The squash commit title is the pull request title.
+- No force-push and no deletion of `main`.
+
+The repository admin role (GitHub base role id 5) may bypass these rules when merging a pull request, and only then. That is how Phil can merge his own pull request when he was the last person to push. Agents never use that bypass. No bot and no GitHub App is a bypass actor.
+
+The Release job checks out with the write deploy key **semantic-release (NEWS-124)**, whose private half is the Actions secret `RELEASE_DEPLOY_KEY`, so its `chore(release)` commit and tag push over SSH. That deploy key is a bypass actor (`bypass_mode: always`) so the pull-request rule does not stop the release commit. GitHub does not allow the GitHub Actions app as a ruleset bypass on a personal-account repo, so `GITHUB_TOKEN` can't push the release commit.
 
 Rotate the release key:
 
@@ -86,9 +92,16 @@ gh repo deploy-key list            # delete the old key: gh repo deploy-key dele
 rm -P release_key release_key.pub
 ```
 
-**PR title** (NEWS-155) reports on every PR. It blocks merges only once it is added to the ruleset as a second required check, which needs an admin. Add it only after `pr-title.yml` is on `main`, or every PR waits on a check that never reports.
+Phil applies or re-checks the ruleset and the squash defaults with his own admin `gh` login. [`scripts/apply-repo-settings.sh`](scripts/apply-repo-settings.sh) prints the diff between GitHub and the checked-in file and changes nothing unless he passes `--apply`. Agents do not run `--apply`.
 
-Inspect or change the ruleset with an admin token: `gh api repos/philga7/informed-news/rulesets`. If the CI job is renamed, update the required check's context in the ruleset in the same change, or every merge blocks on a check that never reports.
+```bash
+scripts/apply-repo-settings.sh
+scripts/apply-repo-settings.sh --apply
+```
+
+`--apply` runs `gh api -X PUT repos/philga7/informed-news/rulesets/24903925 --input .github/rulesets/main-requires-ci.json` and `gh api -X PATCH repos/philga7/informed-news -f squash_merge_commit_title=PR_TITLE -f squash_merge_commit_message=PR_BODY`.
+
+Inspect the live ruleset with `gh api repos/philga7/informed-news/rulesets/24903925`. If the CI job or the PR title job is renamed, update the required check's context in the ruleset file in the same change, or every merge blocks on a check that never reports.
 
 ## Release ≠ cloud deploy
 

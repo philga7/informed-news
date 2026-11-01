@@ -43,14 +43,13 @@ describe('NEWS-180 Claude-eligible work docs', () => {
 		assert.match(contributing, /builder-claude/);
 	});
 
-	it('ROADMAP lists NEWS-180 as dev tooling without Done on that row', () => {
+	it('ROADMAP lists NEWS-180 as Done dev tooling', () => {
 		const rows = roadmap
 			.split('\n')
 			.filter((line) => line.startsWith('|') && line.includes('/browse/NEWS-180)'));
 		assert.equal(rows.length, 1, rows);
 		assert.match(rows[0], /Dev tooling/);
-		assert.doesNotMatch(rows[0], /\*\*Done\*\*/);
-		assert.match(roadmap, /pending Phil; not filed/);
+		assert.match(rows[0], /\*\*Done\*\*/);
 	});
 
 	it('DECISIONS records NEWS-180 with required sections', () => {

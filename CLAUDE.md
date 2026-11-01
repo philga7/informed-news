@@ -65,7 +65,7 @@ The full ritual is in `.cursor/skills/news-ship-loop/SKILL.md`. Repo skills win 
 
 ## Claude-eligible work
 
-Claude builds on GitHub only when someone mentions `@claude`, and only for tickets labeled `builder-claude`. The workflow is `.github/workflows/claude.yml`. It opens a pull request. It never merges. Phil merges.
+Claude builds on GitHub only when someone mentions `@claude`, and only for tickets labeled `builder-claude`. The workflow is `.github/workflows/claude.yml`. It opens a pull request. The builder never approves, never merges, and never enables auto-merge. Its pull requests need Phil's approval. Phil merges.
 
 Which workflow runs:
 
@@ -85,7 +85,7 @@ Rules for `claude-build`:
 - CI green.
 - Update PRODUCT_SPEC and WHATS_NEW when the change is user-visible.
 - Follow the work-hours hold: on weekdays 9 AM–6 PM ET, do not commit, push, open or update pull requests, merge, or write to Jira. A GitHub run cannot queue work. On a weekday from 9 AM–6 PM ET, if the mention is not from Phil (`@philga7`, the repo owner), comment that the hold applies and stop. Mention `@claude` again after 6 PM ET. Phil's own mention counts as do it now. The workflow does not enforce the clock. Only an `@claude` mention starts a run.
-- Open a PR, and only Phil merges.
+- Open a PR. The builder never approves, never merges, and never enables auto-merge. Its pull requests need Phil's approval, and only Phil merges.
 
 ## When reviewing a PR
 

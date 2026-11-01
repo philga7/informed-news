@@ -2,6 +2,27 @@
 
 Binding choices for Informed News. Newest first. When one of these changes, update this file in the same change as [ROADMAP.md](ROADMAP.md) and Jira. What the product does now, in plain language, is [PRODUCT_SPEC.md](PRODUCT_SPEC.md). Pipeline detail remains in [NEWS-84](https://informedcrew.atlassian.net/browse/NEWS-84), [TRIAGE.md](TRIAGE.md), and [BRIEF.md](BRIEF.md). The target is [VISION.md](VISION.md).
 
+## 2026-11-01 — main requires a PR, one approval, PR title and build checks; squash by PR title; no bot bypass (NEWS-178)
+
+**Decision:** `main` requires a pull request, one approval, approval of the latest push, the **PR title** check, and **MVP build & typecheck**. A later push dismisses earlier approvals. Only squash merges are allowed, and the squash commit title is the pull request title. Force-pushes and deleting `main` are blocked. The only human bypass is the repository admin role, and only when merging a pull request. No bot or GitHub App is a bypass actor. The release deploy key remains a bypass actor so the release job can still push `chore(release)`. Phil answered the grill with the recommended answers (Sunday 2026-11-01). The deploy key is kept in addition so [NEWS-124](https://informedcrew.atlassian.net/browse/NEWS-124)'s release push still has a bypass once a pull request is required.
+
+1. **Required checks:** `MVP build & typecheck` and `PR title`, both from GitHub Actions.
+2. **Pull request:** required. Without it a green branch can land on `main` by push.
+3. **Approvals:** 1, and the latest push must be approved by someone else. The repository admin bypasses on pull requests only.
+4. **Bypass:** admin role in pull-request mode, plus the existing release deploy key. Agents never use the admin bypass.
+5. **Force-push and deletion:** both blocked.
+6. **Stale approvals:** dismissed on push.
+7. **Merge methods:** squash only.
+8. **Squash defaults:** title `PR_TITLE`, message `PR_BODY`.
+9. **How Phil applies it:** `.github/rulesets/main-requires-ci.json` and `scripts/apply-repo-settings.sh` (dry-run unless `--apply`).
+10. **Claude review of builder pull requests:** `claude[bot]` is an allowed bot on the automatic review job.
+
+[VISION.md](VISION.md) is unchanged. This is dev tooling, not the product direction.
+
+**Why:** Bots must not merge their own green pull requests. The PR title check has to be required or a non-conventional squash title lands on `main` and cuts no release. The squash title has to be the pull request title or a one-commit pull request keeps its commit subject.
+
+**What it rules out:** A bot or GitHub App bypass; merging with zero approvals; merge commits and rebase merges onto `main`; direct pushes and force-pushes by people; an admin bypass of direct pushes; agents applying the ruleset or using the bypass.
+
 ## 2026-10-31 — Claude builds Small builder-claude tickets on @claude mention via GitHub (NEWS-180)
 
 **Decision:** Claude builds Small `builder-claude` tickets on `@claude` mention via GitHub; never merges; no auto-opened issues. Phil answered the grill with the recommended answers (Saturday 2026-10-31; the work-hours hold did not apply).

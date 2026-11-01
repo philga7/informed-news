@@ -37,9 +37,11 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           # Action docs: comma-separated bot usernames, e.g. dependabot[bot].
-          # Only this automatic review job. The mention job leaves the default
-          # (no bots) so @claude stays limited to humans.
-          allowed_bots: "cursor[bot]"
+          # Only this automatic review job. cursor[bot] reviews Cursor agent
+          # PRs. claude[bot] reviews pull requests the builder opens, so the
+          # approval rule has a review to read. The mention job leaves the
+          # default (no bots) so @claude stays limited to humans.
+          allowed_bots: "cursor[bot],claude[bot]"
           prompt: |
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.pull_request.number }}
