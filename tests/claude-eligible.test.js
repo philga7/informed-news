@@ -65,6 +65,18 @@ describe('NEWS-180 Claude-eligible work docs', () => {
 		assert.match(entry, /\[VISION\.md\]\(VISION\.md\) is unchanged/);
 	});
 
+	it('DECISIONS NEWS-180 allow list is read-only git only', () => {
+		const start = decisions.indexOf('## 2026-10-31 — Claude builds Small');
+		assert.ok(start >= 0, 'NEWS-180 decision entry missing');
+		const nextHeading = decisions.indexOf('\n## ', start + 1);
+		const entry = decisions.slice(start, nextHeading === -1 ? undefined : nextHeading);
+		assert.match(
+			entry,
+			/the allow list is the repo npm test, lint, typecheck, and build scripts, plus read-only git status, diff, log, and show\. Commit and push stay on the action's own wrapper\./,
+		);
+		assert.doesNotMatch(entry, /scripts, plus git\./);
+	});
+
 	it('product direction docs stay free of builder-claude', () => {
 		for (const [name, text] of [
 			['VISION.md', vision],

@@ -30,7 +30,7 @@ Binding choices for Informed News. Newest first. When one of these changes, upda
 1. **Triggers:** `issue_comment`, `pull_request_review_comment`, and `pull_request_review` (`submitted`), plus `issues` (`opened`) only when the body contains `@claude`. No label or assignee triggers, so nothing auto-starts.
 2. **Model:** the action default. Do not pin it with `claude_args --model`.
 3. **Max turns:** `--max-turns 30`.
-4. **Allowed tools:** the repo's npm test, lint, typecheck, and build scripts, plus git. No network installs beyond `npm ci`.
+4. **Allowed tools:** the allow list is the repo npm test, lint, typecheck, and build scripts, plus read-only git status, diff, log, and show. Commit and push stay on the action's own wrapper. No network installs beyond `npm ci`.
 5. **Concurrency:** one run per issue or PR, with cancel-in-progress off.
 6. **CI reads:** `actions: read`, read-only, so Claude can see failing checks on its own pull requests.
 7. **Work-hours hold:** leave it to Phil. The hold is a guideline. The workflow has no time-guard step. Only an `@claude` mention from an owner, member, or collaborator starts a run.
