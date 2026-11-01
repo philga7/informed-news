@@ -65,6 +65,13 @@ jobs:
         with:
           fetch-depth: 1
 
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.3
+
+      - name: Install Kite dependencies
+        run: bun install --frozen-lockfile --cwd apps/kite
+
       - uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}

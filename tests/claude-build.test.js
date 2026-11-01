@@ -81,7 +81,8 @@ describe('NEWS-180 claude build workflow', () => {
 	});
 
 	it('has no merge step and denies merge, force-push, and extra installs', () => {
-		assert.doesNotMatch(workflow, /^\s*run:/m);
+		const runs = [...workflow.matchAll(/^\s*run:\s*(.+)$/gm)].map((match) => match[1]);
+		assert.deepEqual(runs, ['bun install --frozen-lockfile --cwd apps/kite']);
 		const allowed = claudeArgsToolString(workflow, '--allowedTools');
 		const disallowed = claudeArgsToolString(workflow, '--disallowedTools');
 		for (const needle of [
@@ -109,6 +110,19 @@ describe('NEWS-180 claude build workflow', () => {
 		]) {
 			assert.ok(tools.includes(readOnly), `${readOnly} must be allowed`);
 		}
+	});
+
+	it('installs bun 1.4.3 and Kite deps before Claude, and still denies bun install', () => {
+		const setup = workflow.indexOf('oven-sh/setup-bun@v2');
+		const install = workflow.indexOf('bun install --frozen-lockfile --cwd apps/kite');
+		const action = workflow.indexOf('anthropics/claude-code-action@v1');
+		assert.ok(setup !== -1 && setup < action, 'setup-bun before the Claude step');
+		assert.ok(install > setup && install < action, 'frozen Kite install before the Claude step');
+		assert.match(workflow, /bun-version:\s*1\.4\.3/);
+		const allowed = claudeArgsToolString(workflow, '--allowedTools');
+		const disallowed = claudeArgsToolString(workflow, '--disallowedTools');
+		assert.match(disallowed, /bun install/);
+		assert.doesNotMatch(allowed, /bun install/);
 	});
 
 	it('uses a job name the review workflow does not use', () => {
