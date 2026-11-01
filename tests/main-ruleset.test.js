@@ -48,6 +48,7 @@ describe('NEWS-178 main requires a PR, one approval, PR title, and squash by tit
 		assert.equal(pullRequest.parameters.required_approving_review_count, 1);
 		assert.equal(pullRequest.parameters.require_last_push_approval, true);
 		assert.equal(pullRequest.parameters.dismiss_stale_reviews_on_push, true);
+		assert.deepEqual(pullRequest.parameters.required_reviewers, []);
 		assert.deepEqual(pullRequest.parameters.allowed_merge_methods, ['squash']);
 	});
 
