@@ -2,6 +2,22 @@
 
 Binding choices for Informed News. Newest first. When one of these changes, update this file in the same change as [ROADMAP.md](ROADMAP.md) and Jira. What the product does now, in plain language, is [PRODUCT_SPEC.md](PRODUCT_SPEC.md). Pipeline detail remains in [NEWS-84](https://informedcrew.atlassian.net/browse/NEWS-84), [TRIAGE.md](TRIAGE.md), and [BRIEF.md](BRIEF.md). The target is [VISION.md](VISION.md).
 
+## 2026-11-01 — one @claude mention starts only claude-build; the builder runs node --test and bun scripts and opens its own PRs (NEWS-184, NEWS-185, NEWS-186, NEWS-187, NEWS-188)
+
+**Decision:** One `@claude` mention starts only `claude-build`. The builder runs `node --test` and bun scripts, and opens its own pull requests as `claude[bot]`. Phil said go and took every recommended answer (Sunday 2026-11-01). One pull request, not two.
+
+1. **Ruleset field:** the checked-in pull request rule includes `"required_reviewers": []`, where the live ruleset already has it. No rule behavior change. Phil's dry run of the existing apply script should then show no difference. No script change.
+2. **Bun:** the build job installs Bun 1.4.3 with `oven-sh/setup-bun` and runs `bun install --frozen-lockfile --cwd apps/kite` before Claude. `bun install` stays disallowed for Claude.
+3. **One job:** `claude-build` owns every `@claude` mention. The mention job is removed. Automatic review stays on `pull_request` only.
+4. **Node tests:** the allow list adds `Bash(node --test)` and `Bash(node --test:*)` only. Not `Bash(node:*)`. Edit and Write stay as they are. No `Bash(git:*)`. npx, curl, and installs stay out.
+5. **Pull request authorship:** issue #219's run did not fail for lack of `gh pr create` or a token. Tag mode's prompt told Claude to post a compare link. The workflow now tells Claude to run `gh pr create`, and `track_progress: true` keeps tag mode so the action's app token still commits as `claude[bot]`. No new personal access token. No token input on the action.
+
+[VISION.md](VISION.md) is unchanged. This is dev tooling, not the product direction.
+
+**Why:** The first smoke test (issue #219, Actions run 41274247667) could not run `node --test`, posted a compare link instead of opening a pull request (so PR #220 was not authored by `claude[bot]`), and a mention started two jobs. The checked-in ruleset omitted an empty `required_reviewers` list, so the dry run always differed. Phil can approve a `claude[bot]` pull request without the admin bypass.
+
+**What it rules out:** A second Claude job on `@claude`; telling Claude to comment instead of installing bun; `Bash(node:*)` or `Bash(git:*)`; a personal access token or a token input so the pull request is authored as someone else; switching issues to agent mode to dodge the compare-link prompt (that mode does not create the `claude[bot]` branch); agents applying the ruleset.
+
 ## 2026-11-01 — main requires a PR, one approval, PR title and build checks; squash by PR title; no bot bypass (NEWS-178)
 
 **Decision:** `main` requires a pull request, one approval, approval of the latest push, the **PR title** check, and **MVP build & typecheck**. A later push dismisses earlier approvals. Only squash merges are allowed, and the squash commit title is the pull request title. Force-pushes and deleting `main` are blocked. The only human bypass is the repository admin role, and only when merging a pull request. No bot or GitHub App is a bypass actor. The release deploy key remains a bypass actor so the release job can still push `chore(release)`. Phil answered the grill with the recommended answers (Sunday 2026-11-01). The deploy key is kept in addition so [NEWS-124](https://informedcrew.atlassian.net/browse/NEWS-124)'s release push still has a bypass once a pull request is required.

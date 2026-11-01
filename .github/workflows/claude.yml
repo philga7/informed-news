@@ -7,10 +7,9 @@ name: Claude Build
 #   This file does not listen to pull_request.
 # - issue_comment created, or pull_request_review_comment created, when the
 #   comment contains @claude and the author is OWNER, MEMBER, or COLLABORATOR:
-#   this job (name claude-build) and claude-review.yml job mention (name
-#   claude-mention) both start. They do not share a concurrency group, so
-#   neither cancels the other. claude-mention is the review follow-up.
-#   claude-build opens a pull request for Claude-eligible work.
+#   only this job (name claude-build). claude-review.yml does not listen to
+#   those events. The mention job (name claude-mention) is removed, so one
+#   mention starts one Claude job. claude-build opens the pull request.
 # - pull_request_review submitted when the review body contains @claude:
 #   only claude-build.
 # - issues opened when the issue body contains @claude: only claude-build.
@@ -65,13 +64,34 @@ jobs:
         with:
           fetch-depth: 1
 
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.3
+
+      - name: Install Kite dependencies
+        run: bun install --frozen-lockfile --cwd apps/kite
+
       - uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           additional_permissions: |
             actions: read
+          # Issue #219 ran in tag mode. That mode's prompt says to post a
+          # compare link, so Claude did not run gh pr create. track_progress
+          # keeps tag mode when prompt is set: the action still creates the
+          # branch and commits as claude[bot] with its app token. A prompt
+          # without this switches an issue to agent mode, which does not
+          # create that branch. Do not pass a token input or a PAT.
+          track_progress: true
+          prompt: |
+            The steps above that say to post a "Create a PR" compare link are wrong for this repo.
+            After git-push.sh succeeds, open the pull request yourself. Run `gh pr create`.
+            Do not post a compare link. Do not ask a person to open the pull request.
+            Do not pass a personal access token. The action app token is already the credential.
+            The pull request author stays claude[bot].
+            Never merge, approve, or enable auto-merge.
           claude_args: |
             --max-turns 30
-            --append-system-prompt "open a PR, never merge, follow CLAUDE.md and the work-hours hold."
-            --allowedTools "Read,Glob,Grep,Bash(npm test),Bash(npm test:*),Bash(npm run typecheck),Bash(npm run typecheck:*),Bash(npm run test:kite),Bash(npm run test:kite:*),Bash(npm ci),Bash(npm ci:*),Bash(bun run --cwd apps/kite lint),Bash(bun run --cwd apps/kite lint:*),Bash(bun run --cwd apps/kite check),Bash(bun run --cwd apps/kite check:*),Bash(bun run --cwd apps/kite test:unit),Bash(bun run --cwd apps/kite test:unit:*),Bash(bun run --cwd apps/kite build),Bash(bun run --cwd apps/kite build:*),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(gh pr create:*),Bash(gh pr view:*),Bash(gh pr comment:*),Bash(gh pr checks:*),Bash(gh pr diff:*),Bash(gh issue comment:*),Bash(gh issue view:*),Bash(gh run view:*),Bash(gh run list:*)"
+            --append-system-prompt "open a PR, never merge, follow CLAUDE.md and the work-hours hold. After git-push.sh succeeds, Run `gh pr create`. Do not post a compare link. The author stays claude[bot]. Do not pass a personal access token."
+            --allowedTools "Read,Glob,Grep,Bash(npm test),Bash(npm test:*),Bash(node --test),Bash(node --test:*),Bash(npm run typecheck),Bash(npm run typecheck:*),Bash(npm run test:kite),Bash(npm run test:kite:*),Bash(npm ci),Bash(npm ci:*),Bash(bun run --cwd apps/kite lint),Bash(bun run --cwd apps/kite lint:*),Bash(bun run --cwd apps/kite check),Bash(bun run --cwd apps/kite check:*),Bash(bun run --cwd apps/kite test:unit),Bash(bun run --cwd apps/kite test:unit:*),Bash(bun run --cwd apps/kite build),Bash(bun run --cwd apps/kite build:*),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(gh pr create:*),Bash(gh pr view:*),Bash(gh pr comment:*),Bash(gh pr checks:*),Bash(gh pr diff:*),Bash(gh issue comment:*),Bash(gh issue view:*),Bash(gh run view:*),Bash(gh run list:*)"
             --disallowedTools "Bash(git push origin main),Bash(git push origin main:*),Bash(git push -u origin main),Bash(git push -u origin main:*),Bash(git push origin HEAD:main),Bash(git push origin HEAD:main:*),Bash(git push --force),Bash(git push --force:*),Bash(git push -f),Bash(git push -f:*),Bash(git push --force-with-lease),Bash(git push --force-with-lease:*),Bash(gh pr merge:*),Bash(gh pr review:*),Bash(gh issue create:*),Bash(npm install),Bash(npm install:*),Bash(bun install),Bash(bun install:*),Bash(npx:*),Bash(curl:*),Bash(wget:*)"

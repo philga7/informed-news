@@ -75,13 +75,13 @@ describe('NEWS-180 claude build workflow', () => {
 		assert.doesNotMatch(workflow, /\n {2}pull_request:\n/);
 		assert.doesNotMatch(workflow, /^\s*ref:/m);
 		assert.doesNotMatch(workflow, /--model/);
-		assert.doesNotMatch(workflow, /^\s*prompt:/m);
 		assert.match(workflow, /--max-turns 30/);
 		assert.match(workflow, /open a PR, never merge, follow CLAUDE\.md and the work-hours hold/);
 	});
 
 	it('has no merge step and denies merge, force-push, and extra installs', () => {
-		assert.doesNotMatch(workflow, /^\s*run:/m);
+		const runs = [...workflow.matchAll(/^\s*run:\s*(.+)$/gm)].map((match) => match[1]);
+		assert.deepEqual(runs, ['bun install --frozen-lockfile --cwd apps/kite']);
 		const allowed = claudeArgsToolString(workflow, '--allowedTools');
 		const disallowed = claudeArgsToolString(workflow, '--disallowedTools');
 		for (const needle of [
@@ -111,12 +111,68 @@ describe('NEWS-180 claude build workflow', () => {
 		}
 	});
 
+	it('opens its own pull request as claude[bot] with gh pr create and no new token', () => {
+		assert.match(workflow, /pull-requests:\s*write/);
+		const allowed = claudeArgsToolString(workflow, '--allowedTools');
+		assert.ok(allowed.split(',').includes('Bash(gh pr create:*)'));
+		assert.doesNotMatch(workflow, /github_token/);
+		assert.match(workflow, /track_progress:\s*true/);
+		assert.match(workflow, /Run `gh pr create`/);
+		assert.match(workflow, /Do not post a compare link/);
+		assert.match(workflow, /claude\[bot\]/);
+		assert.match(workflow, /Do not pass a personal access token/);
+		assert.match(workflow, /^\s*prompt:/m);
+	});
+
+	it('lets Claude run node --test and keeps broader node, git, npx, curl, and installs out', () => {
+		const allowed = claudeArgsToolString(workflow, '--allowedTools');
+		const disallowed = claudeArgsToolString(workflow, '--disallowedTools');
+		const tools = allowed.split(',');
+		for (const entry of ['Bash(node --test:*)', 'Bash(node --test)']) {
+			assert.ok(tools.includes(entry), `${entry} must be allowed`);
+		}
+		for (const banned of [
+			'Bash(node:*)',
+			'Bash(git:*)',
+			'Bash(npx:*)',
+			'Bash(curl:*)',
+			'Bash(npm install)',
+			'Bash(npm install:*)',
+			'Bash(bun install)',
+			'Bash(bun install:*)',
+			'Edit',
+			'Write',
+		]) {
+			assert.ok(!tools.includes(banned), `${banned} must stay out`);
+		}
+		assert.doesNotMatch(allowed, /Bash\(npx/);
+		assert.doesNotMatch(allowed, /Bash\(curl/);
+		assert.match(disallowed, /Bash\(npx:\*\)/);
+		assert.match(disallowed, /Bash\(curl:\*\)/);
+		assert.match(disallowed, /npm install/);
+		assert.match(disallowed, /bun install/);
+	});
+
+	it('installs bun 1.4.3 and Kite deps before Claude, and still denies bun install', () => {
+		const setup = workflow.indexOf('oven-sh/setup-bun@v2');
+		const install = workflow.indexOf('bun install --frozen-lockfile --cwd apps/kite');
+		const action = workflow.indexOf('anthropics/claude-code-action@v1');
+		assert.ok(setup !== -1 && setup < action, 'setup-bun before the Claude step');
+		assert.ok(install > setup && install < action, 'frozen Kite install before the Claude step');
+		assert.match(workflow, /bun-version:\s*1\.4\.3/);
+		const allowed = claudeArgsToolString(workflow, '--allowedTools');
+		const disallowed = claudeArgsToolString(workflow, '--disallowedTools');
+		assert.match(disallowed, /bun install/);
+		assert.doesNotMatch(allowed, /bun install/);
+	});
+
 	it('uses a job name the review workflow does not use', () => {
 		assert.match(review, /name:\s*claude-review/);
-		assert.match(review, /name:\s*claude-mention/);
+		assert.doesNotMatch(review, /name:\s*claude-mention/);
 		assert.doesNotMatch(review, /name:\s*claude-build/);
 		assert.match(workflow, /claude-mention/);
-		assert.match(workflow, /claude-build/);
+		assert.match(workflow, /name:\s*claude-build/);
+		assert.match(workflow, /only this job \(name claude-build\)/);
 	});
 
 	it('evaluates the workflow if against sample payloads', () => {

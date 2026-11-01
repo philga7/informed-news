@@ -70,7 +70,7 @@ Claude builds on GitHub only when someone mentions `@claude`, and only for ticke
 Which workflow runs:
 
 - A pull request opened, synchronized, reopened, or marked ready for review starts only `.github/workflows/claude-review.yml` job `review` (name `claude-review`). `claude.yml` does not listen to `pull_request`.
-- An issue comment or a pull request review comment that contains `@claude`, from an OWNER, MEMBER, or COLLABORATOR, starts both `claude.yml` job `build` (name `claude-build`) and `claude-review.yml` job `mention` (name `claude-mention`). They do not share a concurrency group, so neither cancels the other. `claude-mention` is the review follow-up: it answers and does not commit or push. `claude-build` is the builder and opens the pull request.
+- An issue comment or a pull request review comment that contains `@claude`, from an OWNER, MEMBER, or COLLABORATOR, starts only `claude.yml` job `build` (name `claude-build`). `.github/workflows/claude-review.yml` does not listen to those events. The mention job (name `claude-mention`) is removed, so one mention starts one Claude job. `claude-build` answers and opens the pull request.
 - A submitted pull request review whose body contains `@claude` starts only `claude-build`.
 - An issue opened whose body contains `@claude` starts only `claude-build`. A mention in the title does not. There is no label trigger, assignee trigger, or schedule, and nothing in the workflow opens an issue or posts `@claude` on its own.
 
@@ -85,7 +85,9 @@ Rules for `claude-build`:
 - CI green.
 - Update PRODUCT_SPEC and WHATS_NEW when the change is user-visible.
 - Follow the work-hours hold: on weekdays 9 AM–6 PM ET, do not commit, push, open or update pull requests, merge, or write to Jira. A GitHub run cannot queue work. On a weekday from 9 AM–6 PM ET, if the mention is not from Phil (`@philga7`, the repo owner), comment that the hold applies and stop. Mention `@claude` again after 6 PM ET. Phil's own mention counts as do it now. The workflow does not enforce the clock. Only an `@claude` mention starts a run.
-- Open a PR. The builder never approves, never merges, and never enables auto-merge. Its pull requests need Phil's approval, and only Phil merges.
+- The build job installs Bun 1.4.3 and runs `bun install --frozen-lockfile --cwd apps/kite` before Claude starts. Claude may run the allowed Kite `bun run` scripts. `bun install` stays disallowed for Claude.
+- `node --test` and `node --test …` are allowed, so `tests/*.test.js` can run. Any other `node` command, `Bash(node:*)`, `Bash(git:*)`, npx, curl, and installs stay disallowed. Edit and Write stay off the allow list.
+- Open a PR with `gh pr create` after the push. Do not post a compare link. The author stays claude[bot] via the action's app token. Do not pass a personal access token. The builder never approves, never merges, and never enables auto-merge. Its pull requests need Phil's approval, and only Phil merges.
 
 ## When reviewing a PR
 
