@@ -48,8 +48,9 @@ jobs:
       issues: write
       pull-requests: write
     steps:
-      # The "main requires CI" ruleset rejects pushes to main that lack the CI check;
-      # only deploy keys bypass it, so the release commit and tag go out over SSH.
+      # The "main requires CI" ruleset rejects direct pushes to main.
+      # The release deploy key is the bypass for this push, so the release
+      # commit and tag go out over SSH.
       - name: Checkout
         uses: actions/checkout@v4
         with:

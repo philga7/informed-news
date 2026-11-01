@@ -55,7 +55,7 @@ describe('NEWS-166 Claude Code PR review', () => {
 	it('allows cursor[bot] on automatic review; @claude mentions stay human-only', () => {
 		const [, mention = ''] = workflow.split(/\n {2}mention:/);
 		const review = workflow.slice(0, workflow.indexOf('\n  mention:'));
-		assert.match(review, /allowed_bots:\s*"cursor\[bot]"/);
+		assert.match(review, /allowed_bots:\s*"cursor\[bot\],claude\[bot\]"/);
 		assert.doesNotMatch(mention, /allowed_bots/);
 		assert.doesNotMatch(workflow, /allowed_bots:\s*"\*"/);
 		assert.doesNotMatch(workflow, /allowed_bots:\s*'\*'/);
