@@ -7,10 +7,9 @@ name: Claude Build
 #   This file does not listen to pull_request.
 # - issue_comment created, or pull_request_review_comment created, when the
 #   comment contains @claude and the author is OWNER, MEMBER, or COLLABORATOR:
-#   this job (name claude-build) and claude-review.yml job mention (name
-#   claude-mention) both start. They do not share a concurrency group, so
-#   neither cancels the other. claude-mention is the review follow-up.
-#   claude-build opens a pull request for Claude-eligible work.
+#   only this job (name claude-build). claude-review.yml does not listen to
+#   those events. The mention job (name claude-mention) is removed, so one
+#   mention starts one Claude job. claude-build opens the pull request.
 # - pull_request_review submitted when the review body contains @claude:
 #   only claude-build.
 # - issues opened when the issue body contains @claude: only claude-build.

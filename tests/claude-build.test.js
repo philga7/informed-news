@@ -127,10 +127,11 @@ describe('NEWS-180 claude build workflow', () => {
 
 	it('uses a job name the review workflow does not use', () => {
 		assert.match(review, /name:\s*claude-review/);
-		assert.match(review, /name:\s*claude-mention/);
+		assert.doesNotMatch(review, /name:\s*claude-mention/);
 		assert.doesNotMatch(review, /name:\s*claude-build/);
 		assert.match(workflow, /claude-mention/);
-		assert.match(workflow, /claude-build/);
+		assert.match(workflow, /name:\s*claude-build/);
+		assert.match(workflow, /only this job \(name claude-build\)/);
 	});
 
 	it('evaluates the workflow if against sample payloads', () => {

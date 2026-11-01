@@ -70,7 +70,7 @@ Claude builds on GitHub only when someone mentions `@claude`, and only for ticke
 Which workflow runs:
 
 - A pull request opened, synchronized, reopened, or marked ready for review starts only `.github/workflows/claude-review.yml` job `review` (name `claude-review`). `claude.yml` does not listen to `pull_request`.
-- An issue comment or a pull request review comment that contains `@claude`, from an OWNER, MEMBER, or COLLABORATOR, starts both `claude.yml` job `build` (name `claude-build`) and `claude-review.yml` job `mention` (name `claude-mention`). They do not share a concurrency group, so neither cancels the other. `claude-mention` is the review follow-up: it answers and does not commit or push. `claude-build` is the builder and opens the pull request.
+- An issue comment or a pull request review comment that contains `@claude`, from an OWNER, MEMBER, or COLLABORATOR, starts only `claude.yml` job `build` (name `claude-build`). `.github/workflows/claude-review.yml` does not listen to those events. The mention job (name `claude-mention`) is removed, so one mention starts one Claude job. `claude-build` answers and opens the pull request.
 - A submitted pull request review whose body contains `@claude` starts only `claude-build`.
 - An issue opened whose body contains `@claude` starts only `claude-build`. A mention in the title does not. There is no label trigger, assignee trigger, or schedule, and nothing in the workflow opens an issue or posts `@claude` on its own.
 

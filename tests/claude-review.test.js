@@ -6,8 +6,16 @@ import { fileURLToPath } from 'node:url';
 
 const root = join(fileURLToPath(new URL('.', import.meta.url)), '..');
 const workflow = readFileSync(join(root, '.github/workflows/claude-review.yml'), 'utf8');
+const build = readFileSync(join(root, '.github/workflows/claude.yml'), 'utf8');
 const claudeMd = readFileSync(join(root, 'CLAUDE.md'), 'utf8');
 const roadmap = readFileSync(join(root, 'docs/ROADMAP.md'), 'utf8');
+
+function parseOnKeys(source) {
+	const start = source.indexOf('on:\n');
+	const end = source.indexOf('\npermissions:');
+	const block = source.slice(start, end);
+	return [...block.matchAll(/^  ([a-z_]+):/gm)].map((match) => match[1]);
+}
 
 describe('NEWS-166 Claude Code PR review', () => {
 	it('pins the official action, OAuth secret only, and Sonnet model', () => {
@@ -22,14 +30,13 @@ describe('NEWS-166 Claude Code PR review', () => {
 		assert.match(workflow, /--model claude-sonnet-5-5/);
 	});
 
-	it('triggers on PR events, skips drafts, and handles @claude mentions', () => {
+	it('triggers on PR events and skips drafts', () => {
 		for (const event of ['opened', 'synchronize', 'reopened', 'ready_for_review']) {
 			assert.match(workflow, new RegExp(event));
 		}
-		assert.match(workflow, /issue_comment/);
-		assert.match(workflow, /pull_request_review_comment/);
-		assert.match(workflow, /@claude/);
 		assert.match(workflow, /draft == false/);
+		assert.doesNotMatch(workflow, /issue_comment/);
+		assert.doesNotMatch(workflow, /pull_request_review_comment/);
 	});
 
 	it('sets read/write permissions needed for review comments', () => {
@@ -52,11 +59,24 @@ describe('NEWS-166 Claude Code PR review', () => {
 		assert.match(workflow, /Bash\(gh pr review:\*\)/);
 	});
 
+	it('an @claude mention starts claude-build only; review stays on pull_request', () => {
+		assert.deepEqual(parseOnKeys(workflow), ['pull_request']);
+		assert.doesNotMatch(workflow, /\n {2}mention:/);
+		assert.doesNotMatch(workflow, /name:\s*claude-mention/);
+		assert.deepEqual(parseOnKeys(build), [
+			'issue_comment',
+			'pull_request_review_comment',
+			'pull_request_review',
+			'issues',
+		]);
+		assert.match(build, /name:\s*claude-build/);
+		assert.match(claudeMd, /starts only `claude\.yml` job `build`/);
+		assert.match(claudeMd, /claude-mention/);
+	});
+
 	it('allows cursor[bot] on automatic review; @claude mentions stay human-only', () => {
-		const [, mention = ''] = workflow.split(/\n {2}mention:/);
-		const review = workflow.slice(0, workflow.indexOf('\n  mention:'));
-		assert.match(review, /allowed_bots:\s*"cursor\[bot\],claude\[bot\]"/);
-		assert.doesNotMatch(mention, /allowed_bots/);
+		assert.match(workflow, /allowed_bots:\s*"cursor\[bot\],claude\[bot\]"/);
+		assert.equal([...workflow.matchAll(/allowed_bots:/g)].length, 1);
 		assert.doesNotMatch(workflow, /allowed_bots:\s*"\*"/);
 		assert.doesNotMatch(workflow, /allowed_bots:\s*'\*'/);
 	});
