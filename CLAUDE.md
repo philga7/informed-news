@@ -87,7 +87,7 @@ Rules for `claude-build`:
 - Follow the work-hours hold: on weekdays 9 AM–6 PM ET, do not commit, push, open or update pull requests, merge, or write to Jira. A GitHub run cannot queue work. On a weekday from 9 AM–6 PM ET, if the mention is not from Phil (`@philga7`, the repo owner), comment that the hold applies and stop. Mention `@claude` again after 6 PM ET. Phil's own mention counts as do it now. The workflow does not enforce the clock. Only an `@claude` mention starts a run.
 - The build job installs Bun 1.4.3 and runs `bun install --frozen-lockfile --cwd apps/kite` before Claude starts. Claude may run the allowed Kite `bun run` scripts. `bun install` stays disallowed for Claude.
 - `node --test` and `node --test …` are allowed, so `tests/*.test.js` can run. Any other `node` command, `Bash(node:*)`, `Bash(git:*)`, npx, curl, and installs stay disallowed. Edit and Write stay off the allow list.
-- Open a PR. The builder never approves, never merges, and never enables auto-merge. Its pull requests need Phil's approval, and only Phil merges.
+- Open a PR with `gh pr create` after the push. Do not post a compare link. The author stays claude[bot] via the action's app token. Do not pass a personal access token. The builder never approves, never merges, and never enables auto-merge. Its pull requests need Phil's approval, and only Phil merges.
 
 ## When reviewing a PR
 

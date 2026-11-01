@@ -75,7 +75,6 @@ describe('NEWS-180 claude build workflow', () => {
 		assert.doesNotMatch(workflow, /\n {2}pull_request:\n/);
 		assert.doesNotMatch(workflow, /^\s*ref:/m);
 		assert.doesNotMatch(workflow, /--model/);
-		assert.doesNotMatch(workflow, /^\s*prompt:/m);
 		assert.match(workflow, /--max-turns 30/);
 		assert.match(workflow, /open a PR, never merge, follow CLAUDE\.md and the work-hours hold/);
 	});
@@ -110,6 +109,19 @@ describe('NEWS-180 claude build workflow', () => {
 		]) {
 			assert.ok(tools.includes(readOnly), `${readOnly} must be allowed`);
 		}
+	});
+
+	it('opens its own pull request as claude[bot] with gh pr create and no new token', () => {
+		assert.match(workflow, /pull-requests:\s*write/);
+		const allowed = claudeArgsToolString(workflow, '--allowedTools');
+		assert.ok(allowed.split(',').includes('Bash(gh pr create:*)'));
+		assert.doesNotMatch(workflow, /github_token/);
+		assert.match(workflow, /track_progress:\s*true/);
+		assert.match(workflow, /Run `gh pr create`/);
+		assert.match(workflow, /Do not post a compare link/);
+		assert.match(workflow, /claude\[bot\]/);
+		assert.match(workflow, /Do not pass a personal access token/);
+		assert.match(workflow, /^\s*prompt:/m);
 	});
 
 	it('lets Claude run node --test and keeps broader node, git, npx, curl, and installs out', () => {

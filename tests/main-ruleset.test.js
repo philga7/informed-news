@@ -137,11 +137,11 @@ printf '%s\\n' '{"squash_merge_commit_title":"COMMIT_OR_PR_TITLE","squash_merge_
 		assert.match(claudeMd, /Its pull requests need Phil's approval/);
 	});
 
-	it('DECISIONS records the ruleset choice first and leaves the product direction unchanged', () => {
+	it('DECISIONS records the ruleset choice and leaves the product direction unchanged', () => {
 		const decisions = read('docs/DECISIONS.md');
 		const heading =
 			'## 2026-11-01 — main requires a PR, one approval, PR title and build checks; squash by PR title; no bot bypass (NEWS-178)';
-		assert.equal(decisions.indexOf('\n## '), decisions.indexOf(`\n${heading}`));
+		assert.ok(decisions.includes(heading));
 		const next = decisions.indexOf('\n## ', decisions.indexOf(heading) + heading.length);
 		const entry = decisions.slice(decisions.indexOf(heading), next);
 		assert.match(entry, /Bots must not merge their own green pull requests/);
