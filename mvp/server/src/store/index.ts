@@ -30,6 +30,22 @@ export {
   untrackCluster,
 } from './trackedStoriesStore.js';
 export type { TrackedEntry, TrackedStories } from './trackedStoriesStore.js';
+export {
+  FeedbackValidationError,
+  createFeedback,
+  feedbackTopicNames,
+  readFeedback,
+  removeFeedback,
+  updateFeedback,
+} from './feedbackStore.js';
+export type {
+  FeedbackEntry,
+  FeedbackFile,
+  FeedbackPatch,
+  FeedbackSignal,
+  FeedbackSnapshot,
+  FeedbackTopicSnapshot,
+} from './feedbackStore.js';
 export { addMuteRule, readMuteRules, removeMuteRule } from './muteRulesStore.js';
 export type { MuteRule, MuteRulesStore } from './muteRulesStore.js';
 export {
@@ -133,6 +149,7 @@ export {
   TOPICS_PATH,
   TRACKED_CLAIMS_PATH,
   TRACKED_STORIES_PATH,
+  FEEDBACK_PATH,
   TRIAGE_PATH,
 } from './paths.js';
 export {
