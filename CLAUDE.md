@@ -103,3 +103,5 @@ Claude reports findings. It never approves or merges.
 - No secrets, `.env`, or `mvp/data/*.json` in the diff.
 - Follow-up tickets proposed (or explicitly None).
 - Product path stays Kite + `mvp/server`; no `_legacy/` default, no Supabase on the live path.
+
+Smoke test 2 (Nov 2026): claude[bot] opened this PR from an @claude issue.
