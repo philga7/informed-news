@@ -5,6 +5,7 @@
  */
 import type { Questions } from '@typesafe-ai/sdk';
 import { choice, noul, score } from '@typesafe-ai/sdk';
+import type { FeedbackEntry } from '../store/feedbackStore.js';
 import type { Article } from '../types/article.js';
 import type { Topic } from '../types/topic.js';
 import type { TriageLabel, TriageReason } from '../types/triage.js';
@@ -16,6 +17,7 @@ import {
   UNDESIRED_MIN,
   WATCH_SIGNIFICANCE_MIN,
 } from './triageConfig.js';
+import { toPromptFeedback, type PromptFeedback } from './triageFeedback.js';
 import { systemOne } from './typesafeClient.js';
 
 export const QUALITY_LABELS = [
@@ -60,6 +62,8 @@ export type TriageJevContext = {
   candidates: Topic[];
   undesired: Topic[];
   sourceCriteria?: { sourceId: string; text: string };
+  /** NEWS-190: reader feedback already selected and capped by the caller. Soft signal only. */
+  feedback?: FeedbackEntry[];
 };
 
 export type TriageJevAnswers = {
@@ -70,6 +74,8 @@ export type TriageJevAnswers = {
   quality: { choice: QualityLabel; confidence: number };
   /** Expected score 0–2 */
   significance: number;
+  /** Id of the feedback entry Jev says drove its judgment (NEWS-190); absent when none did. */
+  feedbackRef?: string;
 };
 
 export type TriageVerdict =
@@ -82,6 +88,9 @@ export type TriageHeadlineState = {
   snippet: string;
   publishedAt: string | null;
   sourceCriteria?: string;
+  /** Present only when feedback was selected. */
+  feedbackNote?: string;
+  feedback?: PromptFeedback[];
 };
 
 export type TriageBodyState = TriageHeadlineState & { bodyExcerpt: string };
@@ -89,6 +98,11 @@ export type TriageBodyState = TriageHeadlineState & { bodyExcerpt: string };
 export type TriageJudgeResult =
   | { ok: true; answers: TriageJevAnswers; verdict: TriageVerdict; model: string }
   | { ok: false; error: string };
+
+const FEEDBACK_NONE = 'none';
+const SIGNAL_LABEL = { like: 'Like', not_relevant: 'Not relevant' } as const;
+const FEEDBACK_NOTE =
+  'Reader feedback on earlier stories (Like / Not relevant, newest or most similar first). Use it as a soft hint about what this reader wants; it never excludes a story by itself.';
 
 const topicKey = (i: number) => `topic_${i}`;
 const undesiredKey = (i: number) => `undesired_${i}`;
@@ -120,6 +134,17 @@ export function buildTriageQuestions(ctx: TriageJevContext): Questions {
     'How significant is this development for someone following the topic(s) this story is about?',
     SIGNIFICANCE_RUBRIC,
   );
+  if (ctx.feedback && ctx.feedback.length > 0) {
+    const criteria: Record<string, string> = {};
+    for (const entry of ctx.feedback) {
+      criteria[entry.id] = `The reader marked "${entry.snapshot.headline}" as ${SIGNAL_LABEL[entry.signal]}.`;
+    }
+    criteria[FEEDBACK_NONE] = 'No feedback entry materially affected the judgment of this story.';
+    questions.feedback = choice(
+      'Which reader feedback entry, if any, most affected your judgment of this story? Feedback is a soft hint about taste, never a reason to exclude a story on its own.',
+      criteria,
+    );
+  }
   return questions;
 }
 
@@ -146,6 +171,7 @@ function publisherLabel(article: Article): string | null {
 export function buildHeadlineState(
   article: Article,
   sourceCriteria?: string,
+  feedback?: readonly FeedbackEntry[],
 ): TriageHeadlineState {
   const state: TriageHeadlineState = {
     headline: article.title,
@@ -154,12 +180,20 @@ export function buildHeadlineState(
     publishedAt: article.publishedAt,
   };
   if (sourceCriteria !== undefined) state.sourceCriteria = sourceCriteria;
+  if (feedback && feedback.length > 0) {
+    state.feedbackNote = FEEDBACK_NOTE;
+    state.feedback = feedback.map(toPromptFeedback);
+  }
   return state;
 }
 
-export function buildBodyState(article: Article, sourceCriteria?: string): TriageBodyState {
+export function buildBodyState(
+  article: Article,
+  sourceCriteria?: string,
+  feedback?: readonly FeedbackEntry[],
+): TriageBodyState {
   return {
-    ...buildHeadlineState(article, sourceCriteria),
+    ...buildHeadlineState(article, sourceCriteria, feedback),
     bodyExcerpt: (article.bodyText ?? '').trim().slice(0, BODY_EXCERPT_MAX_CHARS),
   };
 }
@@ -238,12 +272,23 @@ function mapAnswers(raw: RawAnswers, ctx: TriageJevContext): TriageJevAnswers {
   ctx.undesired.forEach((t, i) => {
     undesired[t.id] = readNoul(raw, undesiredKey(i));
   });
+  const feedbackRef = readFeedbackRef(raw, ctx);
   return {
     relevance,
     undesired,
     quality: readQuality(raw),
     significance: readSignificance(raw),
+    ...(feedbackRef !== undefined ? { feedbackRef } : {}),
   };
+}
+
+/** Lenient: a missing, malformed, low-confidence, "none" or unknown answer cites nothing. */
+function readFeedbackRef(raw: RawAnswers, ctx: TriageJevContext): string | undefined {
+  if (!ctx.feedback || ctx.feedback.length === 0) return undefined;
+  const a = raw.feedback as { choice?: unknown; confidence?: unknown } | undefined;
+  if (typeof a?.choice !== 'string' || !isFiniteNumber(a.confidence)) return undefined;
+  if (a.confidence < QUALITY_CONFIDENCE_MIN) return undefined;
+  return ctx.feedback.some((e) => e.id === a.choice) ? a.choice : undefined;
 }
 
 /** Never throws: call errors and malformed answers come back as `ok: false`. */
@@ -258,8 +303,8 @@ export async function judgeTriage(
     const criteriaText = ctx.sourceCriteria?.text;
     const state =
       stage === 'body'
-        ? buildBodyState(article, criteriaText)
-        : buildHeadlineState(article, criteriaText);
+        ? buildBodyState(article, criteriaText, ctx.feedback)
+        : buildHeadlineState(article, criteriaText, ctx.feedback);
     const res = await call<Questions>({
       state,
       questions: buildTriageQuestions(ctx),

@@ -8,12 +8,14 @@
  */
 import {
   readArticles,
+  readFeedback,
   readMuteRules,
   readTopics,
   readTriage,
   updateMeta,
   updateTriage,
 } from '../store/index.js';
+import type { FeedbackEntry } from '../store/feedbackStore.js';
 import type { MuteRule } from '../store/muteRulesStore.js';
 import type { Article, SourceKind, StoreMeta } from '../types/article.js';
 import type { LoadedRadarSourcesFile, RadarSource } from '../types/radarSource.js';
@@ -30,6 +32,7 @@ import {
 import { loadRadarSourcesFile } from './loadRadarSources.js';
 import {
   isTriageEnabled,
+  resolveFeedbackLimits,
   resolveTriageBudgets,
   TRIAGE_CONCURRENCY,
   TRIAGE_MAX_CANDIDATE_TOPICS,
@@ -45,7 +48,17 @@ import {
   type DedupeCandidate,
   type DedupeGroup,
 } from './triageDedupe.js';
-import { judgeTriage, type TriageJevContext, type TriageVerdict } from './triageJev.js';
+import {
+  feedbackSourceFor,
+  selectFeedback,
+  type FeedbackLimits,
+} from './triageFeedback.js';
+import {
+  judgeTriage,
+  type TriageJevAnswers,
+  type TriageJevContext,
+  type TriageVerdict,
+} from './triageJev.js';
 import { candidateTopicIds, isOutletOnlyTopic, muteReason } from './triageKeywords.js';
 import { prepareSurvivor, writeBackSurvivors } from './triageSurvivor.js';
 import {
@@ -64,6 +77,7 @@ export type TriageDeps = {
   readArticles?: () => Promise<Article[]>;
   writeBackSurvivors?: typeof writeBackSurvivors;
   readTriage?: () => Promise<TriageStore>;
+  readFeedback?: () => Promise<{ entries: FeedbackEntry[] }>;
   updateTriage?: typeof updateTriage;
   updateMeta?: (patch: Partial<StoreMeta>) => Promise<unknown>;
   judge?: typeof judgeTriage;
@@ -125,6 +139,9 @@ type TriageRun = {
   judge: typeof judgeTriage;
   prepare: typeof prepareSurvivor;
   radarSources: readonly RadarSource[];
+  /** Reader feedback (NEWS-190), newest first; a soft signal in the scoring prompt. */
+  feedback: readonly FeedbackEntry[];
+  feedbackLimits: FeedbackLimits;
 };
 
 function errorMessage(err: unknown): string {
@@ -227,13 +244,28 @@ function sourceCriteriaFor(
 
 function contextFor(run: TriageRun, article: Article, topicIds: string[]): TriageJevContext {
   const sourceCriteria = sourceCriteriaFor(article, run.radarSources);
+  const feedback = selectFeedback(
+    run.feedback,
+    { source: feedbackSourceFor(article), topicIds },
+    run.feedbackLimits,
+  );
   return {
     candidates: topicIds
       .map((id) => run.desiredById.get(id))
       .filter((t): t is Topic => t !== undefined),
     undesired: run.undesired,
     ...(sourceCriteria ? { sourceCriteria } : {}),
+    ...(feedback.length > 0 ? { feedback } : {}),
   };
+}
+
+/** The feedback entry Jev cited, if it is one of the entries it was shown. */
+function citedFeedback(
+  ctx: TriageJevContext,
+  answers: TriageJevAnswers,
+): { id: string; signal: 'like' | 'not_relevant' } | undefined {
+  const entry = ctx.feedback?.find((e) => e.id === answers.feedbackRef);
+  return entry ? { id: entry.id, signal: entry.signal } : undefined;
 }
 
 function dropFrom(
@@ -274,7 +306,7 @@ async function triageMember(member: DedupeCandidate, run: TriageRun): Promise<Me
       verdict,
       'headline',
       verdict.significance,
-      advisoryFromJev(verdict, answers, allTopics, sourceId),
+      advisoryFromJev(verdict, answers, allTopics, sourceId, citedFeedback(ctx, answers)),
     );
   }
 
@@ -304,7 +336,13 @@ async function triageMember(member: DedupeCandidate, run: TriageRun): Promise<Me
         body.verdict,
         'body',
         verdict.significance,
-        advisoryFromJev(body.verdict, body.answers, allTopics, sourceId),
+        advisoryFromJev(
+          body.verdict,
+          body.answers,
+          allTopics,
+          sourceId,
+          citedFeedback(ctx, body.answers),
+        ),
       );
     } else {
       cleared = body.verdict;
@@ -323,7 +361,13 @@ async function triageMember(member: DedupeCandidate, run: TriageRun): Promise<Me
       labels: cleared.labels,
       significance: verdict.significance,
       bodyChecked,
-      advisory: advisoryFromJev(cleared, clearedAnswers, allTopics, sourceId),
+      advisory: advisoryFromJev(
+        cleared,
+        clearedAnswers,
+        allTopics,
+        sourceId,
+        citedFeedback(ctx, clearedAnswers),
+      ),
     },
   };
 }
@@ -507,11 +551,12 @@ export async function runTriage(
     return finish();
   }
 
-  const [topicsRead, rulesRead, articlesRead, storeRead] = await Promise.allSettled([
+  const [topicsRead, rulesRead, articlesRead, storeRead, feedbackRead] = await Promise.allSettled([
     (deps.readTopics ?? (() => readTopics()))(),
     (deps.readMuteRules ?? (() => readMuteRules()))(),
     (deps.readArticles ?? readArticles)(),
     (deps.readTriage ?? (() => readTriage()))(),
+    (deps.readFeedback ?? (() => readFeedback()))(),
   ]);
   if (
     topicsRead.status === 'rejected' ||
@@ -531,6 +576,10 @@ export async function runTriage(
   if (rulesRead.status === 'fulfilled') muteRules = rulesRead.value.rules;
   else addError(meta.errors, `mute rules: ${errorMessage(rulesRead.reason)}`);
   const store = storeRead.value;
+  // Feedback is a soft hint: an unreadable file never blocks triage.
+  let feedback: FeedbackEntry[] = [];
+  if (feedbackRead.status === 'fulfilled') feedback = feedbackRead.value.entries;
+  else addError(meta.errors, `feedback: ${errorMessage(feedbackRead.reason)}`);
 
   let started: TriageRun | null = null;
   try {
@@ -559,6 +608,8 @@ export async function runTriage(
       judge: deps.judge ?? judgeTriage,
       prepare: deps.prepareSurvivor ?? prepareSurvivor,
       radarSources: radarConfig.sources,
+      feedback,
+      feedbackLimits: resolveFeedbackLimits(env),
     };
     started = run;
 

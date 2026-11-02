@@ -45,6 +45,20 @@ function parseBudget(raw: string | undefined, fallback: number): number {
   return trimmed !== undefined && /^\d+$/.test(trimmed) ? Number(trimmed) : fallback;
 }
 
+/** NEWS-190: reader feedback injected into a scoring prompt. Both env-overridable. */
+export const DEFAULT_FEEDBACK_MAX_ENTRIES = 20;
+export const DEFAULT_FEEDBACK_TOKEN_BUDGET = 1500;
+
+export function resolveFeedbackLimits(env: NodeJS.ProcessEnv = process.env): {
+  maxEntries: number;
+  tokenBudget: number;
+} {
+  return {
+    maxEntries: parseBudget(env.TRIAGE_FEEDBACK_MAX_ENTRIES, DEFAULT_FEEDBACK_MAX_ENTRIES),
+    tokenBudget: parseBudget(env.TRIAGE_FEEDBACK_TOKEN_BUDGET, DEFAULT_FEEDBACK_TOKEN_BUDGET),
+  };
+}
+
 export function resolveTriageBudgets(env: NodeJS.ProcessEnv = process.env): {
   jevCalls: number;
   summaries: number;

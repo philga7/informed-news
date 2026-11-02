@@ -117,9 +117,20 @@ Ticket: [NEWS-167](https://informedcrew.atlassian.net/browse/NEWS-167). Beside t
 All four are present together, or all absent. **Pre-NEWS-167 rows omit them** (no backfill); the Brief's Approved view still uses `status: 'kept'`. The advisory text is derived from the same Jev answers / non-AI rules that already drove the machine decision — no extra Jev questions.
 
 - **Non-AI drops** (blocklist, mute, undesired keyword, off-topic keyword miss, duplicate, undated, stale, budget, unscored error): `confidence: 1` and a rule id in `criteriaRef` (`rule:blocklist:<term>`, `rule:mute:<id>`, `rule:duplicate`, `rule:budget`, or `global` for keyword off-topic / unscored error).
-- **Jev keeps / drops:** `criteriaRef` is `global`, `topic:<id>`, or `source:<id>`; confidence comes from the driving quality / relevance judgment. The advisory is derived from the typed Jev answers (no free-text model output to parse); `parseAdvisoryVerdict` is a coercion helper for tests and callers that still hold a string.
+- **Jev keeps / drops:** `criteriaRef` is `global`, `topic:<id>`, `source:<id>`, or `feedback:<id>` ([Feedback](#feedback-news-190)); confidence comes from the driving quality / relevance judgment. The advisory is derived from the typed Jev answers (no free-text model output to parse); `parseAdvisoryVerdict` is a coercion helper for tests and callers that still hold a string.
 
 These fields are advisory — AI-assisted judgments, not ground truth. Fixture token baseline (acceptance candidate set, fake `systemOne` at 120 input + 40 output per call): **before 480 / after 480** (delta 0, 0%); 3 Jev calls; `TRIAGE_JEV_BUDGET` default **300** unchanged. Prompts/`buildTriageQuestions` fingerprint identical to `main`.
+
+## Feedback (NEWS-190)
+
+Ticket: [NEWS-190](https://informedcrew.atlassian.net/browse/NEWS-190). Like / Not relevant entries saved on Brief stories (`feedback.json`, NEWS-169) steer later scoring prompts.
+
+- **Selector** (`triageFeedback.ts`): per story, entries that share its source (publisher domain without `www.`, else source kind) or one of its candidate topics come first; the rest follow. Each group is newest first. Selection stops at the entry cap or when the next entry would pass the token budget (estimated as characters ÷ 4 of the prompt form of the entry: id, signal, headline, source, topic names, comment).
+- **Caps / env:** `TRIAGE_FEEDBACK_MAX_ENTRIES` (default `20`) and `TRIAGE_FEEDBACK_TOKEN_BUDGET` (default `1500`). Non-negative integers; unset or invalid → default; `0` turns feedback injection off.
+- **Injection:** the selected entries go into the Jev state (`feedback`, with a note that they are a soft hint) for both the headline and body stage, plus one extra `feedback` question (a choice among the shown entry ids and `none`). No feedback selected → state and questions are identical to before. Feedback is read once per run; a read failure adds a `feedback: …` run error and triage continues without it. Deleting an entry removes it from the next run's prompts.
+- **Citation:** if Jev picks an entry with confidence ≥ the quality threshold (0.6), the record's `criteriaRef` is `feedback:<id>` and `reasonText` notes that reader feedback informed it. This takes the place of `topic:<id>` / `source:<id>`, but not on a muted-topic drop (that stays `topic:<id>`). Non-AI drops keep their `rule:` refs.
+- **Soft only:** the choice answer feeds only the citation. Routing (`routeTriageAnswers`) is unchanged, so Not relevant never mutes or hard-drops an item by itself (muting stays NEWS-90).
+- **Budget:** no extra Jev calls; `TRIAGE_JEV_BUDGET` stays `300`.
 
 ## Budget priority
 
@@ -138,6 +149,7 @@ In `mvp/.env` (see `mvp/.env.example`):
 | `TRIAGE_ENABLED` | Default on. `false` / `0` / `off` / `no` (trimmed, case-insensitive) disables triage; the run is reported `skipped: true`. |
 | `TRIAGE_JEV_BUDGET` | Jev calls per refresh. Non-negative integer; unset or invalid → `300`. `0` means every story that reaches Jev is `not_scored_budget`. |
 | `TRIAGE_SUMMARY_BUDGET` | Ollama Brief summary calls per refresh. Non-negative integer; unset or invalid → `60`. Reported here as `summaryBudget` and **enforced by the Brief's refresh-time summaries** ([BRIEF.md](BRIEF.md#summaries)); failed calls count. |
+| `TRIAGE_FEEDBACK_MAX_ENTRIES` / `TRIAGE_FEEDBACK_TOKEN_BUDGET` | Reader feedback in scoring prompts ([Feedback](#feedback-news-190)). Non-negative integers; unset or invalid → `20` / `1500`. |
 | `TYPESAFE_API_KEY` / `TYPESAFE_MODEL` | Existing TypeSafe settings. Without a key, no Jev calls are made: stories that would reach Jev get `not_scored_error` and the run error `TypeSafe not configured`. |
 
 Other limits are constants in `mvp/server/src/services/triageConfig.ts` (48h window, 14-day article retention, concurrency 4, 6 candidate / 10 undesired topics per call, 2 promotions, Jev thresholds, snippet and body lengths, similar-headline thresholds).

@@ -201,6 +201,8 @@ You can switch between **Last refresh** and **Last 48 hours**. Stories are group
 
 **Scenario:** Given a curated RSS source has a `criteria` note and Jev scored a story from that outlet, when you open the advisory reason on the Brief **Filtered** view or inspect triage records, then `criteriaRef` is `source:<id>` for that source.
 
+**Scenario:** Given you saved Like or Not relevant feedback on earlier stories, when the next refresh scores a story, then your most recent feedback (favoring the same outlet or topic, at most 20 entries and about 1,500 tokens) is shown to Jev as a soft hint. When Jev says a feedback entry drove its judgment, `criteriaRef` is `feedback:<id>`. Not relevant never hides a story by itself, and a deleted entry is not used on the next refresh.
+
 **Scenario:** Given you are signed in and the last refresh dropped nothing, when you open Filtered out, then it says “Nothing was filtered out.”
 
 **Scenario:** Given no refresh has triaged stories yet, when you open the page, then it says no refresh has triaged stories yet.
