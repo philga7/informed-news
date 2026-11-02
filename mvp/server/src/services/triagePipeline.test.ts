@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 import { articleIdFromCanonicalUrl, readArticles, updateArticles } from '../store/index.js';
+import type { FeedbackEntry } from '../store/feedbackStore.js';
 import type { MuteRule } from '../store/muteRulesStore.js';
 import type { Article, FramingAnalysis, StoreMeta } from '../types/article.js';
 import type { LoadedRadarSourcesFile } from '../types/radarSource.js';
@@ -1481,4 +1482,136 @@ test('a search article that only shares the source domain does not get that crit
   assert.equal(contexts.get('found')?.sourceCriteria, undefined);
   assert.equal(state.store.records.found!.status, 'kept');
   assert.equal(state.store.records.found!.criteriaRef, 'topic:tariffs');
+});
+
+function feedbackEntry(
+  id: string,
+  signal: 'like' | 'not_relevant',
+  over: Partial<FeedbackEntry['snapshot']> = {},
+  ts = hoursAgo(5),
+): FeedbackEntry {
+  return {
+    id,
+    itemId: `item-${id}`,
+    signal,
+    comment: `comment ${id}`,
+    ts,
+    snapshot: {
+      headline: `Feedback headline ${id}`,
+      source: 'elsewhere.test',
+      url: `https://elsewhere.test/${id}`,
+      topics: [],
+      ...over,
+    },
+  };
+}
+
+test('selected feedback reaches the Jev context, preferring the article source, capped by env', async () => {
+  const contexts = new Map<string, TriageJevContext>();
+  const feedback = [
+    feedbackEntry('old-other', 'like', {}, hoursAgo(9)),
+    feedbackEntry('new-other', 'like', {}, hoursAgo(2)),
+    feedbackEntry('same-source', 'not_relevant', { source: 'a.example.com' }, hoursAgo(8)),
+  ];
+  const { deps } = harness({
+    topics: [TARIFFS],
+    articles: [article('a', 'New tariff announced')],
+    overrides: {
+      judge: keepingJudge(contexts),
+      readFeedback: async () => ({ entries: feedback, updatedAt: null }),
+    },
+  });
+
+  await run(deps, { ...ENV, TRIAGE_FEEDBACK_MAX_ENTRIES: '2' });
+
+  assert.deepEqual(
+    contexts.get('a')?.feedback?.map((e) => e.id),
+    ['same-source', 'new-other'],
+  );
+});
+
+test('a deleted feedback entry is absent from the next run', async () => {
+  const contexts = new Map<string, TriageJevContext>();
+  let entries = [feedbackEntry('keep-me', 'like'), feedbackEntry('delete-me', 'not_relevant')];
+  const articles = [article('a', 'New tariff announced')];
+  const { deps } = harness({
+    topics: [TARIFFS],
+    articles,
+    overrides: {
+      judge: keepingJudge(contexts),
+      readFeedback: async () => ({ entries, updatedAt: null }),
+    },
+  });
+
+  await run(deps);
+  assert.deepEqual(
+    contexts.get('a')?.feedback?.map((e) => e.id).sort(),
+    ['delete-me', 'keep-me'],
+  );
+
+  entries = entries.filter((e) => e.id !== 'delete-me');
+  articles.push(article('b', 'Another tariff move'));
+  await run(deps);
+  assert.deepEqual(
+    contexts.get('b')?.feedback?.map((e) => e.id),
+    ['keep-me'],
+  );
+});
+
+test('a feedback read failure is non-fatal: triage proceeds with no feedback', async () => {
+  const contexts = new Map<string, TriageJevContext>();
+  const { deps, state } = harness({
+    topics: [TARIFFS],
+    articles: [article('c', 'Tariff again')],
+    overrides: {
+      judge: keepingJudge(contexts),
+      readFeedback: async () => {
+        throw new Error('disk gone');
+      },
+    },
+  });
+  const result = await run(deps);
+  assert.equal(result.skipped, false);
+  assert.equal(state.store.records.c!.status, 'kept');
+  assert.equal(contexts.get('c')?.feedback, undefined);
+  assert.ok(result.errors.some((e) => e.includes('feedback')));
+});
+
+test('a reason driven by feedback carries criteriaRef feedback:<id> and still keeps', async () => {
+  const feedback = [feedbackEntry('nr-1', 'not_relevant', { source: 'a.example.com' })];
+  const { deps, state } = harness({
+    topics: [TARIFFS],
+    articles: [article('a', 'New tariff announced'), article('b', 'Second tariff story')],
+    overrides: {
+      readFeedback: async () => ({ entries: feedback, updatedAt: null }),
+      judge: async (_stage, a, ctx) => {
+        const answers: TriageJevAnswers = {
+          relevance: Object.fromEntries(ctx.candidates.map((t) => [t.id, 1])),
+          undesired: Object.fromEntries(ctx.undesired.map((t) => [t.id, 0])),
+          quality: { choice: 'news', confidence: 0.9 },
+          significance: 2,
+          ...(a.id === 'a' ? { feedbackRef: 'nr-1' } : {}),
+        };
+        return { ok: true, answers, verdict: routeTriageAnswers(answers, ctx), model: 'fake' };
+      },
+    },
+  });
+
+  await run(deps);
+
+  assert.equal(state.store.records.a!.criteriaRef, 'feedback:nr-1');
+  assert.equal(state.store.records.a!.status, 'kept');
+  assert.equal(state.store.records.b!.criteriaRef, 'topic:tariffs');
+});
+
+test('the Jev budget stays 300 by default with feedback present', async () => {
+  const { deps } = harness({
+    topics: [TARIFFS],
+    articles: [article('a', 'New tariff announced')],
+    overrides: {
+      readFeedback: async () => ({ entries: [feedbackEntry('x', 'like')], updatedAt: null }),
+    },
+  });
+  const result = await run(deps, {});
+  assert.equal(result.jev.budget, 300);
 });

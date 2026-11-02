@@ -73,7 +73,7 @@ export type TriageRecord = {
   confidence?: number;
   /** Prose reason (≤300); never the machine drop code */
   reasonText?: string;
-  /** One driving rule: `global` | `topic:<id>` | `source:<id>` | `rule:mute:<id>` | `rule:blocklist:<term>` | `rule:duplicate` | `rule:budget` */
+  /** One driving rule: `global` | `topic:<id>` | `source:<id>` | `feedback:<id>` (reader feedback entry, NEWS-190) | `rule:mute:<id>` | `rule:blocklist:<term>` | `rule:duplicate` | `rule:budget` */
   criteriaRef?: string;
 };
 

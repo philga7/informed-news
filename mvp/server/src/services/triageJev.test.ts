@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { Questions, SystemOneRequest } from '@typesafe-ai/sdk';
+import type { FeedbackEntry } from '../store/feedbackStore.js';
 import type { Article } from '../types/article.js';
 import type { Topic } from '../types/topic.js';
 import { BODY_EXCERPT_MAX_CHARS, HEADLINE_SNIPPET_MAX_CHARS } from './triageConfig.js';
@@ -566,4 +567,121 @@ test('judgeTriage rejects an unknown quality label', async () => {
   });
   assert.equal(res.ok, false);
   assert.match(res.ok ? '' : res.error, /quality/);
+});
+
+const feedbackEntries: FeedbackEntry[] = [
+  {
+    id: 'fb-1',
+    itemId: 'i1',
+    signal: 'not_relevant',
+    comment: 'Too much celebrity noise',
+    ts: '2026-09-29T00:00:00.000Z',
+    snapshot: {
+      headline: 'Star spotted at port',
+      source: 'example.com',
+      url: 'https://example.com/star',
+      topics: [{ id: 't-core', name: 'Ports' }],
+    },
+  },
+  {
+    id: 'fb-2',
+    itemId: 'i2',
+    signal: 'like',
+    comment: '',
+    ts: '2026-09-28T00:00:00.000Z',
+    snapshot: {
+      headline: 'Dockworkers vote on contract',
+      source: 'example.com',
+      url: 'https://example.com/vote',
+      topics: [],
+    },
+  },
+];
+
+const withFeedback: TriageJevContext = { ...ctx, feedback: feedbackEntries };
+
+const feedbackBase = {
+  topic_0: noulA(0.9),
+  topic_1: noulA(0.9),
+  topic_2: noulA(0.9),
+  undesired_0: noulA(0.1),
+  undesired_1: noulA(0.1),
+  quality: {
+    type: 'choice' as const,
+    choice: 'news',
+    confidence: 0.9,
+    probabilities: { news: 0.9 },
+  },
+  significance: {
+    type: 'score' as const,
+    score: 1.6,
+    confidence: 0.7,
+    legend: {},
+    probabilities: { 0: 0.1, 1: 0.2, 2: 0.7 },
+  },
+};
+
+const feedbackChoice = (choice: string, confidence: number): FakeAnswer => ({
+  type: 'choice',
+  choice,
+  confidence,
+  probabilities: { [choice]: confidence },
+});
+
+test('without feedback the questions and state are unchanged', () => {
+  assert.equal('feedback' in buildTriageQuestions(ctx), false);
+  assert.equal('feedback' in buildHeadlineState(makeArticle()), false);
+  assert.equal('feedback' in buildHeadlineState(makeArticle(), undefined, []), false);
+});
+
+test('the prompt state carries the selected feedback and a feedback question follows significance', () => {
+  const state = buildHeadlineState(makeArticle(), undefined, feedbackEntries);
+  const text = JSON.stringify(state);
+  for (const needle of [
+    'fb-1',
+    'fb-2',
+    'not_relevant',
+    'Too much celebrity noise',
+    'Star spotted at port',
+    'Dockworkers vote on contract',
+  ]) {
+    assert.ok(text.includes(needle), needle);
+  }
+  assert.ok(buildBodyState(makeArticle(), undefined, feedbackEntries).feedback);
+
+  const qs = buildTriageQuestions(withFeedback);
+  assert.deepEqual(Object.keys(qs).slice(-3), ['quality', 'significance', 'feedback']);
+});
+
+test('judgeTriage sends the feedback in the request and reads the cited entry', async () => {
+  const calls: Array<SystemOneRequest<Questions>> = [];
+  const res = await judgeTriage('headline', makeArticle(), withFeedback, {
+    systemOne: fakeSystemOne(
+      () => ({ ...feedbackBase, feedback: feedbackChoice('fb-1', 0.8) }),
+      calls,
+    ),
+  });
+  assert.ok(JSON.stringify(calls[0]!.state).includes('Too much celebrity noise'));
+  assert.ok(res.ok);
+  assert.equal(res.answers.feedbackRef, 'fb-1');
+});
+
+test('a none, low-confidence, unknown or malformed feedback answer cites nothing and never fails the call', async () => {
+  for (const feedback of [
+    feedbackChoice('none', 0.9),
+    feedbackChoice('fb-1', 0.2),
+    feedbackChoice('ghost', 0.9),
+    noulA(0.5),
+  ]) {
+    const res = await judgeTriage('headline', makeArticle(), withFeedback, {
+      systemOne: fakeSystemOne(() => ({ ...feedbackBase, feedback })),
+    });
+    assert.ok(res.ok);
+    assert.equal(res.answers.feedbackRef, undefined);
+  }
+});
+
+test('feedback never changes routing: a cited not_relevant entry cannot drop on its own', () => {
+  const verdict = routeTriageAnswers({ ...answers(), feedbackRef: 'fb-1' }, withFeedback);
+  assert.equal(verdict.decision, 'keep');
 });

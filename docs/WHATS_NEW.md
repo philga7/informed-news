@@ -8,6 +8,8 @@ This is not the release log. Releases are recorded in `CHANGELOG.md` by semantic
 
 ## 2026-11-02
 
+Like and Not relevant feedback you save now steers later refreshes. Your most recent feedback, favoring the same outlet or topic, is shown to the scoring step as a soft hint. A story the feedback shaped can show a feedback reference in its advisory reason. Not relevant never hides a story by itself, and a deleted entry stops being used on the next refresh.
+
 **No user-visible change.** How long a background code change may run is not part of the Brief.
 
 ## 2026-10-31

@@ -157,8 +157,19 @@ export function advisoryFromJev(
   answers: TriageJevAnswers,
   topicsById: ReadonlyMap<string, Topic>,
   sourceId?: string,
+  feedback?: { id: string; signal: 'like' | 'not_relevant' },
 ): TriageAdvisory {
   const advisory = advisoryFromJevTopics(verdict, answers, topicsById);
+  const isMuted = verdict.decision === 'drop' && verdict.reason.startsWith('muted:');
+  // NEWS-190: feedback outranks topic/source, but a muted drop keeps its topic rule.
+  if (feedback !== undefined && !isMuted) {
+    const label = feedback.signal === 'like' ? 'Like' : 'Not relevant';
+    return {
+      ...advisory,
+      reasonText: truncateReasonText(`${advisory.reasonText} Reader feedback (${label}) informed this.`),
+      criteriaRef: `feedback:${feedback.id}`,
+    };
+  }
   if (sourceId === undefined) return advisory;
   return { ...advisory, criteriaRef: `source:${sourceId}` };
 }
