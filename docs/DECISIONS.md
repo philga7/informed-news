@@ -2,6 +2,22 @@
 
 Binding choices for Informed News. Newest first. When one of these changes, update this file in the same change as [ROADMAP.md](ROADMAP.md) and Jira. What the product does now, in plain language, is [PRODUCT_SPEC.md](PRODUCT_SPEC.md). Pipeline detail remains in [NEWS-84](https://informedcrew.atlassian.net/browse/NEWS-84), [TRIAGE.md](TRIAGE.md), and [BRIEF.md](BRIEF.md). The target is [VISION.md](VISION.md).
 
+## 2026-11-02 — the Claude build job installs lockfile dependencies before Claude (NEWS-189)
+
+**Decision:** `claude-build` installs dependencies from the lockfiles in a workflow step before Claude starts. Phil said go and took every recommended answer (Sunday evening 2026-11-01; the work-hours hold did not apply).
+
+1. **Where:** `actions/setup-node` with the npm cache, then `npm ci` at the repo root and `npm ci --prefix mvp/server`, before the Claude step.
+2. **What:** only what `npm test` and `npm run test:kite` need. Kite stays on the existing frozen `bun install`.
+3. **Allow list:** Claude still cannot install anything. `npm install`, `npm ci`, `bun install`, npx, and curl stay forbidden. The job runs `npm ci`. `Bash(npm ci)` is not an allowed tool.
+
+This replaces the [NEWS-180](https://informedcrew.atlassian.net/browse/NEWS-180) allowance that left `npm ci` as the one network install Claude could run. Claude does not run it.
+
+[VISION.md](VISION.md) is unchanged. This is dev tooling, not the product direction.
+
+**Why:** Smoke test 2 (issue #222, PR #223) let Claude run `npm test`, which failed at once with `ERR_MODULE_NOT_FOUND: Cannot find package 'tsx'`. Nothing installed `mvp/server` dependencies before Claude, and Claude cannot install them.
+
+**What it rules out:** Letting Claude run `npm ci` or `npm install`; installing `_legacy/` or other workspaces on this job.
+
 ## 2026-11-01 — one @claude mention starts only claude-build; the builder runs node --test and bun scripts and opens its own PRs (NEWS-184, NEWS-185, NEWS-186, NEWS-187, NEWS-188)
 
 **Decision:** One `@claude` mention starts only `claude-build`. The builder runs `node --test` and bun scripts, and opens its own pull requests as `claude[bot]`. Phil said go and took every recommended answer (Sunday 2026-11-01). One pull request, not two.

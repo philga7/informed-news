@@ -81,7 +81,11 @@ describe('NEWS-180 claude build workflow', () => {
 
 	it('has no merge step and denies merge, force-push, and extra installs', () => {
 		const runs = [...workflow.matchAll(/^\s*run:\s*(.+)$/gm)].map((match) => match[1]);
-		assert.deepEqual(runs, ['bun install --frozen-lockfile --cwd apps/kite']);
+		assert.deepEqual(runs, [
+			'npm ci',
+			'npm ci --prefix mvp/server',
+			'bun install --frozen-lockfile --cwd apps/kite',
+		]);
 		const allowed = claudeArgsToolString(workflow, '--allowedTools');
 		const disallowed = claudeArgsToolString(workflow, '--disallowedTools');
 		for (const needle of [
@@ -151,6 +155,42 @@ describe('NEWS-180 claude build workflow', () => {
 		assert.match(disallowed, /Bash\(curl:\*\)/);
 		assert.match(disallowed, /npm install/);
 		assert.match(disallowed, /bun install/);
+	});
+
+	it('installs root and mvp/server lockfiles before Claude and keeps install tools forbidden', () => {
+		const checkout = workflow.indexOf('actions/checkout@v7');
+		const setupNode = workflow.indexOf('actions/setup-node@v4');
+		const rootCi = workflow.search(/^\s*run: npm ci$/m);
+		const serverCi = workflow.indexOf('run: npm ci --prefix mvp/server');
+		const action = workflow.indexOf('anthropics/claude-code-action@v1');
+		assert.ok(checkout !== -1 && setupNode > checkout, 'setup-node after checkout');
+		assert.ok(setupNode !== -1 && setupNode < action, 'setup-node before the Claude step');
+		assert.ok(rootCi > setupNode && rootCi < action, 'root npm ci before the Claude step');
+		assert.ok(
+			serverCi > rootCi && serverCi < action,
+			'mvp/server npm ci before the Claude step',
+		);
+		assert.match(workflow, /node-version:\s*'22'/);
+		assert.match(workflow, /cache:\s*'npm'/);
+		assert.match(
+			workflow,
+			/cache-dependency-path:\s*\|\n\s+package-lock\.json\n\s+mvp\/server\/package-lock\.json/,
+		);
+		const allowed = claudeArgsToolString(workflow, '--allowedTools').split(',');
+		const disallowed = claudeArgsToolString(workflow, '--disallowedTools').split(',');
+		for (const banned of [
+			'Bash(npm ci)',
+			'Bash(npm ci:*)',
+			'Bash(npm install)',
+			'Bash(npm install:*)',
+			'Bash(bun install)',
+			'Bash(bun install:*)',
+			'Bash(npx:*)',
+			'Bash(curl:*)',
+		]) {
+			assert.ok(!allowed.includes(banned), `${banned} must stay forbidden`);
+			assert.ok(disallowed.includes(banned), `${banned} must be disallowed`);
+		}
 	});
 
 	it('installs bun 1.4.3 and Kite deps before Claude, and still denies bun install', () => {
