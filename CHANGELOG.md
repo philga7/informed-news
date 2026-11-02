@@ -1,3 +1,9 @@
+## [0.34.0](https://github.com/philga7/informed-news/compare/v0.33.0...v0.34.0) (2026-11-02)
+
+### Features
+
+* **NEWS-190:** feedback steers later triage prompts ([#230](https://github.com/philga7/informed-news/issues/230)) ([ee87d60](https://github.com/philga7/informed-news/commit/ee87d60ab6641f9699a0cbf5a69d6aeb6ca6f38d)), closes [#228](https://github.com/philga7/informed-news/issues/228)
+
 ## [0.33.0](https://github.com/philga7/informed-news/compare/v0.32.0...v0.33.0) (2026-11-02)
 
 ### Features
