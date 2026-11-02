@@ -10,6 +10,8 @@ This is not the release log. Releases are recorded in `CHANGELOG.md` by semantic
 
 **No user-visible change.**
 
+**No user-visible change.** How long a background code change may run is not part of the Brief.
+
 ## 2026-10-31
 
 The always-on Brief is running on the private machine, and it is not on the public internet. A laptop or phone can open it when Tailscale is installed on that device. Reading the Brief does not ask for the password. Refresh, Topics, Filtered out, and other changes still do.

@@ -2,6 +2,10 @@
 
 Binding choices for Informed News. Newest first. When one of these changes, update this file in the same change as [ROADMAP.md](ROADMAP.md) and Jira. What the product does now, in plain language, is [PRODUCT_SPEC.md](PRODUCT_SPEC.md). Pipeline detail remains in [NEWS-84](https://informedcrew.atlassian.net/browse/NEWS-84), [TRIAGE.md](TRIAGE.md), and [BRIEF.md](BRIEF.md). The target is [VISION.md](VISION.md).
 
+## 2026-11-02 — Claude builder max-turns is 100 (NEWS-190)
+
+**Decision:** `--max-turns 100`. **Why:** Real Small tickets (about 3 TDD tasks plus docs) need more than 30 turns; 30 only fit one-line smoke tests. **What it rules out:** A 30-turn cap. [VISION.md](VISION.md) is unchanged.
+
 ## 2026-11-02 — Feedback store shape, one entry per item, and routes (NEWS-169)
 
 **Decision:** Ship the store and routes for Like / Not relevant from these grill answers. Phil said go and took every recommended answer (Monday 2026-11-02; he is off, and the work-hours hold does not apply). [VISION.md](VISION.md) is unchanged. Buttons, the `/feedback` page, and prompt injection are not in this change.
@@ -78,7 +82,7 @@ This replaces the [NEWS-180](https://informedcrew.atlassian.net/browse/NEWS-180)
 
 1. **Triggers:** `issue_comment`, `pull_request_review_comment`, and `pull_request_review` (`submitted`), plus `issues` (`opened`) only when the body contains `@claude`. No label or assignee triggers, so nothing auto-starts.
 2. **Model:** the action default. Do not pin it with `claude_args --model`.
-3. **Max turns:** `--max-turns 30`.
+3. **Max turns:** `--max-turns 100` (was 30 until 2026-11-02).
 4. **Allowed tools:** the allow list is the repo npm test, lint, typecheck, and build scripts, plus read-only git status, diff, log, and show. Commit and push stay on the action's own wrapper. No network installs beyond `npm ci`.
 5. **Concurrency:** one run per issue or PR, with cancel-in-progress off.
 6. **CI reads:** `actions: read`, read-only, so Claude can see failing checks on its own pull requests.
