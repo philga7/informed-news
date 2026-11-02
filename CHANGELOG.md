@@ -1,3 +1,9 @@
+## [0.33.0](https://github.com/philga7/informed-news/compare/v0.32.0...v0.33.0) (2026-11-02)
+
+### Features
+
+* **NEWS-169:** feedback store and CRUD routes ([#227](https://github.com/philga7/informed-news/issues/227)) ([26a435d](https://github.com/philga7/informed-news/commit/26a435de538bea481bec99cfdef386e4807e922a)), closes [#226](https://github.com/philga7/informed-news/issues/226) [#221](https://github.com/philga7/informed-news/issues/221)
+
 ## [0.32.0](https://github.com/philga7/informed-news/compare/v0.31.0...v0.32.0) (2026-10-31)
 
 ### Features
