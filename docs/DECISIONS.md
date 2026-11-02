@@ -2,6 +2,23 @@
 
 Binding choices for Informed News. Newest first. When one of these changes, update this file in the same change as [ROADMAP.md](ROADMAP.md) and Jira. What the product does now, in plain language, is [PRODUCT_SPEC.md](PRODUCT_SPEC.md). Pipeline detail remains in [NEWS-84](https://informedcrew.atlassian.net/browse/NEWS-84), [TRIAGE.md](TRIAGE.md), and [BRIEF.md](BRIEF.md). The target is [VISION.md](VISION.md).
 
+## 2026-11-02 — Feedback store shape, one entry per item, and routes (NEWS-169)
+
+**Decision:** Ship the store and routes for Like / Not relevant from these grill answers. Phil said go and took every recommended answer (Monday 2026-11-02; he is off, and the work-hours hold does not apply). [VISION.md](VISION.md) is unchanged. Buttons, the `/feedback` page, and prompt injection are not in this change.
+
+1. **What an entry stores.** `mvp/data/feedback.json` holds `{ entries, updatedAt }`. Each entry is `{ id, itemId, signal: "like" | "not_relevant", comment, ts, snapshot }`. `comment` is trimmed and at most 500 characters (empty when omitted). `snapshot` is `{ headline, source, url, topics: [{ id, name }] }`, taken when the entry is saved: headline from the article title (publisher title, then "Untitled", when the title is blank); `source` is the outlet domain (lowercased, a leading `www.` and one trailing `.` removed) or the article's `sourceKind` when there is no domain; `url` is `publisherUrl` when it is `http:` or `https:`, otherwise `canonicalUrl`; `topics` come from the triage record when one exists, otherwise the article's `topicIds`, with names read from `topics.json` without seeding that file (a missing topic keeps its id as the name).
+2. **Routes.** `POST /api/feedback`, `GET /api/feedback` (newest `ts` first), `PATCH /api/feedback/:id` (signal and comment only; `id`, `itemId`, `ts`, and `snapshot` stay), `DELETE /api/feedback/:id`. Session required, same as the other `/api` routes. `400` when the comment is over 500 characters or the signal is not `like` or `not_relevant`. `404` when `itemId` is not an article, or when the feedback `id` is unknown.
+3. **One entry per item.** A new POST for the same `itemId` replaces the old entry (new `id`, new `ts`, new snapshot). `201` when it is new, `200` when it replaces.
+4. **Store writes.** The same atomic temp-file-and-rename plus in-process queue the other `mvp/data` stores use (`writeJsonAtomic` and `enqueueFileWrite`).
+5. **Not relevant is not a mute.** It never writes a mute rule or an undesired topic. "Less like this" stays the hard mute ([2026-10-23 — Take verdict, blocklist, and Like / Not relevant](#2026-10-23--take-verdict-blocklist-and-like--not-relevant)).
+6. **News Desk Bot.** No. The 2026-10-23 decision already rules out feeding this feedback to News Desk Bot story spotting.
+
+The triage prompt and `TRIAGE_JEV_BUDGET` (300) are unchanged. [NEWS-190](https://informedcrew.atlassian.net/browse/NEWS-190) injects selected feedback and cites `feedback:<id>`. [NEWS-191](https://informedcrew.atlassian.net/browse/NEWS-191) adds the buttons, the list page, and the end-to-end check.
+
+**Why:** Brief items roll off, and the later selector (same source or topic) and list page still need to say what was liked. One editable entry per story matches a soft signal the operator can change. The route shape matches the topics API.
+
+**What it rules out:** Sending this feedback to News Desk Bot, treating Not relevant as a mute, keeping more than one entry per item, and changing the triage prompt or the 300-call cap in this change.
+
 ## 2026-11-02 — the Claude build job installs lockfile dependencies before Claude (NEWS-189)
 
 **Decision:** `claude-build` installs dependencies from the lockfiles in a workflow step before Claude starts. Phil said go and took every recommended answer (Sunday evening 2026-11-01; the work-hours hold did not apply).

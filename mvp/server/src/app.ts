@@ -41,7 +41,13 @@ import {
   acceptCluster,
   acceptClaim,
   ackTrackedClaimUpdate,
+  FeedbackValidationError,
   addMuteRule,
+  createFeedback,
+  feedbackTopicNames,
+  readFeedback,
+  removeFeedback,
+  updateFeedback,
   dismissClaimReview,
   ackTrackedUpdate,
   createTopic,
@@ -71,7 +77,7 @@ import {
   updateBriefSeen,
   updateTopic,
 } from './store/index.js';
-import type { TrackedEntry } from './store/index.js';
+import type { FeedbackSnapshot, FeedbackTopicSnapshot, TrackedEntry } from './store/index.js';
 import type { TrackedClaimEntry } from './store/index.js';
 import type { Article } from './types/article.js';
 
@@ -106,6 +112,12 @@ export type CreateAppDeps = {
   createTopic?: typeof createTopic;
   updateTopic?: typeof updateTopic;
   removeTopic?: typeof removeTopic;
+  readFeedback?: typeof readFeedback;
+  createFeedback?: typeof createFeedback;
+  updateFeedback?: typeof updateFeedback;
+  removeFeedback?: typeof removeFeedback;
+  /** Topic names for the feedback snapshot. Default reads topics.json and does not seed it. */
+  feedbackTopicNames?: typeof feedbackTopicNames;
   readTriage?: typeof readTriage;
   loadClaimsRadar?: typeof loadClaimsRadar;
   readClaimMembership?: typeof readClaimMembership;
@@ -198,6 +210,51 @@ function parseBooleanLike(raw: unknown): boolean | undefined {
           : undefined;
 }
 
+function httpUrl(value: string | null): string | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (trimmed.startsWith('https://') || trimmed.startsWith('http://')) return trimmed;
+  return null;
+}
+
+function feedbackSource(article: Pick<Article, 'publisherDomain' | 'sourceKind'>): string {
+  const raw = article.publisherDomain?.trim().toLowerCase().replace(/\.$/, '') ?? '';
+  const domain = raw.replace(/^www\./, '');
+  return domain.length > 0 ? domain : article.sourceKind;
+}
+
+function feedbackSnapshot(
+  article: Article,
+  topicIds: readonly string[],
+  names: ReadonlyMap<string, string>,
+): FeedbackSnapshot {
+  const topics: FeedbackTopicSnapshot[] = [];
+  const seen = new Set<string>();
+  for (const raw of topicIds) {
+    const id = raw.trim();
+    if (id.length === 0 || seen.has(id)) continue;
+    seen.add(id);
+    const name = names.get(id)?.trim();
+    topics.push({ id, name: name && name.length > 0 ? name : id });
+  }
+  return {
+    headline: article.title.trim() || article.publisherTitle?.trim() || 'Untitled',
+    source: feedbackSource(article),
+    url: httpUrl(article.publisherUrl) ?? httpUrl(article.canonicalUrl) ?? article.canonicalUrl,
+    topics,
+  };
+}
+
+function sendFeedbackError(res: Response, verb: string, err: unknown): void {
+  if (err instanceof FeedbackValidationError) {
+    res.status(400).json({ ok: false, error: err.message });
+    return;
+  }
+  const message = err instanceof Error ? err.message : String(err);
+  console.error(`Feedback ${verb} failed:`, message);
+  res.status(500).json({ ok: false, error: message });
+}
+
 function sendTopicWriteError(res: Response, verb: string, err: unknown): void {
   if (err instanceof TopicValidationError) {
     res.status(400).json({ ok: false, error: err.message });
@@ -248,6 +305,11 @@ export function createApp(deps: CreateAppDeps = {}): Express {
   const createOneTopic = deps.createTopic ?? createTopic;
   const updateOneTopic = deps.updateTopic ?? updateTopic;
   const removeOneTopic = deps.removeTopic ?? removeTopic;
+  const readFeedbackStore = deps.readFeedback ?? readFeedback;
+  const createOneFeedback = deps.createFeedback ?? createFeedback;
+  const updateOneFeedback = deps.updateFeedback ?? updateFeedback;
+  const removeOneFeedback = deps.removeFeedback ?? removeFeedback;
+  const topicNamesForFeedback = deps.feedbackTopicNames ?? feedbackTopicNames;
   const readTriageStore = deps.readTriage ?? readTriage;
   const getById = deps.getArticleById ?? getArticleById;
   const classifyBatch = deps.classifyUnclassifiedArticles ?? classifyUnclassifiedArticles;
@@ -648,6 +710,88 @@ export function createApp(deps: CreateAppDeps = {}): Express {
       const message = err instanceof Error ? err.message : String(err);
       console.error('Topic delete failed:', message);
       res.status(500).json({ ok: false, error: message });
+    }
+  });
+
+  /**
+   * Like / Not relevant (NEWS-169). Soft signal only — does not mute.
+   * One entry per item; a later POST for the same itemId replaces it.
+   */
+  app.get('/api/feedback', async (_req, res) => {
+    try {
+      const store = await readFeedbackStore();
+      res.json({ ok: true, entries: store.entries, updatedAt: store.updatedAt });
+    } catch (err) {
+      sendFeedbackError(res, 'read', err);
+    }
+  });
+
+  app.post('/api/feedback', async (req, res) => {
+    try {
+      const itemIdRaw = (req.body as { itemId?: unknown } | null)?.itemId;
+      const itemId = typeof itemIdRaw === 'string' ? itemIdRaw.trim() : '';
+      if (!itemId) {
+        res.status(400).json({ ok: false, error: 'itemId is required' });
+        return;
+      }
+      const found = await getById(itemId);
+      if (!found) {
+        res.status(404).json({ ok: false, error: 'item not found' });
+        return;
+      }
+      const triage = await readTriageStore();
+      const record = triage.records[found.id];
+      const topicIds = record ? record.topicIds : (found.topicIds ?? []);
+      const names = await topicNamesForFeedback(topicIds);
+      const result = await createOneFeedback({
+        itemId: found.id,
+        signal: (req.body as { signal?: unknown } | null)?.signal,
+        comment: (req.body as { comment?: unknown } | null)?.comment,
+        snapshot: feedbackSnapshot(found, topicIds, names),
+      });
+      res.status(result.replaced ? 200 : 201).json({
+        ok: true,
+        replaced: result.replaced,
+        entry: result.entry,
+        entries: result.entries,
+      });
+    } catch (err) {
+      sendFeedbackError(res, 'create', err);
+    }
+  });
+
+  app.patch('/api/feedback/:id', async (req, res) => {
+    try {
+      const raw = req.body;
+      if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
+        res.status(400).json({ ok: false, error: 'signal or comment is required' });
+        return;
+      }
+      const body = raw as { signal?: unknown; comment?: unknown };
+      const patch: { signal?: unknown; comment?: unknown } = {};
+      if ('signal' in body) patch.signal = body.signal;
+      if ('comment' in body) patch.comment = body.comment;
+      const result = await updateOneFeedback(req.params.id, patch);
+      if (!result) {
+        res.status(404).json({ ok: false, error: 'feedback not found' });
+        return;
+      }
+      res.json({ ok: true, entry: result.entry, entries: result.entries });
+    } catch (err) {
+      sendFeedbackError(res, 'update', err);
+    }
+  });
+
+  app.delete('/api/feedback/:id', async (req, res) => {
+    try {
+      const result = await removeOneFeedback(req.params.id);
+      if (!result) {
+        res.status(404).json({ ok: false, error: 'feedback not found' });
+        return;
+      }
+      res.json({ ok: true, removed: true, entries: result.entries });
+    } catch (err) {
+      sendFeedbackError(res, 'delete', err);
     }
   });
 

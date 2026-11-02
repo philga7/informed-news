@@ -148,13 +148,15 @@ describe('NEWS-165 vision and decisions', () => {
 			'NEWS-112',
 			'NEWS-168',
 			'NEWS-169',
+			'NEWS-190',
+			'NEWS-191',
 			'NEWS-170',
 		]);
 		assert.match(
 			combined,
 			/Reordered 2026-10-27: hosting pulled ahead of NEWS-168\/169, approved by Phil\./,
 		);
-		assert.match(combined, /\*\*Current next\*\* is \[NEWS-169\]/);
+		assert.match(combined, /\*\*Current next\*\* is \[NEWS-190\]/);
 		assert.match(roadmap, /NEWS-175[\s\S]{0,400}\*\*Done\*\*/);
 		assert.match(roadmap, /NEWS-182[\s\S]{0,200}\*\*Done\*\*/);
 		assert.match(roadmap, /NEWS-168[\s\S]{0,120}\*\*Done\*\*/);
@@ -179,7 +181,9 @@ describe('NEWS-165 vision and decisions', () => {
 		assert.ok(at('NEWS-172') !== -1 && at('NEWS-172') < at(nextClause), 'NEWS-172 is Done before Current next');
 		assert.ok(at('NEWS-173') !== -1 && at('NEWS-173') < at(nextClause), 'NEWS-173 is Done before Current next');
 		assert.ok(at('NEWS-168') !== -1 && at('NEWS-168') < at(nextClause), 'NEWS-168 is Done before Current next');
-		assert.ok(nextAt('NEWS-169') !== -1 && nextAt('NEWS-169') < nextAt('NEWS-170'));
+		assert.ok(nextAt('NEWS-190') !== -1 && nextAt('NEWS-190') < nextAt('NEWS-191'));
+		assert.ok(nextAt('NEWS-191') < nextAt('NEWS-169'));
+		assert.ok(nextAt('NEWS-169') < nextAt('NEWS-170'));
 		assert.ok(at('NEWS-131') < at(nextClause), 'NEWS-131 is listed as Done before Current next');
 	});
 

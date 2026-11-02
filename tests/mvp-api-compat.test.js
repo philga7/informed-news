@@ -39,6 +39,10 @@ describe('NEWS-43 MVP API compat surface', () => {
 		assert.match(src, /app\.post\('\/api\/topics'/);
 		assert.match(src, /app\.patch\('\/api\/topics\/:id'/);
 		assert.match(src, /app\.delete\('\/api\/topics\/:id'/);
+		assert.match(src, /app\.get\('\/api\/feedback'/);
+		assert.match(src, /app\.post\('\/api\/feedback'/);
+		assert.match(src, /app\.patch\('\/api\/feedback\/:id'/);
+		assert.match(src, /app\.delete\('\/api\/feedback\/:id'/);
 		assert.match(src, /app\.get\('\/api\/triage\/filtered'/);
 		assert.match(src, /app\.post\('\/api\/brief\/stories\/:articleId\/less-like-this'/);
 		assert.match(src, /app\.post\('\/api\/brief\/stories\/:articleId\/remove'/);
@@ -76,6 +80,10 @@ describe('NEWS-43 MVP API compat surface', () => {
 		assert.match(doc, /POST \| `\/api\/topics`/);
 		assert.match(doc, /PATCH \| `\/api\/topics\/:id`/);
 		assert.match(doc, /DELETE \| `\/api\/topics\/:id`/);
+		assert.match(doc, /GET \| `\/api\/feedback`/);
+		assert.match(doc, /POST \| `\/api\/feedback`/);
+		assert.match(doc, /PATCH \| `\/api\/feedback\/:id`/);
+		assert.match(doc, /DELETE \| `\/api\/feedback\/:id`/);
 		assert.match(doc, /GET \| `\/api\/triage\/filtered`/);
 		assert.match(doc, /POST \| `\/api\/brief\/stories\/:articleId\/less-like-this`/);
 		assert.match(doc, /POST \| `\/api\/brief\/stories\/:articleId\/remove`/);
