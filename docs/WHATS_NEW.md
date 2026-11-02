@@ -8,7 +8,7 @@ This is not the release log. Releases are recorded in `CHANGELOG.md` by semantic
 
 ## 2026-11-02
 
-**No user-visible change.**
+**No user-visible change.** How long a background code change may run is not part of the Brief.
 
 ## 2026-10-31
 
