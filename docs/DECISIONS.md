@@ -2,6 +2,20 @@
 
 Binding choices for Informed News. Newest first. When one of these changes, update this file in the same change as [ROADMAP.md](ROADMAP.md) and Jira. What the product does now, in plain language, is [PRODUCT_SPEC.md](PRODUCT_SPEC.md). Pipeline detail remains in [NEWS-84](https://informedcrew.atlassian.net/browse/NEWS-84), [TRIAGE.md](TRIAGE.md), and [BRIEF.md](BRIEF.md). The target is [VISION.md](VISION.md).
 
+## 2026-11-04 — Claude follow-up commits are claude[bot], and Claude may edit its own PR (NEWS-193)
+
+**Decision:** Copy kindling's KIN-118/KIN-119 fix ([philga7/kindling PR #45](https://github.com/philga7/kindling/pull/45), merged `907fd00`). The NEWS-193 prompt took the recommended answers (Wednesday 2026-11-04, after 6 PM ET). [VISION.md](VISION.md) is unchanged.
+
+1. **Commit path.** `claude-build` allows Edit, Write, `git add`, `git commit`, and `git push` on Claude's own branch. Pushes to `main` and every force push stay disallowed. No personal access token. Follow-up commits go out as `claude[bot]` on the action's app token, so CI and Claude Review run on them. This replaces the part of the [2026-10-31](#2026-10-31--claude-builds-small-builder-claude-tickets-on-claude-mention-via-github-news-180) and [2026-11-01](#2026-11-01--one-claude-mention-starts-only-claude-build-the-builder-runs-node---test-and-bun-scripts-and-opens-its-own-prs-news-184-news-185-news-186-news-187-news-188) decisions that left commit and push on the action wrapper and kept Edit and Write off the allow list.
+2. **allowed_bots.** Stays the explicit list `cursor[bot],claude[bot]`. `github-actions[bot]` is not added. Never `*`.
+3. **`gh pr edit`.** Allowed on `claude-build` only. Claude may change only its own pull request's title and body. `claude-review` does not get `gh pr edit`. `gh pr merge` and `gh pr review` stay disallowed.
+4. **Settings.** No Actions approval setting change in this change. If a post-merge follow-up is still held, Phil decides whether to change the setting.
+5. **Guardrails that stay.** No admin permission, no merge tool, and `--max-turns` at least 100. Files under `.github/workflows` stay Cursor's work, not Claude's.
+
+**Why:** PR #230 follow-ups `5b72f0d` and `7b7aff5` were pushed as `github-actions[bot]`. CI waited on "Approve and run", and claude-review failed with "Workflow initiated by non-human actor: github-actions (type: Bot)". kindling stopped seeing held runs after the same allow-list change.
+
+**What it rules out:** `allowed_bots: "*"`, adding `github-actions[bot]` before a run shows that actor, a personal access token, `gh pr edit` on the review job, merge or review tools, pushes to `main`, force pushes, an admin permission, and a repo Settings change in this pull request.
+
 ## 2026-11-02 — Claude builder max-turns is 100 (NEWS-190)
 
 **Decision:** `--max-turns 100`. **Why:** Real Small tickets (about 3 TDD tasks plus docs) need more than 30 turns; 30 only fit one-line smoke tests. **What it rules out:** A 30-turn cap. [VISION.md](VISION.md) is unchanged.
