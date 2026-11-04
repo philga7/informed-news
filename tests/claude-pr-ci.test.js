@@ -50,7 +50,6 @@ describe('NEWS-193 Claude follow-up CI', () => {
 			'Bash(git add:*)',
 			'Bash(git commit)',
 			'Bash(git commit:*)',
-			'Bash(git push)',
 			'Bash(git push origin HEAD)',
 			'Bash(git push -u origin HEAD)',
 			'Bash(gh pr edit:*)',
@@ -59,6 +58,7 @@ describe('NEWS-193 Claude follow-up CI', () => {
 		}
 		assert.equal(allowed.includes('Bash(git:*)'), false);
 		assert.equal(allowed.includes('Bash(git push:*)'), false);
+		assert.equal(allowed.includes('Bash(git push)'), false);
 		for (const entry of [
 			'Bash(gh pr merge:*)',
 			'Bash(gh pr review:*)',
@@ -109,5 +109,7 @@ describe('NEWS-193 Claude follow-up CI', () => {
 			/The rule that workflow files go to Cursor, and the work-hours hold, are advisory/,
 		);
 		assert.match(news193, /main requires CI/);
+		assert.match(news193, /The own-pull-request and title-and-body limit on `gh pr edit` is advisory/);
+		assert.match(news193, /Neither `claude\[bot\]` nor `github-actions\[bot\]` is a bypass actor/);
 	});
 });
