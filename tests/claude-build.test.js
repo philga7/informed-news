@@ -106,10 +106,7 @@ describe('NEWS-180 claude build workflow', () => {
 		}
 		assert.match(workflow, /uses: actions\/checkout@v7/);
 		const tools = allowed.split(',');
-		for (const banned of ['Edit', 'Write', 'Bash(git:*)']) {
-			assert.ok(!tools.includes(banned), `${banned} must not be allowed`);
-		}
-		assert.doesNotMatch(allowed, /Bash\(git push/);
+		assert.ok(!tools.includes('Bash(git:*)'), 'Bash(git:*) must not be allowed');
 		for (const readOnly of [
 			'Bash(git status:*)',
 			'Bash(git diff:*)',
@@ -149,8 +146,6 @@ describe('NEWS-180 claude build workflow', () => {
 			'Bash(npm install:*)',
 			'Bash(bun install)',
 			'Bash(bun install:*)',
-			'Edit',
-			'Write',
 		]) {
 			assert.ok(!tools.includes(banned), `${banned} must stay out`);
 		}

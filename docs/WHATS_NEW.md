@@ -6,6 +6,10 @@ Each ship-loop pull request adds an entry for what is true at merge for that rea
 
 This is not the release log. Releases are recorded in `CHANGELOG.md` by semantic-release. Do not hand-edit `CHANGELOG.md` to mirror these notes.
 
+## 2026-11-04
+
+**No user-visible change.**
+
 ## 2026-11-02
 
 Like and Not relevant feedback you save now steers later refreshes. Your most recent feedback, favoring the same outlet or topic, is shown to the scoring step as a soft hint. A story the feedback shaped can show a feedback reference in its advisory reason. Not relevant never hides a story by itself, and a deleted entry stops being used on the next refresh.
