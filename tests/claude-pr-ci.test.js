@@ -8,6 +8,7 @@ const root = join(fileURLToPath(new URL('.', import.meta.url)), '..');
 const build = readFileSync(join(root, '.github/workflows/claude.yml'), 'utf8');
 const review = readFileSync(join(root, '.github/workflows/claude-review.yml'), 'utf8');
 const claudeMd = readFileSync(join(root, 'CLAUDE.md'), 'utf8');
+const decisions = readFileSync(join(root, 'docs/DECISIONS.md'), 'utf8');
 
 function claudeArgsToolString(source, flag) {
 	const match = source.match(new RegExp(`${flag} "([^"]*)"`));
@@ -50,12 +51,14 @@ describe('NEWS-193 Claude follow-up CI', () => {
 			'Bash(git commit)',
 			'Bash(git commit:*)',
 			'Bash(git push)',
-			'Bash(git push:*)',
+			'Bash(git push origin HEAD)',
+			'Bash(git push -u origin HEAD)',
 			'Bash(gh pr edit:*)',
 		]) {
 			assert.ok(allowed.includes(entry), `${entry} must be allowed`);
 		}
 		assert.equal(allowed.includes('Bash(git:*)'), false);
+		assert.equal(allowed.includes('Bash(git push:*)'), false);
 		for (const entry of [
 			'Bash(gh pr merge:*)',
 			'Bash(gh pr review:*)',
@@ -71,6 +74,20 @@ describe('NEWS-193 Claude follow-up CI', () => {
 			'Bash(git push -f:*)',
 			'Bash(git push --force-with-lease)',
 			'Bash(git push --force-with-lease:*)',
+			'Bash(git push origin --force)',
+			'Bash(git push origin --force:*)',
+			'Bash(git push origin -f)',
+			'Bash(git push origin -f:*)',
+			'Bash(git push origin +main)',
+			'Bash(git push origin +main:*)',
+			'Bash(git push origin HEAD:refs/heads/main)',
+			'Bash(git push origin HEAD:refs/heads/main:*)',
+			'Bash(git push origin HEAD --force)',
+			'Bash(git push origin HEAD --force:*)',
+			'Bash(git push -u origin HEAD --force)',
+			'Bash(git push -u origin HEAD --force:*)',
+			'Bash(git push --delete)',
+			'Bash(git push --delete:*)',
 		]) {
 			assert.ok(disallowed.includes(entry), `${entry} must stay disallowed`);
 			assert.equal(allowed.includes(entry), false, `${entry} must not be allowed`);
@@ -86,5 +103,11 @@ describe('NEWS-193 Claude follow-up CI', () => {
 			/Never merge PRs or push to main\. Open a PR and stop; Phil decides when it merges\./,
 		);
 		assert.match(claudeMd, /Anything under `\.github\/workflows` goes to Cursor, not Claude\./);
+		const news193 = decisions.slice(decisions.indexOf('## 2026-11-04 — Claude follow-up'));
+		assert.match(
+			news193,
+			/The rule that workflow files go to Cursor, and the work-hours hold, are advisory/,
+		);
+		assert.match(news193, /main requires CI/);
 	});
 });
