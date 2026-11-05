@@ -178,6 +178,14 @@
 			>
 				{filteredLabel}
 			</a>
+			<span aria-hidden="true" class="text-gray-400 dark:text-gray-600">·</span>
+			<a
+				href="/feedback"
+				class="text-blue-600 underline underline-offset-2 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+				data-testid="brief-feedback-link"
+			>
+				Feedback
+			</a>
 		</p>
 		<div class="flex flex-wrap items-center gap-2">
 			<div

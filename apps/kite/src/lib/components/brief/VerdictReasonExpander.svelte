@@ -1,4 +1,6 @@
 <script lang="ts">
+	import FeedbackCriteriaLink from './FeedbackCriteriaLink.svelte';
+
 	/**
 	 * NEWS-167: advisory triage reason on Brief cards. Labelled for assistive tech
 	 * as advisory (not ground truth).
@@ -12,6 +14,8 @@
 	let { reasonText, criteriaRef = null }: Props = $props();
 
 	let open = $state(false);
+
+	const feedbackId = $derived(criteriaRef?.match(/^feedback:(.+)$/)?.[1] ?? null);
 </script>
 
 <details
@@ -32,7 +36,11 @@
 			Advisory — AI-assisted judgment, not ground truth
 			{#if criteriaRef}
 				<span aria-hidden="true"> · </span>
-				<span class="font-mono text-[10px]">{criteriaRef}</span>
+				{#if feedbackId}
+					<FeedbackCriteriaLink {feedbackId} />
+				{:else}
+					<span class="font-mono text-[10px]">{criteriaRef}</span>
+				{/if}
 			{/if}
 		</p>
 	</div>
