@@ -4,6 +4,10 @@
 	let { children }: LayoutProps = $props();
 </script>
 
+<svelte:head>
+	<title>Informed News</title>
+</svelte:head>
+
 <main>
 	{@render children()}
 </main>

@@ -122,3 +122,33 @@ test('with shell handler and no kite handler: GET / stays the JSON message and G
     await close();
   }
 });
+
+test('shell next() with no error on /shell/missing is 404 and does not reach Kite', async () => {
+  process.env.SESSION_SECRET = 'test-secret';
+  process.env.MVP_PASSWORD = 'pw';
+  delete process.env.MVP_PASSWORD_HASH;
+
+  const kiteSeen: string[] = [];
+  const shellHandler: RequestHandler = (req, res, next) => {
+    if (req.path === '/shell/missing') {
+      next();
+      return;
+    }
+    res.status(200).send('shell-page');
+  };
+  const kiteHandler: RequestHandler = (req, res) => {
+    kiteSeen.push(req.path);
+    res.status(200).send('kite-page');
+  };
+
+  const app = createApp({ refreshRunner: makeRefreshRunner(), shellHandler, kiteHandler });
+  const { baseUrl, close } = await startServer(app);
+
+  try {
+    const missing = await fetch(`${baseUrl}/shell/missing`);
+    assert.equal(missing.status, 404);
+    assert.deepEqual(kiteSeen, []);
+  } finally {
+    await close();
+  }
+});

@@ -50,6 +50,9 @@ jobs:
         working-directory: apps/web
         run: bun run build
 
+      - name: Test shell build
+        run: npm run test:shell-build --prefix mvp/server
+
       - name: Test
         run: npm test
 
@@ -106,6 +109,8 @@ jobs:
           end=$(date +%s)
           echo "container_start_seconds=$((end - start))" >> "$GITHUB_STEP_SUMMARY"
           curl -fsS http://127.0.0.1:3001/healthz
+          shell_html=$(curl -fsS http://127.0.0.1:3001/shell)
+          printf '%s' "$shell_html" | grep -F -q '<h1>Informed News</h1>'
 
       # Playwright e2e stays local (`npm run test:e2e:kite`) until the hermetic
       # stack fits the Actions time budget (see NEWS-105).

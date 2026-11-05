@@ -1484,10 +1484,12 @@ export function createApp(deps: CreateAppDeps = {}): Express {
         next();
         return;
       }
-      shellHandler(req, res, () => {
-        if (!res.headersSent) {
-          res.status(404).end();
+      shellHandler(req, res, (err?: unknown) => {
+        if (err) {
+          next(err);
+          return;
         }
+        if (!res.headersSent) res.status(404).end();
       });
     });
   }

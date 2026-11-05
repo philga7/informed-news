@@ -97,7 +97,7 @@ Do **not** treat `_legacy/` (including `_legacy/mvp-web`) as the primary product
 
 ## When adding features
 
-1. Prefer Brief / shell work under `apps/kite` (minimize upstream churn) + docs
+1. Kite keeps the Brief until piece (e). The NEWS-170 shell is `apps/web`. Prefer Brief work under `apps/kite` (minimize upstream churn) + docs
 2. Pipeline types/services under `mvp/server`
 3. Routes live in `mvp/server/src/app.ts` (`createApp`) (plus auth router)
 4. Update README / this file / smoke docs when the operator path changes

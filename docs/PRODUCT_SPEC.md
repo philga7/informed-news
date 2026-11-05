@@ -6,14 +6,6 @@ A ship-loop pull request edits this file when what a reader can do changes. If b
 
 The home page is the Brief. Your topics decide what is searched for and what is left out. There is no review queue and no step where you accept a story onto the Brief.
 
-## Shell
-
-There is also a shell page at `/shell`. It is not the Brief. It links back to the Brief. It has no Map tab and no Signals tab. A deeper page at `/shell/deep` stays on that page when you reload it.
-
-**Scenario:** Given you open `/shell`, when the page loads, then you see the shell and a link to the Brief, and you do not see a Map or Signals tab.
-
-**Scenario:** Given you open `/shell/deep`, when you reload, then you are still on that shell page.
-
 ## Sign in
 
 Topics is the sign-in screen. The password field is labeled “MVP password.” Signing in is what unlocks refresh, filtered-out stories, Feedback, adding or removing a story, “Less like this,” on-demand summaries, on-demand full stories, and remembering what you have read. You can read a Brief that is already loaded without signing in. **Log out** is on the Topics page.
@@ -281,3 +273,11 @@ The footer **About** opens a short introduction to the product (`/about`).
 **Transparency** (`/transparency`) is public. No sign-in. It describes funding, how Brief analysis is produced, how to report a mistake, and who builds the product. It states that AI-written analysis is not ground truth, and that the product does not show a bias meter, a trust grid, or a verified / false badge. A link returns to the Brief.
 
 The footer also links to Topics. The old Radar link is gone.
+
+## Shell
+
+There is also a shell page at `/shell`. It is not the Brief. It links back to the Brief. It has no Map tab and no Signals tab. A deeper page at `/shell/deep` stays on that page when you reload it.
+
+**Scenario:** Given you open `/shell`, when the page loads, then you see the shell and a link to the Brief, and you do not see a Map or Signals tab.
+
+**Scenario:** Given you open `/shell/deep`, when you reload, then you are still on that shell page.

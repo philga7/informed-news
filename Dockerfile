@@ -30,7 +30,6 @@ COPY --from=kite-build /src/apps/kite/build /app/apps/kite/build
 COPY --from=kite-build /src/apps/kite/node_modules /app/apps/kite/node_modules
 COPY --from=kite-build /src/apps/kite/package.json /app/apps/kite/package.json
 COPY --from=web-build /src/apps/web/build /app/apps/web/build
-COPY --from=web-build /src/apps/web/node_modules /app/apps/web/node_modules
 COPY --from=web-build /src/apps/web/package.json /app/apps/web/package.json
 RUN mkdir -p /app/mvp/data && chown -R node:node /app
 USER node
