@@ -1,3 +1,9 @@
+## [0.35.0](https://github.com/philga7/informed-news/compare/v0.34.0...v0.35.0) (2026-11-05)
+
+### Features
+
+* **NEWS-191:** Like / Not relevant buttons and comment box on Brief cards ([#233](https://github.com/philga7/informed-news/issues/233)) ([a212d92](https://github.com/philga7/informed-news/commit/a212d92cd5a4d7b7ef46de84ecc497c47b8c2162)), closes [#232](https://github.com/philga7/informed-news/issues/232)
+
 ## [0.34.0](https://github.com/philga7/informed-news/compare/v0.33.0...v0.34.0) (2026-11-02)
 
 ### Features
