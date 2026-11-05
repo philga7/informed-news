@@ -36,8 +36,19 @@ jobs:
       - name: Install Kite
         run: bun install --frozen-lockfile --cwd apps/kite
 
+      - name: Install shell
+        run: bun install --frozen-lockfile --cwd apps/web
+
       - name: Typecheck
         run: npm run typecheck
+
+      - name: Shell check
+        working-directory: apps/web
+        run: bun run check
+
+      - name: Build shell
+        working-directory: apps/web
+        run: bun run build
 
       - name: Test
         run: npm test

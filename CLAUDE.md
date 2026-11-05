@@ -39,6 +39,7 @@ Set `REFRESH_INTERVAL_HOURS=off` when you need the server up without spending re
 | Path | Role |
 |---|---|
 | `apps/kite/` | Brief UI (SvelteKit) |
+| `apps/web/` | Shell placeholder at `/shell` when the image is built. `npm run dev` is still Kite plus the server |
 | `mvp/server/` | Express API + pipeline |
 | `mvp/data/` | Runtime JSON (never commit) |
 | `mvp/.env` | Secrets (never commit); see `mvp/.env.example` |

@@ -63,7 +63,7 @@ The **PR title** workflow (`.github/workflows/pr-title.yml`, running `scripts/ch
 
 ## Why both CI and Release?
 
-- **CI** (`.github/workflows/ci.yml`): every PR into `main` and every push to `main` — install (root, `mvp/server`, `apps/kite`), MVP server typecheck + `npm test`, `npm run test:kite`, Kite `bun run test:unit` + `bun run check`, and product-path `bun run build` in `apps/kite`. No secrets. Fast review feedback; no publish.
+- **CI** (`.github/workflows/ci.yml`): every PR into `main` and every push to `main` — install (root, `mvp/server`, `apps/kite`, `apps/web`), MVP server typecheck + `npm test`, `npm run test:kite`, Kite `bun run test:unit` + `bun run check`, product-path `bun run build` in `apps/kite`, and `apps/web` install, `bun run check`, and `bun run build`. No secrets. Fast review feedback; no publish.
 - **Release** (`.github/workflows/release.yml`): after merge to `main` — re-validate, then `semantic-release`.
 
 Overlap on validation is intentional: a green PR does not skip the final gate before tagging.

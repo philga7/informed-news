@@ -8,6 +8,8 @@ This is not the release log. Releases are recorded in `CHANGELOG.md` by semantic
 
 ## 2026-11-05
 
+A shell page is at `/shell`. The Brief is still the home page. Opening `/shell/deep` and reloading stays on that page. There is no Map or Signals page.
+
 The Brief refresh bar has a **Feedback** link beside Filtered out. It opens a list of the Like and Not relevant choices you saved, newest first, with the headline, outlet, story link, topics, choice, comment, and when you saved it. You can switch a choice, edit the comment, and delete an entry after you confirm. It needs a sign-in. Not relevant still does not hide a story.
 
 When a story’s advisory reason cites one of those entries, the citation is a link to that entry. After you delete it, the reason text stays and the citation says feedback was removed.

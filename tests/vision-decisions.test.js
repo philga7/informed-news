@@ -158,7 +158,10 @@ describe('NEWS-165 vision and decisions', () => {
 			combined,
 			/Reordered 2026-10-27: hosting pulled ahead of NEWS-168\/169, approved by Phil\./,
 		);
-		assert.match(combined, /\*\*Current next\*\* is \[NEWS-170\]/);
+		assert.match(
+			combined,
+			/\*\*Current next\*\* is Briefs module parity, piece \(b\) of \[NEWS-170\]/,
+		);
 		assert.match(roadmap, /NEWS-175[\s\S]{0,400}\*\*Done\*\*/);
 		assert.match(roadmap, /NEWS-182[\s\S]{0,200}\*\*Done\*\*/);
 		assert.match(roadmap, /NEWS-168[\s\S]{0,120}\*\*Done\*\*/);
