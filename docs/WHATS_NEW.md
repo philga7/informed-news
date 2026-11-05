@@ -8,7 +8,7 @@ This is not the release log. Releases are recorded in `CHANGELOG.md` by semantic
 
 ## 2026-11-04
 
-**No user-visible change.**
+Brief cards now have **Like** and **Not relevant** buttons, next to Less like this, on expanded Approved cards and on Filtered cards. Pick one to save it; pick the other to switch; pick the active one again to clear it. After you choose, an optional comment box (up to 500 characters, with a live count) lets you say why. Your choice is remembered when the Brief loads. It needs a sign-in. Not relevant never hides a story; Less like this still does.
 
 ## 2026-11-02
 

@@ -2,6 +2,20 @@
 
 Binding choices for Informed News. Newest first. When one of these changes, update this file in the same change as [ROADMAP.md](ROADMAP.md) and Jira. What the product does now, in plain language, is [PRODUCT_SPEC.md](PRODUCT_SPEC.md). Pipeline detail remains in [NEWS-84](https://informedcrew.atlassian.net/browse/NEWS-84), [TRIAGE.md](TRIAGE.md), and [BRIEF.md](BRIEF.md). The target is [VISION.md](VISION.md).
 
+## 2026-11-04 — Like / Not relevant on Brief cards: card state rules (NEWS-191)
+
+**Decision:** The feedback UI is split: NEWS-191 is part a (buttons and comment box on Brief cards, Claude) and NEWS-192 is part b (`/feedback` page, citation links, E2E, Cursor). [VISION.md](VISION.md) is unchanged. `mvp/server` behavior is unchanged.
+
+1. **Where.** A small component, `FeedbackButtons`, on every expanded Approved card and every Filtered card, next to Less like this. It only calls `/api/feedback`, so it can move to the SPA ([NEWS-170](https://informedcrew.atlassian.net/browse/NEWS-170)) as is. No new Kite store, no shared state outside the component file, no new dependency.
+2. **One load.** The first card to mount does one `GET /api/feedback`. Every card shares it and matches by `itemId`. If the load fails, the next card to mount tries again. A click waits for that load first, so it never POSTs over feedback it has not seen.
+3. **Click rules.** No saved entry: the click POSTs `{ itemId, signal }`. A saved entry with the other signal: PATCH the signal. The active button again: DELETE the entry. Buttons are `aria-pressed` toggles. A failed request leaves the buttons as they were and shows the error in place.
+4. **Comment.** Opens after a POST or a switch. Save PATCHes `{ comment }`, Cancel closes with no request. The counter is live and the field stops at 500, the server limit. A server error for a client error (4xx) is shown as is, and the typed text is kept. A 5xx shows a generic line, so server internals stay out of the UI.
+5. **Not a mute.** Not relevant never hides a story. Less like this stays the hard mute.
+
+**Why:** The store and routes ([NEWS-169](https://informedcrew.atlassian.net/browse/NEWS-169)) and the prompt hint ([NEWS-190](https://informedcrew.atlassian.net/browse/NEWS-190)) had no way to be fed from the Brief.
+
+**What it rules out:** A Kite store for feedback, a second GET per card, DELETE-and-POST to switch a choice, a `/feedback` page or citation links in this change, and E2E in this change.
+
 ## 2026-11-04 — Claude follow-up commits are claude[bot], and Claude may edit its own PR (NEWS-193)
 
 **Decision:** Copy kindling's KIN-118/KIN-119 fix ([philga7/kindling PR #45](https://github.com/philga7/kindling/pull/45), merged `907fd00`). The NEWS-193 prompt took the recommended answers (Wednesday 2026-11-04, after 6 PM ET). [VISION.md](VISION.md) is unchanged.
