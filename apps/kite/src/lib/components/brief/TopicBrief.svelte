@@ -27,6 +27,7 @@ const requestedSummaries = new Set<string>();
 	import StoryCardSkeleton from '$lib/components/story/StoryCardSkeleton.svelte';
 	import BriefFilteredVerdictList from './BriefFilteredVerdictList.svelte';
 	import BriefRefreshBar from './BriefRefreshBar.svelte';
+	import FeedbackButtons from './FeedbackButtons.svelte';
 	import LessLikeThis from './LessLikeThis.svelte';
 	import SeedRemove from './SeedRemove.svelte';
 	import CitationGuardMarks from './CitationGuardMarks.svelte';
@@ -520,6 +521,9 @@ const requestedSummaries = new Set<string>();
 				<p class="text-xs text-gray-500 dark:text-gray-400">{fullStoryRequest.message}</p>
 			{:else if expanded && fullLine?.kind === 'unavailable'}
 				<p class="text-xs text-gray-500 dark:text-gray-400">{fullLine.text}</p>
+			{/if}
+			{#if actionId}
+				<FeedbackButtons itemId={actionId} />
 			{/if}
 			{#if actionId && addedByYou}
 				<SeedRemove articleId={actionId} onRemoved={() => handleSeedRemoved(story)} />

@@ -14,6 +14,7 @@
 		mutedByLine,
 		type FilteredOutItem,
 	} from '$lib/filteredOut';
+	import FeedbackButtons from './FeedbackButtons.svelte';
 	import VerdictReasonExpander from './VerdictReasonExpander.svelte';
 
 	interface Props {
@@ -96,6 +97,9 @@
 					</p>
 					{#if muted}
 						<p class="mt-1 text-xs text-gray-600 dark:text-gray-300">{muted}</p>
+					{/if}
+					{#if item.articleId}
+						<FeedbackButtons itemId={item.articleId} />
 					{/if}
 					{#if reasonText}
 						<VerdictReasonExpander reasonText={reasonText} criteriaRef={item.criteriaRef} />

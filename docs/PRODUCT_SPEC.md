@@ -145,6 +145,20 @@ On success the card says the topic was added, that matching stories hide the nex
 
 Stories already on the Brief that match the new topic drop out the next time the Brief loads. Refresh applies the topic to newly collected stories.
 
+## Like and Not relevant
+
+An expanded Brief card, and every card under Filtered, has two toggle buttons, **Like** and **Not relevant**, beside Less like this. They need a sign-in. The Brief loads your saved choices once, and each card shows its own as pressed. Not relevant is a soft signal that steers later scoring; it never hides a story. Less like this is still the way to mute.
+
+**Scenario:** Given a card with no choice, when you press Like, then it is saved, the button shows as pressed, and an optional comment box opens.
+
+**Scenario:** Given Like is pressed, when you press Not relevant, then the choice switches to Not relevant and the comment box opens.
+
+**Scenario:** Given a button is pressed, when you press it again, then the choice is cleared and the comment box closes.
+
+**Scenario:** Given the comment box is open, when you type, then a count shows “n / 500” and the field stops at 500. Save stores the comment, and Cancel closes the box without saving.
+
+**Scenario:** Given the server refuses a save, when you press a button or Save, then its message shows under the buttons and your typed comment stays.
+
 ## Read and seen
 
 You can mark a story read, or use **Mark all as read**. Opening a story counts as seeing it.
