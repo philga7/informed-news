@@ -77,6 +77,7 @@ import {
   updateBriefSeen,
   updateTopic,
 } from './store/index.js';
+import { shellOwnsPath } from './serveShell.js';
 import type { FeedbackSnapshot, FeedbackTopicSnapshot, TrackedEntry } from './store/index.js';
 import type { TrackedClaimEntry } from './store/index.js';
 import type { Article } from './types/article.js';
@@ -142,6 +143,11 @@ export type CreateAppDeps = {
    * route and `GET /` is not the JSON message — the handler serves the UI.
    */
   kiteHandler?: RequestHandler;
+  /**
+   * Built shell app handler (NEWS-170). When present, mounted after every API
+   * route and before `kiteHandler`. Only `/shell` paths reach it.
+   */
+  shellHandler?: RequestHandler;
 };
 
 const SEEN_IDS_MAX = 100;
@@ -1467,6 +1473,24 @@ export function createApp(deps: CreateAppDeps = {}): Express {
       res.status(500).json({ ok: false, error: message });
     }
   });
+
+  // Shell UI (NEWS-170): after every API route, before Kite. Paths the shell
+  // does not own fall through. A shell path is handled here and does not
+  // reach Kite.
+  if (deps.shellHandler) {
+    const shellHandler = deps.shellHandler;
+    app.use((req, res, next) => {
+      if (!shellOwnsPath(req.path)) {
+        next();
+        return;
+      }
+      shellHandler(req, res, () => {
+        if (!res.headersSent) {
+          res.status(404).end();
+        }
+      });
+    });
+  }
 
   // Built Kite UI (NEWS-109): mounted last so every API route above (and
   // /healthz) stays on Express; the handler only sees what Express didn't.
