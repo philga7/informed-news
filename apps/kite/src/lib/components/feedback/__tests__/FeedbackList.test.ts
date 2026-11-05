@@ -190,6 +190,21 @@ describe('FeedbackList', () => {
 		expect(box.value).toBe('keep me');
 	});
 
+	it('does not link a story URL that is not http or https', async () => {
+		const unsafe = entry({
+			id: 'fb-js',
+			snapshot: {
+				headline: 'Odd scheme',
+				source: 'example.test',
+				url: 'javascript:alert(1)',
+				topics: [],
+			},
+		});
+		await mount([unsafe]);
+		expect(screen.getByText('javascript:alert(1)')).toBeInTheDocument();
+		expect(screen.queryByRole('link', { name: 'javascript:alert(1)' })).not.toBeInTheDocument();
+	});
+
 	it('scrolls to and highlights the entry named by the hash', async () => {
 		const scroll = vi.fn();
 		HTMLElement.prototype.scrollIntoView = scroll;

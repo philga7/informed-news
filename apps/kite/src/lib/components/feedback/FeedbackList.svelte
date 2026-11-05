@@ -34,7 +34,20 @@
 	let pendingId = $state<string | null>(null);
 	let errors = $state<Record<string, string | null>>({});
 	let highlightedId = $state<string | null>(null);
+	/** Hash values already scrolled to, so a later edit does not pull focus back. */
+	let highlightedHash = $state<string | null>(null);
 	let box = $state<HTMLTextAreaElement>();
+
+	/** Only http(s) story links are clickable. Anything else stays plain text. */
+	function httpUrl(value: string): string | null {
+		try {
+			const url = new URL(value);
+			if (url.protocol === 'http:' || url.protocol === 'https:') return url.href;
+		} catch {
+			return null;
+		}
+		return null;
+	}
 
 	function isSignal(value: unknown): value is Signal {
 		return value === 'like' || value === 'not_relevant';
@@ -77,8 +90,9 @@
 	$effect(() => {
 		if (status !== 'ready') return;
 		const id = hashTarget();
-		const match = entries.some((entry) => entry.id === id);
-		if (!id || !match) return;
+		const present = entries.some((entry) => entry.id === id);
+		if (!id || !present || highlightedHash === id) return;
+		highlightedHash = id;
 		highlightedId = id;
 		const node = document.getElementById(id);
 		if (!(node instanceof HTMLElement)) return;
@@ -242,6 +256,7 @@
 				{@const draft = drafts[entry.id] ?? entry.comment}
 				{@const pending = pendingId === entry.id}
 				{@const when = formatTimeAgoShort(entry.ts, now) ?? entry.ts}
+				{@const storyUrl = httpUrl(entry.snapshot.url)}
 				<li>
 					<article
 						id={entry.id}
@@ -260,14 +275,13 @@
 						</h2>
 						<p class="mt-1 flex flex-wrap gap-x-2 text-xs text-gray-500 dark:text-gray-400">
 							<span>{entry.snapshot.source}</span>
-							<a
-								href={entry.snapshot.url}
-								target="_blank"
-								rel="noopener noreferrer"
-								class={linkClass}
-							>
-								{entry.snapshot.url}
-							</a>
+							{#if storyUrl}
+								<a href={storyUrl} target="_blank" rel="noopener noreferrer" class={linkClass}>
+									{storyUrl}
+								</a>
+							{:else}
+								<span>{entry.snapshot.url}</span>
+							{/if}
 							{#if entry.snapshot.topics.length > 0}
 								<span>{entry.snapshot.topics.map((topic) => topic.name).join(', ')}</span>
 							{/if}
