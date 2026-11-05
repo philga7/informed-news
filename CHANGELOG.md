@@ -1,3 +1,9 @@
+## [0.37.0](https://github.com/philga7/informed-news/compare/v0.36.0...v0.37.0) (2026-11-05)
+
+### Features
+
+* **NEWS-170:** SPA shell and Express route split ([5411752](https://github.com/philga7/informed-news/commit/5411752c06bb6024777423c963ee840538782e83))
+
 ## [0.36.0](https://github.com/philga7/informed-news/compare/v0.35.0...v0.36.0) (2026-11-05)
 
 ### Features
