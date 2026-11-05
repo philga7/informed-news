@@ -273,3 +273,11 @@ The footer **About** opens a short introduction to the product (`/about`).
 **Transparency** (`/transparency`) is public. No sign-in. It describes funding, how Brief analysis is produced, how to report a mistake, and who builds the product. It states that AI-written analysis is not ground truth, and that the product does not show a bias meter, a trust grid, or a verified / false badge. A link returns to the Brief.
 
 The footer also links to Topics. The old Radar link is gone.
+
+## Shell
+
+There is also a shell page at `/shell`. It is not the Brief. It links back to the Brief. It has no Map tab and no Signals tab. A deeper page at `/shell/deep` stays on that page when you reload it.
+
+**Scenario:** Given you open `/shell`, when the page loads, then you see the shell and a link to the Brief, and you do not see a Map or Signals tab.
+
+**Scenario:** Given you open `/shell/deep`, when you reload, then you are still on that shell page.

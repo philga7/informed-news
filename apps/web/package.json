@@ -1,0 +1,19 @@
+{
+	"name": "informed-news-shell",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "vite dev --port 5176 --strictPort",
+		"build": "vite build",
+		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json"
+	},
+	"devDependencies": {
+		"@sveltejs/adapter-node": "^5.5.1",
+		"@sveltejs/kit": "^2.49.5",
+		"@sveltejs/vite-plugin-svelte": "^6.2.4",
+		"svelte": "^5.46.4",
+		"svelte-check": "^4.3.5",
+		"typescript": "^5.9.3",
+		"vite": "^7.3.1"
+	}
+}

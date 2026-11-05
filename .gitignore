@@ -12,6 +12,7 @@ dist-ssr
 *.local
 .svelte-kit
 apps/kite/build
+apps/web/build
 test-results
 playwright-report
 blob-report

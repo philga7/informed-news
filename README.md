@@ -10,6 +10,7 @@ Product UI is the vendored **Kite** shell (`apps/kite/`, MIT). Pipeline and fram
 | Layer | Path | Role |
 |-------|------|------|
 | UI | `apps/kite` | SvelteKit Brief shell (default `npm run dev`) |
+| Shell placeholder | `apps/web` | `/shell` when the image is built. `npm run dev` is still Kite plus the server |
 | API | `mvp/server` | Express: auth, fetch, classify, articles |
 | Data | `mvp/data/*.json` | Flat-file article + meta store (gitignored) |
 | Archived UI | `_legacy/mvp-web` | Former React feed — not on the product path |

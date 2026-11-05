@@ -1,3 +1,4 @@
 {
+  "name": "informed-news",
   "install": "bash .cursor/install-deps.sh"
 }

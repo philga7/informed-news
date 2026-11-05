@@ -14,7 +14,7 @@ Jira: project **NEWS** (informedcrew.atlassian.net, cloudId `ebcd227d-1f6d-4a54-
 - **UI:** `apps/kite` — Bun 1.4.3, SvelteKit (vendored kite-public soft fork).
 - **E2E:** Playwright (`npm run test:e2e:kite`) stays local — hermetic `e2e/stack/`, not CI.
 - **Release:** semantic-release on merge to `main` (Conventional Commit squash title sets the bump).
-- **CI:** `.github/workflows/ci.yml` job `MVP build & typecheck` (typecheck, server tests, `test:kite`, Kite unit + check + build).
+- **CI:** `.github/workflows/ci.yml` job `MVP build & typecheck` (typecheck, shell install, check, build, and `test:shell-build`, server tests, `test:kite`, Kite unit + check + build).
 
 Do not revive `_legacy/` (including `_legacy/mvp-web`) as the default `npm run dev` path. Do not call Supabase from the live path.
 
@@ -39,6 +39,7 @@ Set `REFRESH_INTERVAL_HOURS=off` when you need the server up without spending re
 | Path | Role |
 |---|---|
 | `apps/kite/` | Brief UI (SvelteKit) |
+| `apps/web/` | Shell placeholder at `/shell` when the image is built. `npm run dev` is still Kite plus the server |
 | `mvp/server/` | Express API + pipeline |
 | `mvp/data/` | Runtime JSON (never commit) |
 | `mvp/.env` | Secrets (never commit); see `mvp/.env.example` |

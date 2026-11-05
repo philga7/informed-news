@@ -2,6 +2,24 @@
 
 Binding choices for Informed News. Newest first. When one of these changes, update this file in the same change as [ROADMAP.md](ROADMAP.md) and Jira. What the product does now, in plain language, is [PRODUCT_SPEC.md](PRODUCT_SPEC.md). Pipeline detail remains in [NEWS-84](https://informedcrew.atlassian.net/browse/NEWS-84), [TRIAGE.md](TRIAGE.md), and [BRIEF.md](BRIEF.md). The target is [VISION.md](VISION.md).
 
+## 2026-11-05 — SPA shell framework, hosting, and route split (NEWS-170 piece a)
+
+**Decision:** Phil approved [NEWS-170](https://informedcrew.atlassian.net/browse/NEWS-170) on Nov 2, chose the five-way split on Nov 5, and said launch piece (a) now. He was not in this session. Each grill question below takes the launch prompt's recommended answer, recorded as Phil's answer. [VISION.md](VISION.md) is unchanged: the running app stays the topic Brief until a later piece replaces that view. This change is the shell only.
+
+1. **Framework.** SvelteKit (Svelte 5) with `@sveltejs/adapter-node`, the same shape as Kite. Phil's answer: SvelteKit, so Brief components, `FeedbackButtons`, and the Brief end-to-end suite port with the least rewrite in piece (b). adapter-node, not adapter-static, because Express already serves Kite's `handler.js` on one port, and a reload has to get the shell page from that handler.
+2. **Hosting.** The shell stays on the VPS. Tailscale-only. The same Express serves it on one port. It does not move to Vercel. Phil chose all-VPS on Oct 30. Vercel would need a public path to a Tailscale-only API. Revisit once Briefs reaches parity.
+3. **Where it lives.** A new `apps/web` workspace beside `apps/kite`. Kite keeps serving every view that has not moved, including the Brief. The two are routed side by side.
+4. **How traffic splits.** Express sends a path the shell owns to the shell build and every other page to Kite, one route at a time. One port. A Kite view is removed only after its replacement passes the same end-to-end suite. That removal is piece (e).
+5. **Placeholder.** `/shell` and `/shell/deep`. A minimal shell home and one deep link that survives reload. No Brief UI. The Brief stays at `/` on Kite. No Map, Signals, Finance, Situation, or Listen link.
+
+The shell reads and writes only through the one API (`mvp/server`). This placeholder adds no data path. informed-brain over MCP stays unattached until Phil says go.
+
+Pieces, in order, each its own pull request: (a) this shell; (b) Briefs module parity, blocked by (a); (c) Story Desk at its own link, blocked by (b); (d) a nav test that no Map or Signals route or tab exists, blocked by (a), and it can run beside (b) and (c); (e) remove the Kite Brief view after Phil sees (b). (b) through (e) are not filed in this change.
+
+**Why:** The shell has to exist before Briefs can move, and the framework had to be written down before that code. Kite is already SvelteKit, so piece (b) should not start from a second UI stack.
+
+**What it rules out:** A second repository, Vercel for this shell, adapter-static, taking `/` away from Kite in this change, a Brief UI in the shell, empty Map or Signals chrome, a second API, attaching informed-brain, and removing any Kite view.
+
 ## 2026-11-05 — /feedback list, citation links, and the stubbed end-to-end check (NEWS-192)
 
 **Decision:** Ship the Feedback list and the citation links from these grill answers. The launch prompt took every recommended answer (Wednesday 2026-11-04, after 6 PM ET). [VISION.md](VISION.md) is unchanged. `/api/feedback` is unchanged. The triage prompt and `TRIAGE_JEV_BUDGET` (300) are unchanged.
@@ -306,7 +324,7 @@ Clean-room: do not copy CaseCite (Elastic License 2.0). Court checks remain [NEW
 
 ## 2026-10-23 — The SPA lives in this repo
 
-**Decision:** The SPA shell is [NEWS-170](https://informedcrew.atlassian.net/browse/NEWS-170), in philga7/informed-news. It replaces Kite one view at a time: Briefs, then Story Desk. Map ([NEWS-35](https://informedcrew.atlassian.net/browse/NEWS-35)) and Signals ([NEWS-34](https://informedcrew.atlassian.net/browse/NEWS-34)) stay on hold with no empty tabs. The Briefs module matches today's Brief on keyboard, filters, shared links, and accessibility before that Kite view is removed. `apps/kite` keeps serving a view until its replacement passes the same end-to-end suite. Framework and folder are recorded in this file before NEWS-170 code. They are still open.
+**Decision:** The SPA shell is [NEWS-170](https://informedcrew.atlassian.net/browse/NEWS-170), in philga7/informed-news. It replaces Kite one view at a time: Briefs, then Story Desk. Map ([NEWS-35](https://informedcrew.atlassian.net/browse/NEWS-35)) and Signals ([NEWS-34](https://informedcrew.atlassian.net/browse/NEWS-34)) stay on hold with no empty tabs. The Briefs module matches today's Brief on keyboard, filters, shared links, and accessibility before that Kite view is removed. `apps/kite` keeps serving a view until its replacement passes the same end-to-end suite. Framework, folder, hosting, and the route split are recorded in the [2026-11-05 SPA shell entry](#2026-11-05--spa-shell-framework-hosting-and-route-split-news-170-piece-a). The guardrails in this entry still stand.
 
 **Why:** A second repo would split the Brief store from Story Desk. Kite's keyboard, filter, shared-link, and accessibility work is the bar the replacement has to clear.
 

@@ -8,6 +8,7 @@ import { exitIfRadarConfigInvalid } from './services/loadRadarSources.js';
 import { startRefreshScheduler } from './services/index.js';
 import { warnIfSearxngUnset } from './services/searxngSearch.js';
 import { kiteHandlerPath } from './serveKite.js';
+import { shellHandlerPath } from './serveShell.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const envFile = process.env.MVP_ENV_FILE?.trim() || path.resolve(__dirname, '../../.env');
@@ -30,9 +31,22 @@ async function loadKiteHandler(): Promise<RequestHandler | undefined> {
   }
 }
 
-const kiteHandler = await loadKiteHandler();
+async function loadShellHandler(): Promise<RequestHandler | undefined> {
+  const handlerPath = shellHandlerPath(process.env);
+  if (!handlerPath) return undefined;
+  try {
+    const mod = await import(pathToFileURL(handlerPath).href);
+    return mod.handler;
+  } catch (err) {
+    console.error(`Failed to load shell handler at ${handlerPath}:`, err);
+    process.exit(1);
+  }
+}
 
-const app = createApp({ kiteHandler });
+const kiteHandler = await loadKiteHandler();
+const shellHandler = await loadShellHandler();
+
+const app = createApp({ kiteHandler, shellHandler });
 
 app.listen(port, '0.0.0.0', () => {
   console.log(`MVP server listening on http://localhost:${port}`);
