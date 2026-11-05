@@ -37,4 +37,14 @@ describe('BriefRefreshBar verdict toggle (NEWS-167)', () => {
 		await fireEvent.click(filtered);
 		expect(onVerdictViewChange).toHaveBeenCalledWith('filtered');
 	});
+
+	it('links to Feedback beside Filtered out', () => {
+		render(BriefRefreshBar, {
+			props: { refresh, filteredOut: 2, verdictView: 'approved' },
+		});
+		const link = screen.getByTestId('brief-feedback-link');
+		expect(link).toHaveRole('link');
+		expect(link).toHaveTextContent('Feedback');
+		expect(link).toHaveAttribute('href', '/feedback');
+	});
 });

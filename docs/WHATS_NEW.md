@@ -6,6 +6,12 @@ Each ship-loop pull request adds an entry for what is true at merge for that rea
 
 This is not the release log. Releases are recorded in `CHANGELOG.md` by semantic-release. Do not hand-edit `CHANGELOG.md` to mirror these notes.
 
+## 2026-11-05
+
+The Brief refresh bar has a **Feedback** link beside Filtered out. It opens a list of the Like and Not relevant choices you saved, newest first, with the headline, outlet, story link, topics, choice, comment, and when you saved it. You can switch a choice, edit the comment, and delete an entry after you confirm. It needs a sign-in. Not relevant still does not hide a story.
+
+When a story’s advisory reason cites one of those entries, the citation is a link to that entry. After you delete it, the reason text stays and the citation says feedback was removed.
+
 ## 2026-11-04
 
 Brief cards now have **Like** and **Not relevant** buttons, next to Less like this, on expanded Approved cards and on Filtered cards. Pick one to save it; pick the other to switch; pick the active one again to clear it. After you choose, an optional comment box (up to 500 characters, with a live count) lets you say why. Your choice is remembered when the Brief loads. It needs a sign-in. Not relevant never hides a story; Less like this still does.

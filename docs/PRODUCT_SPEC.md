@@ -8,7 +8,7 @@ The home page is the Brief. Your topics decide what is searched for and what is 
 
 ## Sign in
 
-Topics is the sign-in screen. The password field is labeled “MVP password.” Signing in is what unlocks refresh, filtered-out stories, adding or removing a story, “Less like this,” on-demand summaries, on-demand full stories, and remembering what you have read. You can read a Brief that is already loaded without signing in. **Log out** is on the Topics page.
+Topics is the sign-in screen. The password field is labeled “MVP password.” Signing in is what unlocks refresh, filtered-out stories, Feedback, adding or removing a story, “Less like this,” on-demand summaries, on-demand full stories, and remembering what you have read. You can read a Brief that is already loaded without signing in. **Log out** is on the Topics page.
 
 **Scenario:** Given you are not signed in, when you open Topics, then you see a sign-in form and no topic list.
 
@@ -159,6 +159,20 @@ An expanded Brief card, and every card under Filtered, has two toggle buttons, *
 
 **Scenario:** Given the server refuses a save, when you press a button or Save, then its message shows under the buttons and your typed comment stays.
 
+The Brief refresh bar has a **Feedback** link beside Filtered out. It opens Feedback (`/feedback`). You must be signed in; otherwise the page says “Log in on Topics to see feedback.” The page lists your saved choices, newest first. Each entry shows the headline, the outlet, a link to the story, the topics, the choice, the comment, and when you saved it. There is no paging.
+
+**Scenario:** Given you saved Like or Not relevant on a story, when you open Feedback from the refresh bar, then that story is on the list with its headline, outlet, link, topics, choice, comment, and time.
+
+**Scenario:** Given an entry on the list, when you press the other choice, then the choice switches and the comment box opens. Edit comment opens that box without switching. Save stores the comment. Cancel closes the box without saving. Pressing the choice that is already selected does not remove the entry.
+
+**Scenario:** Given an entry on the list, when you press Delete and then No, then the entry stays. When you press Delete and then Yes, then the entry is removed. The page does not use a browser confirm dialog.
+
+When an advisory reason cites one of these entries, that citation is a link to the entry on the Feedback page, and the page scrolls to it and marks it. After you delete the entry, the reason text stays and the citation reads “feedback removed”.
+
+**Scenario:** Given a Filtered reason cites feedback you still have, when you open the reason and follow the citation, then the Feedback page shows that entry.
+
+**Scenario:** Given you deleted that entry, when you open the same reason, then the reason text is still there and the citation says “feedback removed”.
+
 ## Read and seen
 
 You can mark a story read, or use **Mark all as read**. Opening a story counts as seeing it.
@@ -175,7 +189,7 @@ Before the first successful refresh, nothing is hidden as already seen.
 
 While the server is running, the Brief refreshes on a timer. The bar above the sections shows when it last updated and when the next refresh is due. **Refresh** runs one immediately and reloads the Brief. It needs a sign-in; otherwise the bar says “Log in on Topics to refresh.” While a refresh is running the button says “Refreshing…” and is disabled. A refresh can take minutes. If it fails, the bar says “Refresh failed. Try again.”
 
-The bar links to Filtered out. It says **N filtered out** when the last refresh dropped stories, and **Filtered out** otherwise.
+The bar links to Filtered out and, beside it, to Feedback. It says **N filtered out** when the last refresh dropped stories, and **Filtered out** otherwise.
 
 Beside that link, an **Approved / Filtered / All** toggle chooses what the Brief shows. Every load starts on **Approved**. The choice is not remembered across reloads. **Approved** is today’s topic Brief (kept stories). **Filtered** lists stories the last refresh dropped, each with a short advisory reason you can open — separate from the Filtered out page, which stays for spot checks. **All** shows the Approved topic sections, then the Filtered list below (Filtered cards are not mixed into topic ranks).
 
@@ -215,7 +229,7 @@ You can switch between **Last refresh** and **Last 48 hours**. Stories are group
 
 **Scenario:** Given a curated RSS source has a `criteria` note and Jev scored a story from that outlet, when you open the advisory reason on the Brief **Filtered** view or inspect triage records, then `criteriaRef` is `source:<id>` for that source.
 
-**Scenario:** Given you saved Like or Not relevant feedback on earlier stories, when the next refresh scores a story, then your most recent feedback (favoring the same outlet or topic, at most 20 entries and about 1,500 tokens) is shown to Jev as a soft hint. When Jev says a feedback entry drove its judgment, `criteriaRef` is `feedback:<id>`. Not relevant never hides a story by itself, and a deleted entry is not used on the next refresh.
+**Scenario:** Given you saved Like or Not relevant feedback on earlier stories, when the next refresh scores a story, then your most recent feedback (favoring the same outlet or topic, at most 20 entries and about 1,500 tokens) is shown to Jev as a soft hint. When Jev says a feedback entry drove its judgment, the advisory reason cites that entry and the citation links to it on the Feedback page. Not relevant never hides a story by itself, and a deleted entry is not used on the next refresh. If the entry was deleted, the reason text stays and the citation says “feedback removed”.
 
 **Scenario:** Given you are signed in and the last refresh dropped nothing, when you open Filtered out, then it says “Nothing was filtered out.”
 

@@ -2,6 +2,21 @@
 
 Binding choices for Informed News. Newest first. When one of these changes, update this file in the same change as [ROADMAP.md](ROADMAP.md) and Jira. What the product does now, in plain language, is [PRODUCT_SPEC.md](PRODUCT_SPEC.md). Pipeline detail remains in [NEWS-84](https://informedcrew.atlassian.net/browse/NEWS-84), [TRIAGE.md](TRIAGE.md), and [BRIEF.md](BRIEF.md). The target is [VISION.md](VISION.md).
 
+## 2026-11-05 — /feedback list, citation links, and the stubbed end-to-end check (NEWS-192)
+
+**Decision:** Ship the Feedback list and the citation links from these grill answers. The launch prompt took every recommended answer (Wednesday 2026-11-04, after 6 PM ET). [VISION.md](VISION.md) is unchanged. `/api/feedback` is unchanged. The triage prompt and `TRIAGE_JEV_BUDGET` (300) are unchanged.
+
+1. **Where the link lives.** In the Brief refresh bar, immediately after Filtered out. One place. The label is Feedback. It is not in the footer and not on Topics.
+2. **Edit on the list.** Like and Not relevant use the same toggle, comment box, 500-character counter, Save, and Cancel as on a card. Switching the other choice updates the saved choice and opens the comment box. Edit comment opens that box without changing the choice. The pressed button on the list does not remove the entry.
+3. **Delete confirm.** Delete asks inline, “Delete?” with Yes and No, inside the entry. There is no browser confirm dialog.
+4. **Citation for a deleted entry.** The advisory reason text stays. The `feedback:<id>` link becomes the plain words “feedback removed”. That check uses the one shared load of saved feedback. There is not a separate request for each citation.
+5. **Highlight.** Opening `/feedback#<id>` scrolls that entry into view, focuses it, and marks it briefly. When reduced motion is requested, the mark does not animate and the scroll does not smooth-scroll.
+6. **Order and paging.** Newest first, as the list from the server already is. No paging. One entry per story keeps the list small.
+
+**Why:** The store ([NEWS-169](https://informedcrew.atlassian.net/browse/NEWS-169)), the prompt citation ([NEWS-190](https://informedcrew.atlassian.net/browse/NEWS-190)), and the card buttons ([NEWS-191](https://informedcrew.atlassian.net/browse/NEWS-191), `a212d92`, PR #233) had no list and no way to open a cited entry.
+
+**What it rules out:** A second link placement, a browser confirm dialog, a request per citation, paging in this change, a server API change, feeding this feedback to News Desk Bot, and any change to [VISION.md](VISION.md).
+
 ## 2026-11-04 — Like / Not relevant on Brief cards: card state rules (NEWS-191)
 
 **Decision:** The feedback UI is split: NEWS-191 is part a (buttons and comment box on Brief cards, Claude) and NEWS-192 is part b (`/feedback` page, citation links, E2E, Cursor). [VISION.md](VISION.md) is unchanged. `mvp/server` behavior is unchanged.
