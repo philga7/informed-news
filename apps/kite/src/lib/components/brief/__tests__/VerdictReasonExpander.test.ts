@@ -1,9 +1,26 @@
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import { tick } from 'svelte';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { resetFeedbackCriteriaCache } from '../FeedbackCriteriaLink.svelte';
 import VerdictReasonExpander from '../VerdictReasonExpander.svelte';
 
+function jsonResponse(status: number, body: unknown): Response {
+	return new Response(JSON.stringify(body), {
+		status,
+		headers: { 'content-type': 'application/json' },
+	});
+}
+
 describe('VerdictReasonExpander (NEWS-167)', () => {
+	beforeEach(() => {
+		resetFeedbackCriteriaCache();
+		vi.unstubAllGlobals();
+	});
+
+	afterEach(() => {
+		vi.unstubAllGlobals();
+	});
+
 	it('exposes an advisory region and opens via keyboard on the summary', async () => {
 		render(VerdictReasonExpander, {
 			props: {
@@ -38,5 +55,32 @@ describe('VerdictReasonExpander (NEWS-167)', () => {
 		});
 		expect(screen.queryByText(/topic:/)).not.toBeInTheDocument();
 		expect(screen.getByText('Muted by rule or undesired topic gossip.')).toBeInTheDocument();
+	});
+
+	it('renders feedback criteriaRef as a link and keeps other refs plain text', async () => {
+		const fetchMock = vi.fn().mockResolvedValueOnce(
+			jsonResponse(200, {
+				entries: [{ id: 'fb-1', itemId: 'story-1', signal: 'like', comment: '' }],
+			}),
+		);
+		vi.stubGlobal('fetch', fetchMock);
+
+		render(VerdictReasonExpander, {
+			props: {
+				reasonText: 'Filtered after feedback.',
+				criteriaRef: 'feedback:fb-1',
+			},
+		});
+		await vi.waitFor(() => expect(screen.getByTestId('feedback-criteria-link')).toBeInTheDocument());
+		expect(screen.getByRole('link', { name: 'feedback:fb-1' })).toHaveAttribute('href', '/feedback#fb-1');
+
+		render(VerdictReasonExpander, {
+			props: {
+				reasonText: 'Kept for topic.',
+				criteriaRef: 'topic:e2e-topic-grid',
+			},
+		});
+		expect(screen.getByText('topic:e2e-topic-grid')).toBeInTheDocument();
+		expect(screen.queryAllByTestId('feedback-criteria-link')).toHaveLength(1);
 	});
 });
