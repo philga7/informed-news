@@ -34,6 +34,36 @@ No additional product routes yet. The Developing desk (Epic I, [NEWS-57](https:/
 | `/listen` | [NEWS-38](https://informedcrew.atlassian.net/browse/NEWS-38) TTS (F) | Listen control only when `brief.mp3` (or equivalent) exists |
 | `/desk` (optional later) | [NEWS-39](https://informedcrew.atlassian.net/browse/NEWS-39) Voice (G) | Last; never stub in Epic A |
 
+## SPA ownership (NEWS-170)
+
+The shell is a second UI beside Kite, served on the same port. Kite keeps every view below, including the Brief. Map ([NEWS-35](https://informedcrew.atlassian.net/browse/NEWS-35)) and Signals ([NEWS-34](https://informedcrew.atlassian.net/browse/NEWS-34)) stay on hold: no route, no tab, no shell link. The [NEWS-42](https://informedcrew.atlassian.net/browse/NEWS-42) guardrail still stands: no empty tabs.
+
+Express answers `/api/*`, `/health`, and `/healthz` itself. A path in the table below goes to the shell. Every other page goes to Kite.
+
+### Owned by the shell now
+
+| Path | Surface | Notes |
+|------|---------|--------|
+| `/shell` | Shell home | Placeholder. Not the Brief. The Brief stays at `/` on Kite. Links back to the Brief and to `/shell/deep`. No Brief UI. |
+| `/shell/deep` | Deep link | Reloading this address returns this page. Proves a shell link survives a reload. |
+
+`/shell` does not match a longer prefix such as `/shellish`. A path under `/shell/` that the shell does not know is still the shell's (its own not-found), not a Kite page.
+
+### Still on Kite
+
+`/`, `/about`, `/transparency`, `/topics`, `/feedback`, `/filtered`, `/contribute`, and the category routes. None of these move in this change.
+
+### Later, not routed in this change
+
+| Piece | What | Blocked by |
+|-------|------|------------|
+| (b) | Briefs module parity (keyboard, filters, shared links, accessibility, `FeedbackButtons`) and the Brief end-to-end suite ported and green. Not filed yet. | (a) |
+| (c) | Story Desk at its own link. The path is not chosen here. `/desk` stays reserved for Voice ([NEWS-39](https://informedcrew.atlassian.net/browse/NEWS-39)). | (b) |
+| (d) | A nav test that no Map or Signals route or tab exists. Can run beside (b) and (c). | (a) |
+| (e) | Remove the Kite Brief view after (b) passes the same end-to-end suite, and after Phil sees (b). | (b) |
+
+The shell talks only to the one API. This placeholder does not call it. There is no second data path.
+
 ## Explicit non-goals for this shell
 
 - No Finance / Situation / Listen items in header, footer, or category nav until data ships
