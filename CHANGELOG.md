@@ -1,3 +1,9 @@
+## [0.36.0](https://github.com/philga7/informed-news/compare/v0.35.0...v0.36.0) (2026-11-05)
+
+### Features
+
+* **NEWS-192:** feedback list page, citation links and E2E ([#234](https://github.com/philga7/informed-news/issues/234)) ([f028757](https://github.com/philga7/informed-news/commit/f0287578847aadcd4b0306d8c80ac533573327c1)), closes [#233](https://github.com/philga7/informed-news/issues/233) [#233](https://github.com/philga7/informed-news/issues/233)
+
 ## [0.35.0](https://github.com/philga7/informed-news/compare/v0.34.0...v0.35.0) (2026-11-05)
 
 ### Features
