@@ -1,10 +1,44 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { join, relative, sep } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const root = join(fileURLToPath(new URL('.', import.meta.url)), '..');
+
+const { shellOwnsPath } = await import(
+	new URL('../mvp/server/src/serveShell.ts', import.meta.url).href
+);
+
+const FORBIDDEN_SEGMENTS = ['map', 'signals', 'finance', 'situation', 'listen'];
+const NAMES = FORBIDDEN_SEGMENTS.join('|');
+// href="/map", href="/signals/x", or a nav label like >Map<
+const FORBIDDEN_HREF = new RegExp('href\\s*=\\s*[^>]*?/(?:' + NAMES + ')(?![a-z0-9-])', 'i');
+const FORBIDDEN_LABEL = new RegExp('>\\s*(?:' + NAMES + ')\\s*<', 'i');
+
+function walk(dir) {
+	return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+		const full = join(dir, entry.name);
+		return entry.isDirectory() ? walk(full) : [full];
+	});
+}
+
+/** Violations in the shell route tree: forbidden route dirs and nav chrome. */
+function scanShell(files) {
+	const routesDir = join(root, 'apps/web/src/routes');
+	const problems = [];
+	for (const file of files) {
+		const segments = relative(routesDir, file).split(sep);
+		const hit = segments.find((s) => FORBIDDEN_SEGMENTS.includes(s.toLowerCase()));
+		if (hit) problems.push(relative(root, file) + ': forbidden route segment ' + hit);
+		if (/\.(svelte|ts|js)$/.test(file) && existsSync(file)) {
+			const text = readFileSync(file, 'utf8');
+			const m = text.match(FORBIDDEN_HREF) || text.match(FORBIDDEN_LABEL);
+			if (m) problems.push(relative(root, file) + ': forbidden chrome ' + m[0].trim());
+		}
+	}
+	return problems;
+}
 
 describe('NEWS-42 nav shell route map', () => {
 	it('documents Brief + Transparency + Topics + Filtered shipped, Radar retired, and reserved layers docs-only', () => {
@@ -105,5 +139,24 @@ describe('NEWS-42 nav shell route map', () => {
 		assert.doesNotMatch(header, /href="\/finance"/);
 		assert.doesNotMatch(header, /href="\/situation"/);
 		assert.doesNotMatch(header, /href="\/listen"/);
+	});
+
+	it('keeps Map/Signals/Finance/Situation/Listen out of the SPA shell (NEWS-195)', () => {
+		const files = walk(join(root, 'apps/web/src/routes'));
+		assert.ok(files.length > 0, 'expected shell route files');
+		assert.deepEqual(scanShell(files), []);
+	});
+
+	it('scanner flags a forbidden route (sensitivity)', () => {
+		const routes = join(root, 'apps/web/src/routes');
+		assert.ok(scanShell([join(routes, 'map/+page.svelte')]).length > 0);
+		assert.ok(scanShell([join(routes, 'signals/+page.svelte')]).length > 0);
+		assert.ok(scanShell([join(routes, 'shell/listen/+page.svelte')]).length > 0);
+	});
+
+	it('does not let the shell own /map or /signals (NEWS-195)', () => {
+		assert.equal(shellOwnsPath('/map'), false);
+		assert.equal(shellOwnsPath('/signals'), false);
+		assert.equal(shellOwnsPath('/shell'), true);
 	});
 });
