@@ -1,3 +1,12 @@
+## [0.39.0](https://github.com/philga7/informed-news/compare/v0.38.0...v0.39.0) (2026-11-06)
+
+### Features
+
+* **NEWS-196:** port FeedbackButtons to apps/web ([47fe0df](https://github.com/philga7/informed-news/commit/47fe0dfc609ef3260679ab1780ad087dfcd3ec43)), closes [#239](https://github.com/philga7/informed-news/issues/239)
+* **NEWS-197:** port Less like this and Seed remove to apps/web ([f23e2ff](https://github.com/philga7/informed-news/commit/f23e2ffc991ef9771566eee313b74b75c08d5a28)), closes [#240](https://github.com/philga7/informed-news/issues/240)
+* **NEWS-198:** port citation marks and verdict expander to apps/web ([3fc8484](https://github.com/philga7/informed-news/commit/3fc8484f4cdc41e63d20b7949f717398f305c30c)), closes [#241](https://github.com/philga7/informed-news/issues/241)
+* **NEWS-199:** SPA Brief keyboard and live-region helpers ([c9c8eef](https://github.com/philga7/informed-news/commit/c9c8eef3663b77313206b4d094f69910615f9af3)), closes [#242](https://github.com/philga7/informed-news/issues/242)
+
 ## [0.38.0](https://github.com/philga7/informed-news/compare/v0.37.0...v0.38.0) (2026-11-06)
 
 ### Features
