@@ -1,3 +1,9 @@
+## [0.38.0](https://github.com/philga7/informed-news/compare/v0.37.0...v0.38.0) (2026-11-06)
+
+### Features
+
+* **NEWS-194:** SPA Brief foundation harness and express.json scope ([28c84fb](https://github.com/philga7/informed-news/commit/28c84fb9fe20180fdf99c3f5bafaa85ab11d182f))
+
 ## [0.37.0](https://github.com/philga7/informed-news/compare/v0.36.0...v0.37.0) (2026-11-05)
 
 ### Features
