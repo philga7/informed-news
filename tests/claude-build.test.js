@@ -90,6 +90,7 @@ describe('NEWS-180 claude build workflow', () => {
 			'npm ci',
 			'npm ci --prefix mvp/server',
 			'bun install --frozen-lockfile --cwd apps/kite',
+			'bun install --frozen-lockfile --cwd apps/web',
 		]);
 		const allowed = claudeArgsToolString(workflow, '--allowedTools');
 		const disallowed = claudeArgsToolString(workflow, '--disallowedTools');
@@ -196,9 +197,14 @@ describe('NEWS-180 claude build workflow', () => {
 	it('installs bun 1.4.3 and Kite deps before Claude, and still denies bun install', () => {
 		const setup = workflow.indexOf('oven-sh/setup-bun@v2');
 		const install = workflow.indexOf('bun install --frozen-lockfile --cwd apps/kite');
+		const shellInstall = workflow.indexOf('bun install --frozen-lockfile --cwd apps/web');
 		const action = workflow.indexOf('anthropics/claude-code-action@v1');
 		assert.ok(setup !== -1 && setup < action, 'setup-bun before the Claude step');
 		assert.ok(install > setup && install < action, 'frozen Kite install before the Claude step');
+		assert.ok(
+			shellInstall > install && shellInstall < action,
+			'frozen shell install after Kite and before the Claude step',
+		);
 		assert.match(workflow, /bun-version:\s*1\.4\.3/);
 		const allowed = claudeArgsToolString(workflow, '--allowedTools');
 		const disallowed = claudeArgsToolString(workflow, '--disallowedTools');

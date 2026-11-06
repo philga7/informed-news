@@ -50,6 +50,10 @@ jobs:
         working-directory: apps/web
         run: bun run build
 
+      - name: Shell unit tests
+        working-directory: apps/web
+        run: bun run test:unit
+
       - name: Test shell build
         run: npm run test:shell-build --prefix mvp/server
 

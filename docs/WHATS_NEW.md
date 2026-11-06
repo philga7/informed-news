@@ -14,6 +14,8 @@ The Brief refresh bar has a **Feedback** link beside Filtered out. It opens a li
 
 When a story’s advisory reason cites one of those entries, the citation is a link to that entry. After you delete it, the reason text stays and the citation says feedback was removed.
 
+**No user-visible change.** The Brief is still the home page.
+
 ## 2026-11-04
 
 Brief cards now have **Like** and **Not relevant** buttons, next to Less like this, on expanded Approved cards and on Filtered cards. Pick one to save it; pick the other to switch; pick the active one again to clear it. After you choose, an optional comment box (up to 500 characters, with a live count) lets you say why. Your choice is remembered when the Brief loads. It needs a sign-in. Not relevant never hides a story; Less like this still does.

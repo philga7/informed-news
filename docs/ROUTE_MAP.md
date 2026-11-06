@@ -36,7 +36,7 @@ No additional product routes yet. The Developing desk (Epic I, [NEWS-57](https:/
 
 ## SPA ownership (NEWS-170)
 
-The shell is a second UI beside Kite, served on the same port. Kite keeps every view below, including the Brief. Map ([NEWS-35](https://informedcrew.atlassian.net/browse/NEWS-35)) and Signals ([NEWS-34](https://informedcrew.atlassian.net/browse/NEWS-34)) stay on hold: no route, no tab, no shell link. The [NEWS-42](https://informedcrew.atlassian.net/browse/NEWS-42) guardrail still stands: no empty tabs.
+The shell is a second UI beside Kite, served on the same port. `/shell` stays the placeholder. `/` remains the Kite Brief until [NEWS-200](https://informedcrew.atlassian.net/browse/NEWS-200). Kite keeps every view below, including the Brief. Map ([NEWS-35](https://informedcrew.atlassian.net/browse/NEWS-35)) and Signals ([NEWS-34](https://informedcrew.atlassian.net/browse/NEWS-34)) stay on hold: no route, no tab, no shell link. The [NEWS-42](https://informedcrew.atlassian.net/browse/NEWS-42) guardrail still stands: no empty tabs.
 
 Express answers `/api/*`, `/health`, and `/healthz` itself. A path in the "Owned by the shell now" table goes to the shell. Every path not in that table stays on Kite, including the shipped table and the `/radar` redirect. The shell's client files are served under `/shell/_app`, not Kite's `/_app`.
 
@@ -44,7 +44,7 @@ Express answers `/api/*`, `/health`, and `/healthz` itself. A path in the "Owned
 
 | Path | Surface | Notes |
 |------|---------|--------|
-| `/shell` | Shell home | Placeholder. Not the Brief. The Brief stays at `/` on Kite. Links back to the Brief and to `/shell/deep`. No Brief UI. |
+| `/shell` | Shell home | Placeholder. Not the Brief. `/` remains the Kite Brief until [NEWS-200](https://informedcrew.atlassian.net/browse/NEWS-200). Links back to the Brief and to `/shell/deep`. No Brief UI. |
 | `/shell/deep` | Deep link | Reloading this address returns this page. Proves a shell link survives a reload. |
 
 `/shell` does not match a longer prefix such as `/shellish`. A path under `/shell/` that the shell does not know is still the shell's (its own not-found), not a Kite page.
@@ -57,10 +57,10 @@ Every path not in the "Owned by the shell now" table stays on Kite, including th
 
 | Piece | What | Blocked by |
 |-------|------|------------|
-| (b) | Briefs module parity (keyboard, filters, shared links, accessibility, `FeedbackButtons`) and the Brief end-to-end suite ported and green. Not filed yet. A link from the Kite Brief to `/shell` has to be a full page load, because Kite's client router would otherwise treat `/shell` as a batch id. | (a) |
-| (c) | Story Desk at its own link. The path is not chosen here. `/desk` stays reserved for Voice ([NEWS-39](https://informedcrew.atlassian.net/browse/NEWS-39)). | (b) |
-| (d) | A nav test that no Map or Signals route or tab exists. Can run beside (b) and (c). | (a) |
-| (e) | Remove the Kite Brief view after (b) passes the same end-to-end suite, and after Phil sees (b). | (b) |
+| (b) | Briefs module parity (keyboard, filters, shared links, accessibility, `FeedbackButtons`) and the Brief end-to-end suite ported and green. Filed as [NEWS-194](https://informedcrew.atlassian.net/browse/NEWS-194) through [NEWS-200](https://informedcrew.atlassian.net/browse/NEWS-200): foundation, then leaf ports, then assembly and the single E2E gate. A link from the Kite Brief to `/shell` has to be a full page load, because Kite's client router would otherwise treat `/shell` as a batch id. `/` does not move in this change. | (a) |
+| (c) | Story Desk at its own link, [NEWS-201](https://informedcrew.atlassian.net/browse/NEWS-201). The path is not chosen here. `/desk` stays reserved for Voice ([NEWS-39](https://informedcrew.atlassian.net/browse/NEWS-39)). | (b) |
+| (d) | A nav test that no Map or Signals route or tab exists, [NEWS-195](https://informedcrew.atlassian.net/browse/NEWS-195). **Done**. Phil squash-merged PR #237 as `4664366`. Issue 236 is closed. The guard is on `main`. NEWS-194 does not change the guard. [NEWS-170](https://informedcrew.atlassian.net/browse/NEWS-170) stays In Progress. | (a) |
+| (e) | Remove the Kite Brief view: [NEWS-202](https://informedcrew.atlassian.net/browse/NEWS-202) removes the Kite Brief routes, then [NEWS-203](https://informedcrew.atlassian.net/browse/NEWS-203) is Kite Brief cleanup, after (b) passes the same end-to-end suite and Phil sees (b). | (b) |
 
 The shell talks only to the one API. This placeholder does not call it. There is no second data path.
 

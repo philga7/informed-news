@@ -20,7 +20,7 @@ One API (`mvp/server`) and one MCP server sit in front of all three layers. The 
 
 ## SPA shell
 
-One SPA shell in this repo replaces Kite one view at a time. Each module has its own link:
+One SPA shell in this repo replaces Kite one view at a time. A shell placeholder exists. The running Brief stays on Kite until the Briefs cutover replaces that view. Each module has its own link:
 
 - Briefs
 - Story Desk
