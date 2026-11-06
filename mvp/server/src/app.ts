@@ -349,7 +349,7 @@ export function createApp(deps: CreateAppDeps = {}): Express {
       credentials: true,
     }),
   );
-  app.use(express.json());
+  app.use('/api', express.json());
   app.use(createSessionMiddleware());
 
   app.get('/health', (_req, res) => {

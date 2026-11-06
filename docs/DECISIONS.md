@@ -2,6 +2,20 @@
 
 Binding choices for Informed News. Newest first. When one of these changes, update this file in the same change as [ROADMAP.md](ROADMAP.md) and Jira. What the product does now, in plain language, is [PRODUCT_SPEC.md](PRODUCT_SPEC.md). Pipeline detail remains in [NEWS-84](https://informedcrew.atlassian.net/browse/NEWS-84), [TRIAGE.md](TRIAGE.md), and [BRIEF.md](BRIEF.md). The target is [VISION.md](VISION.md).
 
+## 2026-11-05 — SPA Brief foundation harness and express.json on /api (NEWS-194)
+
+**Decision:** Phil authorized the Nov 5 launch prompt after work hours and was not in the implementation session. Each grill answer is the prompt's recommended answer.
+
+1. **Unit tests.** Unit tests live in `apps/web` (`vitest`, `src/**/*.{test,spec}.{js,ts}`, `bun run test:unit`), and CI runs them. Claude leaf ports use `bun run --cwd apps/web test:unit`. `claude-build` installs `apps/web` first. Claude cannot `bun install`.
+2. **JSON bodies.** `express.json()` is mounted on `/api` only. Other paths do not parse JSON bodies. `/api` routes still do.
+3. **Home route.** The Brief stays at `/` on Kite until [NEWS-200](https://informedcrew.atlassian.net/browse/NEWS-200). This change does not take `/`.
+
+`$lib/brief` exports Brief card fixtures, `/api/feedback` bodies, less-like-this and remove-seed URLs, and a fetch mock for [NEWS-196](https://informedcrew.atlassian.net/browse/NEWS-196)–[NEWS-199](https://informedcrew.atlassian.net/browse/NEWS-199). No TopicBrief. Hosting stays the VPS and Tailscale. informed-brain stays unattached. No Map or Signals chrome. [NEWS-195](https://informedcrew.atlassian.net/browse/NEWS-195) (Map/Signals nav guard, piece (d)) is **Done**. Phil squash-merged PR #237 as `4664366`. Issue 236 is closed. The guard is on `main`. NEWS-194 does not change the guard. [NEWS-170](https://informedcrew.atlassian.net/browse/NEWS-170) stays In Progress.
+
+**Why:** Leaf ports need a harness and fixtures, and a global JSON parser would read bodies for shell and Kite pages.
+
+**What it rules out:** Taking `/` in this change, porting TopicBrief, E2E, deleting Kite, Vercel, informed-brain, empty Map/Signals chrome, and letting Claude install dependencies.
+
 ## 2026-11-05 — SPA shell framework, hosting, and route split (NEWS-170 piece a)
 
 **Decision:** Phil approved [NEWS-170](https://informedcrew.atlassian.net/browse/NEWS-170) on Nov 2, chose the five-way split on Nov 5, and said launch piece (a) now. He was not in this session. Each grill question below takes the launch prompt's recommended answer, recorded as Phil's answer. [VISION.md](VISION.md) is unchanged: the running app stays the topic Brief until a later piece replaces that view. This change is the shell only.
