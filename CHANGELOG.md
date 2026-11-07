@@ -1,3 +1,9 @@
+## [0.40.0](https://github.com/philga7/informed-news/compare/v0.39.0...v0.40.0) (2026-11-07)
+
+### Features
+
+* **NEWS-200:** SPA Brief assembly cutover and E2E parity ([7ca5a77](https://github.com/philga7/informed-news/commit/7ca5a77f30ad7bfee265424cf7cb779bd02def91))
+
 ## [0.39.0](https://github.com/philga7/informed-news/compare/v0.38.0...v0.39.0) (2026-11-06)
 
 ### Features
