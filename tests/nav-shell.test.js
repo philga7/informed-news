@@ -159,4 +159,12 @@ describe('NEWS-42 nav shell route map', () => {
 		assert.equal(shellOwnsPath('/signals'), false);
 		assert.equal(shellOwnsPath('/shell'), true);
 	});
+
+	it('lets the shell own Brief URLs (NEWS-200)', () => {
+		assert.equal(shellOwnsPath('/'), true);
+		assert.equal(shellOwnsPath('/latest/world/1'), true);
+		assert.equal(shellOwnsPath('/topics'), false);
+		assert.equal(shellOwnsPath('/map'), false);
+		assert.equal(shellOwnsPath('/signals'), false);
+	});
 });

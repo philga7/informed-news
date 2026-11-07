@@ -1,4 +1,5 @@
 <script lang="ts">
+import { beforeNavigate } from '$app/navigation';
 import { browser } from '$app/environment';
 import { page } from '$app/state';
 import { isRtlLocale } from '$lib/client/rtl-detection';
@@ -15,6 +16,7 @@ import {
 	themeSettings,
 } from '$lib/data/settings.svelte.js';
 import { FEATURES } from '$lib/features';
+import { isShellBriefPath } from '$lib/shellBriefPaths';
 import { dataLanguage } from '$lib/stores/dataLanguage.svelte';
 import { experimental } from '$lib/stores/experimental.svelte';
 import { language } from '$lib/stores/language.svelte.js';
@@ -32,6 +34,17 @@ let { data, children }: { data: PageData; children: Snippet } = $props();
 // Set session context for child components
 // svelte-ignore state_referenced_locally - session context is set once at initialization
 setContext('session', data.session);
+
+beforeNavigate(({ to, cancel }) => {
+	if (!to) {
+		return;
+	}
+	if (!isShellBriefPath(to.url.pathname)) {
+		return;
+	}
+	cancel();
+	location.assign(to.url.href);
+});
 
 // Initialize OverlayScrollbars hook (must be at component level, not in onMount)
 let scrollbarsInitializer: ((element: HTMLElement) => void) | null = null;

@@ -1,11 +1,13 @@
 import path from 'node:path';
 
 /**
- * True for the shell page and anything under it. `/shellish` and the Brief
- * home page stay with Kite.
+ * True for the Brief home, shared brief URLs, and the shell page tree.
+ * `/shellish`, `/latestish`, and other non-shell routes stay with Kite.
  */
 export function shellOwnsPath(pathname: string): boolean {
-  return pathname === '/shell' || pathname.startsWith('/shell/');
+  if (pathname === '/' || pathname === '/shell' || pathname.startsWith('/shell/')) return true;
+  if (pathname === '/latest' || pathname.startsWith('/latest/')) return true;
+  return false;
 }
 
 /**

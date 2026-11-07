@@ -4,7 +4,7 @@ Repo-specific notes. Shared rules live in `~/.claude/CLAUDE.md`. Product invaria
 
 ## What this is
 
-Informed News: an OSINT-oriented product shell. The operator's topics drive sources and filtering; the Kite Brief is the product UI; `mvp/server` owns the pipeline and owned-brief adapter.
+Informed News: an OSINT-oriented product shell. The operator's topics drive sources and filtering. When the image is served, `/` is the shell Brief and Kite still owns the other pages. `npm run dev` is unchanged (server plus Kite, because `WEB_BUILD_DIR` is unset). `mvp/server` owns the pipeline and owned-brief adapter.
 
 Jira: project **NEWS** (informedcrew.atlassian.net, cloudId `ebcd227d-1f6d-4a54-a6d7-cfe70e377a50`). Details are in `.cursor/rules/jira-news.mdc`. Ordering lives in `docs/ROADMAP.md`.
 
@@ -38,8 +38,8 @@ Set `REFRESH_INTERVAL_HOURS=off` when you need the server up without spending re
 
 | Path | Role |
 |---|---|
-| `apps/kite/` | Brief UI (SvelteKit) |
-| `apps/web/` | Shell placeholder at `/shell` when the image is built. Unit tests live there. `npm run dev` is still Kite plus the server, and the Brief is still Kite at `/` |
+| `apps/kite/` | Kite UI (SvelteKit). Owns the pages other than the shell Brief. `npm run dev` still serves it at `/` |
+| `apps/web/` | Shell Brief at `/` and `/latest/…` when the image is served. `/shell` stays the placeholder. Unit tests live there. Kite still owns the other pages. `npm run dev` is still Kite plus the server |
 | `mvp/server/` | Express API + pipeline |
 | `mvp/data/` | Runtime JSON (never commit) |
 | `mvp/.env` | Secrets (never commit); see `mvp/.env.example` |
@@ -106,6 +106,6 @@ Claude reports findings. It never approves or merges.
 - `docs/WHATS_NEW.md` has a new dated entry for what is true at merge, or states **No user-visible change.** A line that is no longer true is corrected in this PR. `CHANGELOG.md` is left to semantic-release.
 - No secrets, `.env`, or `mvp/data/*.json` in the diff.
 - Follow-up tickets proposed (or explicitly None).
-- Product path stays Kite + `mvp/server`; no `_legacy/` default, no Supabase on the live path.
+- Product path: when the image is served, `/` is the shell Brief and Kite still owns the other pages. `npm run dev` is unchanged. No `_legacy/` default, no Supabase on the live path.
 
 Smoke test 3 (Nov 2026): claude[bot] opened this PR from an @claude issue.
