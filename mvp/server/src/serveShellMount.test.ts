@@ -63,13 +63,13 @@ test('with both handlers: shell paths hit the shell only, other pages hit kite o
   const { baseUrl, close } = await startServer(app);
 
   try {
-    for (const pathname of ['/shell', '/shell/deep', '/shell/missing']) {
+    for (const pathname of ['/shell', '/shell/deep', '/shell/missing', '/', '/latest/world/1']) {
       const response = await fetch(`${baseUrl}${pathname}`);
       assert.equal(response.status, 200, pathname);
       assert.equal(await response.text(), 'shell-page', pathname);
     }
 
-    for (const pathname of ['/', '/topics', '/transparency', '/map', '/signals']) {
+    for (const pathname of ['/topics', '/transparency', '/map', '/signals']) {
       const response = await fetch(`${baseUrl}${pathname}`);
       assert.equal(response.status, 200, pathname);
       assert.equal(await response.text(), 'kite-page', pathname);
@@ -87,8 +87,8 @@ test('with both handlers: shell paths hit the shell only, other pages hit kite o
     assert.equal(fetchResp.status, 401);
     assert.equal(fetchRequestCount, 0, 'neither handler sees /api/fetch; Express answered');
 
-    assert.deepEqual(shellSeen, ['/shell', '/shell/deep', '/shell/missing']);
-    assert.deepEqual(kiteSeen, ['/', '/topics', '/transparency', '/map', '/signals']);
+    assert.deepEqual(shellSeen, ['/shell', '/shell/deep', '/shell/missing', '/', '/latest/world/1']);
+    assert.deepEqual(kiteSeen, ['/topics', '/transparency', '/map', '/signals']);
   } finally {
     await close();
   }

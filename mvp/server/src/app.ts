@@ -145,7 +145,7 @@ export type CreateAppDeps = {
   kiteHandler?: RequestHandler;
   /**
    * Built shell app handler (NEWS-170). When present, mounted after every API
-   * route and before `kiteHandler`. Only `/shell` paths reach it.
+   * route and before `kiteHandler`. Brief (`/`, `/latest`, …) and `/shell` paths reach it.
    */
   shellHandler?: RequestHandler;
 };
@@ -1474,9 +1474,9 @@ export function createApp(deps: CreateAppDeps = {}): Express {
     }
   });
 
-  // Shell UI (NEWS-170): after every API route, before Kite. Paths the shell
-  // does not own fall through. A shell path is handled here and does not
-  // reach Kite.
+  // Shell UI (NEWS-170 / NEWS-200): after every API route, before Kite. Paths
+  // the shell does not own fall through. Brief and `/shell` paths are handled
+  // here and do not reach Kite.
   if (deps.shellHandler) {
     const shellHandler = deps.shellHandler;
     app.use((req, res, next) => {

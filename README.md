@@ -3,14 +3,14 @@
 **Copyright © 2025 Sandiebeach LLC. All Rights Reserved.**  
 **Proprietary Software — See [LICENSE](LICENSE) and [COPYRIGHT.md](COPYRIGHT.md)**
 
-Product UI is the vendored **Kite** shell (`apps/kite/`, MIT). Pipeline and framing stay in **`mvp/server`**. The old React feed is archived at `_legacy/mvp-web/` (NEWS-46).
+When the image is served, `/` is the shell Brief (`apps/web`) and Kite still owns the other pages. Default `npm run dev` is still the vendored **Kite** UI (`apps/kite/`, MIT) plus **`mvp/server`**. The old React feed is archived at `_legacy/mvp-web/` (NEWS-46).
 
 ## Stack
 
 | Layer | Path | Role |
 |-------|------|------|
-| UI | `apps/kite` | SvelteKit Brief shell (default `npm run dev`) |
-| Shell placeholder | `apps/web` | `/shell` when the image is built. `npm run dev` is still Kite plus the server |
+| UI | `apps/kite` | SvelteKit. Default `npm run dev` still serves Kite at `/` |
+| Shell | `apps/web` | Brief at `/` and `/latest/…` when the image is served. `/shell` stays the placeholder. Kite still owns the other pages. `npm run dev` is still Kite plus the server |
 | API | `mvp/server` | Express: auth, fetch, classify, articles |
 | Data | `mvp/data/*.json` | Flat-file article + meta store (gitignored) |
 | Archived UI | `_legacy/mvp-web` | Former React feed — not on the product path |
@@ -33,14 +33,14 @@ npm run dev
 - **UI (Kite Brief):** http://localhost:5173  
 - **API:** http://localhost:3001 (`GET /health`)
 
-`npm run dev` starts **mvp/server + Kite**. The old OSINT monolith and archived React feed under `_legacy/` are not on this path.
+`npm run dev` starts **mvp/server + Kite**. `WEB_BUILD_DIR` is unset there, so Vite still serves Kite at `/`. The Docker image and the hermetic E2E stack set `WEB_BUILD_DIR`: `/` and `/latest/…` are the shell Brief, and Kite still owns the other pages. The old OSINT monolith and archived React feed under `_legacy/` are not on this path.
 
-CFP / curated RSS / topic search / framing stay on the MVP API while Kite is the shell — frozen surface: [docs/MVP_API_COMPAT.md](docs/MVP_API_COMPAT.md). X/Twitter history uses [birdclaw](docs/BIRDCLAW.md) locally (xcancel ingest retired, NEWS-123).
+CFP / curated RSS / topic search / framing stay on the MVP API. Kite still serves the non-Brief pages. Frozen surface: [docs/MVP_API_COMPAT.md](docs/MVP_API_COMPAT.md). X/Twitter history uses [birdclaw](docs/BIRDCLAW.md) locally (xcancel ingest retired, NEWS-123).
 
 ## Smoke test
 
 - **Product UI:** open http://localhost:5173 after `npm run dev`.
-- **Automated:** `npm run test:e2e:kite` (Playwright) and `cd apps/kite && bun run test:integration` each start their own throwaway server + Kite on separate ports with seeded data (`e2e/stack/`) — never your dev server, `mvp/data` or `mvp/.env`, so they spend no API budget and don't depend on your local stories.
+- **Automated:** `npm run test:e2e:kite` (Playwright) and `cd apps/kite && bun run test:integration` each start their own seeded stack (`e2e/stack/`). That stack serves the shell Brief at `/` and Kite on the other pages. They never use your dev server, `mvp/data` or `mvp/.env`, so they spend no API budget and don't depend on your local stories.
 - **API compat:** `GET /health` + session `GET /api/articles` (see [docs/MVP_API_COMPAT.md](docs/MVP_API_COMPAT.md)).
 - **API checklist:** [mvp/SMOKE.md](mvp/SMOKE.md) covers classify + citations against `mvp/server`.
 
@@ -85,7 +85,7 @@ Kite UI env: `apps/kite/.env.example`. Brief guide: [docs/BRIEF.md](docs/BRIEF.m
 | `npm run typecheck` | Typecheck `mvp/server` |
 | `npm test` | MVP server unit tests, run against a fresh temp `MVP_DATA_DIR` (never `mvp/data`); fails if a test leaves files there |
 | `npm run test:kite` | Kite provenance + default-entrypoint checks |
-| `npm run test:e2e:kite` | Playwright smoke on its own seeded stack (Kite :5174, API :3101) |
+| `npm run test:e2e:kite` | Playwright smoke on its own seeded stack (shell Brief at `/` via :5174, API :3101) |
 | `npm run build` | Build archived `_legacy/mvp-web` (current Vercel artifact) |
 
 ## Versioning & CI
@@ -99,7 +99,7 @@ Process model matches HARN: **`main` + short-lived branches**, Conventional Comm
 
 ## Hosting (Vercel)
 
-Root [`vercel.json`](vercel.json) still deploys the **archived** `_legacy/mvp-web` static build until a later hosting cutover to Kite. Local product UI is Kite.
+Root [`vercel.json`](vercel.json) still deploys the **archived** `_legacy/mvp-web` static build until a later hosting cutover to Kite. Local `npm run dev` UI is Kite. The image serves the shell Brief at `/`.
 
 | Concern | Where |
 |---------|--------|
@@ -110,7 +110,7 @@ Root [`vercel.json`](vercel.json) still deploys the **archived** `_legacy/mvp-we
 
 ## Roadmap (NEWS)
 
-Agent-facing order of work: **[docs/ROADMAP.md](docs/ROADMAP.md)** — **Current next:** Epic L topic-driven brief ([NEWS-84](https://informedcrew.atlassian.net/browse/NEWS-84)); Epic K bug intake ([NEWS-83](https://informedcrew.atlassian.net/browse/NEWS-83)); Epic J claims desk Done and parked by NEWS-91 (no Radar page; APIs and data remain); next [NEWS-99](https://informedcrew.atlassian.net/browse/NEWS-99) (prune the Brief summaries store); ask before parked Later or Epic [NEWS-34](https://informedcrew.atlassian.net/browse/NEWS-34). Discernment: [docs/CLAIMS_DISCERNMENT.md](docs/CLAIMS_DISCERNMENT.md).
+Agent-facing order of work: **[docs/ROADMAP.md](docs/ROADMAP.md)** — **Current next:** Epic L topic-driven brief ([NEWS-84](https://informedcrew.atlassian.net/browse/NEWS-84)); Epic K bug intake ([NEWS-83](https://informedcrew.atlassian.net/browse/NEWS-83)); Epic J claims desk Done and parked by NEWS-91 (no Radar page; APIs and data remain); current next [NEWS-200](https://informedcrew.atlassian.net/browse/NEWS-200) (Brief assembly and `/` cutover, **in progress**); ask before parked Later or Epic [NEWS-34](https://informedcrew.atlassian.net/browse/NEWS-34). Discernment: [docs/CLAIMS_DISCERNMENT.md](docs/CLAIMS_DISCERNMENT.md).
 
 Done so far: Epic A ([NEWS-33](https://informedcrew.atlassian.net/browse/NEWS-33)), Epic H ([NEWS-48](https://informedcrew.atlassian.net/browse/NEWS-48)), desk v1 under NEWS-57 (parked), Epic L through [NEWS-91](https://informedcrew.atlassian.net/browse/NEWS-91). NEWS-53 absorbed into NEWS-57. Plans: [`.cursor/plans/osint_jira_pivot_d6b40f87.plan.md`](.cursor/plans/osint_jira_pivot_d6b40f87.plan.md), [`.cursor/plans/claims_evidence_spine_8f4cde15.plan.md`](.cursor/plans/claims_evidence_spine_8f4cde15.plan.md).
 

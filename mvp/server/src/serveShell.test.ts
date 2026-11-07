@@ -4,19 +4,32 @@ import { test } from 'node:test';
 
 import { shellHandlerPath, shellOwnsPath } from './serveShell.js';
 
-test('shellOwnsPath is true for /shell and paths under /shell/', () => {
-  assert.equal(shellOwnsPath('/shell'), true);
-  assert.equal(shellOwnsPath('/shell/'), true);
-  assert.equal(shellOwnsPath('/shell/deep'), true);
-  assert.equal(shellOwnsPath('/shell/missing'), true);
+test('shellOwnsPath is true for Brief, /shell, and /latest paths', () => {
+  const owned = [
+    '/',
+    '/shell',
+    '/shell/',
+    '/shell/deep',
+    '/latest',
+    '/latest/world',
+    '/latest/world/1',
+  ];
+  for (const pathname of owned) {
+    assert.equal(shellOwnsPath(pathname), true, pathname);
+  }
 });
 
-test('shellOwnsPath is false for the home page, lookalikes, and non-shell routes', () => {
+test('shellOwnsPath is false for lookalikes and non-shell routes', () => {
   const notOwned = [
     '',
-    '/',
     '/shellish',
+    '/latestish',
     '/topics',
+    '/transparency',
+    '/filtered',
+    '/feedback',
+    '/contribute',
+    '/radar',
     '/api',
     '/healthz',
     '/map',
@@ -25,6 +38,7 @@ test('shellOwnsPath is false for the home page, lookalikes, and non-shell routes
     '/situation',
     '/listen',
     '/desk',
+    '/2026-09-30/world',
     '/api/fetch',
   ];
   for (const pathname of notOwned) {

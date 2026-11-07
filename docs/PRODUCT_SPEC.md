@@ -4,7 +4,7 @@ Plain-language list of what Informed News does now. Features and scenarios only.
 
 A ship-loop pull request edits this file when what a reader can do changes. If behavior did not change, leave the file unchanged.
 
-The home page is the Brief. Your topics decide what is searched for and what is left out. There is no review queue and no step where you accept a story onto the Brief.
+The home page is the Brief, on the shell at `/`. Shared story links are `/latest/…` on that same shell. Your topics decide what is searched for and what is left out. There is no review queue and no step where you accept a story onto the Brief.
 
 ## Sign in
 
@@ -42,7 +42,7 @@ Opening `/radar` sends you to Topics. There is no Radar page.
 
 ## The Brief
 
-The Brief is the home page, under the heading **Your topics**. One section per desired topic that has something to show: all Core sections first, then all Watch sections, in saved topic order (not the A–Z order on the Topics page). The level name (Core or Watch) sits next to the topic name.
+The Brief is the home page on the shell at `/`, under the heading **Your topics**. One section per desired topic that has something to show: all Core sections first, then all Watch sections, in saved topic order (not the A–Z order on the Topics page). The level name (Core or Watch) sits next to the topic name.
 
 A story that matches several topics appears once, under the earliest matching section in that order. A story whose topics are all gone or undesired is not shown.
 
@@ -52,11 +52,15 @@ Topics with nothing to show are one line at the bottom: `Nothing new: …` (Core
 
 Stories are from about the last two days. Older ones drop off.
 
-**Scenario:** Given you have no desired topics, when you open the Brief, then it says “No topics yet” and links to Topics.
+**Scenario:** Given you have no desired topics, when you open the Brief on the shell at `/`, then it says “No topics yet” and links to Topics.
 
-**Scenario:** Given you have topics and nothing new for them, when you open the Brief, then it says “No new stories for your topics” and lists the quiet topics.
+**Scenario:** Given you have topics and nothing new for them, when you open the Brief on the shell at `/`, then it says “No new stories for your topics” and lists the quiet topics.
 
-**Scenario:** Given no stories have been saved yet, when you open the home page, then you see a single sample story (“Owned brief fixture — CFP sample…”) and no topic sections or refresh bar.
+**Scenario:** Given no stories have been saved yet, when you open the shell at `/`, then you see the owned-brief fixture: a single sample story (“Owned brief fixture — CFP sample…”) and no topic sections or refresh bar.
+
+**Scenario:** Given you open a shared article link (`/latest/…`), when the page loads, then that story is on the shell.
+
+**Scenario:** Given single-page mode, when you open the Brief, then you see the shell’s plain list at `/`.
 
 **Scenario:** Given a topic has five kept stories, when you view its section, then three are visible and **More (2)** reveals the other two.
 
@@ -187,7 +191,7 @@ Before the first successful refresh, nothing is hidden as already seen.
 
 ## Refresh
 
-While the server is running, the Brief refreshes on a timer. The bar above the sections shows when it last updated and when the next refresh is due. **Refresh** runs one immediately and reloads the Brief. It needs a sign-in; otherwise the bar says “Log in on Topics to refresh.” While a refresh is running the button says “Refreshing…” and is disabled. A refresh can take minutes. If it fails, the bar says “Refresh failed. Try again.”
+While the server is running, the Brief refreshes on a timer. The bar above the sections shows when it last updated and when the next refresh is due. **Refresh** runs one immediately and reloads the Brief, including the Filtered list when Filtered or All is showing. It needs a sign-in; otherwise the bar says “Log in on Topics to refresh.” While a refresh is running the button says “Refreshing…” and is disabled. A refresh can take minutes. If it fails, the bar says “Refresh failed. Try again.”
 
 The bar links to Filtered out and, beside it, to Feedback. It says **N filtered out** when the last refresh dropped stories, and **Filtered out** otherwise.
 
@@ -199,7 +203,7 @@ The bar also says, in plain language, when a search source failed, when stories 
 
 **Scenario:** Given a refresh is already running, when you press Refresh, then you join that run instead of starting a second one.
 
-**Scenario:** Given you open the Brief, when the page loads, then Approved is selected and you see topic sections, not the Filtered list.
+**Scenario:** Given you open the Brief on the shell at `/`, when the page loads, then Approved is selected and you see topic sections, not the Filtered list.
 
 **Scenario:** Given the last refresh dropped stories, when you choose Filtered, then you see those drops with an advisory reason expander, and topic sections are hidden.
 
@@ -215,7 +219,7 @@ The Brief can keep running while this computer is off. Stories already saved are
 
 **Scenario:** Given the extra search service is not set up, when refresh runs, then new stories still come from Google News.
 
-**Scenario:** Given Tailscale is installed on your laptop or phone and you are on Phil's private network, when you open the always-on copy, then the Brief shows without a password, and refresh, Topics, Filtered out, and other changes ask for the password.
+**Scenario:** Given Tailscale is installed on your laptop or phone and you are on Phil's private network, when you open the always-on copy, then the Brief shows on the shell at `/` without a password, and refresh, Topics, Filtered out, and other changes ask for the password.
 
 **Scenario:** Given you are on the public internet, when you try to open the always-on copy, then it does not open.
 
@@ -244,7 +248,7 @@ Settings → Filters can blur or hide stories on the topic Brief by keyword. Thi
 - **Blur** obscures a matching card until you click it or press Enter on it.
 - **Hide** removes matching cards. Stories from More move up to keep three on screen. A topic left with nothing disappears (it is not listed as quiet). If every story is hidden, the Brief says “Your keyword filters hide every story in your Brief” and links to **Adjust filters**, which opens Settings on the Filters tab.
 
-A match is decided when the Brief loads. A summary or full story that arrives after you open a card does not hide or blur that card. An open card keeps that decision across a reload, including the reload after a refresh. Closing every open card lets those stories be judged again. Changing the filter settings judges again immediately.
+A match is decided when the Brief loads. A summary that arrives after you open a card does not hide or blur that card. An open card keeps that decision across a reload, including the reload after a refresh. Closing every open card lets those stories be judged again. Changing the filter settings judges again immediately.
 
 **Scenario:** Given blur is on and a card matches, when you move to it with the keyboard, then the announcement names the filter words (`Selected story: filtered (matches "…")`) and does not read the title. Enter or o reveals and opens it.
 
@@ -260,11 +264,11 @@ On the Brief, `j` and `k` move through the stories on screen. `G` jumps to the l
 
 The selection stays on the same story when the list changes (for example after Add story, Remove, or a reload) and clears if that story is gone. Nothing is announced for a selection you did not make.
 
-**Scenario:** Given you opened a shared link and the story is on the Brief, when you view it, then the title is plain text, not an expand button. `j` and `k` select nothing, so Enter, o, and x do not collapse that story. **View latest stories** brings the normal shortcuts back.
+**Scenario:** Given you open a shared link (`/latest/…`) and the story is on the Brief, when you view it on the shell, then the title is plain text, not an expand button. A keyword filter can still blur that story. Citation marks still show on that card once it is not blurred. `j` and `k` select nothing, so Enter, o, and x do not collapse that story. **View latest stories** brings the normal shortcuts back.
 
-**Scenario:** Given you opened a shared link and the story cannot be found, when the page loads, then you see the normal Brief, a notice that the shared story could not be found, and the address no longer says you are in the shared view.
+**Scenario:** Given you open a shared link (`/latest/…`) and the story cannot be found, when the page loads, then you see the normal Brief on the shell at `/`, a notice that the shared story could not be found, and the address no longer says you are in the shared view.
 
-**Scenario:** Given you choose View latest stories and then open that same shared link again, when the page handles it, then the shared story is followed again.
+**Scenario:** Given you choose View latest stories and then open that same shared link (`/latest/…`) again, when the page handles it, then the shared story is followed again on the shell.
 
 ## About and Transparency
 
@@ -276,8 +280,8 @@ The footer also links to Topics. The old Radar link is gone.
 
 ## Shell
 
-There is also a shell page at `/shell`. It is not the Brief. It links back to the Brief. It has no Map tab and no Signals tab. A deeper page at `/shell/deep` stays on that page when you reload it.
+The Brief at `/` is the shell. `/shell` is still a placeholder, not that Brief. It links back to the Brief at `/`. It has no Map tab and no Signals tab. A deeper page at `/shell/deep` stays on that page when you reload it.
 
-**Scenario:** Given you open `/shell`, when the page loads, then you see the shell and a link to the Brief, and you do not see a Map or Signals tab.
+**Scenario:** Given you open `/shell`, when the page loads, then you see the placeholder and a link to the Brief at `/`, and you do not see a Map or Signals tab.
 
 **Scenario:** Given you open `/shell/deep`, when you reload, then you are still on that shell page.

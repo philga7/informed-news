@@ -81,7 +81,7 @@ Seeds saved before NEWS-98 have no topic and stay out of the topic Brief. The ol
 
 ## Seen stories
 
-A story counts as **seen** when you open it or mark it read in the Brief (including **Mark all as read**). Kite sends seen marks to the server in batches about a second later, and right away when you leave the tab. Seen marks need a login; without one they are silently skipped.
+A story counts as **seen** when you open it or mark it read in the Brief (including **Mark all as read**). The Brief sends seen marks to the server in batches about a second later, and right away when you leave the tab or press Refresh. Seen marks need a login; without one they are silently skipped. On the image and the hermetic stack that Brief is the shell at `/`. `npm run dev` still serves Kite at `/`, and Kite does not full-page-load `/` unless `PUBLIC_SHELL_OWNS_BRIEF=1`.
 
 - A seen story stays on the page (read styling) until the next successful refresh. After that refresh it is hidden. A story read while a refresh is running hides after the following refresh.
 - It comes back if it is **significantly updated** since you saw it: at least **2 more outlets**, or significance up by at least **0.5**. Seeing it again takes a fresh snapshot.
@@ -128,7 +128,7 @@ In `mvp/.env` (see `mvp/.env.example`):
 
 Other limits are constants in `mvp/server/src/services/briefConfig.ts` (top 3, 8 links, update thresholds, 7-day seen retention, 7-day summary / full-story retention, summary lengths, concurrency, 30/hour on-demand summaries, 20/hour on-demand full stories, refresh check and retry minutes).
 
-`npm run test:e2e:kite` and the Kite integration suite (`bun run test:integration` in `apps/kite`) start their own stack via `e2e/stack/start.mjs`: mvp/server + Kite on separate ports (e2e: Kite 5174 / API 3101; integration: 5175 / 3102), a fresh temp data dir seeded with a fixed topic Brief and a last triage run with dropped stories for the Filtered out view (`e2e/stack/scenarios.mjs`), a local fixture page for the Add story scrape (API port + 100: 3201 / 3202), and a generated env file in place of `mvp/.env` (auto-refresh off, no Ollama / TypeSafe keys, test-only password). They never reuse your dev server or read `mvp/data`, so nothing is skipped for lack of local stories and no budget is spent. The server hooks are `MVP_DATA_DIR` (store directory; process env only) and `MVP_ENV_FILE` (env file instead of `mvp/.env`).
+`npm run test:e2e:kite` and the Kite integration suite (`bun run test:integration` in `apps/kite`) start their own stack via `e2e/stack/start.mjs`: the public port (e2e 5174, integration 5175) proxies to Express (3101 / 3102), which serves the shell Brief at `/` and Kite elsewhere. The stack uses a fresh temp data dir seeded with a fixed topic Brief and a last triage run with dropped stories for the Filtered out view (`e2e/stack/scenarios.mjs`), a local fixture page for the Add story scrape (API port + 100: 3201 / 3202), and a generated env file in place of `mvp/.env` (auto-refresh off, no Ollama / TypeSafe keys, test-only password). They never reuse your dev server or read `mvp/data`, so nothing is skipped for lack of local stories and no budget is spent. The server hooks are `MVP_DATA_DIR` (store directory; process env only), `MVP_ENV_FILE` (env file instead of `mvp/.env`), `WEB_BUILD_DIR`, and `KITE_BUILD_DIR` (each app is built when its `handler.js` is missing).
 
 ## What's stored where
 

@@ -2,6 +2,22 @@
 
 Binding choices for Informed News. Newest first. When one of these changes, update this file in the same change as [ROADMAP.md](ROADMAP.md) and Jira. What the product does now, in plain language, is [PRODUCT_SPEC.md](PRODUCT_SPEC.md). Pipeline detail remains in [NEWS-84](https://informedcrew.atlassian.net/browse/NEWS-84), [TRIAGE.md](TRIAGE.md), and [BRIEF.md](BRIEF.md). The target is [VISION.md](VISION.md).
 
+## 2026-11-07 — Brief at / is the shell (NEWS-200)
+
+**Decision:** The three grill answers for the Brief cutover are adopted. Kite Brief code stays in the repo until [NEWS-202](https://informedcrew.atlassian.net/browse/NEWS-202) and [NEWS-203](https://informedcrew.atlassian.net/browse/NEWS-203).
+
+1. **Brief path.** The Brief path is the SPA at `/`. `/latest/…` shared URLs are that same shell. `/shell` stays the placeholder.
+2. **Full page load.** Leftover Kite links to Brief URLs are a full page load. Do not teach the Kite router that `/shell` is a batch id.
+3. **Parity.** The parity source is the kite-smoke describes: Topic Brief, verdict view, shared links, keyboard, and blur/filter.
+
+The acceptance is kite-smoke parity for keyboard, filters, shared links, the verdict view, blur, and the ported leaves, and it also keeps the reader behaviors already described for the served Brief: on-demand full stories, saved seen marks (including **Mark all as read**), links from a card to its articles, and the last-updated and next-refresh clock. `npm run dev` still serves Kite at `/` only because `WEB_BUILD_DIR` is unset. The image serves those behaviors on the shell.
+
+`npm run dev` is still the server plus Kite vite, because `WEB_BUILD_DIR` is unset there, so local vite still serves Kite at `/` and Kite keeps client-side navigation. Kite full-page-loads `/` and `/latest/…` only when `PUBLIC_SHELL_OWNS_BRIEF=1`, which the image and the hermetic stack set together with `WEB_BUILD_DIR`. There, `/` and `/latest/…` are the shell Brief. Other pages (`/topics`, `/transparency`, `/filtered`, `/feedback`, `/contribute`, `/radar`, and dated batch paths) stay on Kite.
+
+**Why:** The served app should open the shell Brief at `/` with the same topic sections, keyboard, filters, and shared links, without deleting Kite or changing the local dev entry.
+
+**What it rules out:** Teaching the Kite router that `/shell` is a batch id, deleting Kite Brief code in this change, changing the `npm run dev` scripts, marking [NEWS-200](https://informedcrew.atlassian.net/browse/NEWS-200) Done before merge, and starting [NEWS-201](https://informedcrew.atlassian.net/browse/NEWS-201), [NEWS-202](https://informedcrew.atlassian.net/browse/NEWS-202), or [NEWS-203](https://informedcrew.atlassian.net/browse/NEWS-203).
+
 ## 2026-11-05 — SPA Brief foundation harness and express.json on /api (NEWS-194)
 
 **Decision:** Phil authorized the Nov 5 launch prompt after work hours and was not in the implementation session. Each grill answer is the prompt's recommended answer.
