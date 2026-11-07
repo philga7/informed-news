@@ -44,6 +44,18 @@ export const BRIEF_FULL_STORY_UNAVAILABLE = 'Full story unavailable — no reada
 
 export const BRIEF_FULL_STORY_LOADING = 'Loading full story…';
 
+export const BRIEF_FULL_STORY_LOGIN_HINT = 'Log in on Topics to load full stories';
+
+export const BRIEF_FULL_STORY_ERROR = 'Full story could not be loaded right now.';
+
+export const BRIEF_FULL_STORY_RATE_LIMITED = 'Full story limit reached for this hour. Try again later.';
+
+export const BRIEF_FULL_STORY_NOT_IN_BRIEF = 'This story is no longer in the Brief.';
+
+export const BRIEF_NOT_REFRESHED = 'Not refreshed yet';
+
+export const BRIEF_SEEN_DEBOUNCE_MS = 1000;
+
 /** Kite content-filter localStorage key. */
 export const CONTENT_FILTER_STORAGE_KEY = 'kite-content-filter';
 
@@ -70,12 +82,18 @@ export type FullStoryStatus = 'missing' | 'ok' | 'unavailable' | 'error';
 
 export type StoryPerspective = {
 	text?: string;
-	sources?: { name?: string }[];
+	sources?: { name?: string; url?: string }[];
 };
 
 export type StoryArticle = {
+	title?: string;
 	link?: string;
 	domain?: string;
+};
+
+export type TimelineEvent = {
+	date?: string;
+	content?: string;
 };
 
 export type StoryDomain = {
@@ -91,7 +109,12 @@ export type Story = {
 	short_summary?: string;
 	articles?: StoryArticle[];
 	domains?: StoryDomain[];
+	talking_points?: string[];
+	timeline?: TimelineEvent[] | null;
 	perspectives?: StoryPerspective[] | null;
+	quote?: string | null;
+	quote_author?: string | null;
+	informed_full_story_updated?: string;
 	informed_article_id?: string;
 	informed_topic_id?: string;
 	informed_topic_name?: string;
@@ -516,4 +539,154 @@ export function fullStoryLine(story: Story): { kind: 'unavailable'; text: string
 			return _exhaustive;
 		}
 	}
+}
+
+export type BriefRefreshClock = {
+	lastSuccess: { completedAt: string } | null;
+	nextAt: string | null;
+};
+
+export type FullStoryPayload = {
+	status: FullStoryStatus;
+	changeSummary?: string;
+	talking_points?: string[];
+	timeline?: TimelineEvent[] | null;
+	perspectives?: StoryPerspective[] | null;
+	quote?: string | null;
+	quote_author?: string | null;
+};
+
+/** "just now" / "5 min ago" / "3 h ago" / "2 d ago". */
+export function formatTimeAgoShort(iso: string, now: Date): string | null {
+	const at = Date.parse(iso);
+	if (Number.isNaN(at)) return null;
+	const minutes = Math.floor((now.getTime() - at) / 60_000);
+	if (minutes < 1) return 'just now';
+	if (minutes < 60) return `${minutes} min ago`;
+	const hours = Math.floor(minutes / 60);
+	if (hours < 24) return `${hours} h ago`;
+	return `${Math.floor(hours / 24)} d ago`;
+}
+
+export function updatedLabel(refresh: BriefRefreshClock | null, now: Date): string {
+	const ago = refresh?.lastSuccess?.completedAt
+		? formatTimeAgoShort(refresh.lastSuccess.completedAt, now)
+		: null;
+	return ago ? `Updated ${ago}` : BRIEF_NOT_REFRESHED;
+}
+
+export function nextRefreshLabel(nextAt: string | null | undefined, now: Date): string | null {
+	if (!nextAt) return null;
+	const at = Date.parse(nextAt);
+	if (Number.isNaN(at)) return null;
+	if (at <= now.getTime()) return 'Next refresh due now';
+	const time = new Date(at).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+	return `Next refresh ${time}`;
+}
+
+/** http(s) article links shown on a card. */
+export function articleLinks(story: Story): { href: string; label: string }[] {
+	const links: { href: string; label: string }[] = [];
+	for (const article of story.articles ?? []) {
+		const href = article.link?.trim() ?? '';
+		if (!href.startsWith('http://') && !href.startsWith('https://')) continue;
+		let host = '';
+		try {
+			host = new URL(href).host.replace(/^www\./, '');
+		} catch {
+			host = '';
+		}
+		const label = article.domain?.trim() || host || href;
+		links.push({ href, label });
+	}
+	return links;
+}
+
+export function newlyExpandedKeys(
+	prev: Record<string, boolean>,
+	next: Record<string, boolean>,
+): string[] {
+	return Object.keys(next).filter((key) => next[key] && !prev[key]);
+}
+
+/** Full stories are on-demand work: only a single newly opened card auto-loads one. */
+export function autoFullStoryRequestKeys(newlyExpanded: readonly string[]): readonly string[] {
+	return newlyExpanded.length === 1 ? newlyExpanded : [];
+}
+
+export function shouldRequestFullStory(story: Story): boolean {
+	return story.informed_full_story_status === 'missing' || story.informed_full_story_status === 'error';
+}
+
+export function applyFullStory<T extends Story>(story: T, fullStory: FullStoryPayload): T {
+	const next: T = { ...story };
+	if (fullStory.talking_points !== undefined) next.talking_points = fullStory.talking_points;
+	if (fullStory.timeline !== undefined) next.timeline = fullStory.timeline;
+	if (fullStory.perspectives !== undefined) next.perspectives = fullStory.perspectives;
+	if (fullStory.quote !== undefined) next.quote = fullStory.quote;
+	if (fullStory.quote_author !== undefined) next.quote_author = fullStory.quote_author;
+	next.informed_full_story_status = fullStory.status;
+	if (typeof fullStory.changeSummary === 'string' && fullStory.changeSummary.trim()) {
+		next.informed_full_story_updated = fullStory.changeSummary.trim();
+	}
+	return next;
+}
+
+export function fullStoryErrorCopy(status: number, error: string | undefined): string {
+	if (status === 429 || error === 'rate_limited') return BRIEF_FULL_STORY_RATE_LIMITED;
+	if (error === 'not_in_brief') return BRIEF_FULL_STORY_NOT_IN_BRIEF;
+	return BRIEF_FULL_STORY_ERROR;
+}
+
+export type SeenBatcher = {
+	add(ids: string[]): void;
+	flush(): Promise<void>;
+};
+
+/** Debounced seen marks. Each id is posted at most once. Failures are dropped. */
+export function createSeenBatcher(options: {
+	post: (ids: string[]) => Promise<unknown>;
+	delayMs?: number;
+	setTimer?: (fn: () => void, ms: number) => unknown;
+	clearTimer?: (handle: unknown) => void;
+}): SeenBatcher {
+	const delayMs = options.delayMs ?? BRIEF_SEEN_DEBOUNCE_MS;
+	const setTimer = options.setTimer ?? ((fn, ms) => setTimeout(fn, ms));
+	const clearTimer =
+		options.clearTimer ?? ((handle) => clearTimeout(handle as ReturnType<typeof setTimeout>));
+	const sent = new Set<string>();
+	let pending: string[] = [];
+	let timer: unknown = null;
+
+	async function flush(): Promise<void> {
+		if (timer !== null) {
+			clearTimer(timer);
+			timer = null;
+		}
+		const ids = pending;
+		pending = [];
+		if (ids.length === 0) return;
+		try {
+			await options.post(ids);
+		} catch {
+			// Seen marks are best-effort.
+		}
+	}
+
+	return {
+		add(ids) {
+			for (const id of ids) {
+				if (!id || sent.has(id)) continue;
+				sent.add(id);
+				pending.push(id);
+			}
+			if (pending.length === 0) return;
+			if (timer !== null) clearTimer(timer);
+			timer = setTimer(() => {
+				timer = null;
+				void flush();
+			}, delayMs);
+		},
+		flush,
+	};
 }

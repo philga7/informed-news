@@ -8,7 +8,7 @@ The home page is the Brief, on the shell at `/`. Shared story links are `/latest
 
 ## Sign in
 
-Topics is the sign-in screen. The password field is labeled “MVP password.” Signing in is what unlocks refresh, filtered-out stories, Feedback, adding or removing a story, “Less like this,” and on-demand summaries. You can read a Brief that is already loaded without signing in. Marking a story read on the shell stays on this page and is not remembered. **Log out** is on the Topics page.
+Topics is the sign-in screen. The password field is labeled “MVP password.” Signing in is what unlocks refresh, filtered-out stories, Feedback, adding or removing a story, “Less like this,” on-demand summaries, on-demand full stories, and remembering what you have read. You can read a Brief that is already loaded without signing in. **Log out** is on the Topics page.
 
 **Scenario:** Given you are not signed in, when you open Topics, then you see a sign-in form and no topic list.
 
@@ -66,7 +66,7 @@ Stories are from about the last two days. Older ones drop off.
 
 ## Story cards and summaries
 
-A card shows the headline and a short summary. It does not link to the articles. When more than one outlet ran the story, the card says `+N outlets` (N is the extra outlets). An official or primary statement can show an **Official statement** badge. Opening the card shows talking points already saved on that story.
+A card shows the headline, a short summary, and links to the articles. When more than one outlet ran the story, the card says `+N outlets` (N is the extra outlets). An official or primary statement can show an **Official statement** badge.
 
 The summary is one or two neutral sentences written from the story’s own text. It is labeled **AI summary — not ground truth**. It is not a verdict, a trust score, or a claim that the story is true.
 
@@ -82,11 +82,13 @@ Summaries for the top stories in each section are prepared during refresh. The r
 
 ## Full stories
 
-Opening a card on the shell does not fetch a full story. The card does not say “Loading full story…”. It does not show a timeline, perspectives, a pull quote, or **Updated:**.
+Every topic Brief card can open a **Full story**. Opening the card loads it when it is not already saved. While it loads, the card says “Loading full story…”. You must be signed in; otherwise the card links to Topics.
 
-Talking points already saved on the story appear when you open the card. When those points are present, the card says **AI-assisted — not ground truth.** If the story was saved with no readable text for a full story, the open card says “Full story unavailable — no readable text.”
+A full story can include talking points, a timeline, and questions about what to verify or what is still unknown. When the articles support them, it can also show perspectives and a pull quote. If the topic asked for them, it can add a business angle, technical details, practical follow-ups, or history. Empty sections are left out. No map is shown. Generated sections are labeled **AI-assisted — not ground truth.**
 
-Links, quoted lines, and link-backed claims on a card are checked against sources fetched for that run. A link or quote that does not match a fetched source stays on the card and shows as **Unverified** (advisory). A claim that would have been called “debunked” without a linked refuting source among those fetched sources shows as **Unconfirmed** (advisory) — not a verified, false, or debunked badge. Items that match a fetched source show no mark. The marks are keyboard-reachable and polite for screen readers. Failed checks never stop a refresh.
+When the underlying articles change in a meaningful way, an updated full story can show **Updated: …**.
+
+Links, quoted lines, and link-backed claims on a card or full story are checked against sources fetched for that run. A link or quote that does not match a fetched source stays on the card and shows as **Unverified** (advisory). A claim that would have been called “debunked” without a linked refuting source among those fetched sources shows as **Unconfirmed** (advisory) — not a verified, false, or debunked badge. Items that match a fetched source show no mark. The marks are keyboard-reachable and polite for screen readers. Failed checks never stop a refresh.
 
 **Scenario:** Given a quote or link on a card matches a source fetched that run, when you view the card, then no unverified mark appears for that item.
 
@@ -104,7 +106,13 @@ Links, quoted lines, and link-backed claims on a card are checked against source
 
 **Scenario:** Given a citation mark no longer applies after a later check, when you view the card, then the old mark is gone.
 
-**Scenario:** Given the story has no readable text for a full story, when you open the card, then it says “Full story unavailable — no readable text.”
+**Scenario:** Given you are signed in and the story has readable text, when you open the card, then the full story loads and a later visit reuses it while the text is unchanged.
+
+**Scenario:** Given the story has no readable text, when you open the card, then it says “Full story unavailable — no readable text.”
+
+**Scenario:** Given too many on-demand full stories have been requested this hour, when you open another one, then the card says the full story limit for this hour has been reached.
+
+A few strong stories may get a full story during refresh (important stories, with several outlets or an official label). The others wait until you open them.
 
 ## Add a story and remove it
 
@@ -112,7 +120,7 @@ Links, quoted lines, and link-backed claims on a card are checked against source
 
 The form asks for a title, one desired topic (Core, then Watch; nothing is pre-selected), an optional note, and at least one http(s) URL. **Add to Brief** saves it and reloads the Brief.
 
-The saved story is pinned at the top of that topic, with an **Added by you** badge. It follows the same two-day window, mutes, and summaries as other stories. An expanded card for it offers **Remove** instead of Less like this. Remove deletes it from the Brief immediately. It does not appear under Filtered out.
+The saved story is pinned at the top of that topic, with an **Added by you** badge. It follows the same two-day window, mutes, summaries, and full stories as other stories. An expanded card for it offers **Remove** instead of Less like this. Remove deletes it from the Brief immediately. It does not appear under Filtered out.
 
 **Scenario:** Given you have no desired topics, when you open Add story, then it says “Add a desired topic first” and links to Topics.
 
@@ -169,17 +177,21 @@ When an advisory reason cites one of these entries, that citation is a link to t
 
 **Scenario:** Given you deleted that entry, when you open the same reason, then the reason text is still there and the citation says “feedback removed”.
 
-## Read
+## Read and seen
 
-You can mark a story read on this page. The control says **Mark as read**, and **Mark as unread** after that. `m` does the same for the selected story. The mark lasts until you leave the page. The shell does not send it anywhere. There is no **Mark all as read**. Opening a story does not mark it read, and a later refresh does not hide the story because of that mark.
+You can mark a story read, or use **Mark all as read**. Opening a story counts as seeing it.
 
-**Scenario:** Given you mark a story read, when you leave the page and come back, then the mark is gone and the story is still listed.
+**Scenario:** Given you are signed in, when you open a story or mark it read, then it stays on the page until the next successful refresh. After that refresh it is hidden.
 
-**Scenario:** Given you are viewing a shared story, when you look at the card, then it has no read toggle.
+**Scenario:** Given a hidden story later gains clearly more coverage (more outlets, or it is judged more significant) since you saw it, when the Brief reloads, then it can show again.
+
+**Scenario:** Given you are not signed in, when you mark stories read, then that is not remembered for the next refresh.
+
+Before the first successful refresh, nothing is hidden as already seen.
 
 ## Refresh
 
-While the server is running, the Brief refreshes on a timer. The bar above the sections does not show when it last updated or when the next refresh is due. **Refresh** runs one immediately and reloads the Brief, including the Filtered list when Filtered or All is showing. It needs a sign-in; otherwise the bar says “Log in on Topics to refresh.” While a refresh is running the button says “Refreshing…” and is disabled. A refresh can take minutes. If it fails, the bar says “Refresh failed.”
+While the server is running, the Brief refreshes on a timer. The bar above the sections shows when it last updated and when the next refresh is due. **Refresh** runs one immediately and reloads the Brief, including the Filtered list when Filtered or All is showing. It needs a sign-in; otherwise the bar says “Log in on Topics to refresh.” While a refresh is running the button says “Refreshing…” and is disabled. A refresh can take minutes. If it fails, the bar says “Refresh failed. Try again.”
 
 The bar links to Filtered out and, beside it, to Feedback. It says **N filtered out** when the last refresh dropped stories, and **Filtered out** otherwise.
 

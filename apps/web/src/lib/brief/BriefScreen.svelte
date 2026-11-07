@@ -4,25 +4,33 @@
 	import { page } from '$app/state';
 	import { onMount, untrack } from 'svelte';
 	import {
+		applyFullStory,
+		autoFullStoryRequestKeys,
 		BRIEF_ALL_FILTERED,
 		BRIEF_LESS_LABEL,
 		BRIEF_LEVEL_LABEL,
 		BRIEF_STORIES_SECTION_TITLE,
 		decideTopicBriefFilterMatches,
 		filteredCountLabel,
+		createSeenBatcher,
+		fullStoryErrorCopy,
 		groupTopicBrief,
 		hideFilteredStories,
 		isTopicBriefStory,
 		loadContentFilter,
 		moreLabel,
+		newlyExpandedKeys,
 		openKeysForFilterDecision,
+		nextRefreshLabel,
 		quietLine,
 		SHARED_STORY_NOT_FOUND,
 		shouldFilterStory,
+		shouldRequestFullStory,
 		storyKey,
 		storyKeys,
 		survivingExpandedStories,
 		toggleExpandAllKeys,
+		updatedLabel,
 		type ContentFilterSettings,
 	} from './assemble';
 	import {
@@ -31,6 +39,8 @@
 		fetchSeedTopics,
 		filteredOutLinkLabel,
 		loadBrief,
+		postBriefSeen,
+		postFullStory,
 		postRefresh,
 		postSeed,
 		postSummary,
@@ -85,6 +95,13 @@
 	let expandedStories = $state<Record<string, boolean>>({});
 	let readStories = $state<Record<string, boolean>>({});
 	let summaryRequests = $state<Record<string, 'loading' | 'login' | 'error'>>({});
+	let fullStoryRequests = $state<
+		Record<string, { phase: 'loading' | 'login' | 'error'; message?: string }>
+	>({});
+	let clockNow = $state(new Date());
+	const seen = createSeenBatcher({ post: (ids) => postBriefSeen(ids) });
+	const fullStarted = new Set<string>();
+	let previousExpanded: Record<string, boolean> = {};
 	let openMore = $state<Record<string, boolean>>({});
 	let revealed = $state<Set<string>>(new Set());
 	let matchByKey = $state<Record<string, string[]>>({});
@@ -156,6 +173,7 @@
 		if (showTopics) return showsApproved(verdictView) ? visibleTopicStories : [];
 		return flatShown;
 	});
+	const hasUnread = $derived(renderedStories.some((story) => story.id && !readStories[story.id]));
 	const keyboardOrder = $derived(
 		renderedStories.flatMap((story) => {
 			const index = stories.indexOf(story);
@@ -270,7 +288,21 @@
 
 	function toggleRead(story: BriefStory | undefined): void {
 		if (!story?.id) return;
-		readStories = { ...readStories, [story.id]: !readStories[story.id] };
+		const next = !readStories[story.id];
+		readStories = { ...readStories, [story.id]: next };
+		if (next) seen.add([story.id]);
+	}
+
+	function markAllRead(): void {
+		const ids: string[] = [];
+		const next = { ...readStories };
+		for (const story of renderedStories) {
+			if (!story.id || next[story.id]) continue;
+			next[story.id] = true;
+			ids.push(story.id);
+		}
+		readStories = next;
+		if (ids.length > 0) seen.add(ids);
 	}
 
 	function removeStory(story: BriefStory): void {
@@ -478,6 +510,7 @@
 		if (refreshing) return;
 		refreshing = true;
 		refreshMessage = null;
+		await seen.flush();
 		const result = await postRefresh();
 		if (!result.ok) {
 			refreshing = false;
@@ -549,6 +582,31 @@
 		});
 	}
 
+	async function requestFullStory(story: BriefStory): Promise<void> {
+		const id = story.id;
+		if (!id || !shouldRequestFullStory(story) || fullStarted.has(id)) return;
+		fullStarted.add(id);
+		fullStoryRequests = { ...fullStoryRequests, [id]: { phase: 'loading' } };
+		const result = await postFullStory(id);
+		if (!result.ok) {
+			fullStoryRequests = {
+				...fullStoryRequests,
+				[id]: result.unauthenticated
+					? { phase: 'login' }
+					: { phase: 'error', message: fullStoryErrorCopy(result.status, result.error) },
+			};
+			if (!result.unauthenticated) {
+				stories = stories.map((item) =>
+					item.id === id ? { ...item, informed_full_story_status: 'error' } : item,
+				);
+			}
+			return;
+		}
+		const { [id]: _done, ...rest } = fullStoryRequests;
+		fullStoryRequests = rest;
+		stories = stories.map((item) => (item.id === id ? applyFullStory(item, result.fullStory) : item));
+	}
+
 	$effect(() => {
 		const settings = contentFilter;
 		const current = stories;
@@ -614,6 +672,36 @@
 			requestedSummaries.add(id);
 			void requestSummary(id);
 		}
+	});
+
+	$effect(() => {
+		const current = { ...expandedStories };
+		const opened = newlyExpandedKeys(previousExpanded, current);
+		previousExpanded = current;
+		if (!loaded || opened.length === 0) return;
+		const fullKeys = new Set(autoFullStoryRequestKeys(opened));
+		untrack(() => {
+			const ids: string[] = [];
+			for (const key of opened) {
+				const story = stories.find((item) => storyKey(item) === key);
+				if (!story?.id || !isTopicBriefStory(story)) continue;
+				ids.push(story.id);
+				if (fullKeys.has(key)) {
+					if (story.informed_full_story_status === 'error') fullStarted.delete(story.id);
+					void requestFullStory(story);
+				}
+			}
+			if (ids.length > 0) seen.add(ids);
+		});
+	});
+
+	$effect(() => {
+		const story = sharedStory;
+		if (!story?.id || !loaded) return;
+		untrack(() => {
+			seen.add([story.id as string]);
+			void requestFullStory(story);
+		});
 	});
 
 	$effect(() => {
@@ -699,10 +787,15 @@
 		const onHash = () => applyHash();
 		window.addEventListener('hashchange', onHash);
 		window.addEventListener('keydown', onKeyDown);
+		const clock = window.setInterval(() => {
+			clockNow = new Date();
+		}, 30_000);
 		void reload();
 		return () => {
 			window.removeEventListener('hashchange', onHash);
 			window.removeEventListener('keydown', onKeyDown);
+			window.clearInterval(clock);
+			void seen.flush();
 		};
 	});
 </script>
@@ -720,6 +813,7 @@
 		shared={sharedActive}
 		read={Boolean(story.id && readStories[story.id])}
 		summaryPhase={story.id ? summaryRequests[story.id] : undefined}
+		fullPhase={story.id ? fullStoryRequests[story.id] : undefined}
 		onToggle={() => toggleStory(story)}
 		onReveal={() => revealStory(story)}
 		onReadToggle={() => toggleRead(story)}
@@ -767,6 +861,10 @@
 		</section>
 		<div data-testid="brief-refresh-bar">
 			<p class="bar-links">
+				<span>{updatedLabel(overview.refresh, clockNow)}</span>
+				{#if nextRefreshLabel(overview.refresh?.nextAt, clockNow)}
+					<span>{nextRefreshLabel(overview.refresh?.nextAt, clockNow)}</span>
+				{/if}
 				<a href="/filtered" data-testid="brief-filtered-link">{filteredOutLinkLabel(overview.filteredOut)}</a>
 				<a href="/feedback" data-testid="brief-feedback-link">Feedback</a>
 			</p>
@@ -854,6 +952,9 @@
 			{#if quiet}
 				<p data-testid="topic-brief-quiet">{quiet}</p>
 			{/if}
+			{#if hasUnread}
+				<button type="button" onclick={markAllRead}>Mark all as read</button>
+			{/if}
 		{/if}
 
 		{#if showsFiltered(verdictView)}
@@ -873,6 +974,9 @@
 		{/each}
 		{#if flatHiddenCount > 0}
 			<p>{filteredCountLabel(contentFilter.filterMode, flatHiddenCount)}</p>
+		{/if}
+		{#if hasUnread}
+			<button type="button" onclick={markAllRead}>Mark all as read</button>
 		{/if}
 	{/if}
 

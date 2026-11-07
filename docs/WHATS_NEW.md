@@ -8,7 +8,7 @@ This is not the release log. Releases are recorded in `CHANGELOG.md` by semantic
 
 ## 2026-11-07
 
-The Brief at `/` is the shell. It has the same topic sections, keyboard, filters, and shared links.
+The Brief at `/` is the shell. It has the same topic sections, keyboard, filters, and shared links, including full stories, saved read marks, article links, and the refresh clock.
 
 ## 2026-11-05
 

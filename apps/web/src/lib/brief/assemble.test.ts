@@ -22,6 +22,13 @@ import {
 	decideTopicBriefFilterMatches,
 	filteredCountLabel,
 	fullStoryLine,
+	applyFullStory,
+	articleLinks,
+	autoFullStoryRequestKeys,
+	createSeenBatcher,
+	nextRefreshLabel,
+	shouldRequestFullStory,
+	updatedLabel,
 	groupTopicBrief,
 	hideFilteredStories,
 	isManualSeedStory,
@@ -551,5 +558,58 @@ describe('card copy helpers', () => {
 		expect(BRIEF_SUMMARY_LOGIN_HINT).toBe('Log in on Topics to load summaries');
 		expect(BRIEF_SUMMARY_ERROR).toBe('Summary could not be loaded right now.');
 		expect(BRIEF_FULL_STORY_LOADING).toBe('Loading full story…');
+	});
+
+	it('keeps full story, source links, seen marks, and the refresh clock', async () => {
+		const now = new Date('2026-11-07T15:00:00.000Z');
+		expect(
+			updatedLabel({ lastSuccess: { completedAt: '2026-11-07T14:55:00.000Z' }, nextAt: null }, now),
+		).toBe('Updated 5 min ago');
+		expect(updatedLabel(null, now)).toBe('Not refreshed yet');
+		expect(nextRefreshLabel('2026-11-07T14:00:00.000Z', now)).toBe('Next refresh due now');
+		expect(nextRefreshLabel(null, now)).toBeNull();
+
+		expect(articleLinks(makeStory('a', { articles: [{ link: 'https://example.com/a', domain: 'example.com', title: 'Piece' }, { link: 'notaurl' }] }))).toEqual([
+			{ href: 'https://example.com/a', label: 'example.com' },
+		]);
+
+		const story = makeStory('a', { informed_full_story_status: 'missing' });
+		expect(shouldRequestFullStory(story)).toBe(true);
+		expect(autoFullStoryRequestKeys(['only'])).toEqual(['only']);
+		expect(autoFullStoryRequestKeys(['a', 'b'])).toEqual([]);
+		const filled = applyFullStory(story, {
+			status: 'ok',
+			changeSummary: 'New outlets',
+			timeline: [{ date: 'Monday', content: 'The vote' }],
+			perspectives: [{ text: 'One view' }],
+			quote: 'A line',
+			quote_author: 'A person',
+		});
+		expect(filled.timeline?.[0]?.content).toBe('The vote');
+		expect(filled.perspectives?.[0]?.text).toBe('One view');
+		expect(filled.quote).toBe('A line');
+		expect(filled.informed_full_story_updated).toBe('New outlets');
+		expect(filled.informed_full_story_status).toBe('ok');
+
+		const posted: string[][] = [];
+		const pending: Array<() => void> = [];
+		const batcher = createSeenBatcher({
+			post: async (ids) => {
+				posted.push(ids);
+			},
+			setTimer: (fn) => {
+				pending.push(fn);
+				return pending.length;
+			},
+			clearTimer: () => {},
+		});
+		batcher.add(['a', 'a']);
+		batcher.add(['b']);
+		expect(posted).toEqual([]);
+		await batcher.flush();
+		expect(posted).toEqual([['a', 'b']]);
+		batcher.add(['a']);
+		await batcher.flush();
+		expect(posted).toEqual([['a', 'b']]);
 	});
 });

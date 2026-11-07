@@ -1,10 +1,13 @@
 <script lang="ts">
 	import {
 		BRIEF_ADDED_BY_YOU_LABEL,
+		BRIEF_FULL_STORY_LOADING,
+		BRIEF_FULL_STORY_LOGIN_HINT,
 		BRIEF_OFFICIAL_LABEL,
 		BRIEF_SUMMARY_ERROR,
 		BRIEF_SUMMARY_LOADING,
 		BRIEF_SUMMARY_LOGIN_HINT,
+		articleLinks,
 		fullStoryLine,
 		isManualSeedStory,
 		isOfficialStory,
@@ -34,6 +37,7 @@
 		shared: boolean;
 		read: boolean;
 		summaryPhase?: 'loading' | 'login' | 'error';
+		fullPhase?: { phase: 'loading' | 'login' | 'error'; message?: string };
 		onToggle: () => void;
 		onReveal: () => void;
 		onReadToggle: () => void;
@@ -51,6 +55,7 @@
 		shared,
 		read,
 		summaryPhase,
+		fullPhase,
 		onToggle,
 		onReveal,
 		onReadToggle,
@@ -67,6 +72,7 @@
 	const articleId = $derived(
 		isTopicBriefStory(story) ? (story.informed_article_id ?? null) : null,
 	);
+	const sources = $derived(articleLinks(story));
 	const manual = $derived(isManualSeedStory(story));
 	const official = $derived(isOfficialStory(story));
 	const reason = $derived(story.informed_reason_text?.trim() ?? '');
@@ -148,9 +154,53 @@
 	{:else if line}
 		<p>{line.text}</p>
 	{/if}
+	{#if sources.length > 0}
+		<ul class="article-links">
+			{#each sources as source (source.href)}
+				<li><a href={source.href}>{source.label}</a></li>
+			{/each}
+		</ul>
+	{/if}
 	{#if !blurred}
 		{#if showContent && unavailable}
 			<p>{unavailable.text}</p>
+		{/if}
+		{#if showContent && fullPhase?.phase === 'loading'}
+			<p aria-live="polite">{BRIEF_FULL_STORY_LOADING}</p>
+		{:else if showContent && fullPhase?.phase === 'login'}
+			<p><a href="/topics">{BRIEF_FULL_STORY_LOGIN_HINT}</a></p>
+		{:else if showContent && fullPhase?.phase === 'error'}
+			<p>{fullPhase.message}</p>
+		{/if}
+		{#if showContent && story.informed_full_story_updated}
+			<p>Updated: {story.informed_full_story_updated}</p>
+		{/if}
+		{#if showContent && story.timeline && story.timeline.length > 0}
+			<ul>
+				{#each story.timeline as event, index (key + ':t:' + index)}
+					<li>{event.date ? `${event.date} — ` : ''}{event.content ?? ''}</li>
+				{/each}
+			</ul>
+		{/if}
+		{#if showContent && story.perspectives && story.perspectives.length > 0}
+			<ul>
+				{#each story.perspectives as perspective, index (key + ':p:' + index)}
+					<li>
+						{perspective.text}
+						{#each perspective.sources ?? [] as source (source.url ?? source.name)}
+							{#if source.url?.startsWith('http')}
+								<a href={source.url}>{source.name || source.url}</a>
+							{/if}
+						{/each}
+					</li>
+				{/each}
+			</ul>
+		{/if}
+		{#if showContent && story.quote}
+			<blockquote>
+				<p>{story.quote}</p>
+				{#if story.quote_author}<p>{story.quote_author}</p>{/if}
+			</blockquote>
 		{/if}
 		{#if reason}
 			<VerdictReasonExpander reasonText={reason} criteriaRef={story.informed_criteria_ref ?? null} />

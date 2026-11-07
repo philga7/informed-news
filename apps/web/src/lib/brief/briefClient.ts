@@ -3,12 +3,16 @@
  * (`briefSeed.ts`); no Kite imports.
  */
 
-import type { BriefOverviewSection, Story, TopicBriefLevel } from './assemble';
+import type {
+	BriefOverviewSection,
+	BriefRefreshClock,
+	FullStoryPayload,
+	Story,
+	TopicBriefLevel,
+} from './assemble';
 import type { InformedCitationMark } from './citationMarks';
 
 export type BriefStory = Story & {
-	talking_points?: string[];
-	timeline?: unknown[];
 	suggested_qna?: unknown[];
 	informed_publisher_domain?: string | null;
 	informed_reason_text?: string | null;
@@ -21,6 +25,7 @@ export type TopicOverview = {
 	notices: string[];
 	sections: BriefOverviewSection[];
 	quiet: Array<{ id: string; name: string; level: TopicBriefLevel }>;
+	refresh: BriefRefreshClock | null;
 };
 
 export type LoadedBrief = {
@@ -67,6 +72,10 @@ export type SummaryPostResult =
 	| { ok: true; status: 'unavailable' }
 	| { ok: false; unauthenticated: boolean };
 
+export type FullStoryPostResult =
+	| { ok: true; fullStory: FullStoryPayload }
+	| { ok: false; status: number; error?: string; unauthenticated: boolean };
+
 export const SEED_TITLE_REQUIRED = 'Title is required.';
 export const SEED_TOPIC_REQUIRED = 'Choose a topic.';
 export const SEED_URL_REQUIRED = 'Add at least one URL.';
@@ -76,7 +85,7 @@ export const FILTERED_LOGIN = 'Log in on Topics to see filtered stories';
 export const REFRESH_LABEL = 'Refresh';
 export const REFRESHING_LABEL = 'Refreshing…';
 export const REFRESH_LOGIN = 'Log in on Topics to refresh';
-export const REFRESH_ERROR = 'Refresh failed';
+export const REFRESH_ERROR = 'Refresh failed. Try again.';
 
 const STORY_COUNT_DEFAULT = 12;
 
@@ -188,6 +197,16 @@ function parseStories(body: unknown): BriefStory[] {
 	return stories;
 }
 
+function parseRefresh(value: unknown): BriefRefreshClock | null {
+	if (!isRecord(value)) return null;
+	const lastSuccess = isRecord(value.lastSuccess) ? value.lastSuccess : null;
+	const completedAt =
+		lastSuccess && typeof lastSuccess.completedAt === 'string' ? lastSuccess.completedAt : null;
+	const nextAt = typeof value.nextAt === 'string' ? value.nextAt : null;
+	if (!completedAt && !nextAt) return null;
+	return { lastSuccess: completedAt ? { completedAt } : null, nextAt };
+}
+
 function parseOverview(body: unknown): TopicOverview | null {
 	if (!isRecord(body) || body.ok !== true || body.fixture === true) return null;
 	if (!Array.isArray(body.sections) || !Array.isArray(body.quiet)) return null;
@@ -220,6 +239,7 @@ function parseOverview(body: unknown): TopicOverview | null {
 		notices: stringList(body.notices),
 		sections,
 		quiet,
+		refresh: parseRefresh(body.refresh),
 	};
 }
 
@@ -299,6 +319,50 @@ export async function postSummary(articleId: string): Promise<SummaryPostResult>
 		return { ok: false, unauthenticated: false };
 	} catch {
 		return { ok: false, unauthenticated: false };
+	}
+}
+
+export async function postFullStory(articleId: string): Promise<FullStoryPostResult> {
+	try {
+		const response = await fetch(`/api/brief/stories/${encodeURIComponent(articleId)}/full`, {
+			method: 'POST',
+			credentials: 'include',
+			headers: { 'Content-Type': 'application/json' },
+			body: '{}',
+		});
+		const body = (await response.json().catch(() => null)) as {
+			ok?: unknown;
+			error?: unknown;
+			fullStory?: FullStoryPayload;
+		} | null;
+		if (response.status === 401) return { ok: false, status: 401, unauthenticated: true };
+		const error = typeof body?.error === 'string' ? body.error : undefined;
+		const fullStory = body?.fullStory;
+		if (
+			response.ok &&
+			body?.ok === true &&
+			fullStory &&
+			(fullStory.status === 'ok' || fullStory.status === 'unavailable' || fullStory.status === 'error')
+		) {
+			return { ok: true, fullStory };
+		}
+		return { ok: false, status: response.status, error, unauthenticated: false };
+	} catch {
+		return { ok: false, status: 0, unauthenticated: false };
+	}
+}
+
+export async function postBriefSeen(articleIds: string[]): Promise<void> {
+	if (articleIds.length === 0) return;
+	try {
+		await fetch('/api/brief/seen', {
+			method: 'POST',
+			credentials: 'include',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ articleIds }),
+		});
+	} catch {
+		// Seen marks are best-effort.
 	}
 }
 
