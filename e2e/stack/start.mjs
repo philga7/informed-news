@@ -122,6 +122,8 @@ const api = spawn(path.join(root, 'mvp/server/node_modules/.bin/tsx'), ['src/ind
 		WEB_BUILD_DIR: webBuildDir,
 		KITE_BUILD_DIR: kiteBuildDir,
 		KITE_API_BASE: `http://127.0.0.1:${E2E_API_PORT}/api`,
+		// Kite full-page-loads Brief URLs only when the shell owns them.
+		PUBLIC_SHELL_OWNS_BRIEF: '1',
 	},
 	stdio: 'inherit',
 });

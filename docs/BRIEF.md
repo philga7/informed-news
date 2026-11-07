@@ -81,7 +81,7 @@ Seeds saved before NEWS-98 have no topic and stay out of the topic Brief. The ol
 
 ## Seen stories
 
-A story counts as **seen** when you open it or mark it read in the Brief (including **Mark all as read**). Kite sends seen marks to the server in batches about a second later, and right away when you leave the tab. Seen marks need a login; without one they are silently skipped.
+A story counts as **seen** when you open it or mark it read in the Brief (including **Mark all as read**). The Brief sends seen marks to the server in batches about a second later, and right away when you leave the tab or press Refresh. Seen marks need a login; without one they are silently skipped. On the image and the hermetic stack that Brief is the shell at `/`. `npm run dev` still serves Kite at `/`, and Kite does not full-page-load `/` unless `PUBLIC_SHELL_OWNS_BRIEF=1`.
 
 - A seen story stays on the page (read styling) until the next successful refresh. After that refresh it is hidden. A story read while a refresh is running hides after the following refresh.
 - It comes back if it is **significantly updated** since you saw it: at least **2 more outlets**, or significance up by at least **0.5**. Seeing it again takes a fresh snapshot.

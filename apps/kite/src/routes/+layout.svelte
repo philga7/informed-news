@@ -2,6 +2,7 @@
 import { beforeNavigate } from '$app/navigation';
 import { browser } from '$app/environment';
 import { page } from '$app/state';
+import { env } from '$env/dynamic/public';
 import { isRtlLocale } from '$lib/client/rtl-detection';
 import { syncManager } from '$lib/client/sync-manager';
 import '../app.css';
@@ -16,7 +17,7 @@ import {
 	themeSettings,
 } from '$lib/data/settings.svelte.js';
 import { FEATURES } from '$lib/features';
-import { isShellBriefPath } from '$lib/shellBriefPaths';
+import { shouldReloadForShell } from '$lib/shellBriefPaths';
 import { dataLanguage } from '$lib/stores/dataLanguage.svelte';
 import { experimental } from '$lib/stores/experimental.svelte';
 import { language } from '$lib/stores/language.svelte.js';
@@ -39,7 +40,7 @@ beforeNavigate(({ to, cancel }) => {
 	if (!to) {
 		return;
 	}
-	if (!isShellBriefPath(to.url.pathname)) {
+	if (!shouldReloadForShell(to.url.pathname, env.PUBLIC_SHELL_OWNS_BRIEF === '1')) {
 		return;
 	}
 	cancel();

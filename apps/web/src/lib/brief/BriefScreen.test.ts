@@ -28,6 +28,10 @@ type Overview = {
 		moreIds: string[];
 	}>;
 	quiet: Array<{ id: string; name: string; level: 'core' | 'watch' }>;
+	refresh?: {
+		lastSuccess: { completedAt: string } | null;
+		nextAt: string | null;
+	};
 };
 
 function setPath(path: string): void {
@@ -35,7 +39,7 @@ function setPath(path: string): void {
 	page.url.href = `http://localhost${path}`;
 }
 
-function overview(partial: Pick<Overview, 'sections' | 'quiet'>): Overview {
+function overview(partial: Pick<Overview, 'sections' | 'quiet'> & Partial<Pick<Overview, 'refresh'>>): Overview {
 	return { ok: true, filteredOut: 0, notices: [], ...partial };
 }
 
@@ -67,6 +71,7 @@ function install(options: {
 	stories?: unknown[];
 	brief?: Overview;
 	onSummary?: () => Response | Promise<Response>;
+	onFull?: () => Response | Promise<Response>;
 }) {
 	const stories = options.stories ?? [];
 	const brief =
@@ -84,24 +89,44 @@ function install(options: {
 			quiet: [],
 		});
 	const filteredUrls: string[] = [];
+	const seenBodies: unknown[] = [];
+	const seenIds = new Set<string>();
 	let summaryPosts = 0;
-	const mock = installBriefFetchMock(({ url, method }) => {
+	let fullPosts = 0;
+	let refreshed = false;
+	const mock = installBriefFetchMock(({ url, method, body }) => {
 		if (url === '/api/batches/latest') return jsonResponse(200, { id: 'batch-1' });
 		if (url === '/api/batches/batch-1/categories') {
 			return jsonResponse(200, { categories: [{ id: 'world', categoryName: 'Brief' }] });
 		}
 		if (url.startsWith('/api/batches/batch-1/categories/world/stories')) {
-			return jsonResponse(200, { stories });
+			const visible = refreshed
+				? stories.filter((item) => !seenIds.has((item as { id: string }).id))
+				: stories;
+			return jsonResponse(200, { stories: visible });
 		}
 		if (url === '/api/brief/overview') return jsonResponse(200, brief);
 		if (url.startsWith('/api/triage/filtered')) {
 			filteredUrls.push(url);
 			return jsonResponse(401, { ok: false });
 		}
-		if (url === '/api/fetch' && method === 'POST') return jsonResponse(200, { ok: true });
+		if (url === '/api/brief/seen' && method === 'POST') {
+			seenBodies.push(body);
+			const ids = (body as { articleIds?: string[] } | undefined)?.articleIds ?? [];
+			for (const id of ids) seenIds.add(id);
+			return jsonResponse(200, { ok: true });
+		}
+		if (url === '/api/fetch' && method === 'POST') {
+			refreshed = true;
+			return jsonResponse(200, { ok: true });
+		}
 		if (url.includes('/summary') && method === 'POST') {
 			summaryPosts += 1;
 			return options.onSummary ? options.onSummary() : jsonResponse(401, { ok: false });
+		}
+		if (url.includes('/full') && method === 'POST') {
+			fullPosts += 1;
+			return options.onFull ? options.onFull() : jsonResponse(401, { ok: false });
 		}
 		if (url === '/api/feedback') return jsonResponse(200, { ok: true, entries: [] });
 		return jsonResponse(404, { ok: false });
@@ -109,7 +134,9 @@ function install(options: {
 	return {
 		...mock,
 		filteredUrls,
+		seenBodies,
 		summaryPosts: () => summaryPosts,
+		fullPosts: () => fullPosts,
 	};
 }
 
@@ -235,6 +262,170 @@ describe('BriefScreen shared card', () => {
 		expect(await screen.findByText('Citation checks')).toBeVisible();
 		expect(screen.getByText('Battery storage rises')).toBeVisible();
 		expect(screen.queryByRole('button', { name: 'Battery storage rises' })).not.toBeInTheDocument();
+		mock.restore();
+	});
+});
+
+const fullStory = {
+	status: 'ok' as const,
+	changeSummary: 'New outlets',
+	timeline: [{ date: 'Monday', content: 'The vote' }],
+	perspectives: [{ text: 'One view' }],
+	quote: 'A line',
+	talking_points: ['Stored point'],
+};
+
+describe('BriefScreen full story, seen marks, and refresh clock', () => {
+	it('opening one card fetches the full story and renders its details', async () => {
+		const mock = install({
+			stories: [story({ informed_full_story_status: 'missing', informed_summary_status: 'ok' })],
+			onFull: () => jsonResponse(200, { ok: true, fullStory }),
+		});
+		render(BriefScreen);
+		await fireEvent.click(await screen.findByRole('button', { name: 'Battery storage rises' }));
+		expect(await screen.findByText('Loading full story…')).toBeVisible();
+		expect(await screen.findByText(/The vote/)).toBeVisible();
+		expect(screen.getByText('One view')).toBeVisible();
+		expect(screen.getByText('A line')).toBeVisible();
+		expect(screen.getByText('Updated: New outlets')).toBeVisible();
+		expect(mock.fullPosts()).toBe(1);
+		mock.restore();
+	});
+
+	it('a signed-out full story links to Topics', async () => {
+		const mock = install({
+			stories: [story({ informed_full_story_status: 'missing', informed_summary_status: 'ok' })],
+			onFull: () => jsonResponse(401, { ok: false }),
+		});
+		render(BriefScreen);
+		await fireEvent.click(await screen.findByRole('button', { name: 'Battery storage rises' }));
+		const login = await screen.findByRole('link', { name: 'Log in on Topics to load full stories' });
+		expect(login).toHaveAttribute('href', '/topics');
+		expect(mock.fullPosts()).toBe(1);
+		mock.restore();
+	});
+
+	it('does not fetch a full story when Expand all opens more than one card, matching Kite', async () => {
+		const second = story({
+			id: 'story-2',
+			cluster_number: 2,
+			title: 'Ports stay open',
+			informed_article_id: 'story-2',
+			informed_full_story_status: 'missing',
+			informed_summary_status: 'ok',
+		});
+		const mock = install({
+			stories: [
+				story({ informed_full_story_status: 'missing', informed_summary_status: 'ok' }),
+				second,
+			],
+			onFull: () => jsonResponse(200, { ok: true, fullStory }),
+		});
+		render(BriefScreen);
+		await screen.findByRole('heading', { name: 'Your topics', level: 2 });
+		await fireEvent.doubleClick(screen.getByRole('button', { name: 'Brief' }));
+		expect(screen.getByRole('button', { name: 'Battery storage rises' })).toHaveAttribute(
+			'aria-expanded',
+			'true',
+		);
+		expect(screen.getByRole('button', { name: 'Ports stay open' })).toHaveAttribute(
+			'aria-expanded',
+			'true',
+		);
+		await tick();
+		expect(mock.fullPosts()).toBe(0);
+		mock.restore();
+	});
+
+	it('opening, Mark as read, and Mark all as read each post seen marks', async () => {
+		const second = story({
+			id: 'story-2',
+			cluster_number: 2,
+			title: 'Ports stay open',
+			informed_article_id: 'story-2',
+			informed_summary_status: 'ok',
+		});
+		const third = story({
+			id: 'story-3',
+			cluster_number: 3,
+			title: 'Demand response',
+			informed_article_id: 'story-3',
+			informed_summary_status: 'ok',
+		});
+		const mock = install({
+			stories: [story({ informed_summary_status: 'ok' }), second, third],
+		});
+		render(BriefScreen);
+		await fireEvent.click(await screen.findByRole('button', { name: 'Battery storage rises' }));
+		await vi.waitFor(() => expect(mock.seenBodies).toEqual([{ articleIds: ['story-1'] }]), {
+			timeout: 2500,
+		});
+
+		await fireEvent.click(screen.getAllByRole('button', { name: 'Mark as read' })[1]);
+		await vi.waitFor(
+			() =>
+				expect(mock.seenBodies).toEqual([
+					{ articleIds: ['story-1'] },
+					{ articleIds: ['story-2'] },
+				]),
+			{ timeout: 2500 },
+		);
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Mark all as read' }));
+		await vi.waitFor(
+			() =>
+				expect(mock.seenBodies).toEqual([
+					{ articleIds: ['story-1'] },
+					{ articleIds: ['story-2'] },
+					{ articleIds: ['story-3'] },
+				]),
+			{ timeout: 2500 },
+		);
+		mock.restore();
+	});
+
+	it('hides a seen story after the next refresh returns the server list without it', async () => {
+		const mock = install({
+			stories: [
+				story({ informed_summary_status: 'ok' }),
+				story({
+					id: 'story-2',
+					cluster_number: 2,
+					title: 'Ports stay open',
+					informed_article_id: 'story-2',
+					informed_summary_status: 'ok',
+				}),
+			],
+		});
+		render(BriefScreen);
+		await fireEvent.click(await screen.findByRole('button', { name: 'Battery storage rises' }));
+		await vi.waitFor(() => expect(mock.seenBodies.length).toBe(1), { timeout: 2500 });
+		await fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+		await vi.waitFor(() =>
+			expect(screen.queryByRole('button', { name: 'Battery storage rises' })).not.toBeInTheDocument(),
+		);
+		expect(screen.getByRole('button', { name: 'Ports stay open' })).toBeVisible();
+		mock.restore();
+	});
+
+	it('renders the last-updated and next-refresh clock on the refresh bar', async () => {
+		const now = Date.now();
+		const mock = install({
+			stories: [story({ informed_summary_status: 'ok' })],
+			brief: overview({
+				sections: [
+					{ topicId: 'grid', name: 'Grid', level: 'core', storyIds: ['story-1'], moreIds: [] },
+				],
+				quiet: [],
+				refresh: {
+					lastSuccess: { completedAt: new Date(now - 30_000).toISOString() },
+					nextAt: new Date(now + 3_600_000).toISOString(),
+				},
+			}),
+		});
+		render(BriefScreen);
+		expect(await screen.findByText(/Updated/)).toBeVisible();
+		expect(screen.getByText(/Next refresh/)).toBeVisible();
 		mock.restore();
 	});
 });

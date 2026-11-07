@@ -12,7 +12,7 @@ Binding choices for Informed News. Newest first. When one of these changes, upda
 
 The acceptance is kite-smoke parity for keyboard, filters, shared links, the verdict view, blur, and the ported leaves, and it also keeps the reader behaviors already described for the served Brief: on-demand full stories, saved seen marks (including **Mark all as read**), links from a card to its articles, and the last-updated and next-refresh clock. `npm run dev` still serves Kite at `/` only because `WEB_BUILD_DIR` is unset. The image serves those behaviors on the shell.
 
-`npm run dev` is still the server plus Kite vite, because `WEB_BUILD_DIR` is unset there, so local vite still serves Kite at `/`. The Docker image and the hermetic E2E stack set `WEB_BUILD_DIR`. There, `/` and `/latest/…` are the shell Brief. Other pages (`/topics`, `/transparency`, `/filtered`, `/feedback`, `/contribute`, `/radar`, and dated batch paths) stay on Kite.
+`npm run dev` is still the server plus Kite vite, because `WEB_BUILD_DIR` is unset there, so local vite still serves Kite at `/` and Kite keeps client-side navigation. Kite full-page-loads `/` and `/latest/…` only when `PUBLIC_SHELL_OWNS_BRIEF=1`, which the image and the hermetic stack set together with `WEB_BUILD_DIR`. There, `/` and `/latest/…` are the shell Brief. Other pages (`/topics`, `/transparency`, `/filtered`, `/feedback`, `/contribute`, `/radar`, and dated batch paths) stay on Kite.
 
 **Why:** The served app should open the shell Brief at `/` with the same topic sections, keyboard, filters, and shared links, without deleting Kite or changing the local dev entry.
 
