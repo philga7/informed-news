@@ -349,6 +349,57 @@ describe('BriefScreen full story, seen marks, and refresh clock', () => {
 		mock.restore();
 	});
 
+	it('a card the guard skips shows a load control, not the loading line, and sends no request', async () => {
+		const second = story({
+			id: 'story-2',
+			cluster_number: 2,
+			title: 'Ports stay open',
+			informed_article_id: 'story-2',
+			informed_full_story_status: 'missing',
+			informed_summary_status: 'ok',
+		});
+		const mock = install({
+			stories: [story({ informed_full_story_status: 'missing', informed_summary_status: 'ok' }), second],
+			onFull: () => jsonResponse(200, { ok: true, fullStory }),
+		});
+		render(BriefScreen);
+		await screen.findByRole('heading', { name: 'Your topics', level: 2 });
+		await fireEvent.doubleClick(screen.getByRole('button', { name: 'Brief' }));
+		await tick();
+		expect(mock.fullPosts()).toBe(0);
+		expect(screen.queryByText('Loading full story…')).not.toBeInTheDocument();
+		const loaders = screen.getAllByRole('button', { name: 'Load full story' });
+		expect(loaders).toHaveLength(2);
+		await fireEvent.click(loaders[1]);
+		expect(await screen.findByText(/The vote/)).toBeVisible();
+		expect(mock.fullPosts()).toBe(1);
+		expect(screen.queryByText('Loading full story…')).not.toBeInTheDocument();
+		mock.restore();
+	});
+
+	it('a failed full-story request shows the error and no loading line', async () => {
+		const mock = install({
+			stories: [story({ informed_full_story_status: 'missing', informed_summary_status: 'ok' })],
+			onFull: () => jsonResponse(500, { ok: false }),
+		});
+		render(BriefScreen);
+		await fireEvent.click(await screen.findByRole('button', { name: 'Battery storage rises' }));
+		expect(await screen.findByText('Full story could not be loaded right now.')).toBeVisible();
+		expect(screen.queryByText('Loading full story…')).not.toBeInTheDocument();
+		expect(mock.fullPosts()).toBe(1);
+		mock.restore();
+	});
+
+	it('has exactly one level-1 heading, above the Your topics h2', async () => {
+		const mock = install({ stories: [story({ informed_summary_status: 'ok' })] });
+		render(BriefScreen);
+		await screen.findByRole('heading', { name: 'Your topics', level: 2 });
+		const h1s = screen.getAllByRole('heading', { level: 1 });
+		expect(h1s).toHaveLength(1);
+		expect(h1s[0]).toHaveTextContent('Informed News');
+		mock.restore();
+	});
+
 	it('opening, Mark as read, and Mark all as read each post seen marks', async () => {
 		const second = story({
 			id: 'story-2',

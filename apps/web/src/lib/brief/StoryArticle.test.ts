@@ -35,6 +35,7 @@ describe('StoryArticle reader parity', () => {
 				onToggle: () => {},
 				onReveal: () => {},
 				onReadToggle: () => {},
+				onLoadFull: () => {},
 				onRemoved: () => {},
 			},
 		});
@@ -64,6 +65,7 @@ describe('StoryArticle reader parity', () => {
 				onToggle: () => {},
 				onReveal: () => {},
 				onReadToggle: () => {},
+				onLoadFull: () => {},
 				onRemoved: () => {},
 			},
 		});

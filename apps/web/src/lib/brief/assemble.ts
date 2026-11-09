@@ -42,6 +42,8 @@ export const BRIEF_SUMMARY_ERROR = 'Summary could not be loaded right now.';
 /** Quiet inline copy when full-story generation had no usable source text (NEWS-101). */
 export const BRIEF_FULL_STORY_UNAVAILABLE = 'Full story unavailable — no readable text';
 
+export const BRIEF_FULL_STORY_LOAD = 'Load full story';
+
 export const BRIEF_FULL_STORY_LOADING = 'Loading full story…';
 
 export const BRIEF_FULL_STORY_LOGIN_HINT = 'Log in on Topics to load full stories';

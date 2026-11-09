@@ -619,6 +619,12 @@
 		stories = stories.map((item) => (item.id === id ? applyFullStory(item, result.fullStory) : item));
 	}
 
+	/** Explicit user action for a card the budget guard skipped: one request, this card only. */
+	function loadFullStory(story: BriefStory): void {
+		if (story.id && story.informed_full_story_status === 'error') fullStarted.delete(story.id);
+		void requestFullStory(story);
+	}
+
 	$effect(() => {
 		const settings = contentFilter;
 		const current = stories;
@@ -829,13 +835,14 @@
 		onToggle={() => toggleStory(story)}
 		onReveal={() => revealStory(story)}
 		onReadToggle={() => toggleRead(story)}
+		onLoadFull={() => loadFullStory(story)}
 		onRemoved={() => removeStory(story)}
 	/>
 {/snippet}
 
 <div class="screen">
 	<header class="top">
-		<p class="brand">Informed News</p>
+		<h1 class="brand">Informed News</h1>
 		<div class="top-actions">
 			<button type="button" aria-label="Settings" onclick={() => openSettings('language')}>Settings</button>
 			{#if !sharedActive}

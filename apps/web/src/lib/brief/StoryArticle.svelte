@@ -1,6 +1,7 @@
 <script lang="ts">
 	import {
 		BRIEF_ADDED_BY_YOU_LABEL,
+		BRIEF_FULL_STORY_LOAD,
 		BRIEF_FULL_STORY_LOADING,
 		BRIEF_FULL_STORY_LOGIN_HINT,
 		BRIEF_OFFICIAL_LABEL,
@@ -41,6 +42,7 @@
 		onToggle: () => void;
 		onReveal: () => void;
 		onReadToggle: () => void;
+		onLoadFull: () => void;
 		onRemoved: () => void;
 	}
 
@@ -59,6 +61,7 @@
 		onToggle,
 		onReveal,
 		onReadToggle,
+		onLoadFull,
 		onRemoved,
 	}: Props = $props();
 
@@ -174,6 +177,9 @@
 			<p><a href="/topics">{BRIEF_FULL_STORY_LOGIN_HINT}</a></p>
 		{:else if showContent && fullPhase?.phase === 'error'}
 			<p>{fullPhase.message}</p>
+		{:else if showContent && !shared && !fullPhase && story.informed_full_story_status === 'missing'}
+			<!-- Not requested: the budget guard skipped this card, so offer an explicit load. -->
+			<p><button type="button" onclick={onLoadFull}>{BRIEF_FULL_STORY_LOAD}</button></p>
 		{/if}
 		{#if showContent && story.informed_full_story_updated}
 			<p>Updated: {story.informed_full_story_updated}</p>
