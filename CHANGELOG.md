@@ -1,3 +1,9 @@
+## [0.40.1](https://github.com/philga7/informed-news/compare/v0.40.0...v0.40.1) (2026-11-09)
+
+### Bug Fixes
+
+* **NEWS-204:** visible read state and story-link tests on shell Brief ([cc85a7e](https://github.com/philga7/informed-news/commit/cc85a7e8cdc009f54ccb667087383ad2c0d7357f)), closes [#248](https://github.com/philga7/informed-news/issues/248)
+
 ## [0.40.0](https://github.com/philga7/informed-news/compare/v0.39.0...v0.40.0) (2026-11-07)
 
 ### Features
