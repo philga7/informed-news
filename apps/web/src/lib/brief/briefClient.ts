@@ -354,16 +354,14 @@ export async function postFullStory(articleId: string): Promise<FullStoryPostRes
 
 export async function postBriefSeen(articleIds: string[]): Promise<void> {
 	if (articleIds.length === 0) return;
-	try {
-		await fetch('/api/brief/seen', {
-			method: 'POST',
-			credentials: 'include',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ articleIds }),
-		});
-	} catch {
-		// Seen marks are best-effort.
-	}
+	const response = await fetch('/api/brief/seen', {
+		method: 'POST',
+		credentials: 'include',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ articleIds }),
+	});
+	// Throws on a network error or a non-2xx answer so the caller can say the write failed.
+	if (!response.ok) throw new Error(`seen write failed: ${response.status}`);
 }
 
 export async function fetchFilteredVerdicts(): Promise<FilteredVerdictResult> {

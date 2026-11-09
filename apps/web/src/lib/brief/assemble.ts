@@ -55,6 +55,7 @@ export const BRIEF_FULL_STORY_NOT_IN_BRIEF = 'This story is no longer in the Bri
 export const BRIEF_NOT_REFRESHED = 'Not refreshed yet';
 
 export const BRIEF_SEEN_DEBOUNCE_MS = 1000;
+export const BRIEF_SEEN_SAVE_ERROR = "Couldn't save read marks. They apply to this page only.";
 
 /** Kite content-filter localStorage key. */
 export const CONTENT_FILTER_STORAGE_KEY = 'kite-content-filter';
@@ -643,9 +644,10 @@ export type SeenBatcher = {
 	flush(): Promise<void>;
 };
 
-/** Debounced seen marks. Each id is posted at most once. Failures are dropped. */
+/** Debounced seen marks. Each id is posted at most once. A failed post is not retried; `onError` hears of it. */
 export function createSeenBatcher(options: {
 	post: (ids: string[]) => Promise<unknown>;
+	onError?: (ids: string[]) => void;
 	delayMs?: number;
 	setTimer?: (fn: () => void, ms: number) => unknown;
 	clearTimer?: (handle: unknown) => void;
@@ -669,7 +671,7 @@ export function createSeenBatcher(options: {
 		try {
 			await options.post(ids);
 		} catch {
-			// Seen marks are best-effort.
+			options.onError?.(ids);
 		}
 	}
 

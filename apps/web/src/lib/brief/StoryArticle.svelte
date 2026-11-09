@@ -106,7 +106,10 @@
 </script>
 
 {#snippet body()}
-	<div class="category-label">{label}</div>
+	<div class="category-label">
+		{label}
+		{#if read && !shared && !blurred}<span class="read-badge">Read</span>{/if}
+	</div>
 	<div class="title-row">
 		{#if shared}
 			<div class="title-text">{story.title}</div>
@@ -259,10 +262,12 @@
 	<article
 		id={domId}
 		class="story-card"
+		class:story-card-read={read}
 		aria-label={`News story: ${story.title}`}
 		aria-current={selected ? 'true' : undefined}
 		data-story-index={storyIndex}
 		data-linked-story={linked ? 'true' : undefined}
+		data-read={read ? 'true' : undefined}
 	>
 		{@render body()}
 	</article>
@@ -273,6 +278,27 @@
 		position: relative;
 		padding: 0.75rem 0;
 		border-bottom: 1px solid #e5e7eb;
+	}
+
+	/* Text badge plus a left rule and muted title, so read state is not colour alone. */
+	.story-card-read {
+		border-inline-start: 3px solid #6b7280;
+		padding-inline-start: 0.5rem;
+	}
+
+	.story-card-read .title-button,
+	.story-card-read .title-text {
+		font-weight: 400;
+		color: #4b5563;
+	}
+
+	.read-badge {
+		margin-inline-start: 0.5rem;
+		padding: 0 0.375rem;
+		border: 1px solid #6b7280;
+		border-radius: 0.25rem;
+		color: #374151;
+		text-transform: none;
 	}
 
 	.story-card-blurred {

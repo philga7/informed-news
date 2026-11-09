@@ -12,6 +12,7 @@
 		BRIEF_STORIES_SECTION_TITLE,
 		decideTopicBriefFilterMatches,
 		filteredCountLabel,
+		BRIEF_SEEN_SAVE_ERROR,
 		createSeenBatcher,
 		fullStoryErrorCopy,
 		groupTopicBrief,
@@ -99,7 +100,14 @@
 		Record<string, { phase: 'loading' | 'login' | 'error'; message?: string }>
 	>({});
 	let clockNow = $state(new Date());
-	const seen = createSeenBatcher({ post: (ids) => postBriefSeen(ids) });
+	let seenError = $state(false);
+	let readAnnouncement = $state('');
+	const seen = createSeenBatcher({
+		post: (ids) => postBriefSeen(ids),
+		onError: () => {
+			seenError = true;
+		},
+	});
 	const fullStarted = new Set<string>();
 	let previousExpanded: Record<string, boolean> = {};
 	let openMore = $state<Record<string, boolean>>({});
@@ -290,6 +298,7 @@
 		if (!story?.id) return;
 		const next = !readStories[story.id];
 		readStories = { ...readStories, [story.id]: next };
+		readAnnouncement = `${next ? 'Marked as read' : 'Marked as unread'}: ${story.title}`;
 		if (next) seen.add([story.id]);
 	}
 
@@ -302,7 +311,10 @@
 			ids.push(story.id);
 		}
 		readStories = next;
-		if (ids.length > 0) seen.add(ids);
+		if (ids.length > 0) {
+			readAnnouncement = `Marked ${ids.length} ${ids.length === 1 ? 'story' : 'stories'} as read`;
+			seen.add(ids);
+		}
 	}
 
 	function removeStory(story: BriefStory): void {
@@ -841,6 +853,11 @@
 	{/if}
 
 	<div class="sr-only" data-testid="keyboard-selection-announcer" aria-live="polite">{announcement}</div>
+
+	<div class="sr-only" data-testid="read-announcer" aria-live="polite">{readAnnouncement}</div>
+	{#if seenError}
+		<p role="alert">{BRIEF_SEEN_SAVE_ERROR}</p>
+	{/if}
 
 	{#if sharedMissingNotice}
 		<div role="status">

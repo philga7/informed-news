@@ -6,6 +6,10 @@ Each ship-loop pull request adds an entry for what is true at merge for that rea
 
 This is not the release log. Releases are recorded in `CHANGELOG.md` by semantic-release. Do not hand-edit `CHANGELOG.md` to mirror these notes.
 
+## 2026-11-09
+
+On the Brief, a story you mark as read now shows a **Read** label and a muted look, and screen readers hear the change. **Mark all as read** does the same for every story on the page. If the read mark can't be saved, the Brief says it applies to this page only. A read story still stays on the page until the next refresh.
+
 ## 2026-11-07
 
 The Brief at `/` is the shell. It has the same topic sections, keyboard, filters, and shared links, including full stories, saved read marks, article links, and the refresh clock.

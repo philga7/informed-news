@@ -187,6 +187,10 @@ You can mark a story read, or use **Mark all as read**. Opening a story counts a
 
 **Scenario:** Given you are not signed in, when you mark stories read, then that is not remembered for the next refresh.
 
+**Scenario:** Given you mark a story read, when you look at its card, then it shows a **Read** label and a muted style, and the change is announced politely.
+
+**Scenario:** Given the read mark could not be saved, when you mark a story read, then the Brief says the mark applies to this page only. The card still shows as read.
+
 Before the first successful refresh, nothing is hidden as already seen.
 
 ## Refresh
