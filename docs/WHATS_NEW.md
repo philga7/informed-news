@@ -8,6 +8,8 @@ This is not the release log. Releases are recorded in `CHANGELOG.md` by semantic
 
 ## 2026-11-09
 
+On the Brief, a card opened together with others no longer says “Loading full story…” forever. It shows a **Load full story** button, and the loading line appears only while that story is really loading. The page also has one main heading, **Informed News**, for screen readers.
+
 On the Brief, a story you mark as read now shows a **Read** label and a muted look, and screen readers hear the change. **Mark all as read** does the same for every story on the page. If the read mark can't be saved, the Brief says it applies to this page only. A read story still stays on the page until the next refresh.
 
 ## 2026-11-07
