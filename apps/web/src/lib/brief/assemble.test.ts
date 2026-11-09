@@ -612,4 +612,24 @@ describe('card copy helpers', () => {
 		await batcher.flush();
 		expect(posted).toEqual([['a', 'b']]);
 	});
+
+	it('reports a failed post through onError and does not retry those ids', async () => {
+		const failed: string[][] = [];
+		let calls = 0;
+		const batcher = createSeenBatcher({
+			post: async () => {
+				calls += 1;
+				throw new Error('500');
+			},
+			onError: (ids) => failed.push(ids),
+			setTimer: () => 1,
+			clearTimer: () => {},
+		});
+		batcher.add(['a']);
+		await batcher.flush();
+		batcher.add(['a']);
+		await batcher.flush();
+		expect(failed).toEqual([['a']]);
+		expect(calls).toBe(1);
+	});
 });

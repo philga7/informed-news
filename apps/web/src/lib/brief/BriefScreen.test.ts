@@ -1,14 +1,22 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/svelte';
+import { goto, replaceState } from '$app/navigation';
 import { page } from '$app/state';
 import { tick } from 'svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { installBriefFetchMock, jsonResponse } from '$lib/brief/fetchMock';
-import { CONTENT_FILTER_STORAGE_KEY } from './assemble';
+import { CONTENT_FILTER_STORAGE_KEY, SHARED_STORY_NOT_FOUND } from './assemble';
 import { resetFeedbackCache } from './FeedbackButtons.svelte';
 import BriefScreen from './BriefScreen.svelte';
 import type { InformedCitationMark } from './citationMarks';
 
-const unverifiedLink: InformedCitationMark = {
+// The unit runner has no SvelteKit router, so navigation is recorded instead of run.
+vi.mock('$app/navigation', async (importOriginal) => ({
+	...(await importOriginal<typeof import('$app/navigation')>()),
+	goto: vi.fn(async () => {}),
+	replaceState: vi.fn(),
+}));
+
+const unverifiedLink:InformedCitationMark = {
 	kind: 'url',
 	status: 'missing-source',
 	display: 'unverified',
@@ -64,6 +72,8 @@ afterEach(() => {
 	resetFeedbackCache();
 	setPath('/');
 	vi.mocked(localStorage.getItem).mockReset();
+	vi.mocked(goto).mockClear();
+	vi.mocked(replaceState).mockClear();
 	vi.unstubAllGlobals();
 });
 
@@ -72,6 +82,7 @@ function install(options: {
 	brief?: Overview;
 	onSummary?: () => Response | Promise<Response>;
 	onFull?: () => Response | Promise<Response>;
+	onSeen?: () => Response | Promise<Response>;
 }) {
 	const stories = options.stories ?? [];
 	const brief =
@@ -112,6 +123,7 @@ function install(options: {
 		}
 		if (url === '/api/brief/seen' && method === 'POST') {
 			seenBodies.push(body);
+			if (options.onSeen) return options.onSeen();
 			const ids = (body as { articleIds?: string[] } | undefined)?.articleIds ?? [];
 			for (const id of ids) seenIds.add(id);
 			return jsonResponse(200, { ok: true });
@@ -426,6 +438,189 @@ describe('BriefScreen full story, seen marks, and refresh clock', () => {
 		render(BriefScreen);
 		expect(await screen.findByText(/Updated/)).toBeVisible();
 		expect(screen.getByText(/Next refresh/)).toBeVisible();
+		mock.restore();
+	});
+});
+
+function threeStories() {
+	return [
+		story({ informed_summary_status: 'ok' }),
+		story({
+			id: 'story-2',
+			cluster_number: 2,
+			title: 'Ports stay open',
+			informed_article_id: 'story-2',
+			informed_summary_status: 'ok',
+		}),
+		story({
+			id: 'story-3',
+			cluster_number: 3,
+			title: 'Demand response',
+			informed_article_id: 'story-3',
+			informed_summary_status: 'ok',
+		}),
+	];
+}
+
+function card(title: string): HTMLElement {
+	return screen.getByRole('article', { name: `News story: ${title}` });
+}
+
+describe('BriefScreen visible read state (NEWS-204)', () => {
+	it('Mark as read gives the card a visible Read marker and announces it politely', async () => {
+		const mock = install({ stories: threeStories() });
+		render(BriefScreen);
+		await screen.findByRole('button', { name: 'Battery storage rises' });
+		expect(card('Battery storage rises')).not.toHaveAttribute('data-read');
+		await fireEvent.click(screen.getAllByRole('button', { name: 'Mark as read' })[0]);
+		const read = card('Battery storage rises');
+		expect(read).toHaveAttribute('data-read', 'true');
+		expect(within(read).getByText('Read')).toBeVisible();
+		expect(card('Ports stay open')).not.toHaveAttribute('data-read');
+		expect(screen.getByTestId('read-announcer')).toHaveAttribute('aria-live', 'polite');
+		expect(screen.getByTestId('read-announcer')).toHaveTextContent(
+			'Marked as read: Battery storage rises',
+		);
+		await fireEvent.click(within(read).getByRole('button', { name: 'Mark as unread' }));
+		expect(card('Battery storage rises')).not.toHaveAttribute('data-read');
+		mock.restore();
+	});
+
+	it('Mark all as read marks every rendered card and posts each id once', async () => {
+		const mock = install({ stories: threeStories() });
+		render(BriefScreen);
+		await screen.findByRole('button', { name: 'Battery storage rises' });
+		await fireEvent.click(screen.getAllByRole('button', { name: 'Mark all as read' })[0]);
+		for (const title of ['Battery storage rises', 'Ports stay open', 'Demand response']) {
+			expect(card(title)).toHaveAttribute('data-read', 'true');
+		}
+		await vi.waitFor(
+			() => expect(mock.seenBodies).toEqual([{ articleIds: ['story-1', 'story-2', 'story-3'] }]),
+			{ timeout: 2500 },
+		);
+		mock.restore();
+	});
+
+	it('a failed seen write is not shown as saved: honest error, local mark kept', async () => {
+		const mock = install({
+			stories: threeStories(),
+			onSeen: () => jsonResponse(500, { ok: false }),
+		});
+		render(BriefScreen);
+		await screen.findByRole('button', { name: 'Battery storage rises' });
+		await fireEvent.click(screen.getAllByRole('button', { name: 'Mark as read' })[0]);
+		const alert = await screen.findByRole('alert', {}, { timeout: 2500 });
+		expect(alert).toHaveTextContent("Couldn't save read marks. They apply to this page only.");
+		expect(card('Battery storage rises')).toHaveAttribute('data-read', 'true');
+		mock.restore();
+	});
+});
+
+describe('BriefScreen seen marks across refresh and reload (NEWS-204)', () => {
+	it('marks post exact ids once, a reload without refresh keeps cards, a refresh drops them', async () => {
+		const mock = install({ stories: threeStories() });
+		render(BriefScreen);
+		await fireEvent.click(await screen.findByRole('button', { name: 'Battery storage rises' }));
+		await vi.waitFor(() => expect(mock.seenBodies).toEqual([{ articleIds: ['story-1'] }]), {
+			timeout: 2500,
+		});
+		// The opened card still says "Mark as read", so index 1 is the second story.
+		await fireEvent.click(screen.getAllByRole('button', { name: 'Mark as read' })[1]);
+		await vi.waitFor(
+			() =>
+				expect(mock.seenBodies).toEqual([{ articleIds: ['story-1'] }, { articleIds: ['story-2'] }]),
+			{ timeout: 2500 },
+		);
+		await fireEvent.click(screen.getByRole('button', { name: 'Mark all as read' }));
+		await vi.waitFor(
+			() =>
+				expect(mock.seenBodies).toEqual([
+					{ articleIds: ['story-1'] },
+					{ articleIds: ['story-2'] },
+					{ articleIds: ['story-3'] },
+				]),
+			{ timeout: 2500 },
+		);
+
+		// Reload without a refresh: the server list is unchanged, so all cards stay.
+		cleanup();
+		render(BriefScreen);
+		expect(await screen.findByRole('button', { name: 'Battery storage rises' })).toBeVisible();
+		expect(screen.getByRole('button', { name: 'Ports stay open' })).toBeVisible();
+		expect(screen.getByRole('button', { name: 'Demand response' })).toBeVisible();
+
+		// A successful refresh whose server list omits the seen ids removes them.
+		await fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+		await vi.waitFor(() =>
+			expect(screen.queryByRole('button', { name: 'Battery storage rises' })).not.toBeInTheDocument(),
+		);
+		expect(screen.queryByRole('button', { name: 'Ports stay open' })).not.toBeInTheDocument();
+		expect(screen.queryByRole('button', { name: 'Demand response' })).not.toBeInTheDocument();
+		mock.restore();
+	});
+});
+
+describe('BriefScreen story links (NEWS-204)', () => {
+	it('/latest/world/0 opens the first card and the last loaded index opens the last card', async () => {
+		setPath('/latest/world/0?shared=1');
+		let mock = install({ stories: threeStories() });
+		render(BriefScreen);
+		expect(await screen.findByText('Viewing a shared story')).toBeVisible();
+		expect(card('Battery storage rises')).toBeVisible();
+		expect(screen.getAllByRole('article')).toHaveLength(1);
+		cleanup();
+		mock.restore();
+
+		setPath('/latest/world/2?shared=1');
+		mock = install({ stories: threeStories() });
+		render(BriefScreen);
+		expect(await screen.findByText('Viewing a shared story')).toBeVisible();
+		expect(card('Demand response')).toBeVisible();
+		expect(screen.getAllByRole('article')).toHaveLength(1);
+		mock.restore();
+	});
+
+	it('an out-of-range shared index shows the not-found notice and clears shared', async () => {
+		setPath('/latest/world/3?shared=1');
+		const mock = install({ stories: threeStories() });
+		render(BriefScreen);
+		expect(await screen.findByText(SHARED_STORY_NOT_FOUND)).toBeVisible();
+		expect(screen.queryByText('Viewing a shared story')).not.toBeInTheDocument();
+		expect(screen.getAllByRole('article')).toHaveLength(3);
+		expect(replaceState).toHaveBeenCalledWith('/latest/world/3', {});
+		mock.restore();
+	});
+
+	it('an out-of-range index without shared shows the normal Brief and opens nothing', async () => {
+		setPath('/latest/world/3');
+		const mock = install({ stories: threeStories() });
+		render(BriefScreen);
+		await screen.findByRole('button', { name: 'Battery storage rises' });
+		expect(screen.queryByText(SHARED_STORY_NOT_FOUND)).not.toBeInTheDocument();
+		expect(screen.queryByText('Viewing a shared story')).not.toBeInTheDocument();
+		for (const title of ['Battery storage rises', 'Ports stay open', 'Demand response']) {
+			expect(screen.getByRole('button', { name: title })).toHaveAttribute('aria-expanded', 'false');
+		}
+		mock.restore();
+	});
+
+	it('leaving a shared view restores the full Brief, and View latest goes to /', async () => {
+		setPath('/latest/world/1?shared=1');
+		let mock = install({ stories: threeStories() });
+		render(BriefScreen);
+		expect(await screen.findByText('Viewing a shared story')).toBeVisible();
+		await fireEvent.click(screen.getByRole('button', { name: 'View latest stories' }));
+		expect(goto).toHaveBeenCalledWith('/');
+		cleanup();
+		mock.restore();
+
+		// Back lands on the previous URL, which remounts the Brief without `shared`.
+		setPath('/');
+		mock = install({ stories: threeStories() });
+		render(BriefScreen);
+		expect(await screen.findByRole('heading', { name: 'Your topics', level: 2 })).toBeVisible();
+		expect(screen.queryByText('Viewing a shared story')).not.toBeInTheDocument();
+		expect(screen.getAllByRole('article')).toHaveLength(3);
 		mock.restore();
 	});
 });
