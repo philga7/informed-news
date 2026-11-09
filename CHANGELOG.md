@@ -1,3 +1,9 @@
+## [0.40.2](https://github.com/philga7/informed-news/compare/v0.40.1...v0.40.2) (2026-11-09)
+
+### Bug Fixes
+
+* **NEWS-205:** honest full-story loading state and Brief h1 on shell ([6bf476e](https://github.com/philga7/informed-news/commit/6bf476e6318243ed6cc49758d4dea2e38a53e51b)), closes [#250](https://github.com/philga7/informed-news/issues/250)
+
 ## [0.40.1](https://github.com/philga7/informed-news/compare/v0.40.0...v0.40.1) (2026-11-09)
 
 ### Bug Fixes
