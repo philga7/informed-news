@@ -82,7 +82,7 @@ Summaries for the top stories in each section are prepared during refresh. The r
 
 ## Full stories
 
-Every topic Brief card can open a **Full story**. Opening the card loads it when it is not already saved. While it loads, the card says “Loading full story…”; that line shows only while a request for that card is in flight. When several cards are opened at once, none load on their own and each shows a **Load full story** button instead. You must be signed in; otherwise the card links to Topics.
+Every topic Brief card can open a **Full story**. Opening the card loads it when it is not already saved. While it loads, the card says “Loading full story…”; that line shows only while a request for that card is in flight. A card auto-loads only when it is the one open card. When several cards are open, whether opened together or one after another while an earlier card is still open, the newly opened card does not load on its own and shows a **Load full story** button instead. You must be signed in; otherwise the card links to Topics.
 
 A full story can include talking points, a timeline, and questions about what to verify or what is still unknown. When the articles support them, it can also show perspectives and a pull quote. If the topic asked for them, it can add a business angle, technical details, practical follow-ups, or history. Empty sections are left out. No map is shown. Generated sections are labeled **AI-assisted — not ground truth.**
 
@@ -109,6 +109,8 @@ Links, quoted lines, and link-backed claims on a card or full story are checked 
 **Scenario:** Given you are signed in and the story has readable text, when you open the card, then the full story loads and a later visit reuses it while the text is unchanged.
 
 **Scenario:** Given several cards open at once and none has a full story yet, when they open, then no request is sent and each card shows a **Load full story** button instead of “Loading full story…”.
+
+**Scenario:** Given one card is open, when you open a second card without closing the first, then the second sends no request and shows **Load full story**; clicking it sends exactly one request and shows loading, then the story or an error.
 
 **Scenario:** Given the story has no readable text, when you open the card, then it says “Full story unavailable — no readable text.”
 

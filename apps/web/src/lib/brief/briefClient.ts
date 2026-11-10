@@ -266,7 +266,11 @@ export async function loadBrief(): Promise<LoadedBrief> {
 		: null;
 	let overview: TopicOverview | null = null;
 	try {
-		const response = await fetch('/api/brief/overview', { credentials: 'include' });
+		const response = await fetch('/api/brief/overview', {
+			credentials: 'include',
+			// The provider status line must reflect the server now, never a cached copy.
+			cache: 'no-store',
+		});
 		if (response.ok) overview = parseOverview(await response.json());
 	} catch {
 		overview = null;

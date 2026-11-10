@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/svelte';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import { goto, replaceState } from '$app/navigation';
 import { page } from '$app/state';
 import { tick } from 'svelte';
@@ -47,7 +47,7 @@ function setPath(path: string): void {
 	page.url.href = `http://localhost${path}`;
 }
 
-function overview(partial: Pick<Overview, 'sections' | 'quiet'> & Partial<Pick<Overview, 'refresh'>>): Overview {
+function overview(partial: Pick<Overview, 'sections' | 'quiet'> & Partial<Pick<Overview, 'refresh' | 'notices'>>): Overview {
 	return { ok: true, filteredOut: 0, notices: [], ...partial };
 }
 
@@ -374,6 +374,70 @@ describe('BriefScreen full story, seen marks, and refresh clock', () => {
 		expect(await screen.findByText(/The vote/)).toBeVisible();
 		expect(mock.fullPosts()).toBe(1);
 		expect(screen.queryByText('Loading full story…')).not.toBeInTheDocument();
+		mock.restore();
+	});
+
+	it('a card opened while another is open sends no request and offers Load; Load sends exactly one', async () => {
+		const second = story({
+			id: 'story-2',
+			cluster_number: 2,
+			title: 'Ports stay open',
+			informed_article_id: 'story-2',
+			informed_full_story_status: 'missing',
+			informed_summary_status: 'ok',
+		});
+		const mock = install({
+			stories: [story({ informed_full_story_status: 'missing', informed_summary_status: 'ok' }), second],
+			onFull: () => jsonResponse(200, { ok: true, fullStory }),
+		});
+		render(BriefScreen);
+		await fireEvent.click(await screen.findByRole('button', { name: 'Battery storage rises' }));
+		expect(await screen.findByText(/The vote/)).toBeVisible();
+		expect(mock.fullPosts()).toBe(1);
+		await fireEvent.click(screen.getByRole('button', { name: 'Ports stay open' }));
+		await tick();
+		expect(mock.fullPosts()).toBe(1);
+		expect(screen.queryByText('Loading full story…')).not.toBeInTheDocument();
+		const loader = screen.getByRole('button', { name: 'Load full story' });
+		await fireEvent.click(loader);
+		await waitFor(() => expect(screen.getAllByText(/The vote/)).toHaveLength(2));
+		expect(mock.fullPosts()).toBe(2);
+		mock.restore();
+	});
+
+	it('a failed Load on a guard-skipped card shows the error', async () => {
+		const second = story({
+			id: 'story-2',
+			cluster_number: 2,
+			title: 'Ports stay open',
+			informed_article_id: 'story-2',
+			informed_full_story_status: 'missing',
+			informed_summary_status: 'ok',
+		});
+		let calls = 0;
+		const mock = install({
+			stories: [story({ informed_full_story_status: 'missing', informed_summary_status: 'ok' }), second],
+			onFull: () => (++calls === 1 ? jsonResponse(200, { ok: true, fullStory }) : jsonResponse(500, { ok: false })),
+		});
+		render(BriefScreen);
+		await fireEvent.click(await screen.findByRole('button', { name: 'Battery storage rises' }));
+		await screen.findByText(/The vote/);
+		await fireEvent.click(screen.getByRole('button', { name: 'Ports stay open' }));
+		await fireEvent.click(screen.getByRole('button', { name: 'Load full story' }));
+		expect(await screen.findByText('Full story could not be loaded right now.')).toBeVisible();
+		expect(mock.fullPosts()).toBe(2);
+		mock.restore();
+	});
+
+	it('fetches the provider status line fresh, never from the HTTP cache', async () => {
+		const mock = install({
+			stories: [story({ informed_summary_status: 'ok' })],
+			brief: overview({ sections: [], quiet: [], notices: ['Summaries unavailable (Ollama not configured)'] }),
+		});
+		render(BriefScreen);
+		expect(await screen.findByText('Summaries unavailable (Ollama not configured)')).toBeVisible();
+		const init = mock.fetchMock.mock.calls.find(([url]) => url === '/api/brief/overview')?.[1];
+		expect(init?.cache).toBe('no-store');
 		mock.restore();
 	});
 

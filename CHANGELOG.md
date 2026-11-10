@@ -1,3 +1,9 @@
+## [0.40.3](https://github.com/philga7/informed-news/compare/v0.40.2...v0.40.3) (2026-11-10)
+
+### Bug Fixes
+
+* **NEWS-207:** full-story guard for second open card and live provider status ([#254](https://github.com/philga7/informed-news/issues/254)) ([1e49ece](https://github.com/philga7/informed-news/commit/1e49ece1c07fdf21dee5e32ccce90e3c2710d358)), closes [#253](https://github.com/philga7/informed-news/issues/253)
+
 ## [0.40.2](https://github.com/philga7/informed-news/compare/v0.40.1...v0.40.2) (2026-11-09)
 
 ### Bug Fixes
