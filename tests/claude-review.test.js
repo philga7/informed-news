@@ -58,20 +58,22 @@ describe('NEWS-166 Claude Code PR review', () => {
 		);
 	});
 
-	it('reviews acceptance criteria only, comments only, and blocks edits, commits, and pushes', () => {
+	it('reviews acceptance criteria then the checklist, comments only, and blocks edits, commits, and pushes', () => {
 		assert.match(workflow, /acceptance criteria/i);
 		assert.match(workflow, /no Jira access/);
+		assert.match(workflow, /do not invent criteria/i);
+		assert.match(workflow, /When reviewing a PR/);
 		assert.match(workflow, /gh pr comment/);
 		assert.match(workflow, /gh issue view/);
 		assert.match(workflow, /Do not approve/i);
 		assert.match(workflow, /Do not merge/i);
 		assert.match(workflow, /Do not push/i);
 		assert.match(workflow, /Do not edit files/i);
-		assert.doesNotMatch(workflow, /When reviewing a PR/);
 		const allowed = workflow.match(/--allowedTools "([^"]*)"/);
 		assert.ok(allowed, 'missing --allowedTools');
 		const allowedTools = allowed[1].split(',');
 		for (const entry of [
+			'Read',
 			'mcp__github_inline_comment__create_inline_comment',
 			'Bash(gh pr comment:*)',
 			'Bash(gh pr diff:*)',

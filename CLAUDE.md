@@ -98,7 +98,7 @@ Rules for `claude-build`:
 
 Claude reports findings. It never approves or merges.
 
-The automatic job `claude-review` does not use the checklist below. It reviews the diff against the acceptance criteria in the linked GitHub issue body and the pull request body. It has no Jira access. It posts pull request comments only. It does not edit code, commit, push, approve, or merge. Its model is `claude-opus-5-5`. The checklist below is for a person reviewing a pull request.
+The automatic job `claude-review` checks the diff against the acceptance criteria in the linked GitHub issue body and the pull request body first, then checks this pull request against the checklist below. It has no Jira access and does not invent acceptance criteria. It posts pull request comments only. It does not edit code, commit, push, approve, or merge. Its model is `claude-opus-5-5`.
 
 - PR title is a Conventional Commit with every `NEWS` key in the scope and the highest bump type in the batch (the **PR title** check enforces the shape; CONTRIBUTING § Squash merges).
 - Approach (TDD/SDD) fits the ticket; SDD has a plan file if required.

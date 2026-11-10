@@ -56,19 +56,25 @@ jobs:
             PR NUMBER: ${{ github.event.pull_request.number }}
 
             This is an automatic pull request review. You have no Jira access.
-            Read the acceptance criteria in this pull request's body and in the
-            linked GitHub issue body (`gh pr view` and `gh issue view`). Review
-            the diff against those acceptance criteria only. If neither body
-            states acceptance criteria, say so in the summary comment and do
-            not invent criteria.
+            Do two passes, in this order.
 
-            Post findings as pull request comments only: a summary with
-            `gh pr comment`, and inline comments for specific lines.
+            Pass 1. Read the acceptance criteria in this pull request's body and
+            in the linked GitHub issue body (`gh pr view` and `gh issue view`).
+            Review the diff against those acceptance criteria. If neither body
+            states acceptance criteria, say so in the summary comment and do not invent criteria.
+
+            Pass 2. Read CLAUDE.md and check this pull request against its
+            "When reviewing a PR" section: title and NEWS keys, TDD/SDD fit,
+            test plan ticked with evidence, spec and WHATS_NEW, and the rest
+            of that checklist.
+
+            Post findings from both passes as pull request comments only: a
+            summary with `gh pr comment`, and inline comments for specific lines.
 
             Do not edit files. Do not commit. Do not push. Do not approve.
             Do not merge. Do not run `gh pr review`, `gh pr merge`, `gh pr edit`,
             or `git push`.
           claude_args: |
             --model claude-opus-5-5
-            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh issue view:*)"
+            --allowedTools "Read,mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh issue view:*)"
             --disallowedTools "Edit,Write,NotebookEdit,Bash(git add),Bash(git add:*),Bash(git commit),Bash(git commit:*),Bash(git push),Bash(git push:*),Bash(gh pr merge:*),Bash(gh pr review:*),Bash(gh pr edit),Bash(gh pr edit:*),Bash(gh issue comment:*),Bash(gh issue create:*)"
