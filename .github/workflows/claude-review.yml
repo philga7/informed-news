@@ -38,10 +38,12 @@ jobs:
           # Action docs: comma-separated bot usernames, e.g. dependabot[bot].
           # Only this automatic review job. cursor[bot] reviews Cursor agent
           # PRs. claude[bot] reviews pull requests the builder opens, so the
-          # approval rule has a review to read. @claude mentions are not a
-          # trigger on this workflow, so they stay limited to humans on
-          # claude-build.
-          allowed_bots: "cursor[bot],claude[bot]"
+          # approval rule has a review to read. github-actions[bot] is the
+          # actor on a Claude Build follow-up push (PR #257, run 42748052627);
+          # without it the review fails as a non-human actor. Never "*".
+          # @claude mentions are not a trigger on this workflow, so they stay
+          # limited to humans on claude-build.
+          allowed_bots: "cursor[bot],claude[bot],github-actions[bot]"
           # Overrides the action's app-token defaults (contents, pull_requests,
           # and issues write). Underscore keys match the GitHub token API.
           # issues: read is so `gh issue view` can read the linked issue body.

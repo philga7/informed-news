@@ -116,7 +116,7 @@ describe('NEWS-166 Claude Code PR review', () => {
 	});
 
 	it('allows cursor[bot] on automatic review; @claude mentions stay human-only', () => {
-		assert.match(workflow, /allowed_bots:\s*"cursor\[bot\],claude\[bot\]"/);
+		assert.match(workflow, /allowed_bots:\s*"cursor\[bot\],claude\[bot\],github-actions\[bot\]"/);
 		assert.equal([...workflow.matchAll(/allowed_bots:/g)].length, 1);
 		assert.doesNotMatch(workflow, /allowed_bots:\s*"\*"/);
 		assert.doesNotMatch(workflow, /allowed_bots:\s*'\*'/);

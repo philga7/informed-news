@@ -35,7 +35,7 @@ describe('NEWS-193 Claude follow-up CI', () => {
 		assert.equal(bots.includes('*'), false);
 		assert.doesNotMatch(review, /allowed_bots:\s*"\*"/);
 		assert.doesNotMatch(review, /allowed_bots:\s*'\*'/);
-		assert.equal(bots.includes('github-actions[bot]'), false);
+		assert.deepEqual(bots, ['cursor[bot]', 'claude[bot]', 'github-actions[bot]']);
 		const reviewAllowed = claudeArgsToolString(review, '--allowedTools');
 		assert.equal(reviewAllowed.split(',').includes('Bash(gh pr edit:*)'), false);
 	});
