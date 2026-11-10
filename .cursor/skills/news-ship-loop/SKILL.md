@@ -140,7 +140,7 @@ The PR test plan includes both items. Tick the spec item when scenarios changed,
      - [ ] `docs/PRODUCT_SPEC.md` updated in this PR when behavior changed (scenarios edited). Left unchanged when behavior did not change. No **Last checked** bump.
      - [ ] `docs/WHATS_NEW.md` has a new entry for what is true at merge, or states **No user-visible change.** A line that is no longer true is corrected in this PR.
      - [ ] CI green (**MVP build & typecheck**), with the Actions run URL — tick only when that link is present
-5. Opening the PR starts **automatic Claude Code review** (`.github/workflows/claude-review.yml`, against `CLAUDE.md` "When reviewing a PR"); resolve findings (push re-runs it) before Phil's ship request — never merge without that request.
+5. Opening the PR starts **automatic Claude Code review** (`.github/workflows/claude-review.yml`, Opus, comments only, against the acceptance criteria in the linked GitHub issue body and the pull request body first, then against `CLAUDE.md` "When reviewing a PR"; the job has no Jira access). Resolve findings (push re-runs it) before Phil's ship request — never merge without that request.
 6. When the user asks to **merge**:
    1. **CI green** — invoke `/fix-ci` and/or the `ci-watcher` agent (do not improvise a parallel check ritual). Required check: **MVP build & typecheck** (see `main` requires CI). Watch until settled; on failure, `/fix-ci` applies the smallest fix and re-checks.
    2. **Link the green run before ticking CI** — from `gh pr checks` / `gh run view`, record the passing GitHub Actions run URL in the ship notes (and the PR body test-plan CI item). Do **not** mark the CI test-plan box until that green run link is present.

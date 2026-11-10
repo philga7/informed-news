@@ -12,6 +12,8 @@ On the Brief, stories you read stay marked as read after you reload the page. Op
 
 On the Brief, opening a second card while another is still open no longer loads its full story on its own. It shows **Load full story**, and one click loads just that story. The notices under the topics, such as whether summaries are available, are now fetched fresh each time the page loads instead of reused from a saved copy.
 
+Which model reviews a pull request does not change the Brief.
+
 ## 2026-11-09
 
 On the Brief, a card opened together with others no longer says “Loading full story…” forever. It shows a **Load full story** button, and the loading line appears only while that story is really loading. The page also has one main heading, **Informed News**, for screen readers.
