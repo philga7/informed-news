@@ -1,3 +1,9 @@
+## [0.40.4](https://github.com/philga7/informed-news/compare/v0.40.3...v0.40.4) (2026-11-10)
+
+### Bug Fixes
+
+* **NEWS-206:** server seen state supports unseen, reload and full story ([#255](https://github.com/philga7/informed-news/issues/255)) ([a8cdde8](https://github.com/philga7/informed-news/commit/a8cdde8fd1c471d1cbc048693ec3c620ff6c5817)), closes [#252](https://github.com/philga7/informed-news/issues/252)
+
 ## [0.40.3](https://github.com/philga7/informed-news/compare/v0.40.2...v0.40.3) (2026-11-10)
 
 ### Bug Fixes
