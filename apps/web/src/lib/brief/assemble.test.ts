@@ -575,8 +575,10 @@ describe('card copy helpers', () => {
 
 		const story = makeStory('a', { informed_full_story_status: 'missing' });
 		expect(shouldRequestFullStory(story)).toBe(true);
-		expect(autoFullStoryRequestKeys(['only'])).toEqual(['only']);
-		expect(autoFullStoryRequestKeys(['a', 'b'])).toEqual([]);
+		expect(autoFullStoryRequestKeys(['only'], 1)).toEqual(['only']);
+		expect(autoFullStoryRequestKeys(['a', 'b'], 2)).toEqual([]);
+		// A second sequential open: one newly opened key, but another card is still open.
+		expect(autoFullStoryRequestKeys(['b'], 2)).toEqual([]);
 		const filled = applyFullStory(story, {
 			status: 'ok',
 			changeSummary: 'New outlets',

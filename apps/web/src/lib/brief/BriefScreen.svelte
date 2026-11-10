@@ -697,7 +697,7 @@
 		const opened = newlyExpandedKeys(previousExpanded, current);
 		previousExpanded = current;
 		if (!loaded || opened.length === 0) return;
-		const fullKeys = new Set(autoFullStoryRequestKeys(opened));
+		const fullKeys = new Set(autoFullStoryRequestKeys(opened, Object.values(current).filter(Boolean).length));
 		untrack(() => {
 			const ids: string[] = [];
 			for (const key of opened) {
