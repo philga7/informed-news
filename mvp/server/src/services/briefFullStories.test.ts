@@ -165,6 +165,42 @@ test('not in Brief returns not_in_brief without enrichment', async () => {
   assert.equal(h.calls, 0);
 });
 
+const LATER = '2026-10-01T11:30:00.000Z';
+
+test('NEWS-206 a seen story still listed (seen after the refresh boundary) generates a full story', async () => {
+  const h = harness(undefined, undefined, {
+    readBriefSeen: async () => ({
+      seen: { main: { seenAt: LATER, outletCount: 2, significance: 1.5 } },
+      updatedAt: LATER,
+    }),
+  });
+  const result = await generateFullStory('main', { now: NOW }, h.deps);
+  assert.equal(result.ok, true);
+});
+
+test('NEWS-206 a story seen before the boundary but significantly updated is still found', async () => {
+  const h = harness(undefined, undefined, {
+    readBriefSeen: async () => ({
+      seen: { main: { seenAt: '2026-10-01T10:00:00.000Z', outletCount: 2, significance: 0.5 } },
+      updatedAt: null,
+    }),
+  });
+  const result = await generateFullStory('main', { now: NOW }, h.deps);
+  assert.equal(result.ok, true);
+});
+
+test('NEWS-206 the next successful refresh still hides a seen story', async () => {
+  const h = harness(undefined, undefined, {
+    readBriefSeen: async () => ({
+      seen: { main: { seenAt: '2026-10-01T10:00:00.000Z', outletCount: 2, significance: 1.5 } },
+      updatedAt: null,
+    }),
+  });
+  const result = await generateFullStory('main', { now: NOW }, h.deps);
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.equal(result.code, 'not_in_brief');
+});
+
 test('no usable member text persists unavailable without Ollama', async () => {
   const h = harness([article('main', { bodyStatus: 'unavailable', bodyText: null, snippet: 'short' })], [kept('main')]);
   const result = await generateFullStory('main', { now: NOW }, h.deps);

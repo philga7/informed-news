@@ -3,7 +3,7 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
-import type { Server } from 'node:http';
+import { get as httpGet, type Server } from 'node:http';
 import express from 'express';
 
 import type { CreateAppDeps } from './app.js';
@@ -3596,6 +3596,115 @@ test('NEWS-157 POST /api/brief/seen serializes concurrent marks so none are lost
     );
     for (const resp of responses) assert.equal(resp.status, 200);
     assert.deepEqual(Object.keys(disk.seen).sort(), ['k1', 'k2', 'k3']);
+  } finally {
+    await close();
+  }
+});
+
+const SEEN_ENTRY = { seenAt: '2026-09-30T11:30:00.000Z', outletCount: 1, significance: 1 };
+const SEEN_BOUNDARY_META: StoreMeta = {
+  lastFetchAt: null,
+  lastError: null,
+  refresh: {
+    last: { trigger: 'manual', startedAt: '2026-09-30T11:00:00.000Z', completedAt: '2026-09-30T11:05:00.000Z', ok: true, error: null },
+    lastSuccess: { trigger: 'manual', startedAt: '2026-09-30T11:00:00.000Z', completedAt: '2026-09-30T11:05:00.000Z', ok: true, error: null },
+  },
+};
+
+test('NEWS-206 DELETE /api/brief/seen/:id requires session', async () => {
+  let writes = 0;
+  const { baseUrl, close } = await startSeenServer({
+    articles: [],
+    updateBriefSeen: async (mutate) => {
+      writes += 1;
+      return mutate({ seen: {}, updatedAt: null });
+    },
+  });
+  try {
+    const resp = await fetch(`${baseUrl}/api/brief/seen/k1`, { method: 'DELETE' });
+    assert.equal(resp.status, 401);
+    assert.equal(writes, 0);
+  } finally {
+    await close();
+  }
+});
+
+test('NEWS-206 DELETE /api/brief/seen/:id clears the record and is idempotent', async () => {
+  const { baseUrl, close } = await startSeenServer({
+    articles: [briefArticle('k1'), briefArticle('k2')],
+    records: [keptRecord('k1', ['t1']), keptRecord('k2', ['t1'])],
+    meta: SEEN_BOUNDARY_META,
+    seen: { seen: { k1: SEEN_ENTRY, k2: SEEN_ENTRY }, updatedAt: null },
+  });
+  try {
+    const cookie = await login(baseUrl);
+    const first = await fetch(`${baseUrl}/api/brief/seen/k1`, { method: 'DELETE', headers: { cookie } });
+    assert.equal(first.status, 200);
+    assert.deepEqual(await first.json(), { ok: true, cleared: 1 });
+    const again = await fetch(`${baseUrl}/api/brief/seen/k1`, { method: 'DELETE', headers: { cookie } });
+    assert.equal(again.status, 200);
+    assert.deepEqual(await again.json(), { ok: true, cleared: 0 });
+    const unknown = await fetch(`${baseUrl}/api/brief/seen/nope`, { method: 'DELETE', headers: { cookie } });
+    assert.equal(unknown.status, 200);
+
+    const body = await getJson<KiteBatchStoriesResponse>(
+      `${baseUrl}/api/batches/latest/categories/world/stories`,
+    );
+    const byId = Object.fromEntries(body.stories.map((s) => [s.id, s]));
+    assert.equal(byId.k1!.informed_seen, undefined);
+    assert.equal(byId.k2!.informed_seen, true);
+  } finally {
+    await close();
+  }
+});
+
+/** fetch() adds Cache-Control: no-cache to conditional requests, which defeats 304; use node:http. */
+function conditionalGet(
+  url: string,
+  ifNoneMatch: string,
+): Promise<{ status: number; etag: string | null; body: string }> {
+  return new Promise((resolve, reject) => {
+    httpGet(url, { headers: { 'if-none-match': ifNoneMatch } }, (res) => {
+      let body = '';
+      res.setEncoding('utf8');
+      res.on('data', (chunk: string) => (body += chunk));
+      res.on('end', () =>
+        resolve({ status: res.statusCode ?? 0, etag: res.headers.etag ?? null, body }),
+      );
+    }).on('error', reject);
+  });
+}
+
+test('NEWS-206 stories list carries seen state and its ETag changes on seen / unseen', async () => {
+  const { baseUrl, close } = await startSeenServer({
+    articles: [briefArticle('k1')],
+    records: [keptRecord('k1', ['t1'])],
+    meta: SEEN_BOUNDARY_META,
+  });
+  const url = `${baseUrl}/api/batches/latest/categories/world/stories`;
+  try {
+    const cookie = await login(baseUrl);
+    const unread = await fetch(url);
+    const unreadTag = unread.headers.get('etag');
+    assert.ok(unreadTag);
+    const unreadBody = (await unread.json()) as KiteBatchStoriesResponse;
+    assert.equal(unreadBody.stories[0]!.informed_seen, undefined);
+    assert.equal(unreadBody.stories[0]!.informed_seen_at, undefined);
+    assert.equal((await conditionalGet(url, unreadTag)).status, 304);
+
+    const mark = await postJson(baseUrl, '/api/brief/seen', { articleIds: ['k1'] }, cookie);
+    assert.equal(mark.status, 200);
+    const read = await conditionalGet(url, unreadTag);
+    assert.equal(read.status, 200);
+    assert.notEqual(read.etag, unreadTag);
+    const readBody = JSON.parse(read.body) as KiteBatchStoriesResponse;
+    assert.equal(readBody.stories[0]!.informed_seen, true);
+    assert.equal(readBody.stories[0]!.informed_seen_at, BRIEF_NOW.toISOString());
+
+    await fetch(`${baseUrl}/api/brief/seen/k1`, { method: 'DELETE', headers: { cookie } });
+    const back = await conditionalGet(url, read.etag!);
+    assert.equal(back.status, 200);
+    assert.equal(back.etag, unreadTag);
   } finally {
     await close();
   }

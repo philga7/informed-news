@@ -107,6 +107,9 @@ export type KiteBriefStory = {
   informed_publisher_domain?: string;
   /** Operator-added seed (NEWS-98); omitted for found stories. */
   informed_added_by_you?: true;
+  /** Read by the reader (NEWS-206); omitted when unread. Changes the list ETag. */
+  informed_seen?: true;
+  informed_seen_at?: string;
   /** NEWS-167 advisory triage layer; omitted when absent on the record. */
   informed_verdict?: 'approved' | 'filtered';
   informed_confidence?: number;
@@ -782,6 +785,10 @@ function topicStoryToKite(
   }
   if (story.manualSeed) {
     kite.informed_added_by_you = true;
+  }
+  if (story.seenAt !== undefined) {
+    kite.informed_seen = true;
+    kite.informed_seen_at = story.seenAt;
   }
   if (story.verdict !== undefined) {
     kite.informed_verdict = story.verdict;
