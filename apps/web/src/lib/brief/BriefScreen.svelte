@@ -117,13 +117,13 @@
 
 	/** Show ids as read now; the batcher reverts them if the write fails. */
 	function markRead(ids: string[]): void {
+		// Already-read ids (including server-seen ones) need no write.
 		const fresh = ids.filter((id) => !readStories[id]);
-		if (fresh.length > 0) {
-			const next = { ...readStories };
-			for (const id of fresh) next[id] = true;
-			readStories = next;
-		}
-		seen.add(ids);
+		if (fresh.length === 0) return;
+		const next = { ...readStories };
+		for (const id of fresh) next[id] = true;
+		readStories = next;
+		seen.add(fresh);
 	}
 	const fullStarted = new Set<string>();
 	let previousExpanded: Record<string, boolean> = {};

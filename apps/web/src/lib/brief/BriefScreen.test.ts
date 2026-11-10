@@ -710,6 +710,36 @@ describe('BriefScreen read state follows server seen state (NEWS-208)', () => {
 		);
 		mock.restore();
 	});
+
+	it('opening a story the server already reports as seen sends no seen POST', async () => {
+		const mock = install({ stories: seenFirst() });
+		render(BriefScreen);
+		await fireEvent.click(await screen.findByRole('button', { name: 'Battery storage rises' }));
+		// A later mark flushes its own batch; story-1 must not ride along.
+		await fireEvent.click(screen.getAllByRole('button', { name: 'Mark as read' })[0]);
+		await vi.waitFor(() => expect(mock.seenBodies).toEqual([{ articleIds: ['story-2'] }]), {
+			timeout: 2500,
+		});
+		expect(card('Battery storage rises')).toHaveAttribute('data-read', 'true');
+		mock.restore();
+	});
+
+	for (const status of [401, 500]) {
+		it(`a server-seen story stays read after opening when a seen POST fails (${status})`, async () => {
+			const mock = install({
+				stories: seenFirst(),
+				onSeen: () => jsonResponse(status, { ok: false }),
+			});
+			render(BriefScreen);
+			await fireEvent.click(await screen.findByRole('button', { name: 'Battery storage rises' }));
+			// A failing write for another story: a stray story-1 write would also fail.
+			await fireEvent.click(screen.getAllByRole('button', { name: 'Mark as read' })[0]);
+			await screen.findByRole('alert', {}, { timeout: 2500 });
+			expect(card('Battery storage rises')).toHaveAttribute('data-read', 'true');
+			expect(card('Ports stay open')).not.toHaveAttribute('data-read');
+			mock.restore();
+		});
+	}
 });
 
 describe('BriefScreen seen marks across refresh and reload (NEWS-204)', () => {
