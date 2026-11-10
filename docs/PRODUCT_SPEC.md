@@ -193,7 +193,13 @@ You can mark a story read, or use **Mark all as read**. Opening a story counts a
 
 **Scenario:** Given you mark a story read, when you look at its card, then it shows a **Read** label and a muted style, and the change is announced politely.
 
-**Scenario:** Given the read mark could not be saved, when you mark a story read, then the Brief says the mark applies to this page only. The card still shows as read.
+**Scenario:** Given you are signed in and a story is marked read, when you reload the page, then that story still shows as read.
+
+**Scenario:** Given you open a story, when you look at its card, then it shows as read.
+
+**Scenario:** Given a read story, when you choose **Mark as unread**, then the card stops showing as read and the Brief clears the read record on the server once.
+
+**Scenario:** Given a read mark or an unread request could not be saved (a failed request, or you are signed out), when you try it, then the Brief shows a short error and puts the card back as it was. It is not shown as saved.
 
 **Scenario:** Given you are signed in and a story is marked read, when you ask the server to mark it unread (`DELETE /api/brief/seen/:articleId`), then the read record is cleared and the next refresh keeps the story. Asking again, or for an id that was never read, changes nothing and still succeeds. When you are not signed in, the request is refused (401).
 

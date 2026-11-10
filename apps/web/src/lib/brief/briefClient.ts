@@ -18,6 +18,9 @@ export type BriefStory = Story & {
 	informed_reason_text?: string | null;
 	informed_criteria_ref?: string | null;
 	informed_citation_marks?: InformedCitationMark[] | null;
+	/** Present (true) only when the server has this story as read and unchanged since. */
+	informed_seen?: boolean;
+	informed_seen_at?: string;
 };
 
 export type TopicOverview = {
@@ -366,6 +369,15 @@ export async function postBriefSeen(articleIds: string[]): Promise<void> {
 	});
 	// Throws on a network error or a non-2xx answer so the caller can say the write failed.
 	if (!response.ok) throw new Error(`seen write failed: ${response.status}`);
+}
+
+/** Clears one seen mark. Throws on a network error or a non-2xx answer (401 when signed out). */
+export async function deleteBriefSeen(articleId: string): Promise<void> {
+	const response = await fetch(`/api/brief/seen/${encodeURIComponent(articleId)}`, {
+		method: 'DELETE',
+		credentials: 'include',
+	});
+	if (!response.ok) throw new Error(`unseen write failed: ${response.status}`);
 }
 
 export async function fetchFilteredVerdicts(): Promise<FilteredVerdictResult> {
