@@ -1,3 +1,9 @@
+## [0.40.5](https://github.com/philga7/informed-news/compare/v0.40.4...v0.40.5) (2026-11-10)
+
+### Bug Fixes
+
+* **NEWS-208:** shell Brief read state follows server seen state ([#257](https://github.com/philga7/informed-news/issues/257)) ([c84004d](https://github.com/philga7/informed-news/commit/c84004d1cdd5ba533d77d977e15ae8462d96aee7)), closes [#256](https://github.com/philga7/informed-news/issues/256)
+
 ## [0.40.4](https://github.com/philga7/informed-news/compare/v0.40.3...v0.40.4) (2026-11-10)
 
 ### Bug Fixes
