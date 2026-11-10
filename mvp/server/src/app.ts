@@ -34,6 +34,7 @@ import {
   lessLikeThis,
   loadClaimsRadar,
   markBriefSeen,
+  unmarkBriefSeen,
   summarizeBriefStory,
 } from './services/index.js';
 import type { RefreshRunner, RefreshSteps } from './services/index.js';
@@ -513,6 +514,31 @@ export function createApp(deps: CreateAppDeps = {}): Express {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.error('Brief seen write failed:', message);
+      res.status(500).json({ ok: false, error: message });
+    }
+  });
+
+  /**
+   * Mark as unread (NEWS-206): clears the story's seen record so the next
+   * refresh keeps it. Idempotent; unknown ids → { cleared: 0 }.
+   */
+  app.delete('/api/brief/seen/:articleId', async (req, res) => {
+    const articleId = req.params.articleId.trim();
+    if (articleId === '') {
+      res.status(400).json({ ok: false, error: 'articleId is required' });
+      return;
+    }
+    try {
+      let cleared = 0;
+      await updateSeen(async (seen) => {
+        const result = unmarkBriefSeen({ seen, articleIds: [articleId], now: now() });
+        cleared = result.cleared;
+        return result.store;
+      });
+      res.json({ ok: true, cleared });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('Brief unseen write failed:', message);
       res.status(500).json({ ok: false, error: message });
     }
   });

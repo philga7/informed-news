@@ -72,6 +72,7 @@ export {
   composeTopicBrief,
   isSignificantlyUpdated,
   markBriefSeen,
+  unmarkBriefSeen,
   summarySourceFor,
 } from './topicBrief.js';
 export type {

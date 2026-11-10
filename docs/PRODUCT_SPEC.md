@@ -193,6 +193,12 @@ You can mark a story read, or use **Mark all as read**. Opening a story counts a
 
 **Scenario:** Given the read mark could not be saved, when you mark a story read, then the Brief says the mark applies to this page only. The card still shows as read.
 
+**Scenario:** Given you are signed in and a story is marked read, when you ask the server to mark it unread (`DELETE /api/brief/seen/:articleId`), then the read record is cleared and the next refresh keeps the story. Asking again, or for an id that was never read, changes nothing and still succeeds. When you are not signed in, the request is refused (401).
+
+**Scenario:** Given a story is marked read, when the Brief list is loaded again (for example after a page reload), then that story carries `informed_seen: true` and `informed_seen_at` (the time it was marked read). A story that is unread, or that gained clearly more coverage since you read it, carries neither field. Marking a story read or unread changes the list response, so a cached copy is not reused.
+
+**Scenario:** Given a story is marked read and no refresh has run since, when you open its full story, then it loads as for any listed story. Only the next successful refresh hides it.
+
 Before the first successful refresh, nothing is hidden as already seen.
 
 ## Refresh

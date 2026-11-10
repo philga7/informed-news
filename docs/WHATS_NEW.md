@@ -6,6 +6,10 @@ Each ship-loop pull request adds an entry for what is true at merge for that rea
 
 This is not the release log. Releases are recorded in `CHANGELOG.md` by semantic-release. Do not hand-edit `CHANGELOG.md` to mirror these notes.
 
+## 2026-11-10
+
+**No user-visible change.** The server can now mark a story unread and reports which stories are read when the Brief loads. The Brief page does not use this yet.
+
 ## 2026-11-09
 
 On the Brief, a card opened together with others no longer says “Loading full story…” forever. It shows a **Load full story** button, and the loading line appears only while that story is really loading. The page also has one main heading, **Informed News**, for screen readers.

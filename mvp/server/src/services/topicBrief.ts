@@ -57,6 +57,8 @@ export type BriefStory = {
   significance: number | null;
   /** Operator-added seed (kept article `sourceKind: 'manual'`); pinned first in its section */
   manualSeed: boolean;
+  /** ISO time the reader marked it read; omitted when unread or significantly updated since (NEWS-206) */
+  seenAt?: string;
   /** Kept article first, then duplicate members; distinct domains, ≤ BRIEF_MAX_LINKS */
   links: BriefLink[];
   summary: { status: BriefSummaryStatus; text: string | null };
@@ -223,6 +225,33 @@ export function markBriefSeen(input: {
   return { store: { seen, updatedAt: seenAt }, recorded };
 }
 
+/**
+ * Clear the seen record for each id (mark as unread). Ids with no record are
+ * ignored, so it is idempotent. Leaves the store untouched when nothing was cleared.
+ */
+export function unmarkBriefSeen(input: {
+  seen: BriefSeenStore;
+  articleIds: string[];
+  now: Date;
+}): { store: BriefSeenStore; cleared: number } {
+  const seen = { ...input.seen.seen };
+  let cleared = 0;
+  for (const id of new Set(input.articleIds)) {
+    if (!Object.hasOwn(seen, id)) continue;
+    delete seen[id];
+    cleared += 1;
+  }
+  if (cleared === 0) return { store: input.seen, cleared };
+  return { store: { seen, updatedAt: input.now.toISOString() }, cleared };
+}
+
+/** Read and not significantly updated since; such a story is shown as read. */
+function seenAtFor(record: TriageRecord, seen: BriefSeenStore): string | undefined {
+  const entry = Object.hasOwn(seen.seen, record.articleId) ? seen.seen[record.articleId] : undefined;
+  if (!entry || isSignificantlyUpdated(record, entry)) return undefined;
+  return entry.seenAt;
+}
+
 function isHiddenAsSeen(
   record: TriageRecord,
   seen: BriefSeenStore,
@@ -361,7 +390,9 @@ export function composeTopicBrief(input: ComposeTopicBriefInput): TopicBrief {
     }
     sections.push({
       topic: topicRef(topic),
-      stories: candidates.map(({ record, article }, i) => ({
+      stories: candidates.map(({ record, article }, i) => {
+        const seenAt = seenAtFor(record, input.seen);
+        return {
         articleId: article.id,
         topicId: topic.id,
         rank: i + 1,
@@ -376,6 +407,7 @@ export function composeTopicBrief(input: ComposeTopicBriefInput): TopicBrief {
         labels: [...record.labels],
         significance: record.significance,
         manualSeed: isSeed(article),
+        ...(seenAt !== undefined ? { seenAt } : {}),
         links: buildLinks(record, article, articles, input.triage),
         summary: summaryFor(record, articles, input.triage, input.summaries),
         imageUrl: article.imageUrl,
@@ -389,7 +421,8 @@ export function composeTopicBrief(input: ComposeTopicBriefInput): TopicBrief {
               criteriaRef: record.criteriaRef,
             }
           : {}),
-      })),
+        };
+      }),
     });
   });
 
