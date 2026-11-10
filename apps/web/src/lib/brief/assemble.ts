@@ -612,9 +612,16 @@ export function newlyExpandedKeys(
 	return Object.keys(next).filter((key) => next[key] && !prev[key]);
 }
 
-/** Full stories are on-demand work: only a single newly opened card auto-loads one. */
-export function autoFullStoryRequestKeys(newlyExpanded: readonly string[]): readonly string[] {
-	return newlyExpanded.length === 1 ? newlyExpanded : [];
+/**
+ * Full stories are on-demand work: a card auto-loads one only when it is the single open card.
+ * `openCount` is how many cards are open now, not how many just opened, so a second
+ * sequential open (another card still expanded) is skipped and gets the Load control.
+ */
+export function autoFullStoryRequestKeys(
+	newlyExpanded: readonly string[],
+	openCount: number,
+): readonly string[] {
+	return newlyExpanded.length === 1 && openCount === 1 ? newlyExpanded : [];
 }
 
 export function shouldRequestFullStory(story: Story): boolean {
