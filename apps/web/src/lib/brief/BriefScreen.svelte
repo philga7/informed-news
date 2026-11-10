@@ -39,6 +39,7 @@
 		fetchFilteredVerdicts,
 		fetchSeedTopics,
 		filteredOutLinkLabel,
+		deleteBriefSeen,
 		loadBrief,
 		postBriefSeen,
 		postFullStory,
@@ -104,10 +105,26 @@
 	let readAnnouncement = $state('');
 	const seen = createSeenBatcher({
 		post: (ids) => postBriefSeen(ids),
-		onError: () => {
+		onError: (ids) => {
+			// Not saved: drop the read style instead of showing it as kept.
+			const next = { ...readStories };
+			for (const id of ids) next[id] = false;
+			readStories = next;
+			seen.forget(ids);
 			seenError = true;
 		},
 	});
+
+	/** Show ids as read now; the batcher reverts them if the write fails. */
+	function markRead(ids: string[]): void {
+		// Already-read ids (including server-seen ones) need no write.
+		const fresh = ids.filter((id) => !readStories[id]);
+		if (fresh.length === 0) return;
+		const next = { ...readStories };
+		for (const id of fresh) next[id] = true;
+		readStories = next;
+		seen.add(fresh);
+	}
 	const fullStarted = new Set<string>();
 	let previousExpanded: Record<string, boolean> = {};
 	let openMore = $state<Record<string, boolean>>({});
@@ -296,24 +313,31 @@
 
 	function toggleRead(story: BriefStory | undefined): void {
 		if (!story?.id) return;
-		const next = !readStories[story.id];
-		readStories = { ...readStories, [story.id]: next };
+		const id = story.id;
+		const next = !readStories[id];
+		seenError = false;
 		readAnnouncement = `${next ? 'Marked as read' : 'Marked as unread'}: ${story.title}`;
-		if (next) seen.add([story.id]);
+		if (next) {
+			markRead([id]);
+			return;
+		}
+		readStories = { ...readStories, [id]: false };
+		seen.forget([id]);
+		deleteBriefSeen(id).catch(() => {
+			readStories = { ...readStories, [id]: true };
+			seenError = true;
+		});
 	}
 
 	function markAllRead(): void {
 		const ids: string[] = [];
-		const next = { ...readStories };
 		for (const story of renderedStories) {
-			if (!story.id || next[story.id]) continue;
-			next[story.id] = true;
+			if (!story.id || readStories[story.id]) continue;
 			ids.push(story.id);
 		}
-		readStories = next;
 		if (ids.length > 0) {
 			readAnnouncement = `Marked ${ids.length} ${ids.length === 1 ? 'story' : 'stories'} as read`;
-			seen.add(ids);
+			markRead(ids);
 		}
 	}
 
@@ -508,6 +532,12 @@
 		const previous = expandedStories;
 		const data = await loadBrief();
 		stories = data.stories;
+		const serverSeen = data.stories.flatMap((item) =>
+			item.id && item.informed_seen === true && !readStories[item.id] ? [item.id] : [],
+		);
+		if (serverSeen.length > 0) {
+			readStories = { ...readStories, ...Object.fromEntries(serverSeen.map((id) => [id, true])) };
+		}
 		overview = data.overview;
 		categoryName = data.categoryName;
 		loaded = true;
@@ -709,7 +739,7 @@
 					void requestFullStory(story);
 				}
 			}
-			if (ids.length > 0) seen.add(ids);
+			if (ids.length > 0) markRead(ids);
 		});
 	});
 
@@ -717,7 +747,7 @@
 		const story = sharedStory;
 		if (!story?.id || !loaded) return;
 		untrack(() => {
-			seen.add([story.id as string]);
+			markRead([story.id as string]);
 			void requestFullStory(story);
 		});
 	});

@@ -57,7 +57,7 @@ export const BRIEF_FULL_STORY_NOT_IN_BRIEF = 'This story is no longer in the Bri
 export const BRIEF_NOT_REFRESHED = 'Not refreshed yet';
 
 export const BRIEF_SEEN_DEBOUNCE_MS = 1000;
-export const BRIEF_SEEN_SAVE_ERROR = "Couldn't save read marks. They apply to this page only.";
+export const BRIEF_SEEN_SAVE_ERROR = "Couldn't save read marks. Sign in and try again.";
 
 /** Kite content-filter localStorage key. */
 export const CONTENT_FILTER_STORAGE_KEY = 'kite-content-filter';
@@ -651,9 +651,11 @@ export function fullStoryErrorCopy(status: number, error: string | undefined): s
 export type SeenBatcher = {
 	add(ids: string[]): void;
 	flush(): Promise<void>;
+	/** Forget ids (queued or sent) so marking them read again posts again. */
+	forget(ids: string[]): void;
 };
 
-/** Debounced seen marks. Each id is posted at most once. A failed post is not retried; `onError` hears of it. */
+/** Debounced seen marks. Each id is posted once until forgotten. A failed post is not retried; `onError` hears of it and may `forget` the ids. */
 export function createSeenBatcher(options: {
 	post: (ids: string[]) => Promise<unknown>;
 	onError?: (ids: string[]) => void;
@@ -685,6 +687,10 @@ export function createSeenBatcher(options: {
 	}
 
 	return {
+		forget(ids) {
+			for (const id of ids) sent.delete(id);
+			pending = pending.filter((id) => !ids.includes(id));
+		},
 		add(ids) {
 			for (const id of ids) {
 				if (!id || sent.has(id)) continue;

@@ -83,6 +83,7 @@ function install(options: {
 	onSummary?: () => Response | Promise<Response>;
 	onFull?: () => Response | Promise<Response>;
 	onSeen?: () => Response | Promise<Response>;
+	onUnseen?: () => Response | Promise<Response>;
 }) {
 	const stories = options.stories ?? [];
 	const brief =
@@ -102,6 +103,7 @@ function install(options: {
 	const filteredUrls: string[] = [];
 	const seenBodies: unknown[] = [];
 	const seenIds = new Set<string>();
+	const unseenUrls: string[] = [];
 	let summaryPosts = 0;
 	let fullPosts = 0;
 	let refreshed = false;
@@ -128,6 +130,11 @@ function install(options: {
 			for (const id of ids) seenIds.add(id);
 			return jsonResponse(200, { ok: true });
 		}
+		if (url.startsWith('/api/brief/seen/') && method === 'DELETE') {
+			unseenUrls.push(url);
+			if (options.onUnseen) return options.onUnseen();
+			return jsonResponse(200, { ok: true, cleared: 1 });
+		}
 		if (url === '/api/fetch' && method === 'POST') {
 			refreshed = true;
 			return jsonResponse(200, { ok: true });
@@ -147,6 +154,7 @@ function install(options: {
 		...mock,
 		filteredUrls,
 		seenBodies,
+		unseenUrls,
 		summaryPosts: () => summaryPosts,
 		fullPosts: () => fullPosts,
 	};
@@ -488,7 +496,7 @@ describe('BriefScreen full story, seen marks, and refresh clock', () => {
 			timeout: 2500,
 		});
 
-		await fireEvent.click(screen.getAllByRole('button', { name: 'Mark as read' })[1]);
+		await fireEvent.click(screen.getAllByRole('button', { name: 'Mark as read' })[0]);
 		await vi.waitFor(
 			() =>
 				expect(mock.seenBodies).toEqual([
@@ -616,7 +624,7 @@ describe('BriefScreen visible read state (NEWS-204)', () => {
 		mock.restore();
 	});
 
-	it('a failed seen write is not shown as saved: honest error, local mark kept', async () => {
+	it('a failed seen write is not shown as saved: error shown, local mark reverted', async () => {
 		const mock = install({
 			stories: threeStories(),
 			onSeen: () => jsonResponse(500, { ok: false }),
@@ -625,10 +633,113 @@ describe('BriefScreen visible read state (NEWS-204)', () => {
 		await screen.findByRole('button', { name: 'Battery storage rises' });
 		await fireEvent.click(screen.getAllByRole('button', { name: 'Mark as read' })[0]);
 		const alert = await screen.findByRole('alert', {}, { timeout: 2500 });
-		expect(alert).toHaveTextContent("Couldn't save read marks. They apply to this page only.");
+		expect(alert).toHaveTextContent("Couldn't save read marks.");
+		expect(card('Battery storage rises')).not.toHaveAttribute('data-read');
+		mock.restore();
+	});
+
+	it('a 401 seen write shows the error and reverts the read style', async () => {
+		const mock = install({
+			stories: threeStories(),
+			onSeen: () => jsonResponse(401, { ok: false, error: 'Unauthorized' }),
+		});
+		render(BriefScreen);
+		await screen.findByRole('button', { name: 'Battery storage rises' });
+		await fireEvent.click(screen.getAllByRole('button', { name: 'Mark as read' })[0]);
+		await screen.findByRole('alert', {}, { timeout: 2500 });
+		expect(card('Battery storage rises')).not.toHaveAttribute('data-read');
+		mock.restore();
+	});
+});
+
+describe('BriefScreen read state follows server seen state (NEWS-208)', () => {
+	function seenFirst(): unknown[] {
+		const stories = threeStories();
+		Object.assign(stories[0] as object, {
+			informed_seen: true,
+			informed_seen_at: '2026-11-09T12:00:00.000Z',
+		});
+		return stories;
+	}
+
+	it('shows stories the server reports as seen as read after a load', async () => {
+		const mock = install({ stories: seenFirst() });
+		render(BriefScreen);
+		await screen.findByRole('button', { name: 'Battery storage rises' });
+		expect(card('Battery storage rises')).toHaveAttribute('data-read', 'true');
+		expect(card('Ports stay open')).not.toHaveAttribute('data-read');
+		mock.restore();
+	});
+
+	it('opening a card shows it as read', async () => {
+		const mock = install({ stories: threeStories() });
+		render(BriefScreen);
+		await fireEvent.click(await screen.findByRole('button', { name: 'Battery storage rises' }));
+		await vi.waitFor(() =>
+			expect(card('Battery storage rises')).toHaveAttribute('data-read', 'true'),
+		);
+		mock.restore();
+	});
+
+	it('Mark as unread sends one DELETE with the exact story id', async () => {
+		const mock = install({ stories: seenFirst() });
+		render(BriefScreen);
+		await screen.findByRole('button', { name: 'Battery storage rises' });
+		await fireEvent.click(
+			within(card('Battery storage rises')).getByRole('button', { name: 'Mark as unread' }),
+		);
+		expect(card('Battery storage rises')).not.toHaveAttribute('data-read');
+		await vi.waitFor(() => expect(mock.unseenUrls).toEqual(['/api/brief/seen/story-1']));
+		mock.restore();
+	});
+
+	it('a 401 on Mark as unread shows the error and restores the read style', async () => {
+		const mock = install({
+			stories: seenFirst(),
+			onUnseen: () => jsonResponse(401, { ok: false, error: 'Unauthorized' }),
+		});
+		render(BriefScreen);
+		await screen.findByRole('button', { name: 'Battery storage rises' });
+		await fireEvent.click(
+			within(card('Battery storage rises')).getByRole('button', { name: 'Mark as unread' }),
+		);
+		const alert = await screen.findByRole('alert');
+		expect(alert).toHaveTextContent("Couldn't save read marks.");
+		await vi.waitFor(() =>
+			expect(card('Battery storage rises')).toHaveAttribute('data-read', 'true'),
+		);
+		mock.restore();
+	});
+
+	it('opening a story the server already reports as seen sends no seen POST', async () => {
+		const mock = install({ stories: seenFirst() });
+		render(BriefScreen);
+		await fireEvent.click(await screen.findByRole('button', { name: 'Battery storage rises' }));
+		// A later mark flushes its own batch; story-1 must not ride along.
+		await fireEvent.click(screen.getAllByRole('button', { name: 'Mark as read' })[0]);
+		await vi.waitFor(() => expect(mock.seenBodies).toEqual([{ articleIds: ['story-2'] }]), {
+			timeout: 2500,
+		});
 		expect(card('Battery storage rises')).toHaveAttribute('data-read', 'true');
 		mock.restore();
 	});
+
+	for (const status of [401, 500]) {
+		it(`a server-seen story stays read after opening when a seen POST fails (${status})`, async () => {
+			const mock = install({
+				stories: seenFirst(),
+				onSeen: () => jsonResponse(status, { ok: false }),
+			});
+			render(BriefScreen);
+			await fireEvent.click(await screen.findByRole('button', { name: 'Battery storage rises' }));
+			// A failing write for another story: a stray story-1 write would also fail.
+			await fireEvent.click(screen.getAllByRole('button', { name: 'Mark as read' })[0]);
+			await screen.findByRole('alert', {}, { timeout: 2500 });
+			expect(card('Battery storage rises')).toHaveAttribute('data-read', 'true');
+			expect(card('Ports stay open')).not.toHaveAttribute('data-read');
+			mock.restore();
+		});
+	}
 });
 
 describe('BriefScreen seen marks across refresh and reload (NEWS-204)', () => {
@@ -639,8 +750,8 @@ describe('BriefScreen seen marks across refresh and reload (NEWS-204)', () => {
 		await vi.waitFor(() => expect(mock.seenBodies).toEqual([{ articleIds: ['story-1'] }]), {
 			timeout: 2500,
 		});
-		// The opened card still says "Mark as read", so index 1 is the second story.
-		await fireEvent.click(screen.getAllByRole('button', { name: 'Mark as read' })[1]);
+		// The opened card is now read, so index 0 is the second story.
+		await fireEvent.click(screen.getAllByRole('button', { name: 'Mark as read' })[0]);
 		await vi.waitFor(
 			() =>
 				expect(mock.seenBodies).toEqual([{ articleIds: ['story-1'] }, { articleIds: ['story-2'] }]),
