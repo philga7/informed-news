@@ -2,6 +2,20 @@
 
 Binding choices for Informed News. Newest first. When one of these changes, update this file in the same change as [ROADMAP.md](ROADMAP.md) and Jira. What the product does now, in plain language, is [PRODUCT_SPEC.md](PRODUCT_SPEC.md). Pipeline detail remains in [NEWS-84](https://informedcrew.atlassian.net/browse/NEWS-84), [TRIAGE.md](TRIAGE.md), and [BRIEF.md](BRIEF.md). The target is [VISION.md](VISION.md).
 
+## 2026-11-09 — Claude builder pins Sonnet and PR review pins Opus
+
+**Decision:** Philip Clapper approved this pilot on Nov 9, 2026, 9:49 PM ET, for philga7/informed-news only. [VISION.md](VISION.md) is unchanged. This is dev tooling, not the product direction. No NEWS key yet.
+
+1. **Builder.** `claude-build` (`.github/workflows/claude.yml`, the `@claude` issue and comment workflow used for Small TDD tickets) pins `--model claude-sonnet-5-5` in `claude_args`. The action version in use is `anthropics/claude-code-action@v1`, which has no `model:` input. The v1 path is `claude_args: --model`. That action installs Claude Code 2.1.322. Claude Code documents `claude-sonnet-5-5` and `claude-opus-5-5` as model ids, and 2.1.322 is newer than the 2.1.284 and 2.1.280 minimums for those two models. `--max-turns` stays 100. Triggers, secrets, and the turn cap are unchanged.
+2. **Review.** The existing `claude-review` job (`.github/workflows/claude-review.yml`, `pull_request` opened, synchronize, reopened, and ready_for_review) pins `--model claude-opus-5-5` the same way. It reviews the diff against the acceptance criteria in the linked GitHub issue body and the pull request body. The runner has no Jira access. It posts pull request comments only. It does not edit code, commit, push, approve, or merge. Workflow permissions are `contents: read` and `pull-requests: write`, plus `id-token: write` because the action's default GitHub App token path requires it. `issues: write` is removed. The action's OIDC app token otherwise defaults to contents, pull requests, and issues write (`src/github/token.ts` on `v1`). `additional_permissions` overrides those keys to `contents: read`, `pull_requests: write`, and `issues: read` (`issues: read` is what `gh issue view` needs for the linked issue body). Allowed tools are the inline comment tool, `gh pr comment`, `gh pr diff`, `gh pr view`, and `gh issue view`. Edit, Write, commits, pushes, and merge or review commands are disallowed.
+3. **Not automated.** Small TDD tickets build on Sonnet. A big or unsplittable ticket may use Opus (`claude-opus-5-5`) as the builder by setting the model for that run. Fable 5.2 (`claude-fable-5-2`) only if a ticket stalls twice on Opus. Nobody automates that switch. The pilot is to judge review quality over a few pull requests.
+
+This replaces point 2 of the [2026-10-31](#2026-10-31--claude-builds-small-builder-claude-tickets-on-claude-mention-via-github-news-180) decision, which left the builder on the action default and said not to pin a model.
+
+**Why:** Small tickets should stay on Sonnet. Review of the diff against the ticket's acceptance criteria is the place to try Opus, read-only, and see whether the comments are worth it.
+
+**What it rules out:** Leaving the builder unpinned, leaving review on Sonnet, a review that edits or pushes, a review that reads Jira, automating an Opus or Fable builder switch, changing triggers or the 100-turn cap, and copying this split to another repo.
+
 ## 2026-11-07 — Brief at / is the shell (NEWS-200)
 
 **Decision:** The three grill answers for the Brief cutover are adopted. Kite Brief code stays in the repo until [NEWS-202](https://informedcrew.atlassian.net/browse/NEWS-202) and [NEWS-203](https://informedcrew.atlassian.net/browse/NEWS-203).
@@ -172,7 +186,7 @@ This replaces the [NEWS-180](https://informedcrew.atlassian.net/browse/NEWS-180)
 **Decision:** Claude builds Small `builder-claude` tickets on `@claude` mention via GitHub; never merges; no auto-opened issues. Phil answered the grill with the recommended answers (Saturday 2026-10-31; the work-hours hold did not apply).
 
 1. **Triggers:** `issue_comment`, `pull_request_review_comment`, and `pull_request_review` (`submitted`), plus `issues` (`opened`) only when the body contains `@claude`. No label or assignee triggers, so nothing auto-starts.
-2. **Model:** the action default. Do not pin it with `claude_args --model`.
+2. **Model:** the action default. Do not pin it with `claude_args --model`. Superseded for the model pin by the [2026-11-09](#2026-11-09--claude-builder-pins-sonnet-and-pr-review-pins-opus) decision. The builder now pins Sonnet.
 3. **Max turns:** `--max-turns 100` (was 30 until 2026-11-02).
 4. **Allowed tools:** the allow list is the repo npm test, lint, typecheck, and build scripts, plus read-only git status, diff, log, and show. Commit and push stay on the action's own wrapper. No network installs beyond `npm ci`.
 5. **Concurrency:** one run per issue or PR, with cancel-in-progress off.

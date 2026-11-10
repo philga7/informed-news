@@ -82,6 +82,7 @@ Rules for `claude-build`:
 - Claude builds only tickets labeled `builder-claude`.
 - The label is on the NEWS ticket in Jira, which Claude cannot read from GitHub. The issue or comment that mentions `@claude` names the NEWS key, and that mention confirms the label. If no key is named, comment and stop.
 - Small means: one area, under about 300 lines, clear acceptance criteria and a test, no auth, secrets, CI, release config, migrations or deploys, and no design call.
+- The build job pins `--model claude-sonnet-5-5` in `claude_args`. `--max-turns` stays 100. Small TDD tickets stay on Sonnet. A big or unsplittable ticket may use Opus (`claude-opus-5-5`) as the builder by setting that model for the one run. Use Fable 5.2 (`claude-fable-5-2`) only if a ticket stalls twice on Opus. That switch is not automated. This is a pilot in this repo to judge review quality over a few pull requests.
 - If the work grows past Small, stop and comment instead of building.
 - TDD, with the failing test first.
 - One Conventional Commit per ticket, and a PR title that names every key.
@@ -96,6 +97,8 @@ Rules for `claude-build`:
 ## When reviewing a PR
 
 Claude reports findings. It never approves or merges.
+
+The automatic job `claude-review` does not use the checklist below. It reviews the diff against the acceptance criteria in the linked GitHub issue body and the pull request body. It has no Jira access. It posts pull request comments only. It does not edit code, commit, push, approve, or merge. Its model is `claude-opus-5-5`. The checklist below is for a person reviewing a pull request.
 
 - PR title is a Conventional Commit with every `NEWS` key in the scope and the highest bump type in the batch (the **PR title** check enforces the shape; CONTRIBUTING § Squash merges).
 - Approach (TDD/SDD) fits the ticket; SDD has a plan file if required.

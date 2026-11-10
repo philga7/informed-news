@@ -18,7 +18,7 @@ function parseOnKeys(source) {
 }
 
 describe('NEWS-166 Claude Code PR review', () => {
-	it('pins the official action, OAuth secret only, and Sonnet model', () => {
+	it('pins the official action, OAuth secret only, and Opus model', () => {
 		assert.match(workflow, /anthropics\/claude-code-action@v1/);
 		assert.match(
 			workflow,
@@ -27,7 +27,9 @@ describe('NEWS-166 Claude Code PR review', () => {
 		assert.doesNotMatch(workflow, /anthropic_api_key/i);
 		assert.doesNotMatch(workflow, /sk-ant-/);
 		assert.doesNotMatch(workflow, /CLAUDE_CODE_OAUTH_TOKEN:\s*['"]?[A-Za-z0-9_-]{20,}/);
-		assert.match(workflow, /--model claude-sonnet-5-5/);
+		assert.match(workflow, /--model claude-opus-5-5/);
+		assert.doesNotMatch(workflow, /claude-sonnet-5-5/);
+		assert.doesNotMatch(workflow, /^\s*model:/m);
 	});
 
 	it('triggers on PR events and skips drafts', () => {
@@ -39,24 +41,63 @@ describe('NEWS-166 Claude Code PR review', () => {
 		assert.doesNotMatch(workflow, /pull_request_review_comment/);
 	});
 
-	it('sets read/write permissions needed for review comments', () => {
-		assert.match(workflow, /contents:\s*read/);
-		assert.match(workflow, /pull-requests:\s*write/);
-		assert.match(workflow, /issues:\s*write/);
-		assert.match(workflow, /id-token:\s*write/);
+	it('sets contents read and pull-request write for comments', () => {
+		const permissions = workflow.slice(
+			workflow.indexOf('\npermissions:\n'),
+			workflow.indexOf('\njobs:'),
+		);
+		assert.match(permissions, /contents:\s*read/);
+		assert.match(permissions, /pull-requests:\s*write/);
+		assert.doesNotMatch(permissions, /contents:\s*write/);
+		assert.doesNotMatch(permissions, /issues:\s*write/);
+		assert.doesNotMatch(permissions, /issues:\s*read/);
+		assert.match(permissions, /id-token:\s*write/);
+		assert.match(
+			workflow,
+			/additional_permissions:\s*\|\n\s+contents:\s*read\n\s+pull_requests:\s*write\n\s+issues:\s*read/,
+		);
 	});
 
-	it('reviews against CLAUDE.md, comments only, and blocks merge/push tools', () => {
-		assert.match(workflow, /When reviewing a PR/);
+	it('reviews acceptance criteria only, comments only, and blocks edits, commits, and pushes', () => {
+		assert.match(workflow, /acceptance criteria/i);
+		assert.match(workflow, /no Jira access/);
 		assert.match(workflow, /gh pr comment/);
-		assert.match(workflow, /never approve/i);
-		assert.match(workflow, /merge/i);
-		assert.match(workflow, /push/i);
-		assert.match(workflow, /disallowedTools/);
-		assert.match(workflow, /Bash\(git push:\*\)/);
-		assert.match(workflow, /Bash\(git commit:\*\)/);
-		assert.match(workflow, /Bash\(gh pr merge:\*\)/);
-		assert.match(workflow, /Bash\(gh pr review:\*\)/);
+		assert.match(workflow, /gh issue view/);
+		assert.match(workflow, /Do not approve/i);
+		assert.match(workflow, /Do not merge/i);
+		assert.match(workflow, /Do not push/i);
+		assert.match(workflow, /Do not edit files/i);
+		assert.doesNotMatch(workflow, /When reviewing a PR/);
+		const allowed = workflow.match(/--allowedTools "([^"]*)"/);
+		assert.ok(allowed, 'missing --allowedTools');
+		const allowedTools = allowed[1].split(',');
+		for (const entry of [
+			'mcp__github_inline_comment__create_inline_comment',
+			'Bash(gh pr comment:*)',
+			'Bash(gh pr diff:*)',
+			'Bash(gh pr view:*)',
+			'Bash(gh issue view:*)',
+		]) {
+			assert.ok(allowedTools.includes(entry), `${entry} must be allowed`);
+		}
+		for (const banned of ['Edit', 'Write', 'Bash(git commit:*)', 'Bash(git push:*)', 'Bash(gh pr edit:*)']) {
+			assert.equal(allowedTools.includes(banned), false, `${banned} must not be allowed`);
+		}
+		const disallowed = workflow.match(/--disallowedTools "([^"]*)"/);
+		assert.ok(disallowed, 'missing --disallowedTools');
+		const disallowedTools = disallowed[1].split(',');
+		for (const entry of [
+			'Edit',
+			'Write',
+			'NotebookEdit',
+			'Bash(git push:*)',
+			'Bash(git commit:*)',
+			'Bash(gh pr merge:*)',
+			'Bash(gh pr review:*)',
+			'Bash(gh pr edit:*)',
+		]) {
+			assert.ok(disallowedTools.includes(entry), `${entry} must be disallowed`);
+		}
 	});
 
 	it('an @claude mention starts claude-build only; review stays on pull_request', () => {

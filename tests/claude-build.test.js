@@ -74,12 +74,13 @@ describe('NEWS-180 claude build workflow', () => {
 		assert.doesNotMatch(workflow, /\n\s*schedule:/);
 		assert.doesNotMatch(workflow, /\n {2}pull_request:\n/);
 		assert.doesNotMatch(workflow, /^\s*ref:/m);
-		assert.doesNotMatch(workflow, /--model/);
+		assert.match(workflow, /--model claude-sonnet-5-5/);
+		assert.doesNotMatch(workflow, /--model claude-opus-5-5/);
 		assert.match(workflow, /--max-turns 100/);
 		assert.doesNotMatch(workflow, /--max-turns 30/);
 		assert.match(
 			workflow,
-			/^ {10}# real Small tickets \(about 3 TDD tasks plus docs\) need more than 30 turns; 30 only fit one-line smoke tests\.\n {10}claude_args: \|\n {12}--max-turns 100$/m,
+			/^ {10}# real Small tickets \(about 3 TDD tasks plus docs\) need more than 30 turns; 30 only fit one-line smoke tests\.\n {10}# Small TDD tickets pin Sonnet\. A one-run Opus or Fable override is a manual edit of this line, not a second workflow\. See docs\/DECISIONS\.md\.\n {10}claude_args: \|\n {12}--max-turns 100\n {12}--model claude-sonnet-5-5$/m,
 		);
 		assert.match(workflow, /open a PR, never merge, follow CLAUDE\.md and the work-hours hold/);
 	});
