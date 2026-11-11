@@ -1,3 +1,9 @@
+## [0.40.6](https://github.com/philga7/informed-news/compare/v0.40.5...v0.40.6) (2026-11-11)
+
+### Bug Fixes
+
+* **NEWS-210:** poll running refresh instead of treating a dropped POST as failure ([#261](https://github.com/philga7/informed-news/issues/261)) ([e2c5052](https://github.com/philga7/informed-news/commit/e2c5052d599477dd55434c2038ddf327ce9a2c57)), closes [#259](https://github.com/philga7/informed-news/issues/259)
+
 ## [0.40.5](https://github.com/philga7/informed-news/compare/v0.40.4...v0.40.5) (2026-11-10)
 
 ### Bug Fixes
