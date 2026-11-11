@@ -8,6 +8,8 @@ This is not the release log. Releases are recorded in `CHANGELOG.md` by semantic
 
 ## 2026-11-11
 
+Full stories from publisher pages that start with a very large block of script data (common on some news sites) no longer lose their article text. The app now ignores that script code before reading the first million characters of the page.
+
 On the Brief, **Refresh** no longer says “Refresh failed” just because the connection dropped while the server was still working. The button keeps saying “Refreshing…”, and the Brief reloads with the new stories when the run finishes, without a manual page reload. “Refresh failed. Try again.” now appears only when the run really failed or never started.
 
 ## 2026-11-10

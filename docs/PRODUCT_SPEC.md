@@ -116,6 +116,8 @@ Links, quoted lines, and link-backed claims on a card or full story are checked 
 
 **Scenario:** Given too many on-demand full stories have been requested this hour, when you open another one, then the card says the full story limit for this hour has been reached.
 
+When the app reads a publisher's page for article text, it first drops script and style code, then reads at most the first 1,000,000 characters of what is left. Pages whose first megabyte is mostly script data still show their article text; a page with more than a million characters of real markup is read only up to that point. This keeps the app responsive while it reads large pages.
+
 A few strong stories may get a full story during refresh (important stories, with several outlets or an official label). The others wait until you open them.
 
 ## Add a story and remove it
