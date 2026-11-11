@@ -27,7 +27,7 @@ One SPA shell in this repo replaces Kite one view at a time. When the image is s
 - Map ([NEWS-35](https://informedcrew.atlassian.net/browse/NEWS-35)), on hold
 - Signals ([NEWS-34](https://informedcrew.atlassian.net/browse/NEWS-34)), on hold
 
-Story Desk is next and has not shipped. The Briefs module matches the Kite Brief (keyboard, filters, shared links, accessibility) before [NEWS-202](https://informedcrew.atlassian.net/browse/NEWS-202) and [NEWS-203](https://informedcrew.atlassian.net/browse/NEWS-203) remove that view. Map and Signals have not shipped and get no chrome until their epics have data.
+Story Desk is next and has not shipped. The Briefs module matches the Kite Brief (keyboard, filters, shared links, accessibility) before [NEWS-202](https://informedcrew.atlassian.net/browse/NEWS-202) removes that view. Map and Signals have not shipped and get no chrome until their epics have data.
 
 ## Alerts
 
