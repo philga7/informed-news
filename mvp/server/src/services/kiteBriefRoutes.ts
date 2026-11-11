@@ -39,7 +39,7 @@ import {
 import { loadBriefClaims } from './briefClaims.js';
 import { resolveRefreshIntervalHours } from './briefConfig.js';
 import { getRefreshRunner } from './refreshRunner.js';
-import { composeTopicBrief, type TopicBrief } from './topicBrief.js';
+import { composeTopicBrief, currentProviderConfig, type TopicBrief } from './topicBrief.js';
 
 export type CreateKiteBriefRouterDeps = {
   loadBriefClaims?: typeof loadBriefClaims;
@@ -310,6 +310,7 @@ export function createKiteBriefRouter(
           intervalHours: resolveRefreshIntervalHours(deps.env ?? process.env),
           running: isRefreshRunning(),
           degraded: owned.fixture ? [] : owned.degraded,
+          providers: currentProviderConfig(deps.env ?? process.env),
         }),
       );
     } catch (err) {

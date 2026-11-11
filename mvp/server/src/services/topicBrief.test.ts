@@ -650,8 +650,52 @@ function providerStatus(state: 'ok' | 'partial' | 'down' | 'disabled') {
   return { state, topicsAttempted: 1, topicsFailed: 0, items: 0, errors: [] };
 }
 
+const KEYS_PRESENT = { typesafe: true, ollama: true };
+const KEYS_ABSENT = { typesafe: false, ollama: false };
+
+test('buildRefreshNotices: provider notices follow current config, not last-run meta (NEWS-209)', () => {
+  const stale: StoreMeta = {
+    lastFetchAt: null,
+    lastError: null,
+    triage: {
+      at: NOW.toISOString(),
+      skipped: false,
+      candidates: 1,
+      kept: 1,
+      dropped: 0,
+      byReason: {},
+      jev: { budget: 1, used: 0, errors: 0 },
+      summaryBudget: 60,
+      errors: ['TypeSafe not configured'],
+    },
+    brief: {
+      at: NOW.toISOString(),
+      summaries: {
+        budget: 60,
+        used: 0,
+        generated: 0,
+        reused: 0,
+        unavailable: 0,
+        errors: ['Ollama not configured'],
+      },
+    },
+  };
+  assert.deepEqual(buildRefreshNotices(stale, KEYS_PRESENT), []);
+  const fresh: StoreMeta = { lastFetchAt: null, lastError: null };
+  assert.deepEqual(buildRefreshNotices(fresh, KEYS_ABSENT), [
+    'Story scoring unavailable (TypeSafe not configured)',
+    'Summaries unavailable (Ollama not configured)',
+  ]);
+  assert.deepEqual(buildRefreshNotices(fresh, { typesafe: true, ollama: false }), [
+    'Summaries unavailable (Ollama not configured)',
+  ]);
+});
+
 test('buildRefreshNotices: one notice per source', () => {
-  assert.deepEqual(buildRefreshNotices({ lastFetchAt: null, lastError: null }), []);
+  assert.deepEqual(
+    buildRefreshNotices({ lastFetchAt: null, lastError: null }, KEYS_PRESENT),
+    [],
+  );
 
   const meta: StoreMeta = {
     lastFetchAt: null,
@@ -687,7 +731,7 @@ test('buildRefreshNotices: one notice per source', () => {
       lastSuccess: null,
     },
   };
-  assert.deepEqual(buildRefreshNotices(meta), [
+  assert.deepEqual(buildRefreshNotices(meta, KEYS_ABSENT), [
     'SearXNG unavailable',
     'Google News partly failed',
     'Story scoring unavailable (TypeSafe not configured)',
@@ -706,7 +750,7 @@ test('buildRefreshNotices: one notice per source', () => {
     brief: { ...meta.brief!, summaries: { ...meta.brief!.summaries, errors: [] } },
     refresh: { last: run(BOUNDARY), lastSuccess: run(BOUNDARY) },
   };
-  assert.deepEqual(buildRefreshNotices(quiet), [
+  assert.deepEqual(buildRefreshNotices(quiet, KEYS_PRESENT), [
     'SearXNG partly failed',
     'Google News unavailable',
     '1 story not scored (budget)',
@@ -720,7 +764,7 @@ test('buildRefreshNotices: one notice per source', () => {
       providers: { searxng: providerStatus('disabled'), google_news: providerStatus('ok') },
     },
   };
-  assert.deepEqual(buildRefreshNotices(disabled), []);
+  assert.deepEqual(buildRefreshNotices(disabled, KEYS_PRESENT), []);
 });
 
 test('markBriefSeen snapshots kept records, ignores unknown ids, prunes old and no-longer-kept entries', () => {

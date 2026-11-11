@@ -8,6 +8,8 @@ This is not the release log. Releases are recorded in `CHANGELOG.md` by semantic
 
 ## 2026-11-11
 
+The Brief's status line now checks whether the scoring (TypeSafe) and summary (Ollama) keys are set on the running app right now. After you turn the keys on, loading or reloading the Brief no longer says “not configured” because of an earlier refresh that ran without them. With a key missing, the line still says so.
+
 On the Brief, if the connection drops and the refresh you just started has already finished successfully by the time the page checks, **Refresh** now treats it as done: the Brief reloads with the new stories and no “Refresh failed” message. A run that really failed, or one that never started, still shows “Refresh failed. Try again.”
 
 Full stories from publisher pages that start with a very large block of script data (common on some news sites) no longer lose their article text. The app now ignores that script code before reading the first million characters of the page.

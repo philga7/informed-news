@@ -438,8 +438,29 @@ function pluralStories(n: number): string {
   return n === 1 ? '1 story' : `${n} stories`;
 }
 
-/** Plain-language status lines for the refresh bar, built from meta.json. */
-export function buildRefreshNotices(meta: StoreMeta): string[] {
+/** Which scoring/summary providers are configured on the running app now. */
+export interface ProviderConfig {
+  typesafe: boolean;
+  ollama: boolean;
+}
+
+/** Reads current key presence (same trim rule as the provider clients). */
+export function currentProviderConfig(env: NodeJS.ProcessEnv = process.env): ProviderConfig {
+  return {
+    typesafe: Boolean(env.TYPESAFE_API_KEY?.trim()),
+    ollama: Boolean(env.OLLAMA_API_KEY?.trim()),
+  };
+}
+
+/**
+ * Plain-language status lines for the refresh bar. Search/budget/refresh lines
+ * come from meta.json; "not configured" lines come from current key presence,
+ * never from the last run's saved errors (NEWS-209).
+ */
+export function buildRefreshNotices(
+  meta: StoreMeta,
+  config: ProviderConfig = currentProviderConfig(),
+): string[] {
   const notices: string[] = [];
 
   const providers = meta.topicSearch?.providers;
@@ -451,16 +472,16 @@ export function buildRefreshNotices(meta: StoreMeta): string[] {
     }
   }
 
+  if (!config.typesafe) {
+    notices.push('Story scoring unavailable (TypeSafe not configured)');
+  }
   const triage = meta.triage;
   if (triage) {
-    if (triage.errors.some((e) => e.includes('TypeSafe not configured'))) {
-      notices.push('Story scoring unavailable (TypeSafe not configured)');
-    }
     const unscored = triage.byReason.not_scored_budget ?? 0;
     if (unscored > 0) notices.push(`${pluralStories(unscored)} not scored (budget)`);
   }
 
-  if (meta.brief?.summaries.errors.some((e) => e.includes('Ollama not configured'))) {
+  if (!config.ollama) {
     notices.push('Summaries unavailable (Ollama not configured)');
   }
 
