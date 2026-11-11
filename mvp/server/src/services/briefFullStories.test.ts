@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { ON_DEMAND_OLLAMA_RETRIES, ON_DEMAND_OLLAMA_TIMEOUT_MS } from './briefConfig.js';
 import type { Article, StoreMeta } from '../types/article.js';
 import type { BriefFullStoryRecord, BriefFullStoriesStore } from '../types/briefFullStory.js';
 import type { BriefSeenStore, BriefSummariesStore, RefreshRun } from '../types/brief.js';
@@ -467,4 +468,50 @@ test('citation guard still runs on cache-hit reuse', async () => {
   assert.deepEqual(result, { ok: true, record: cached });
   assert.equal(guardCalls, 1);
   assert.equal(h.calls, 0);
+});
+
+test('NEWS-211 on-demand full story uses the longer on-demand timeout', async () => {
+  const h = harness();
+  const seen: Array<number | undefined> = [];
+  const enrich: NonNullable<BriefFullStoryDeps['enrich']> = async (_req, d) => {
+    seen.push(d?.timeoutMs);
+    return { talking_points: ['Point'], timeline: [], suggested_qna: [] };
+  };
+  const result = await generateFullStory('main', { now: NOW }, { ...h.deps, enrich });
+  assert.equal(result.ok, true);
+  assert.deepEqual(seen, [ON_DEMAND_OLLAMA_TIMEOUT_MS]);
+});
+
+test('NEWS-211 on-demand full story retries once after a timeout and then succeeds', async () => {
+  const h = harness();
+  let calls = 0;
+  const enrich: NonNullable<BriefFullStoryDeps['enrich']> = async () => {
+    calls += 1;
+    if (calls === 1) throw new Error('Ollama API request timed out');
+    return { talking_points: ['Point'], timeline: [], suggested_qna: [] };
+  };
+  const result = await generateFullStory('main', { now: NOW }, { ...h.deps, enrich });
+  assert.equal(calls, 2);
+  assert.equal(result.ok, true);
+});
+
+test('NEWS-211 on-demand full story fails honestly when every attempt times out; other errors are not retried', async () => {
+  const h = harness();
+  let calls = 0;
+  const enrich: NonNullable<BriefFullStoryDeps['enrich']> = async () => {
+    calls += 1;
+    throw new Error('Ollama API request timed out');
+  };
+  const result = await generateFullStory('main', { now: NOW }, { ...h.deps, enrich });
+  assert.equal(calls, 1 + ON_DEMAND_OLLAMA_RETRIES);
+  assert.equal(result.ok, false);
+
+  const h2 = harness();
+  let other = 0;
+  const refused: NonNullable<BriefFullStoryDeps['enrich']> = async () => {
+    other += 1;
+    throw new Error('connect ECONNREFUSED');
+  };
+  await generateFullStory('main', { now: NOW }, { ...h2.deps, enrich: refused });
+  assert.equal(other, 1);
 });
