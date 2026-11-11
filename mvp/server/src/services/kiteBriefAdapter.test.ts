@@ -972,7 +972,13 @@ test('buildBriefOverview: sections with More split, quiet, notices, nextAt, runn
     } as unknown as StoreMeta['topicSearch'],
   };
 
-  const overview = buildBriefOverview({ brief: topicBrief(), meta, intervalHours: 2.5, running: true });
+  const overview = buildBriefOverview({
+    brief: topicBrief(),
+    meta,
+    intervalHours: 2.5,
+    running: true,
+    providers: { typesafe: true, ollama: true },
+  });
   assert.deepEqual(overview, {
     ok: true,
     fixture: false,
@@ -1002,6 +1008,7 @@ test('buildBriefOverview: sections with More split, quiet, notices, nextAt, runn
     meta: { lastFetchAt: null, lastError: null },
     intervalHours: 3,
     running: false,
+    providers: { typesafe: true, ollama: true },
   });
   assert.equal(never.refresh.nextAt, null);
   assert.equal(never.refresh.last, null);
@@ -1014,6 +1021,7 @@ test('buildBriefOverview: sections with More split, quiet, notices, nextAt, runn
     intervalHours: 3,
     running: false,
     degraded: ['seen', 'summaries'],
+    providers: { typesafe: true, ollama: true },
   });
   assert.deepEqual(degraded.notices, [
     'SearXNG unavailable',

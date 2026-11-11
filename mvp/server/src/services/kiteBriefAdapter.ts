@@ -16,6 +16,7 @@ import {
   type BriefStory,
   type BriefSummaryStatus,
   type BriefTopicRef,
+  type ProviderConfig,
   type TopicBrief,
 } from './topicBrief.js';
 import { isHostnameLike, normalizeOutletDomain } from './triageKeywords.js';
@@ -976,12 +977,14 @@ export function buildBriefOverview(input: {
   intervalHours: number | null;
   running: boolean;
   degraded?: readonly BriefDegradedStore[];
+  /** Defaults to current key presence on the running app. */
+  providers?: ProviderConfig;
 }): BriefOverview {
   const last = input.meta.refresh?.last ?? null;
   const lastSuccess = input.meta.refresh?.lastSuccess ?? null;
   const triage = input.meta.triage ?? null;
   const notices = [
-    ...buildRefreshNotices(input.meta),
+    ...buildRefreshNotices(input.meta, input.providers),
     ...(input.degraded ?? []).map((store) => DEGRADED_NOTICES[store]),
   ];
   return {

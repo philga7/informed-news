@@ -78,7 +78,9 @@ The summary is one or two neutral sentences written from the story’s own text.
 
 **Scenario:** Given too many on-demand summaries have been requested this hour, when you open another story, then the card says the summary limit for this hour has been reached.
 
-Summaries for the top stories in each section are prepared during refresh. The rest wait until you open them. If summaries could not be written on the last refresh, the refresh bar says so.
+Summaries for the top stories in each section are prepared during refresh. The rest wait until you open them. If summaries could not be written on the last refresh, the refresh bar says so. The “not configured” lines for story scoring (TypeSafe) and summaries (Ollama) come from the keys set on the running app now, not from the last refresh.
+
+**Scenario:** Given the TypeSafe and Ollama keys are set but the last refresh ran without them, when you load or reload the Brief, then the refresh bar does not say “not configured”. With a key missing, it says that provider is not configured.
 
 ## Full stories
 

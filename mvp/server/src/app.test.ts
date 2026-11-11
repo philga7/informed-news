@@ -3312,7 +3312,10 @@ test('GET /api/brief/overview: sections with More split, quiet, notices, nextAt,
       ],
       meta,
     },
-    { env: { REFRESH_INTERVAL_HOURS: '2' }, isRefreshRunning: () => true },
+    {
+      env: { REFRESH_INTERVAL_HOURS: '2', TYPESAFE_API_KEY: 'k', OLLAMA_API_KEY: 'k' },
+      isRefreshRunning: () => true,
+    },
   );
   try {
     const overview = await getJson<unknown>(`${baseUrl}/api/brief/overview`);
@@ -3382,6 +3385,7 @@ for (const [store, dep, notice] of [
         records: [keptRecord('k1', ['t1']), keptRecord('k2', ['t1'])],
       },
       {
+        env: { TYPESAFE_API_KEY: 'k', OLLAMA_API_KEY: 'k' },
         [dep]: async () => {
           throw new Error(`corrupt ${store}`);
         },
