@@ -3,7 +3,12 @@ import type { RequestHandler } from 'express';
 
 import { sessionCookieShouldBeSecure } from './sessionCookie.js';
 
-const SESSION_COOKIE_NAME = 'mvp_session';
+const DEFAULT_SESSION_COOKIE_NAME = 'mvp_session';
+
+function sessionCookieName(): string {
+  const configured = process.env.SESSION_COOKIE_NAME?.trim();
+  return configured ? configured : DEFAULT_SESSION_COOKIE_NAME;
+}
 
 export function createSessionMiddleware(): RequestHandler {
   const secret = process.env.SESSION_SECRET?.trim();
@@ -13,8 +18,9 @@ export function createSessionMiddleware(): RequestHandler {
     );
   }
 
+  const cookieName = sessionCookieName();
   const sessionMiddleware = cookieSession({
-    name: SESSION_COOKIE_NAME,
+    name: cookieName,
     keys: [secret],
     httpOnly: true,
     sameSite: 'lax',
@@ -39,7 +45,7 @@ export function createSessionMiddleware(): RequestHandler {
           res.setHeader(
             'Set-Cookie',
             list.map((c) =>
-              c.startsWith(`${SESSION_COOKIE_NAME}`) && !/;\s*secure(;|$)/i.test(c)
+              c.startsWith(`${cookieName}`) && !/;\s*secure(;|$)/i.test(c)
                 ? `${c}; Secure`
                 : c,
             ),

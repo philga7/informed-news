@@ -18,6 +18,7 @@ const ALLOWED_VALUES = [
   /^http:\/\/searxng:8080$/,
   /^http:\/\/127\.0\.0\.1:8888$/,
   /^(glm-5\.3-flash|jev-1\.13\.0)$/,
+  /^(mvp_session|informed-news-data)$/,
 ];
 
 function sourceFiles(dir) {

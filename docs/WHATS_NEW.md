@@ -8,6 +8,8 @@ This is not the release log. Releases are recorded in `CHANGELOG.md` by semantic
 
 ## 2026-11-11
 
+No user-visible change.
+
 On the Brief, if the model answers a full-story request with a response the app cannot read, the card now says the full story could not be built because the AI response was malformed. Before, it showed the generic “could not be loaded right now” message. It does not retry on its own, and you can try again.
 
 On the Brief, opening a story right after a refresh is more likely to load its summary and full story. The server now waits longer for the model when you open a story, and, if the first attempt times out, cancels it and tries once more with a fresh request. “Could not be loaded right now” still appears when the model really can't be reached.
