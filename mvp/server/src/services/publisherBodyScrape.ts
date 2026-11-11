@@ -1,6 +1,7 @@
 import * as cheerio from 'cheerio';
 import type { BodyStatus } from '../types/article.js';
 import { truncateBodyText } from '../types/article.js';
+import { prepareHtmlForParse } from './htmlParseGuard.js';
 import { isRetryableNetworkError } from './isRetryableNetworkError.js';
 import { USER_AGENT } from './userAgent.js';
 
@@ -342,7 +343,7 @@ export async function scrapePublisherBody(
 
     if (BLOCKED_HTTP.has(response.status)) {
       try {
-        const html = await response.text();
+        const html = await prepareHtmlForParse(await response.text());
         const extracted = extractPublisherBodyFromHtml(html, publisherUrl);
         return { ...extracted, bodyText: null, bodyStatus: 'blocked' };
       } catch {
@@ -355,7 +356,7 @@ export async function scrapePublisherBody(
       return emptyResult('unavailable');
     }
 
-    const html = await response.text();
+    const html = await prepareHtmlForParse(await response.text());
     return extractPublisherBodyFromHtml(html, publisherUrl);
   } catch (err) {
     console.warn(
