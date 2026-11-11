@@ -1,3 +1,9 @@
+## [0.40.12](https://github.com/philga7/informed-news/compare/v0.40.11...v0.40.12) (2026-11-11)
+
+### Bug Fixes
+
+* **NEWS-215:** show a parse failure when full-story JSON is malformed ([78ca473](https://github.com/philga7/informed-news/commit/78ca473ee36a375f7ea35441dfa9b8c269cbe02d)), closes [#271](https://github.com/philga7/informed-news/issues/271)
+
 ## [0.40.11](https://github.com/philga7/informed-news/compare/v0.40.10...v0.40.11) (2026-11-11)
 
 ### Bug Fixes
