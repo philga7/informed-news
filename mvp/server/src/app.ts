@@ -165,7 +165,12 @@ function parseSeenArticleIds(body: unknown): string[] | null {
   return ids;
 }
 
-const SUMMARY_ERROR_STATUS = { not_in_brief: 404, rate_limited: 429, error: 502 } as const;
+const SUMMARY_ERROR_STATUS = {
+  not_in_brief: 404,
+  rate_limited: 429,
+  error: 502,
+  parse_failed: 502,
+} as const;
 
 function parseClusterId(body: unknown): string | null {
   const raw = (body as { clusterId?: unknown } | null)?.clusterId;

@@ -6,6 +6,7 @@ import type { BriefFullStoryRecord, BriefFullStoriesStore } from '../types/brief
 import type { BriefSeenStore, BriefSummariesStore, RefreshRun } from '../types/brief.js';
 import type { Topic } from '../types/topic.js';
 import type { TriageRecord, TriageStore } from '../types/triage.js';
+import { enrichFullStory, FULL_STORY_PARSE_ERROR } from './briefFullStoryEnrichment.js';
 import {
   createFullStoryOnDemandLimiter,
   generateFullStory,
@@ -514,4 +515,29 @@ test('NEWS-211 on-demand full story fails honestly when every attempt times out;
   };
   await generateFullStory('main', { now: NOW }, { ...h2.deps, enrich: refused });
   assert.equal(other, 1);
+});
+
+test('NEWS-215 malformed enrichment JSON persists a parse-failure error record and is not retried', async () => {
+  let chats = 0;
+  const enrich: NonNullable<BriefFullStoryDeps['enrich']> = (req, d) =>
+    enrichFullStory(req, {
+      ...d,
+      chat: async () => {
+        chats += 1;
+        return '{"talking_points": ["One" "Two"], "timeline": [], "suggested_qna": []}';
+      },
+    });
+  const h = harness(undefined, undefined, { enrich });
+  const result = await generateFullStory('main', { now: NOW }, h.deps);
+  assert.deepEqual(result, { ok: false, code: 'parse_failed', error: FULL_STORY_PARSE_ERROR });
+  assert.equal(chats, 1);
+  assert.equal(h.puts[0]!.status, 'error');
+  assert.equal(h.puts[0]!.error, FULL_STORY_PARSE_ERROR);
+});
+
+test('NEWS-215 a valid enrichment payload still produces an ok record', async () => {
+  const h = harness();
+  const result = await generateFullStory('main', { now: NOW }, h.deps);
+  assert.equal(result.ok, true);
+  assert.equal(h.puts[0]!.status, 'ok');
 });

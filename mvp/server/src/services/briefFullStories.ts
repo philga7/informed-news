@@ -27,6 +27,7 @@ import {
 import { retryThrowOnTimeout } from './onDemandOllama.js';
 import {
   enrichFullStory,
+  FullStoryParseError,
   type FullStoryMemberInput,
   type FullStoryRequestedSection,
 } from './briefFullStoryEnrichment.js';
@@ -48,7 +49,7 @@ import { getOllamaClient, getOllamaModelName } from './ollamaFraming.js';
 
 export type GenerateFullStoryResult =
   | { ok: true; record: BriefFullStoryRecord }
-  | { ok: false; code: 'not_in_brief' | 'rate_limited' | 'error'; error: string };
+  | { ok: false; code: 'not_in_brief' | 'rate_limited' | 'error' | 'parse_failed'; error: string };
 
 export type BriefFullStoryDeps = BriefSummaryDeps & RegisterAndGuardDeps & {
   readBriefFullStories?: () => Promise<BriefFullStoriesStore>;
@@ -454,7 +455,7 @@ async function generateFullStoryOnce(
     const writeError = await putSafely(deps, failed);
     return {
       ok: false,
-      code: 'error',
+      code: err instanceof FullStoryParseError ? 'parse_failed' : 'error',
       error: writeError ? `full story write: ${writeError}` : failed.error!,
     };
   }

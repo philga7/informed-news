@@ -4,6 +4,8 @@ import { FULL_STORY_BODY_MAX_CHARS } from './briefConfig.js';
 import {
   buildFullStoryEnrichmentPrompt,
   enrichFullStory,
+  FULL_STORY_PARSE_ERROR,
+  FullStoryParseError,
   parseFullStoryEnrichmentResponse,
 } from './briefFullStoryEnrichment.js';
 
@@ -161,4 +163,48 @@ test('enrichFullStory prompt from fake chat never solicits map', async () => {
   assert.match(capturedPrompt, /historical_background/);
   assert.doesNotMatch(capturedPrompt, /"map"/);
   assert.match(capturedPrompt, /Never include map/);
+});
+
+// Array-element syntax error like the window 9 failure: a missing comma between elements.
+const MALFORMED_ARRAY_JSON =
+  '{"talking_points": ["One" "Two"], "timeline": [], "suggested_qna": []}';
+
+test('NEWS-215 malformed enrichment JSON throws a stable parse failure without the payload', () => {
+  assert.throws(
+    () => parseFullStoryEnrichmentResponse(MALFORMED_ARRAY_JSON, []),
+    (err: unknown) => {
+      assert.ok(err instanceof FullStoryParseError);
+      assert.equal(err.message, FULL_STORY_PARSE_ERROR);
+      assert.equal(err.message.includes('One'), false);
+      return true;
+    },
+  );
+});
+
+test('NEWS-215 parse failure logs raw length and truncation, never the content', () => {
+  const lines: string[] = [];
+  const original = console.warn;
+  console.warn = (...args: unknown[]) => {
+    lines.push(args.map(String).join(' '));
+  };
+  try {
+    assert.throws(
+      () => parseFullStoryEnrichmentResponse('{"talking_points": ["SECRET-TEXT", "cut', []),
+      FullStoryParseError,
+    );
+  } finally {
+    console.warn = original;
+  }
+  const logged = lines.join('\n');
+  assert.match(logged, /length=\d+/);
+  assert.match(logged, /truncated=true/);
+  assert.equal(logged.includes('SECRET-TEXT'), false);
+});
+
+test('NEWS-215 a valid payload still parses', () => {
+  const parsed = parseFullStoryEnrichmentResponse(
+    JSON.stringify({ talking_points: ['A'], timeline: [], suggested_qna: [] }),
+    [],
+  );
+  assert.deepEqual(parsed.talking_points, ['A']);
 });

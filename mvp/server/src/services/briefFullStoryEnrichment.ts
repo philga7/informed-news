@@ -243,11 +243,51 @@ function validateFullStoryPayload(
   return out;
 }
 
+/** Stable reason persisted on the error record and mapped to Brief copy (NEWS-215). */
+export const FULL_STORY_PARSE_ERROR = 'Full-story response could not be parsed';
+
+/** The model answered, but its JSON was malformed. Never retried. */
+export class FullStoryParseError extends Error {
+  constructor() {
+    super(FULL_STORY_PARSE_ERROR);
+    this.name = 'FullStoryParseError';
+  }
+}
+
+/** A cut-off payload has more opening than closing braces/brackets, or ends mid-structure. */
+function looksTruncated(raw: string): boolean {
+  const text = raw.trim();
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (const ch of text) {
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (ch === '\\') escaped = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') inString = true;
+    else if (ch === '{' || ch === '[') depth += 1;
+    else if (ch === '}' || ch === ']') depth -= 1;
+  }
+  return inString || depth > 0;
+}
+
 export function parseFullStoryEnrichmentResponse(
   raw: string,
   requested: FullStoryEnrichRequest['requestedSections'],
 ): BriefFullStoryEnrichment {
-  const parsed = parseJsonResponse(raw);
+  let parsed: unknown;
+  try {
+    parsed = parseJsonResponse(raw);
+  } catch {
+    // Length and shape only — never the response content.
+    console.warn(
+      `[full-story] enrichment JSON parse failed: length=${raw.length} truncated=${looksTruncated(raw)}`,
+    );
+    throw new FullStoryParseError();
+  }
   return validateFullStoryPayload(parsed, requested);
 }
 
