@@ -37,6 +37,8 @@ export type RefreshState = BriefRefreshClock & {
 	running: boolean;
 	/** `ok` of the last finished run; null when none is recorded. */
 	lastOk: boolean | null;
+	/** `startedAt` of the last finished run (ISO); null when none is recorded. */
+	lastStartedAt: string | null;
 };
 
 export type LoadedBrief = {
@@ -216,8 +218,10 @@ function parseRefresh(value: unknown): RefreshState | null {
 	const nextAt = typeof value.nextAt === 'string' ? value.nextAt : null;
 	const running = value.running === true;
 	const lastOk = isRecord(value.last) && typeof value.last.ok === 'boolean' ? value.last.ok : null;
+	const lastStartedAt =
+		isRecord(value.last) && typeof value.last.startedAt === 'string' ? value.last.startedAt : null;
 	if (!completedAt && !nextAt && !running && lastOk === null) return null;
-	return { lastSuccess: completedAt ? { completedAt } : null, nextAt, running, lastOk };
+	return { lastSuccess: completedAt ? { completedAt } : null, nextAt, running, lastOk, lastStartedAt };
 }
 
 function parseOverview(body: unknown): TopicOverview | null {
@@ -317,13 +321,25 @@ export const REFRESH_POLL_MS = 5_000;
 /** Give up waiting on a running refresh after this long (the job is far shorter). */
 export const REFRESH_POLL_MAX_MS = 30 * 60 * 1000;
 
-/** Current refresh state from the overview, or null when it cannot be read. */
+/**
+ * Current refresh state from the overview, or null when it cannot be read. A readable
+ * overview with no refresh facts yet (nothing ran, nothing running) is an idle state, not null.
+ */
 export async function fetchRefreshState(): Promise<RefreshState | null> {
 	try {
 		const response = await fetch('/api/brief/overview', { credentials: 'include', cache: 'no-store' });
 		if (!response.ok) return null;
 		const body: unknown = await response.json();
-		return isRecord(body) ? parseRefresh(body.refresh) : null;
+		if (!isRecord(body)) return null;
+		return (
+			parseRefresh(body.refresh) ?? {
+				lastSuccess: null,
+				nextAt: null,
+				running: false,
+				lastOk: null,
+				lastStartedAt: null,
+			}
+		);
 	} catch {
 		return null;
 	}
@@ -333,19 +349,38 @@ export type RefreshOutcome = 'succeeded' | 'failed';
 
 /**
  * After a start request that did not come back cleanly (dropped connection, proxy timeout,
- * error status): ask the server whether the job is running. Nothing running means the start
- * never began, so it failed. Otherwise poll until it stops and report how it ended.
+ * error status): ask the server whether the job is running. Poll until it stops and report
+ * how it ended. If nothing is running on the first read, the job may have finished already:
+ * a last run that started at or after `clickedAt` (ms epoch) decides by its `ok`. No such
+ * run means the start never began, so it failed.
  */
 export async function settleRefresh(
+	clickedAt: number,
 	sleep: (ms: number) => Promise<void> = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
 ): Promise<RefreshOutcome> {
+	// Until a read shows `running: true`, `last` may be an older run, so it only counts when it
+	// started at or after the click. Once a run was seen, the finished `last` is this click's run.
+	let sawRunning = false;
+	const settled = (state: RefreshState): RefreshOutcome => {
+		if (!sawRunning) {
+			const startedAt = state.lastStartedAt ? Date.parse(state.lastStartedAt) : Number.NaN;
+			if (Number.isNaN(startedAt) || startedAt < clickedAt) return 'failed';
+			return state.lastOk === true ? 'succeeded' : 'failed';
+		}
+		return state.lastOk === false ? 'failed' : 'succeeded';
+	};
+
 	let state = await fetchRefreshState();
-	if (!state?.running) return 'failed';
+	// An unreadable first read is not a failed job: fall through and keep polling.
+	if (state?.running) sawRunning = true;
+	else if (state) return settled(state);
 	for (let waited = 0; waited < REFRESH_POLL_MAX_MS; waited += REFRESH_POLL_MS) {
 		await sleep(REFRESH_POLL_MS);
 		state = await fetchRefreshState();
 		// A failed status read is not a failed job: keep waiting.
-		if (state && !state.running) return state.lastOk === false ? 'failed' : 'succeeded';
+		if (!state) continue;
+		if (state.running) sawRunning = true;
+		else return settled(state);
 	}
 	return 'failed';
 }

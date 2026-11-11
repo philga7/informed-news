@@ -89,7 +89,7 @@ function install(options: {
 	/** Overrides the POST /api/fetch answer (may reject to model a dropped connection). */
 	onFetch?: () => Response | Promise<Response>;
 	/** Overrides the overview body per request (refresh state changes over time). */
-	overviewNow?: () => Overview;
+	overviewNow?: () => Overview | null;
 }) {
 	const stories = options.stories ?? [];
 	const brief =
@@ -124,7 +124,10 @@ function install(options: {
 				: stories;
 			return jsonResponse(200, { stories: visible });
 		}
-		if (url === '/api/brief/overview') return jsonResponse(200, options.overviewNow?.() ?? brief);
+		if (url === '/api/brief/overview') {
+			const next = options.overviewNow ? options.overviewNow() : brief;
+			return next === null ? jsonResponse(503, { ok: false }) : jsonResponse(200, next);
+		}
 		if (url.startsWith('/api/triage/filtered')) {
 			filteredUrls.push(url);
 			return jsonResponse(401, { ok: false });
@@ -990,6 +993,194 @@ describe('BriefScreen refresh survives a dropped POST (NEWS-210)', () => {
 		await screen.findByRole('button', { name: 'Battery storage rises' });
 
 		await fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+		expect(await screen.findByText('Refresh failed. Try again.')).toBeVisible();
+		mock.restore();
+	});
+});
+
+describe('BriefScreen refresh finished before the first status read (NEWS-213)', () => {
+	type Last = NonNullable<NonNullable<Overview['refresh']>['last']>;
+
+	/** The job already ended when the first overview read happens; `last` is built at POST time. */
+	function setupFinished(makeLast: () => Last | null) {
+		const stories = [story({ informed_summary_status: 'ok' })];
+		let done = false;
+		let last: Last | null = null;
+		return install({
+			stories,
+			onFetch: () => {
+				stories.push(
+					story({
+						id: 'story-2',
+						cluster_number: 2,
+						title: 'Ports stay open',
+						informed_article_id: 'story-2',
+						informed_summary_status: 'ok',
+					}),
+				);
+				last = makeLast();
+				done = true;
+				return Promise.reject(new TypeError('network error'));
+			},
+			overviewNow: () =>
+				overview({
+					sections: [
+						{
+							topicId: 'grid',
+							name: 'Grid',
+							level: 'core',
+							storyIds: stories.map((item) => item.id),
+							moreIds: [],
+						},
+					],
+					quiet: [],
+					refresh: { lastSuccess: null, nextAt: null, running: false, last: done ? last : null },
+				}),
+		});
+	}
+
+	const run = (ok: boolean, startedAt: string): Last => ({
+		ok,
+		startedAt,
+		completedAt: new Date().toISOString(),
+		error: ok ? null : 'fetch failed',
+	});
+
+	it('treats a successful run started after the click as success', async () => {
+		const mock = setupFinished(() => run(true, new Date().toISOString()));
+		render(BriefScreen);
+		await screen.findByRole('button', { name: 'Battery storage rises' });
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+		expect(await screen.findByRole('button', { name: 'Ports stay open' })).toBeVisible();
+		expect(screen.queryByText('Refresh failed. Try again.')).not.toBeInTheDocument();
+		expect(screen.getByRole('button', { name: 'Refresh' })).toBeEnabled();
+		mock.restore();
+	});
+
+	it('says Refresh failed when the run started after the click failed', async () => {
+		const mock = setupFinished(() => run(false, new Date().toISOString()));
+		render(BriefScreen);
+		await screen.findByRole('button', { name: 'Battery storage rises' });
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+		expect(await screen.findByText('Refresh failed. Try again.')).toBeVisible();
+		mock.restore();
+	});
+
+	it('says Refresh failed when the last run is older than the click (start never began)', async () => {
+		const mock = setupFinished(() => run(true, '2020-01-01T00:00:00.000Z'));
+		render(BriefScreen);
+		await screen.findByRole('button', { name: 'Battery storage rises' });
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+		expect(await screen.findByText('Refresh failed. Try again.')).toBeVisible();
+		mock.restore();
+	});
+});
+
+describe('BriefScreen refresh with an unreadable first status read (NEWS-213)', () => {
+	type Last = NonNullable<NonNullable<Overview['refresh']>['last']>;
+	const POLL_MS = 5_000;
+
+	/** After the dropped POST, the first overview read fails; later reads show `last` and not running. */
+	function setupUnreadableFirst(makeLast: () => Last | null) {
+		const stories = [story({ informed_summary_status: 'ok' })];
+		let posted = false;
+		let reads = 0;
+		let last: Last | null = null;
+		return install({
+			stories,
+			onFetch: () => {
+				stories.push(
+					story({
+						id: 'story-2',
+						cluster_number: 2,
+						title: 'Ports stay open',
+						informed_article_id: 'story-2',
+						informed_summary_status: 'ok',
+					}),
+				);
+				last = makeLast();
+				posted = true;
+				return Promise.reject(new TypeError('network error'));
+			},
+			overviewNow: () => {
+				if (posted && reads++ === 0) return null;
+				return overview({
+					sections: [
+						{
+							topicId: 'grid',
+							name: 'Grid',
+							level: 'core',
+							storyIds: stories.map((item) => item.id),
+							moreIds: [],
+						},
+					],
+					quiet: [],
+					refresh: { lastSuccess: null, nextAt: null, running: false, last: posted ? last : null },
+				});
+			},
+		});
+	}
+
+	const run = (ok: boolean, startedAt: string): Last => ({
+		ok,
+		startedAt,
+		completedAt: new Date().toISOString(),
+		error: ok ? null : 'fetch failed',
+	});
+
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
+	it('says Refresh failed when a later read shows only a stale successful run', async () => {
+		vi.useFakeTimers({ shouldAdvanceTime: true });
+		const mock = setupUnreadableFirst(() => run(true, '2020-01-01T00:00:00.000Z'));
+		render(BriefScreen);
+		await screen.findByRole('button', { name: 'Battery storage rises' });
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+		await vi.advanceTimersByTimeAsync(POLL_MS);
+		expect(await screen.findByText('Refresh failed. Try again.')).toBeVisible();
+		mock.restore();
+	});
+
+	it('says Refresh failed when a later read shows no last run at all', async () => {
+		vi.useFakeTimers({ shouldAdvanceTime: true });
+		const mock = setupUnreadableFirst(() => null);
+		render(BriefScreen);
+		await screen.findByRole('button', { name: 'Battery storage rises' });
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+		await vi.advanceTimersByTimeAsync(POLL_MS);
+		expect(await screen.findByText('Refresh failed. Try again.')).toBeVisible();
+		mock.restore();
+	});
+
+	it("treats this click's successful run as success when a later read shows it", async () => {
+		vi.useFakeTimers({ shouldAdvanceTime: true });
+		const mock = setupUnreadableFirst(() => run(true, new Date().toISOString()));
+		render(BriefScreen);
+		await screen.findByRole('button', { name: 'Battery storage rises' });
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+		await vi.advanceTimersByTimeAsync(POLL_MS);
+		expect(await screen.findByRole('button', { name: 'Ports stay open' })).toBeVisible();
+		expect(screen.queryByText('Refresh failed. Try again.')).not.toBeInTheDocument();
+		expect(screen.getByRole('button', { name: 'Refresh' })).toBeEnabled();
+		mock.restore();
+	});
+
+	it("says Refresh failed when this click's run failed and a later read shows it", async () => {
+		vi.useFakeTimers({ shouldAdvanceTime: true });
+		const mock = setupUnreadableFirst(() => run(false, new Date().toISOString()));
+		render(BriefScreen);
+		await screen.findByRole('button', { name: 'Battery storage rises' });
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+		await vi.advanceTimersByTimeAsync(POLL_MS);
 		expect(await screen.findByText('Refresh failed. Try again.')).toBeVisible();
 		mock.restore();
 	});

@@ -554,6 +554,7 @@
 		refreshing = true;
 		refreshMessage = null;
 		await seen.flush();
+		const clickedAt = Date.now();
 		const result = await postRefresh();
 		if (!result.ok && result.unauthenticated) {
 			refreshing = false;
@@ -562,7 +563,7 @@
 		}
 		// The long POST can drop while the server keeps working. Ask the server before
 		// calling it a failure, and reload whenever the job ended.
-		const outcome = result.ok ? 'succeeded' : await settleRefresh();
+		const outcome = result.ok ? 'succeeded' : await settleRefresh(clickedAt);
 		await reload();
 		refreshing = false;
 		if (outcome === 'failed') refreshMessage = REFRESH_ERROR;
