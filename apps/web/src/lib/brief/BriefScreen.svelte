@@ -52,6 +52,7 @@
 		REFRESH_LABEL,
 		REFRESH_LOGIN,
 		REFRESHING_LABEL,
+		settleRefresh,
 		sharedHrefVisit,
 		storyIndexFromPath,
 		type BriefStory,
@@ -554,13 +555,17 @@
 		refreshMessage = null;
 		await seen.flush();
 		const result = await postRefresh();
-		if (!result.ok) {
+		if (!result.ok && result.unauthenticated) {
 			refreshing = false;
-			refreshMessage = result.unauthenticated ? REFRESH_LOGIN : REFRESH_ERROR;
+			refreshMessage = REFRESH_LOGIN;
 			return;
 		}
+		// The long POST can drop while the server keeps working. Ask the server before
+		// calling it a failure, and reload whenever the job ended.
+		const outcome = result.ok ? 'succeeded' : await settleRefresh();
 		await reload();
 		refreshing = false;
+		if (outcome === 'failed') refreshMessage = REFRESH_ERROR;
 	}
 
 	async function loadFiltered(): Promise<void> {
