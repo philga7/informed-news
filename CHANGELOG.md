@@ -1,3 +1,9 @@
+## [0.40.8](https://github.com/philga7/informed-news/compare/v0.40.7...v0.40.8) (2026-11-11)
+
+### Bug Fixes
+
+* **NEWS-214:** strip scripts before capping publisher HTML for parse ([#267](https://github.com/philga7/informed-news/issues/267)) ([2d862cf](https://github.com/philga7/informed-news/commit/2d862cf7cd5c0f34a7782744511aceb76a19bc98)), closes [#266](https://github.com/philga7/informed-news/issues/266)
+
 ## [0.40.7](https://github.com/philga7/informed-news/compare/v0.40.6...v0.40.7) (2026-11-11)
 
 ### Bug Fixes
