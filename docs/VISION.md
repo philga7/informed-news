@@ -2,7 +2,7 @@
 
 Informed News is one OSINT product in [philga7/informed-news](https://github.com/philga7/informed-news). This file is the target. Binding choices live in [DECISIONS.md](DECISIONS.md). Ordering lives in [ROADMAP.md](ROADMAP.md).
 
-The product that is running, until [NEWS-170](https://informedcrew.atlassian.net/browse/NEWS-170), is the Kite Brief plus `mvp/server`. The operator's topics drive sources and filtering. Jev scores stories in triage. Ollama writes Brief verbiage for stories that are shown. There is no review queue. Today's triage order is [TRIAGE.md](TRIAGE.md): config blocklist, mute and keywords, duplicate grouping (including duplicate-of-already-kept) on the keyword survivors, a Jev headline check, survivor scrape, then a Jev body check. Nothing in that path calls Ollama.
+The running Brief is the SPA Briefs module at `/`, with `mvp/server`. Kite Brief code remains in the repo until [NEWS-202](https://informedcrew.atlassian.net/browse/NEWS-202) and [NEWS-203](https://informedcrew.atlassian.net/browse/NEWS-203). The operator's topics drive sources and filtering. Jev scores stories in triage. Ollama writes Brief verbiage for stories that are shown. There is no review queue. Today's triage order is [TRIAGE.md](TRIAGE.md): config blocklist, mute and keywords, duplicate grouping (including duplicate-of-already-kept) on the keyword survivors, a Jev headline check, survivor scrape, then a Jev body check. Nothing in that path calls Ollama.
 
 The shape of the target follows the [Menon Lab stack](https://themenonlab.blog/blog/osint-shadowbroker-crucix-thinkcreate-intel-stack) (raw, then scoring, then output).
 
@@ -20,14 +20,14 @@ One API (`mvp/server`) and one MCP server sit in front of all three layers. The 
 
 ## SPA shell
 
-One SPA shell in this repo replaces Kite one view at a time. A shell placeholder exists. The running Brief stays on Kite until the Briefs cutover replaces that view. Each module has its own link:
+One SPA shell in this repo replaces Kite one view at a time. The running Brief is the Briefs module at `/`. Kite Brief code remains in the repo until [NEWS-202](https://informedcrew.atlassian.net/browse/NEWS-202) and [NEWS-203](https://informedcrew.atlassian.net/browse/NEWS-203). Each module has its own link:
 
-- Briefs
-- Story Desk
+- Briefs (the running Brief at `/`)
+- Story Desk ([NEWS-201](https://informedcrew.atlassian.net/browse/NEWS-201); not shipped)
 - Map ([NEWS-35](https://informedcrew.atlassian.net/browse/NEWS-35)), on hold
 - Signals ([NEWS-34](https://informedcrew.atlassian.net/browse/NEWS-34)), on hold
 
-Briefs ships first, then Story Desk. Map and Signals get no chrome until their epics have data. The Briefs module matches the current Brief (keyboard, filters, shared links, accessibility) before that Kite view is removed.
+Story Desk is next and has not shipped. Map and Signals have not shipped and get no chrome until their epics have data.
 
 ## Alerts
 

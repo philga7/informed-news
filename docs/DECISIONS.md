@@ -2,6 +2,16 @@
 
 Binding choices for Informed News. Newest first. When one of these changes, update this file in the same change as [ROADMAP.md](ROADMAP.md) and Jira. What the product does now, in plain language, is [PRODUCT_SPEC.md](PRODUCT_SPEC.md). Pipeline detail remains in [NEWS-84](https://informedcrew.atlassian.net/browse/NEWS-84), [TRIAGE.md](TRIAGE.md), and [BRIEF.md](BRIEF.md). The target is [VISION.md](VISION.md).
 
+## 2026-11-11 — The running Brief is the SPA at /
+
+**Decision:** This supersedes [2026-10-23 — The running app stays the topic Brief until the SPA](#2026-10-23--the-running-app-stays-the-topic-brief-until-the-spa) as a description of what is running now. That entry stays in place. The running Brief is the SPA at `/`. [NEWS-200](https://informedcrew.atlassian.net/browse/NEWS-200) (Brief assembly, `/` cutover, one E2E gate) is **Done**. [NEWS-170](https://informedcrew.atlassian.net/browse/NEWS-170) stays In Progress. Piece (a) is **Done**. Piece (b) is **Done** ([NEWS-200](https://informedcrew.atlassian.net/browse/NEWS-200)). Piece (d) is **Done** ([NEWS-195](https://informedcrew.atlassian.net/browse/NEWS-195)). **Current next** is [NEWS-201](https://informedcrew.atlassian.net/browse/NEWS-201) (Story Desk at `/story`; keep `/desk` reserved for Voice / [NEWS-39](https://informedcrew.atlassian.net/browse/NEWS-39)). Kite Brief removal still waits for [NEWS-202](https://informedcrew.atlassian.net/browse/NEWS-202) (remove Kite Brief routes) and [NEWS-203](https://informedcrew.atlassian.net/browse/NEWS-203) (Kite Brief cleanup, piece (e)). Story Desk, Map, and Signals have not shipped. Topics still drive sources and filtering, there is still no review queue, Jev still scores in triage, and Ollama still writes Brief verbiage for stories that are shown.
+
+The 2026-11-07 bar on marking [NEWS-200](https://informedcrew.atlassian.net/browse/NEWS-200) Done applied before that change merged. [NEWS-200](https://informedcrew.atlassian.net/browse/NEWS-200) is Done now. The Story Desk path stays the one already written on [NEWS-201](https://informedcrew.atlassian.net/browse/NEWS-201): `/story`, with `/desk` reserved for Voice.
+
+**Why:** The 2026-10-23 entry still said the running product, until [NEWS-170](https://informedcrew.atlassian.net/browse/NEWS-170), is the Kite Brief. The Brief cutover is on main.
+
+**What it rules out:** Treating the Kite Brief as the running product, marking [NEWS-170](https://informedcrew.atlassian.net/browse/NEWS-170) Done, removing Kite Brief code before [NEWS-202](https://informedcrew.atlassian.net/browse/NEWS-202) and [NEWS-203](https://informedcrew.atlassian.net/browse/NEWS-203), and claiming Story Desk, Map, or Signals have shipped.
+
 ## 2026-11-09 — Claude builder pins Sonnet and PR review pins Opus
 
 **Decision:** Philip Clapper approved this pilot on Nov 9, 2026, 9:49 PM ET, for philga7/informed-news only. [VISION.md](VISION.md) is unchanged. This is dev tooling, not the product direction. No NEWS key yet.
