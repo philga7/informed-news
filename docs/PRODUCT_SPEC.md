@@ -116,6 +116,8 @@ Links, quoted lines, and link-backed claims on a card or full story are checked 
 
 **Scenario:** Given the story has no readable text, when you open the card, then it says “Full story unavailable — no readable text.”
 
+**Scenario:** Given the AI answers with a malformed response that cannot be read, when you load a full story, then the card says the full story could not be built because the AI response was malformed, not the generic “could not be loaded right now” and not that the model is unreachable. The failure is not retried automatically; you can try again.
+
 **Scenario:** Given too many on-demand full stories have been requested this hour, when you open another one, then the card says the full story limit for this hour has been reached.
 
 When the app reads a publisher's page for article text, it first drops script and style code, then reads at most the first 1,000,000 characters of what is left. Pages whose first megabyte is mostly script data still show their article text; a page with more than a million characters of real markup is read only up to that point. This keeps the app responsive while it reads large pages.

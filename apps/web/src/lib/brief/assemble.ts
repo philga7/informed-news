@@ -50,6 +50,9 @@ export const BRIEF_FULL_STORY_LOGIN_HINT = 'Log in on Topics to load full storie
 
 export const BRIEF_FULL_STORY_ERROR = 'Full story could not be loaded right now.';
 
+export const BRIEF_FULL_STORY_PARSE_ERROR =
+	'Full story could not be built: the AI response was malformed. Try again.';
+
 export const BRIEF_FULL_STORY_RATE_LIMITED = 'Full story limit reached for this hour. Try again later.';
 
 export const BRIEF_FULL_STORY_NOT_IN_BRIEF = 'This story is no longer in the Brief.';
@@ -645,6 +648,7 @@ export function applyFullStory<T extends Story>(story: T, fullStory: FullStoryPa
 export function fullStoryErrorCopy(status: number, error: string | undefined): string {
 	if (status === 429 || error === 'rate_limited') return BRIEF_FULL_STORY_RATE_LIMITED;
 	if (error === 'not_in_brief') return BRIEF_FULL_STORY_NOT_IN_BRIEF;
+	if (error === 'parse_failed') return BRIEF_FULL_STORY_PARSE_ERROR;
 	return BRIEF_FULL_STORY_ERROR;
 }
 

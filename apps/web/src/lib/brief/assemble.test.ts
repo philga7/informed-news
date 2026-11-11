@@ -3,8 +3,11 @@ import {
 	BRIEF_ADDED_BY_YOU_LABEL,
 	BRIEF_AI_SUMMARY_NOTE,
 	BRIEF_ALL_FILTERED,
+	BRIEF_FULL_STORY_ERROR,
 	BRIEF_FULL_STORY_LOADING,
+	BRIEF_FULL_STORY_PARSE_ERROR,
 	BRIEF_FULL_STORY_UNAVAILABLE,
+	fullStoryErrorCopy,
 	BRIEF_LESS_LABEL,
 	BRIEF_LEVEL_LABEL,
 	BRIEF_OFFICIAL_LABEL,
@@ -558,6 +561,14 @@ describe('card copy helpers', () => {
 		expect(BRIEF_SUMMARY_LOGIN_HINT).toBe('Log in on Topics to load summaries');
 		expect(BRIEF_SUMMARY_ERROR).toBe('Summary could not be loaded right now.');
 		expect(BRIEF_FULL_STORY_LOADING).toBe('Loading full story…');
+	});
+
+	it('NEWS-215 shows an honest parse failure, not the generic or Ollama copy', () => {
+		const copy = fullStoryErrorCopy(502, 'parse_failed');
+		expect(copy).toBe(BRIEF_FULL_STORY_PARSE_ERROR);
+		expect(copy).not.toBe(BRIEF_FULL_STORY_ERROR);
+		expect(copy).not.toMatch(/ollama/i);
+		expect(fullStoryErrorCopy(502, 'error')).toBe(BRIEF_FULL_STORY_ERROR);
 	});
 
 	it('keeps full story, source links, seen marks, and the refresh clock', async () => {
