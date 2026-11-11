@@ -21,6 +21,9 @@ export const SUMMARY_POST_MIN_CHARS = 120;
 /** Ollama summary calls in flight */
 export const SUMMARY_CONCURRENCY = 2;
 export const ON_DEMAND_SUMMARY_MAX_PER_HOUR = 30;
+/** On-demand Ollama calls (NEWS-211): longer than the 30s refresh default, one retry after a timeout */
+export const ON_DEMAND_OLLAMA_TIMEOUT_MS = 90_000;
+export const ON_DEMAND_OLLAMA_RETRIES = 1;
 
 /** Full Kite stories (NEWS-89) */
 export const FULL_STORY_AUTO_MAX_PER_REFRESH = 5;

@@ -26,7 +26,13 @@ import type {
 } from '../types/brief.js';
 import type { Topic } from '../types/topic.js';
 import type { TriageStore } from '../types/triage.js';
-import { BRIEF_TOP_N, ON_DEMAND_SUMMARY_MAX_PER_HOUR, SUMMARY_CONCURRENCY } from './briefConfig.js';
+import {
+  BRIEF_TOP_N,
+  ON_DEMAND_OLLAMA_TIMEOUT_MS,
+  ON_DEMAND_SUMMARY_MAX_PER_HOUR,
+  SUMMARY_CONCURRENCY,
+} from './briefConfig.js';
+import { retryResultOnTimeout } from './onDemandOllama.js';
 import { OLLAMA_NOT_CONFIGURED, summarizeSource } from './briefSummary.js';
 import { extractCitationItems } from './citationGuard/extractCitationItems.js';
 import {
@@ -252,9 +258,10 @@ async function summarizeSafely(
   summarize: typeof summarizeSource,
   story: BriefStory,
   source: SummarySource,
+  options?: { timeoutMs?: number; abortOnTimeout?: boolean },
 ): ReturnType<typeof summarizeSource> {
   try {
-    return await summarize({ title: story.title, text: source.text });
+    return await summarize({ title: story.title, text: source.text }, options);
   } catch (err) {
     return { ok: false, error: errorMessage(err) };
   }
@@ -465,7 +472,12 @@ async function summarizeBriefStoryOnce(
     };
   }
 
-  const result = await summarizeSafely(deps.summarize ?? summarizeSource, story, source);
+  const result = await retryResultOnTimeout(() =>
+    summarizeSafely(deps.summarize ?? summarizeSource, story, source, {
+      timeoutMs: ON_DEMAND_OLLAMA_TIMEOUT_MS,
+      abortOnTimeout: true,
+    }),
+  );
   const record = resultRecord(articleId, source, result, at, 'on_demand');
   await writeOnDemand(deps, record);
   if (result.ok) {

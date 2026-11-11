@@ -21,8 +21,10 @@ import {
   FULL_STORY_AUTO_MAX_PER_REFRESH,
   FULL_STORY_MEMBER_MAX,
   ON_DEMAND_FULL_STORY_MAX_PER_HOUR,
+  ON_DEMAND_OLLAMA_TIMEOUT_MS,
   SUMMARY_POST_MIN_CHARS,
 } from './briefConfig.js';
+import { retryThrowOnTimeout } from './onDemandOllama.js';
 import {
   enrichFullStory,
   type FullStoryMemberInput,
@@ -414,10 +416,12 @@ async function generateFullStoryOnce(
   }
 
   try {
-    const enrichment = await (deps.enrich ?? enrichFullStory)({
-      members: inputs,
-      requestedSections: requestedSections(sections),
-    });
+    const enrichRequest = { members: inputs, requestedSections: requestedSections(sections) };
+    const enrich = deps.enrich ?? enrichFullStory;
+    const enrichment =
+      trigger === 'on_demand'
+        ? await retryThrowOnTimeout(() => enrich(enrichRequest, { timeoutMs: ON_DEMAND_OLLAMA_TIMEOUT_MS, abortOnTimeout: true }))
+        : await enrich(enrichRequest);
     const quote = pickStoryQuote(members);
     const next: BriefFullStoryRecord = {
       articleId,

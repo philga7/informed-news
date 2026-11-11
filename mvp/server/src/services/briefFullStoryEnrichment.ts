@@ -5,6 +5,7 @@ import type {
 } from '../types/clusterEnrichment.js';
 import { FULL_STORY_BODY_MAX_CHARS } from './briefConfig.js';
 import { getOllamaClient, getOllamaModelName } from './ollamaFraming.js';
+import { onDemandChat, type OnDemandClientFactory } from './onDemandOllama.js';
 import type { Ollama } from 'ollama';
 
 export type { BriefFullStoryEnrichment } from '../types/briefFullStory.js';
@@ -255,7 +256,21 @@ async function chatWithTimeout(
   model: string,
   prompt: string,
   timeoutMs = DEFAULT_TIMEOUT_MS,
+  onDemand?: { makeClient?: OnDemandClientFactory },
 ): Promise<string> {
+  if (onDemand) {
+    const response = await onDemandChat(
+      { model, messages: [{ role: 'user', content: prompt }], stream: false },
+      timeoutMs,
+      onDemand.makeClient,
+    );
+    const content = response?.message?.content;
+    if (typeof content !== 'string' || !content.trim()) {
+      throw new Error('Ollama returned empty message content');
+    }
+    return content;
+  }
+
   let timeoutId: ReturnType<typeof setTimeout> | null = null;
   const timeoutPromise = new Promise<never>((_, reject) => {
     timeoutId = setTimeout(
@@ -288,6 +303,9 @@ export type EnrichFullStoryDeps = {
   chat?: (prompt: string) => Promise<string>;
   model?: string;
   timeoutMs?: number;
+  /** On-demand (NEWS-211): fresh client per call; the timeout aborts the HTTP request. */
+  abortOnTimeout?: boolean;
+  makeOnDemandClient?: OnDemandClientFactory;
 };
 
 export async function enrichFullStory(
@@ -308,7 +326,13 @@ export async function enrichFullStory(
       if (!ollama) {
         throw new Error('Ollama service not available — OLLAMA_API_KEY not configured');
       }
-      return chatWithTimeout(ollama, model, p, deps?.timeoutMs);
+      return chatWithTimeout(
+        ollama,
+        model,
+        p,
+        deps?.timeoutMs,
+        deps?.abortOnTimeout ? { makeClient: deps.makeOnDemandClient } : undefined,
+      );
     });
 
   const raw = await chat(prompt);

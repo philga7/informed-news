@@ -8,6 +8,8 @@ This is not the release log. Releases are recorded in `CHANGELOG.md` by semantic
 
 ## 2026-11-11
 
+On the Brief, opening a story right after a refresh is more likely to load its summary and full story. The server now waits longer for the model when you open a story, and, if the first attempt times out, cancels it and tries once more with a fresh request. “Could not be loaded right now” still appears when the model really can't be reached.
+
 The Brief's status line now checks whether the scoring (TypeSafe) and summary (Ollama) keys are set on the running app right now. After you turn the keys on, loading or reloading the Brief no longer says “not configured” because of an earlier refresh that ran without them. With a key missing, the line still says so.
 
 On the Brief, if the connection drops and the refresh you just started has already finished successfully by the time the page checks, **Refresh** now treats it as done: the Brief reloads with the new stories and no “Refresh failed” message. A run that really failed, or one that never started, still shows “Refresh failed. Try again.”

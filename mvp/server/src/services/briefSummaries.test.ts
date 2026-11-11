@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { test } from 'node:test';
+import { ON_DEMAND_OLLAMA_RETRIES, ON_DEMAND_OLLAMA_TIMEOUT_MS } from './briefConfig.js';
 import type { Article, StoreMeta } from '../types/article.js';
 import type {
   BriefRunMeta,
@@ -555,4 +556,55 @@ test('createOnDemandLimiter allows maxPerHour in a sliding hour', () => {
   assert.equal(limiter.tryAcquire(), false);
   t = 3_601_000;
   assert.equal(limiter.tryAcquire(), true);
+});
+
+const TIMEOUT_ERROR = 'Ollama API request timed out';
+
+test('NEWS-211 on-demand summary uses the longer on-demand timeout, not the refresh default', async () => {
+  const h = harness(standardWorld());
+  const seen: Array<number | undefined> = [];
+  const summarize: typeof summarizeSource = async (_source, d) => {
+    seen.push(d?.timeoutMs);
+    return { ok: true, text: SUMMARY_TEXT, model: 'm' };
+  };
+  const result = await summarizeBriefStory('a5', { now: NOW }, { ...h.deps, summarize });
+  assert.equal(result.ok, true);
+  assert.deepEqual(seen, [ON_DEMAND_OLLAMA_TIMEOUT_MS]);
+  assert.ok(ON_DEMAND_OLLAMA_TIMEOUT_MS > 30_000);
+});
+
+test('NEWS-211 on-demand summary retries once after a timeout and then succeeds', async () => {
+  const h = harness(standardWorld());
+  let calls = 0;
+  const summarize: typeof summarizeSource = async () => {
+    calls += 1;
+    return calls === 1
+      ? { ok: false, error: TIMEOUT_ERROR }
+      : { ok: true, text: SUMMARY_TEXT, model: 'm' };
+  };
+  const result = await summarizeBriefStory('a5', { now: NOW }, { ...h.deps, summarize });
+  assert.equal(calls, 2);
+  assert.equal(result.ok, true);
+});
+
+test('NEWS-211 on-demand summary fails honestly when every attempt times out; other errors are not retried', async () => {
+  const h = harness(standardWorld());
+  let calls = 0;
+  const timedOut: typeof summarizeSource = async () => {
+    calls += 1;
+    return { ok: false, error: TIMEOUT_ERROR };
+  };
+  const result = await summarizeBriefStory('a5', { now: NOW }, { ...h.deps, summarize: timedOut });
+  assert.equal(calls, 1 + ON_DEMAND_OLLAMA_RETRIES);
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.equal(result.error, TIMEOUT_ERROR);
+
+  const h2 = harness(standardWorld());
+  let other = 0;
+  const refused: typeof summarizeSource = async () => {
+    other += 1;
+    return { ok: false, error: 'connect ECONNREFUSED' };
+  };
+  await summarizeBriefStory('a5', { now: NOW }, { ...h2.deps, summarize: refused });
+  assert.equal(other, 1);
 });
