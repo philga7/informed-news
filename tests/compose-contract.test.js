@@ -254,5 +254,12 @@ describe('QA instance runbook', () => {
 		assert.doesNotMatch(section, /SESSION_SECRET=(?!<)[^\s<]/);
 		assert.equal(section.includes('informed-news-data'), true);
 		assert.match(section, /never remove `informed-news-data`/i);
+
+		const liveStart = runbook.indexOf('## Start, logs, stop');
+		const liveNext = runbook.indexOf('\n## ', liveStart + 1);
+		const startSection = runbook.slice(liveStart, liveNext);
+		assert.match(startSection, /must not pass `-p`/);
+		assert.match(startSection, /must not set `COMPOSE_PROJECT_NAME`/);
+		assert.match(startSection, /volume `informed-news-data`/);
 	});
 });

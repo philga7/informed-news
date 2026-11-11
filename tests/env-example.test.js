@@ -18,8 +18,12 @@ const ALLOWED_VALUES = [
   /^http:\/\/searxng:8080$/,
   /^http:\/\/127\.0\.0\.1:8888$/,
   /^(glm-5\.3-flash|jev-1\.13\.0)$/,
-  /^(mvp_session|informed-news-data)$/,
 ];
+
+const KEY_VALUES = {
+  SESSION_COOKIE_NAME: /^mvp_session$/,
+  INFORMED_NEWS_DATA_VOLUME: /^informed-news-data$/,
+};
 
 function sourceFiles(dir) {
   const out = [];
@@ -61,9 +65,11 @@ test("mvp/.env.example lists every env var the server reads", () => {
 });
 
 test("mvp/.env.example holds placeholder values only", () => {
-  const bad = [...parseExample()].filter(
-    ([, v]) => !ALLOWED_VALUES.some((re) => re.test(v)),
-  );
+  const bad = [...parseExample()].filter(([key, value]) => {
+    const scoped = KEY_VALUES[key];
+    if (scoped) return !scoped.test(value);
+    return !ALLOWED_VALUES.some((re) => re.test(value));
+  });
   assert.deepEqual(bad, []);
 });
 

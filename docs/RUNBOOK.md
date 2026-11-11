@@ -33,6 +33,8 @@ docker compose down
 
 The image defaults to `informed-news:local`. CI uses `informed-news:ci`. The port is published on `127.0.0.1` only. The Compose service is named `app`.
 
+Live commands must not pass `-p` and must not set `COMPOSE_PROJECT_NAME`. Either one names a different volume, so the app looks empty even though `informed-news-data` is still there. Before a live `up`, `docker compose config` should show volume `informed-news-data`.
+
 ## Update
 
 The checkout may be a single-branch clone. Fetch `main` into the local `main` ref before checking it out.

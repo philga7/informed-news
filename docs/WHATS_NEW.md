@@ -20,7 +20,7 @@ Full stories from publisher pages that start with a very large block of script d
 
 On the Brief, **Refresh** no longer says “Refresh failed” just because the connection dropped while the server was still working. The button keeps saying “Refreshing…”, and the Brief reloads with the new stories when the run finishes, without a manual page reload. “Refresh failed. Try again.” now appears only when the run really failed or never started.
 
-**No user-visible change.** An operator can run a separate QA instance; the live Brief and login are unchanged.
+**No user-visible change.** The separate QA copy does not change the live Brief or its login. The notes above are earlier changes from this date.
 
 ## 2026-11-10
 
