@@ -53,7 +53,14 @@ describe('NEWS-165 vision and decisions', () => {
 		assert.match(vision, /Signals/);
 		assert.match(vision, /Map/);
 		assert.match(vision, /news section first/i);
-		assert.match(vision, /until \[NEWS-170\]/);
+		assert.match(vision, /When the image is served, the running Brief is the SPA Briefs module at `\/`/);
+		assert.match(vision, /`npm run dev` still serves Kite at `\/`/);
+		assert.match(
+			vision,
+			/Kite Brief code remains in the repo until \[NEWS-202\]\([^)]+\) and \[NEWS-203\]/,
+		);
+		assert.match(vision, /keyboard, filters, shared links, accessibility/);
+		assert.match(vision, /before \[NEWS-202\]\([^)]+\) removes that view/);
 	});
 
 	it('records the Oct 23 decisions with a decision, a why, and what each rules out', () => {
@@ -153,6 +160,12 @@ describe('NEWS-165 vision and decisions', () => {
 			'NEWS-191',
 			'NEWS-192',
 			'NEWS-170',
+			'NEWS-200',
+			'NEWS-195',
+			'NEWS-201',
+			'NEWS-39',
+			'NEWS-202',
+			'NEWS-203',
 		]);
 		assert.match(
 			combined,
@@ -160,7 +173,7 @@ describe('NEWS-165 vision and decisions', () => {
 		);
 		assert.match(
 			combined,
-			/\*\*Current next\*\* is Briefs module parity, piece \(b\) of \[NEWS-170\]/,
+			/\*\*Current next\*\* is \[NEWS-201\]\([^)]+\): Story Desk at `\/story`/,
 		);
 		assert.match(roadmap, /NEWS-175[\s\S]{0,400}\*\*Done\*\*/);
 		assert.match(roadmap, /NEWS-182[\s\S]{0,200}\*\*Done\*\*/);
