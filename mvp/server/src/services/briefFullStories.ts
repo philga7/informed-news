@@ -420,7 +420,7 @@ async function generateFullStoryOnce(
     const enrich = deps.enrich ?? enrichFullStory;
     const enrichment =
       trigger === 'on_demand'
-        ? await retryThrowOnTimeout(() => enrich(enrichRequest, { timeoutMs: ON_DEMAND_OLLAMA_TIMEOUT_MS }))
+        ? await retryThrowOnTimeout(() => enrich(enrichRequest, { timeoutMs: ON_DEMAND_OLLAMA_TIMEOUT_MS, abortOnTimeout: true }))
         : await enrich(enrichRequest);
     const quote = pickStoryQuote(members);
     const next: BriefFullStoryRecord = {

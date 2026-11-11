@@ -258,7 +258,7 @@ async function summarizeSafely(
   summarize: typeof summarizeSource,
   story: BriefStory,
   source: SummarySource,
-  options?: { timeoutMs?: number },
+  options?: { timeoutMs?: number; abortOnTimeout?: boolean },
 ): ReturnType<typeof summarizeSource> {
   try {
     return await summarize({ title: story.title, text: source.text }, options);
@@ -475,6 +475,7 @@ async function summarizeBriefStoryOnce(
   const result = await retryResultOnTimeout(() =>
     summarizeSafely(deps.summarize ?? summarizeSource, story, source, {
       timeoutMs: ON_DEMAND_OLLAMA_TIMEOUT_MS,
+      abortOnTimeout: true,
     }),
   );
   const record = resultRecord(articleId, source, result, at, 'on_demand');

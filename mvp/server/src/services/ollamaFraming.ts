@@ -105,6 +105,26 @@ export function getOllamaClient(): Ollama | null {
   return client;
 }
 
+/**
+ * Fresh Ollama Cloud client whose HTTP requests carry `signal` (NEWS-211).
+ * ollama 0.6.3 cannot abort `chat({ stream: false })` itself and `Ollama.abort()`
+ * only cancels streamed calls, so the signal is attached in a `fetch` wrapper.
+ * Never touches the shared client used by refresh/auto. Null without an API key.
+ */
+export function createAbortableOllamaClient(
+  signal: AbortSignal,
+  baseFetch: typeof fetch = fetch,
+): Ollama | null {
+  const apiKey = process.env.OLLAMA_API_KEY?.trim();
+  if (!apiKey) return null;
+  return new Ollama({
+    host: OLLAMA_HOST,
+    headers: { Authorization: `Bearer ${apiKey}` },
+    fetch: ((input: string | URL | Request, init?: RequestInit) =>
+      baseFetch(input, { ...init, signal })) as typeof fetch,
+  });
+}
+
 export function isOllamaAvailable(): boolean {
   return getOllamaClient() !== null;
 }

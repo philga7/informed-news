@@ -4,6 +4,7 @@
  */
 import { SUMMARY_MAX_CHARS, SUMMARY_MIN_CHARS } from './briefConfig.js';
 import { getOllamaClient, getOllamaModelName } from './ollamaFraming.js';
+import { onDemandChat, type OnDemandClientFactory } from './onDemandOllama.js';
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 const SUMMARY_MAX_SENTENCES = 2;
@@ -17,6 +18,9 @@ export type SummarizeDeps = {
   ollama?: SummarizeChat | null;
   model?: string;
   timeoutMs?: number;
+  /** On-demand (NEWS-211): fresh client per call; the timeout aborts the HTTP request. */
+  abortOnTimeout?: boolean;
+  makeOnDemandClient?: OnDemandClientFactory;
 };
 
 export type ParseSummaryResult = { ok: true; text: string } | { ok: false; error: string };
@@ -136,7 +140,21 @@ async function chatWithTimeout(
   model: string,
   prompt: string,
   timeoutMs: number,
+  onDemand?: { makeClient?: OnDemandClientFactory },
 ): Promise<string> {
+  if (onDemand) {
+    const response = await onDemandChat(
+      { model, messages: [{ role: 'user', content: prompt }], format: 'json', stream: false },
+      timeoutMs,
+      onDemand.makeClient,
+    );
+    const content = response?.message?.content;
+    if (typeof content !== 'string' || !content.trim()) {
+      throw new Error('Ollama returned empty message content');
+    }
+    return content;
+  }
+
   let timeoutId: ReturnType<typeof setTimeout> | null = null;
   const timeoutPromise = new Promise<never>((_, reject) => {
     timeoutId = setTimeout(() => reject(new Error('Ollama API request timed out')), timeoutMs);
@@ -179,6 +197,7 @@ export async function summarizeSource(
       model,
       buildSummaryPrompt(source.title, source.text),
       deps.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+      deps.abortOnTimeout ? { makeClient: deps.makeOnDemandClient } : undefined,
     );
     const parsed = parseSummaryOutput(raw);
     return parsed.ok ? { ok: true, text: parsed.text, model } : parsed;
