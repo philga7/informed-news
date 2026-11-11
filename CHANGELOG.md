@@ -1,3 +1,9 @@
+## [0.41.0](https://github.com/philga7/informed-news/compare/v0.40.12...v0.41.0) (2026-11-11)
+
+### Features
+
+* **NEWS-216:** add isolated QA instance with configurable volume and session cookie ([6a1f489](https://github.com/philga7/informed-news/commit/6a1f4897c248831c0a18a0bf5c8cb229e1b118da))
+
 ## [0.40.12](https://github.com/philga7/informed-news/compare/v0.40.11...v0.40.12) (2026-11-11)
 
 ### Bug Fixes
