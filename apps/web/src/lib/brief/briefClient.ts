@@ -358,18 +358,29 @@ export async function settleRefresh(
 	clickedAt: number,
 	sleep: (ms: number) => Promise<void> = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
 ): Promise<RefreshOutcome> {
+	// Until a read shows `running: true`, `last` may be an older run, so it only counts when it
+	// started at or after the click. Once a run was seen, the finished `last` is this click's run.
+	let sawRunning = false;
+	const settled = (state: RefreshState): RefreshOutcome => {
+		if (!sawRunning) {
+			const startedAt = state.lastStartedAt ? Date.parse(state.lastStartedAt) : Number.NaN;
+			if (Number.isNaN(startedAt) || startedAt < clickedAt) return 'failed';
+			return state.lastOk === true ? 'succeeded' : 'failed';
+		}
+		return state.lastOk === false ? 'failed' : 'succeeded';
+	};
+
 	let state = await fetchRefreshState();
 	// An unreadable first read is not a failed job: fall through and keep polling.
-	if (state && !state.running) {
-		const startedAt = state.lastStartedAt ? Date.parse(state.lastStartedAt) : Number.NaN;
-		if (Number.isNaN(startedAt) || startedAt < clickedAt) return 'failed';
-		return state.lastOk === true ? 'succeeded' : 'failed';
-	}
+	if (state?.running) sawRunning = true;
+	else if (state) return settled(state);
 	for (let waited = 0; waited < REFRESH_POLL_MAX_MS; waited += REFRESH_POLL_MS) {
 		await sleep(REFRESH_POLL_MS);
 		state = await fetchRefreshState();
 		// A failed status read is not a failed job: keep waiting.
-		if (state && !state.running) return state.lastOk === false ? 'failed' : 'succeeded';
+		if (!state) continue;
+		if (state.running) sawRunning = true;
+		else return settled(state);
 	}
 	return 'failed';
 }
