@@ -6,6 +6,10 @@ Each ship-loop pull request adds an entry for what is true at merge for that rea
 
 This is not the release log. Releases are recorded in `CHANGELOG.md` by semantic-release. Do not hand-edit `CHANGELOG.md` to mirror these notes.
 
+## 2026-11-11
+
+On the Brief, **Refresh** no longer says “Refresh failed” just because the connection dropped while the server was still working. The button keeps saying “Refreshing…”, and the Brief reloads with the new stories when the run finishes, without a manual page reload. “Refresh failed. Try again.” now appears only when the run really failed or never started.
+
 ## 2026-11-10
 
 On the Brief, stories you read stay marked as read after you reload the page. Opening a story now marks it as read. **Mark as unread** now clears the mark on the server, not just on the page. If a read or unread mark can't be saved (for example when you are signed out), the Brief shows a short error and puts the card back as it was.

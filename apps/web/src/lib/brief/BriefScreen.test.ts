@@ -39,6 +39,8 @@ type Overview = {
 	refresh?: {
 		lastSuccess: { completedAt: string } | null;
 		nextAt: string | null;
+		running?: boolean;
+		last?: { ok: boolean; startedAt: string; completedAt: string; error: string | null } | null;
 	};
 };
 
@@ -84,6 +86,10 @@ function install(options: {
 	onFull?: () => Response | Promise<Response>;
 	onSeen?: () => Response | Promise<Response>;
 	onUnseen?: () => Response | Promise<Response>;
+	/** Overrides the POST /api/fetch answer (may reject to model a dropped connection). */
+	onFetch?: () => Response | Promise<Response>;
+	/** Overrides the overview body per request (refresh state changes over time). */
+	overviewNow?: () => Overview;
 }) {
 	const stories = options.stories ?? [];
 	const brief =
@@ -118,7 +124,7 @@ function install(options: {
 				: stories;
 			return jsonResponse(200, { stories: visible });
 		}
-		if (url === '/api/brief/overview') return jsonResponse(200, brief);
+		if (url === '/api/brief/overview') return jsonResponse(200, options.overviewNow?.() ?? brief);
 		if (url.startsWith('/api/triage/filtered')) {
 			filteredUrls.push(url);
 			return jsonResponse(401, { ok: false });
@@ -137,6 +143,7 @@ function install(options: {
 		}
 		if (url === '/api/fetch' && method === 'POST') {
 			refreshed = true;
+			if (options.onFetch) return options.onFetch();
 			return jsonResponse(200, { ok: true });
 		}
 		if (url.includes('/summary') && method === 'POST') {
@@ -847,6 +854,143 @@ describe('BriefScreen story links (NEWS-204)', () => {
 		expect(await screen.findByRole('heading', { name: 'Your topics', level: 2 })).toBeVisible();
 		expect(screen.queryByText('Viewing a shared story')).not.toBeInTheDocument();
 		expect(screen.getAllByRole('article')).toHaveLength(3);
+		mock.restore();
+	});
+});
+
+describe('BriefScreen refresh survives a dropped POST (NEWS-210)', () => {
+	const SECTION = (ids: string[]) => [
+		{ topicId: 'grid', name: 'Grid', level: 'core' as const, storyIds: ids, moreIds: [] },
+	];
+	const LAST_OK = {
+		ok: true,
+		startedAt: '2026-11-10T23:17:03.000Z',
+		completedAt: '2026-11-10T23:25:06.000Z',
+		error: null,
+	};
+	const LAST_FAILED = { ...LAST_OK, ok: false, error: 'fetch failed' };
+	const POLL_MS = 5_000;
+
+	function setup(options: {
+		onFetch: () => Response | Promise<Response>;
+		/** What the server says after the job settles. */
+		settled: NonNullable<Overview['refresh']>['last'];
+		startsRunning: boolean;
+	}) {
+		const stories = [story({ informed_summary_status: 'ok' })];
+		let running = false;
+		let done = false;
+		const mock = install({
+			stories,
+			onFetch: () => {
+				running = options.startsRunning;
+				return options.onFetch();
+			},
+			overviewNow: () =>
+				overview({
+					sections: SECTION(stories.map((item) => item.id)),
+					quiet: [],
+					refresh: {
+						lastSuccess: done ? { completedAt: '2026-11-10T23:25:06.000Z' } : null,
+						nextAt: null,
+						running,
+						last: done ? options.settled : null,
+					},
+				}),
+		});
+		return {
+			mock,
+			finishJob() {
+				stories.push(
+					story({
+						id: 'story-2',
+						cluster_number: 2,
+						title: 'Ports stay open',
+						informed_article_id: 'story-2',
+						informed_summary_status: 'ok',
+					}),
+				);
+				running = false;
+				done = true;
+			},
+		};
+	}
+
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
+	it.each([
+		['the connection drops', () => Promise.reject(new TypeError('network error'))],
+		['the proxy times out', () => jsonResponse(504, { error: 'gateway timeout' })],
+	])('keeps Refreshing, never says failed, and reloads the new cards when %s', async (_name, onFetch) => {
+		vi.useFakeTimers({ shouldAdvanceTime: true });
+		const { mock, finishJob } = setup({ onFetch, settled: LAST_OK, startsRunning: true });
+		render(BriefScreen);
+		await screen.findByRole('button', { name: 'Battery storage rises' });
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+		await vi.advanceTimersByTimeAsync(POLL_MS);
+		expect(screen.getByRole('button', { name: 'Refreshing…' })).toBeDisabled();
+		expect(screen.queryByText('Refresh failed. Try again.')).not.toBeInTheDocument();
+		expect(screen.queryByRole('button', { name: 'Ports stay open' })).not.toBeInTheDocument();
+
+		finishJob();
+		await vi.advanceTimersByTimeAsync(POLL_MS);
+		expect(await screen.findByRole('button', { name: 'Ports stay open' })).toBeVisible();
+		expect(screen.getByRole('button', { name: 'Refresh' })).toBeEnabled();
+		expect(screen.queryByText('Refresh failed. Try again.')).not.toBeInTheDocument();
+		expect(screen.getByText(/Updated/)).toBeVisible();
+		mock.restore();
+	});
+
+	it('says Refresh failed when the job itself failed after a dropped POST', async () => {
+		vi.useFakeTimers({ shouldAdvanceTime: true });
+		const { mock, finishJob } = setup({
+			onFetch: () => Promise.reject(new TypeError('network error')),
+			settled: LAST_FAILED,
+			startsRunning: true,
+		});
+		render(BriefScreen);
+		await screen.findByRole('button', { name: 'Battery storage rises' });
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+		await vi.advanceTimersByTimeAsync(POLL_MS);
+		expect(screen.queryByText('Refresh failed. Try again.')).not.toBeInTheDocument();
+
+		finishJob();
+		await vi.advanceTimersByTimeAsync(POLL_MS);
+		expect(await screen.findByText('Refresh failed. Try again.')).toBeVisible();
+		expect(screen.getByRole('button', { name: 'Refresh' })).toBeEnabled();
+		mock.restore();
+	});
+
+	it('says Refresh failed at once when the start never began and nothing is running', async () => {
+		const { mock } = setup({
+			onFetch: () => Promise.reject(new TypeError('network error')),
+			settled: null,
+			startsRunning: false,
+		});
+		render(BriefScreen);
+		await screen.findByRole('button', { name: 'Battery storage rises' });
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+		expect(await screen.findByText('Refresh failed. Try again.')).toBeVisible();
+		expect(screen.getByRole('button', { name: 'Refresh' })).toBeEnabled();
+		mock.restore();
+	});
+
+	it('still says Refresh failed when the server answers the POST with a real failure', async () => {
+		const { mock } = setup({
+			onFetch: () => jsonResponse(500, { ok: false, error: 'boom' }),
+			settled: null,
+			startsRunning: false,
+		});
+		render(BriefScreen);
+		await screen.findByRole('button', { name: 'Battery storage rises' });
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+		expect(await screen.findByText('Refresh failed. Try again.')).toBeVisible();
 		mock.restore();
 	});
 });

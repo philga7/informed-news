@@ -211,7 +211,7 @@ Before the first successful refresh, nothing is hidden as already seen.
 
 ## Refresh
 
-While the server is running, the Brief refreshes on a timer. The bar above the sections shows when it last updated and when the next refresh is due. **Refresh** runs one immediately and reloads the Brief, including the Filtered list when Filtered or All is showing. It needs a sign-in; otherwise the bar says “Log in on Topics to refresh.” While a refresh is running the button says “Refreshing…” and is disabled. A refresh can take minutes. If it fails, the bar says “Refresh failed. Try again.”
+While the server is running, the Brief refreshes on a timer. The bar above the sections shows when it last updated and when the next refresh is due. **Refresh** runs one immediately and reloads the Brief, including the Filtered list when Filtered or All is showing. It needs a sign-in; otherwise the bar says “Log in on Topics to refresh.” While a refresh is running the button says “Refreshing…” and is disabled. A refresh can take minutes. If the connection drops while the server is still refreshing, the button keeps saying “Refreshing…”, the page checks every few seconds, and the Brief reloads when the run ends. The bar says “Refresh failed. Try again.” only when the run itself failed, or when the refresh never started.
 
 The bar links to Filtered out and, beside it, to Feedback. It says **N filtered out** when the last refresh dropped stories, and **Filtered out** otherwise.
 
@@ -220,6 +220,10 @@ Beside that link, an **Approved / Filtered / All** toggle chooses what the Brief
 The bar also says, in plain language, when a search source failed, when stories could not be scored, when summaries could not be written, or when the last refresh failed.
 
 **Scenario:** Given you are signed in and no refresh is running, when you press Refresh, then the button shows “Refreshing…” and the Brief reloads when the run finishes.
+
+**Scenario:** Given you pressed Refresh and the connection drops or times out while the server is still refreshing, when you wait, then the button keeps saying “Refreshing…” with no failure message, and the Brief reloads with the new stories when the run finishes.
+
+**Scenario:** Given a refresh run failed on the server, or could not start and nothing is running, when the page finds out, then the bar says “Refresh failed. Try again.”
 
 **Scenario:** Given a refresh is already running, when you press Refresh, then you join that run instead of starting a second one.
 

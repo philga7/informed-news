@@ -28,7 +28,15 @@ export type TopicOverview = {
 	notices: string[];
 	sections: BriefOverviewSection[];
 	quiet: Array<{ id: string; name: string; level: TopicBriefLevel }>;
-	refresh: BriefRefreshClock | null;
+	refresh: RefreshState | null;
+};
+
+/** The refresh clock plus what the server says about the job right now. */
+export type RefreshState = BriefRefreshClock & {
+	/** True while the single-flight refresh job is in progress. */
+	running: boolean;
+	/** `ok` of the last finished run; null when none is recorded. */
+	lastOk: boolean | null;
 };
 
 export type LoadedBrief = {
@@ -200,14 +208,16 @@ function parseStories(body: unknown): BriefStory[] {
 	return stories;
 }
 
-function parseRefresh(value: unknown): BriefRefreshClock | null {
+function parseRefresh(value: unknown): RefreshState | null {
 	if (!isRecord(value)) return null;
 	const lastSuccess = isRecord(value.lastSuccess) ? value.lastSuccess : null;
 	const completedAt =
 		lastSuccess && typeof lastSuccess.completedAt === 'string' ? lastSuccess.completedAt : null;
 	const nextAt = typeof value.nextAt === 'string' ? value.nextAt : null;
-	if (!completedAt && !nextAt) return null;
-	return { lastSuccess: completedAt ? { completedAt } : null, nextAt };
+	const running = value.running === true;
+	const lastOk = isRecord(value.last) && typeof value.last.ok === 'boolean' ? value.last.ok : null;
+	if (!completedAt && !nextAt && !running && lastOk === null) return null;
+	return { lastSuccess: completedAt ? { completedAt } : null, nextAt, running, lastOk };
 }
 
 function parseOverview(body: unknown): TopicOverview | null {
@@ -300,6 +310,44 @@ export async function postRefresh(): Promise<{ ok: true } | { ok: false; unauthe
 	} catch {
 		return { ok: false, unauthenticated: false };
 	}
+}
+
+/** How often to ask whether a refresh the POST lost track of is still running. */
+export const REFRESH_POLL_MS = 5_000;
+/** Give up waiting on a running refresh after this long (the job is far shorter). */
+export const REFRESH_POLL_MAX_MS = 30 * 60 * 1000;
+
+/** Current refresh state from the overview, or null when it cannot be read. */
+export async function fetchRefreshState(): Promise<RefreshState | null> {
+	try {
+		const response = await fetch('/api/brief/overview', { credentials: 'include', cache: 'no-store' });
+		if (!response.ok) return null;
+		const body: unknown = await response.json();
+		return isRecord(body) ? parseRefresh(body.refresh) : null;
+	} catch {
+		return null;
+	}
+}
+
+export type RefreshOutcome = 'succeeded' | 'failed';
+
+/**
+ * After a start request that did not come back cleanly (dropped connection, proxy timeout,
+ * error status): ask the server whether the job is running. Nothing running means the start
+ * never began, so it failed. Otherwise poll until it stops and report how it ended.
+ */
+export async function settleRefresh(
+	sleep: (ms: number) => Promise<void> = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+): Promise<RefreshOutcome> {
+	let state = await fetchRefreshState();
+	if (!state?.running) return 'failed';
+	for (let waited = 0; waited < REFRESH_POLL_MAX_MS; waited += REFRESH_POLL_MS) {
+		await sleep(REFRESH_POLL_MS);
+		state = await fetchRefreshState();
+		// A failed status read is not a failed job: keep waiting.
+		if (state && !state.running) return state.lastOk === false ? 'failed' : 'succeeded';
+	}
+	return 'failed';
 }
 
 export async function postSummary(articleId: string): Promise<SummaryPostResult> {
