@@ -1,3 +1,9 @@
+## [0.40.9](https://github.com/philga7/informed-news/compare/v0.40.8...v0.40.9) (2026-11-11)
+
+### Bug Fixes
+
+* **NEWS-213:** treat a finished successful refresh as success after a dropped POST ([#268](https://github.com/philga7/informed-news/issues/268)) ([d8ea93d](https://github.com/philga7/informed-news/commit/d8ea93db88ea9e1362aa6688bed04dafa96596c1)), closes [#265](https://github.com/philga7/informed-news/issues/265)
+
 ## [0.40.8](https://github.com/philga7/informed-news/compare/v0.40.7...v0.40.8) (2026-11-11)
 
 ### Bug Fixes
