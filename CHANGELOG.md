@@ -1,3 +1,9 @@
+## [0.40.10](https://github.com/philga7/informed-news/compare/v0.40.9...v0.40.10) (2026-11-11)
+
+### Bug Fixes
+
+* **NEWS-209:** provider status uses current config, not last-run meta ([#270](https://github.com/philga7/informed-news/issues/270)) ([3612b52](https://github.com/philga7/informed-news/commit/3612b524e3e71bcca2973e4b663efc6b14c46044)), closes [#263](https://github.com/philga7/informed-news/issues/263)
+
 ## [0.40.9](https://github.com/philga7/informed-news/compare/v0.40.8...v0.40.9) (2026-11-11)
 
 ### Bug Fixes
