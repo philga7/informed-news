@@ -1,3 +1,9 @@
+## [0.40.7](https://github.com/philga7/informed-news/compare/v0.40.6...v0.40.7) (2026-11-11)
+
+### Bug Fixes
+
+* **NEWS-212:** keep healthz responsive during publisher scrape ([#262](https://github.com/philga7/informed-news/issues/262)) ([93b0b69](https://github.com/philga7/informed-news/commit/93b0b691f5d9c3401cb29af0e0dee01b9361e76e)), closes [#260](https://github.com/philga7/informed-news/issues/260)
+
 ## [0.40.6](https://github.com/philga7/informed-news/compare/v0.40.5...v0.40.6) (2026-11-11)
 
 ### Bug Fixes
