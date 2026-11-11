@@ -39,7 +39,9 @@ services:
 
 volumes:
   informed-news-data:
-    name: informed-news-data
+    # Unset on project informed-news stays informed-news-data.
+    # Any other project name gets its own volume, so -p cannot mount the live one.
+    name: ${INFORMED_NEWS_DATA_VOLUME:-${COMPOSE_PROJECT_NAME:-informed-news}-data}
 
 networks:
   nanobot-mem0:

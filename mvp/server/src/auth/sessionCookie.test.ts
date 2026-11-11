@@ -39,7 +39,11 @@ test('sessionCookieShouldBeSecure: case-insensitive https', () => {
 
 async function withApp(
   run: (baseUrl: string) => Promise<void>,
+  options?: { cookieName?: string },
 ): Promise<void> {
+  const previousCookieName = process.env.SESSION_COOKIE_NAME;
+  if (options?.cookieName === undefined) delete process.env.SESSION_COOKIE_NAME;
+  else process.env.SESSION_COOKIE_NAME = options.cookieName;
   process.env.SESSION_SECRET = 'test-secret';
   process.env.MVP_PASSWORD = 'pw';
   delete process.env.MVP_PASSWORD_HASH;
@@ -53,6 +57,8 @@ async function withApp(
   try {
     await run(`http://127.0.0.1:${address.port}`);
   } finally {
+    if (previousCookieName === undefined) delete process.env.SESSION_COOKIE_NAME;
+    else process.env.SESSION_COOKIE_NAME = previousCookieName;
     await new Promise<void>((resolve, reject) => {
       server.close((err) => (err ? reject(err) : resolve()));
     });
@@ -64,6 +70,7 @@ async function withApp(
 async function login(
   baseUrl: string,
   extra: Record<string, string>,
+  cookieName = 'mvp_session',
 ): Promise<{ setCookie: string; cookie: string; body: unknown }> {
   const resp = await fetch(`${baseUrl}/api/login`, {
     method: 'POST',
@@ -72,9 +79,14 @@ async function login(
   });
   assert.equal(resp.status, 200);
   const cookies = resp.headers.getSetCookie();
-  const setCookie = cookies.find((c) => c.startsWith('mvp_session=')) ?? '';
+  const setCookie = cookies.find((c) => c.startsWith(`${cookieName}=`)) ?? '';
   const cookie = cookies.map((c) => c.split(';')[0]!).join('; ');
   return { setCookie, cookie, body: await resp.json() };
+}
+
+async function topicsStatus(baseUrl: string, cookie: string): Promise<number> {
+  const resp = await fetch(`${baseUrl}/api/topics`, { headers: { cookie } });
+  return resp.status;
 }
 
 test('login behind https proxy sets a Secure HttpOnly cookie that authenticates', async () => {
@@ -94,9 +106,68 @@ test('login behind https proxy sets a Secure HttpOnly cookie that authenticates'
 test('plain http login sets HttpOnly cookie without Secure', async () => {
   await withApp(async (baseUrl) => {
     const { setCookie, cookie } = await login(baseUrl, {});
+    assert.match(setCookie, /^mvp_session=/);
     assert.match(setCookie, /;\s*httponly/i);
     assert.doesNotMatch(setCookie, /;\s*secure/i);
     const topics = await fetch(`${baseUrl}/api/topics`, { headers: { cookie } });
     assert.notEqual(topics.status, 401);
+  });
+});
+
+test('blank SESSION_COOKIE_NAME still uses mvp_session', async () => {
+  await withApp(async (baseUrl) => {
+    const { setCookie } = await login(baseUrl, {});
+    assert.match(setCookie, /^mvp_session=/);
+  }, { cookieName: '   ' });
+});
+
+test('login with a custom session cookie name authenticates', async () => {
+  await withApp(async (baseUrl) => {
+    const { setCookie, cookie, body } = await login(baseUrl, {}, 'mvp_qa_session');
+    assert.deepEqual(body, { ok: true });
+    assert.match(setCookie, /^mvp_qa_session=/);
+    assert.doesNotMatch(setCookie, /^mvp_session=/);
+    assert.notEqual(await topicsStatus(baseUrl, cookie), 401);
+  }, { cookieName: 'mvp_qa_session' });
+});
+
+test('invalid SESSION_COOKIE_NAME fails when the app is created', async () => {
+  const previous = process.env.SESSION_COOKIE_NAME;
+  process.env.SESSION_COOKIE_NAME = 'mvp session';
+  process.env.SESSION_SECRET = 'test-secret';
+  process.env.MVP_PASSWORD = 'pw';
+  delete process.env.MVP_PASSWORD_HASH;
+  try {
+    const { createApp } = await import('../app.js');
+    assert.throws(
+      () => createApp(),
+      /SESSION_COOKIE_NAME is not a valid cookie name/,
+    );
+  } finally {
+    if (previous === undefined) delete process.env.SESSION_COOKIE_NAME;
+    else process.env.SESSION_COOKIE_NAME = previous;
+  }
+});
+
+test('login on one cookie name leaves the other instance signed in', async () => {
+  await withApp(async (liveUrl) => {
+    await withApp(async (qaUrl) => {
+      const live = await login(liveUrl, {}, 'mvp_session');
+      const qa = await login(qaUrl, {}, 'mvp_qa_session');
+      assert.match(live.setCookie, /^mvp_session=/);
+      assert.match(qa.setCookie, /^mvp_qa_session=/);
+
+      assert.notEqual(await topicsStatus(liveUrl, live.cookie), 401);
+      assert.notEqual(await topicsStatus(qaUrl, qa.cookie), 401);
+      assert.equal(await topicsStatus(qaUrl, live.cookie), 401);
+      assert.equal(await topicsStatus(liveUrl, qa.cookie), 401);
+
+      const liveAgain = await login(liveUrl, {}, 'mvp_session');
+      assert.notEqual(await topicsStatus(qaUrl, qa.cookie), 401);
+      assert.notEqual(await topicsStatus(liveUrl, liveAgain.cookie), 401);
+      const qaAgain = await login(qaUrl, {}, 'mvp_qa_session');
+      assert.notEqual(await topicsStatus(liveUrl, liveAgain.cookie), 401);
+      assert.notEqual(await topicsStatus(qaUrl, qaAgain.cookie), 401);
+    }, { cookieName: 'mvp_qa_session' });
   });
 });
