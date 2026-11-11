@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, it } from 'node:test';
@@ -120,7 +121,7 @@ describe('QA instance compose isolation', () => {
 		assert.notEqual(override, LIVE_VOLUME);
 	});
 
-	it('gives a second project its own volume, port, and env file without a live mount', () => {
+	it('gives a second project its own volume and port, and keeps the env file settable', () => {
 		const contents = composeText();
 		const liveVolume = resolveVolumeName(contents, { COMPOSE_PROJECT_NAME: LIVE_PROJECT });
 		const qaVolume = resolveVolumeName(contents, { COMPOSE_PROJECT_NAME: QA_PROJECT });
@@ -133,8 +134,75 @@ describe('QA instance compose isolation', () => {
 		assert.equal(qaPort, QA_PORT);
 		assert.notEqual(qaPort, livePort);
 		assert.notEqual(QA_PROJECT, LIVE_PROJECT);
-		assert.match(contents, /INFORMED_NEWS_ENV_FILE:-\/opt\/informed-news\/\.env/);
+		assert.match(contents, /\$\{INFORMED_NEWS_ENV_FILE:-\/opt\/informed-news\/\.env\}/);
 		assert.doesNotMatch(contents, /informed-news-qa/);
+	});
+});
+
+function composeCli() {
+	const docker = spawnSync('docker', ['compose', 'version'], { encoding: 'utf8' });
+	if (docker.status === 0) return { command: 'docker', prefix: ['compose'] };
+	return null;
+}
+
+function renderedCompose(extraEnv, project) {
+	const cli = composeCli();
+	assert.ok(cli, 'docker compose is required for this test');
+	const env = { ...process.env };
+	delete env.INFORMED_NEWS_DATA_VOLUME;
+	delete env.INFORMED_NEWS_PORT;
+	delete env.INFORMED_NEWS_IMAGE;
+	delete env.COMPOSE_PROJECT_NAME;
+	delete env.COMPOSE_FILE;
+	Object.assign(env, extraEnv);
+	env.INFORMED_NEWS_ENV_FILE = join(root, 'mvp/.env.example');
+	const args = [...cli.prefix];
+	if (project) args.push('-p', project);
+	args.push('config');
+	const result = spawnSync(cli.command, args, { cwd: root, env, encoding: 'utf8' });
+	assert.equal(result.status, 0, result.stderr);
+	return result.stdout;
+}
+
+function configuredVolume(config) {
+	const volumes = config.split(/^volumes:\s*$/m)[1] ?? '';
+	const match = volumes.match(/^\s+name:\s*(\S+)\s*$/m);
+	assert.ok(match, 'rendered config has no volume name');
+	return match[1];
+}
+
+function configuredPort(config) {
+	const match = config.match(/published:\s*"?(\d+)"?/);
+	assert.ok(match, 'rendered config has no published port');
+	return match[1];
+}
+
+describe('QA instance rendered by docker compose', { skip: composeCli() ? false : 'docker compose is not installed' }, () => {
+	it('keeps the live volume, port, and image when the new vars are unset', () => {
+		const config = renderedCompose({}, undefined);
+		assert.equal(configuredVolume(config), LIVE_VOLUME);
+		assert.equal(configuredPort(config), LIVE_PORT);
+		assert.match(config, /informed-news:local/);
+		assert.doesNotMatch(config, /informed-news:qa/);
+	});
+
+	it('does not mount the live volume for project informed-news-qa', () => {
+		const config = renderedCompose({}, QA_PROJECT);
+		assert.equal(configuredVolume(config), QA_VOLUME);
+		assert.notEqual(configuredVolume(config), LIVE_VOLUME);
+		assert.match(config, /^name: informed-news-qa$/m);
+	});
+
+	it('uses a QA port and volume override that are not the live ones', () => {
+		const config = renderedCompose(
+			{ INFORMED_NEWS_DATA_VOLUME: QA_VOLUME, INFORMED_NEWS_PORT: QA_PORT, INFORMED_NEWS_IMAGE: 'informed-news:qa' },
+			QA_PROJECT,
+		);
+		assert.equal(configuredVolume(config), QA_VOLUME);
+		assert.notEqual(configuredVolume(config), LIVE_VOLUME);
+		assert.equal(configuredPort(config), QA_PORT);
+		assert.notEqual(configuredPort(config), LIVE_PORT);
+		assert.match(config, /informed-news:qa/);
 	});
 });
 

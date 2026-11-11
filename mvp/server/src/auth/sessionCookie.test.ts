@@ -131,6 +131,24 @@ test('login with a custom session cookie name authenticates', async () => {
   }, { cookieName: 'mvp_qa_session' });
 });
 
+test('invalid SESSION_COOKIE_NAME fails when the app is created', async () => {
+  const previous = process.env.SESSION_COOKIE_NAME;
+  process.env.SESSION_COOKIE_NAME = 'mvp session';
+  process.env.SESSION_SECRET = 'test-secret';
+  process.env.MVP_PASSWORD = 'pw';
+  delete process.env.MVP_PASSWORD_HASH;
+  try {
+    const { createApp } = await import('../app.js');
+    assert.throws(
+      () => createApp(),
+      /SESSION_COOKIE_NAME is not a valid cookie name/,
+    );
+  } finally {
+    if (previous === undefined) delete process.env.SESSION_COOKIE_NAME;
+    else process.env.SESSION_COOKIE_NAME = previous;
+  }
+});
+
 test('login on one cookie name leaves the other instance signed in', async () => {
   await withApp(async (liveUrl) => {
     await withApp(async (qaUrl) => {

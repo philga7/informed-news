@@ -5,9 +5,18 @@ import { sessionCookieShouldBeSecure } from './sessionCookie.js';
 
 const DEFAULT_SESSION_COOKIE_NAME = 'mvp_session';
 
+// RFC 6265 cookie-name token. A bad name makes cookie-session throw on login.
+const COOKIE_NAME_TOKEN = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/;
+
 function sessionCookieName(): string {
   const configured = process.env.SESSION_COOKIE_NAME?.trim();
-  return configured ? configured : DEFAULT_SESSION_COOKIE_NAME;
+  if (!configured) return DEFAULT_SESSION_COOKIE_NAME;
+  if (!COOKIE_NAME_TOKEN.test(configured)) {
+    throw new Error(
+      'Auth misconfigured: SESSION_COOKIE_NAME is not a valid cookie name',
+    );
+  }
+  return configured;
 }
 
 export function createSessionMiddleware(): RequestHandler {
