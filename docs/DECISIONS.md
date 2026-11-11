@@ -9,7 +9,7 @@ Binding choices for Informed News. Newest first. When one of these changes, upda
 1. **Volume.** `compose.yaml` names the data volume `${INFORMED_NEWS_DATA_VOLUME:-${COMPOSE_PROJECT_NAME:-informed-news}-data}`. Unset, on the live project `informed-news`, the volume stays `informed-news-data`. `docker compose -p informed-news-qa` resolves `informed-news-qa-data` and does not mount the live volume. The QA env sets `INFORMED_NEWS_DATA_VOLUME` to `informed-news-qa-data`, not `informed-news-data`. Compose does not reject an override that names the live volume; the runbook forbids that setting.
 2. **Cookie.** `SESSION_COOKIE_NAME` defaults to `mvp_session` when unset or blank. QA sets `mvp_qa_session`, so a login on the QA URL does not replace the live cookie. Browsers ignore the port on the same hostname.
 3. **Credentials.** Only the bcrypt hash goes in the QA env file (`/opt/informed-news/qa.env`, mode 600, hash single-quoted). The plaintext password is not written into the repo, the pull request, or CI logs.
-4. **Same compose file.** There is no second compose file and no override file. The live project, volume, and port stay the defaults when the new variables are unset.
+4. **Same compose file, separate image tag.** There is no second compose file and no override file. QA is built as `informed-news:qa`. A QA `docker compose up --build` must not retag `informed-news:local`, which is the live project's default. The live project, volume, and port stay the defaults when the new variables are unset.
 
 **Why:** QA walks were stalling on the live operator password, which cannot be entered in a group QA room. A second login on the live instance would read and write the operator Brief.
 

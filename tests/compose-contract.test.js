@@ -159,7 +159,10 @@ describe('QA instance runbook', () => {
 			'tailscale serve --bg --https=8443 http://127.0.0.1:3002',
 			'tailscale serve --https=8443 off',
 			'INFORMED_NEWS_DATA_VOLUME=informed-news-qa-data \\',
+			'INFORMED_NEWS_IMAGE=informed-news:qa \\',
 			'docker compose --env-file /opt/informed-news/qa.env -p informed-news-qa up -d --build',
+			'Docker Compose v2.40.3',
+			'informed-news:local',
 			'docker compose --env-file /opt/informed-news/qa.env -p informed-news-qa down',
 			'docker volume rm informed-news-qa-data',
 			'Do not set `INFORMED_NEWS_DATA_VOLUME` to `informed-news-data`',
@@ -169,6 +172,15 @@ describe('QA instance runbook', () => {
 		]) {
 			assert.ok(section.includes(phrase), `QA instance section missing: ${phrase}`);
 		}
+
+		const imageTagLines = section
+			.split('\n')
+			.filter((line) => line.includes('INFORMED_NEWS_IMAGE=informed-news:qa'));
+		assert.equal(
+			imageTagLines.length,
+			2,
+			'QA image tag belongs in the env placeholder and the start command',
+		);
 
 		assert.doesNotMatch(section, /\$2[aby]\$/);
 		assert.doesNotMatch(section, /SESSION_SECRET=(?!<)[^\s<]/);

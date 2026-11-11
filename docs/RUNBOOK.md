@@ -122,6 +122,7 @@ COMPOSE_PROJECT_NAME=informed-news-qa
 INFORMED_NEWS_ENV_FILE=/opt/informed-news/qa.env
 INFORMED_NEWS_DATA_VOLUME=informed-news-qa-data
 INFORMED_NEWS_PORT=3002
+INFORMED_NEWS_IMAGE=informed-news:qa
 SESSION_COOKIE_NAME=mvp_qa_session
 REFRESH_INTERVAL_HOURS=off
 MVP_PASSWORD_HASH='<bcrypt hash>'
@@ -136,19 +137,21 @@ TYPESAFE_API_KEY=
 
 ### Project, volume, and port
 
-From `/opt/informed-news`. The prefixes win over a shell export, so this command cannot pick up the live env file, volume, or port from the shell:
+From `/opt/informed-news`. The prefixes win over a shell export, so this command cannot pick up the live env file, volume, port, or image tag from the shell:
 
 ```bash
 COMPOSE_PROJECT_NAME=informed-news-qa \
 INFORMED_NEWS_ENV_FILE=/opt/informed-news/qa.env \
 INFORMED_NEWS_DATA_VOLUME=informed-news-qa-data \
 INFORMED_NEWS_PORT=3002 \
+INFORMED_NEWS_IMAGE=informed-news:qa \
 docker compose --env-file /opt/informed-news/qa.env -p informed-news-qa up -d --build
 ```
 
 - Project name: `informed-news-qa`. A second project does not mount `informed-news-data`. With no volume override, project `informed-news-qa` uses volume `informed-news-qa-data`. The prefix sets that name anyway.
+- That volume split needs Compose to set `COMPOSE_PROJECT_NAME` from `-p` (or the top-level `name`) before it interpolates the file. Checked with Docker Compose v2.40.3. Before the first QA start, run `docker compose -p informed-news-qa config` and confirm the volume name is `informed-news-qa-data`. If it is still `informed-news-data`, stop. That Compose build would mount the live volume.
 - Host port: `127.0.0.1:3002`, forwarded to port 3001 inside the container. The live publish stays `127.0.0.1:3001`.
-- Same `compose.yaml`, same image. There is no second compose file.
+- Same `compose.yaml` and Dockerfile. There is no second compose file. The QA image tag is `informed-news:qa`. A QA build must not retag `informed-news:local`, which is what the live project uses. The running live container keeps its current image, and the next live `docker compose up` does not pick up a QA build.
 
 Health check, on the VPS:
 

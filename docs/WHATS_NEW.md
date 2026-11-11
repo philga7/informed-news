@@ -8,8 +8,6 @@ This is not the release log. Releases are recorded in `CHANGELOG.md` by semantic
 
 ## 2026-11-11
 
-No user-visible change.
-
 On the Brief, if the model answers a full-story request with a response the app cannot read, the card now says the full story could not be built because the AI response was malformed. Before, it showed the generic “could not be loaded right now” message. It does not retry on its own, and you can try again.
 
 On the Brief, opening a story right after a refresh is more likely to load its summary and full story. The server now waits longer for the model when you open a story, and, if the first attempt times out, cancels it and tries once more with a fresh request. “Could not be loaded right now” still appears when the model really can't be reached.
@@ -21,6 +19,8 @@ On the Brief, if the connection drops and the refresh you just started has alrea
 Full stories from publisher pages that start with a very large block of script data (common on some news sites) no longer lose their article text. The app now ignores that script code before reading the first million characters of the page.
 
 On the Brief, **Refresh** no longer says “Refresh failed” just because the connection dropped while the server was still working. The button keeps saying “Refreshing…”, and the Brief reloads with the new stories when the run finishes, without a manual page reload. “Refresh failed. Try again.” now appears only when the run really failed or never started.
+
+**No user-visible change.** An operator can run a separate QA instance; the live Brief and login are unchanged.
 
 ## 2026-11-10
 
