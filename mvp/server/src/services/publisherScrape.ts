@@ -1,4 +1,5 @@
 import * as cheerio from 'cheerio';
+import { prepareHtmlForParse } from './htmlParseGuard.js';
 import { isRetryableNetworkError } from './isRetryableNetworkError.js';
 import { USER_AGENT } from './userAgent.js';
 
@@ -60,10 +61,11 @@ function firstExternalLink(
   let found: string | null = null;
 
   nodes.each((_i, el) => {
-    if (found) return;
     const href = $(el).attr('href');
     if (!isExternalHttpLink(href, sourceDomain) || !href) return;
     found = resolveHref(href, pageUrl);
+    // Stop scanning once a link is found (returning false ends cheerio's each).
+    return found ? false : undefined;
   });
 
   return found;
@@ -133,7 +135,7 @@ export async function scrapePublisherUrl(
       return null;
     }
 
-    const html = await response.text();
+    const html = await prepareHtmlForParse(await response.text());
     return extractPublisherUrl(html, pageUrl, sourceDomain);
   } catch (err) {
     console.warn(
