@@ -1,3 +1,9 @@
+## [0.40.11](https://github.com/philga7/informed-news/compare/v0.40.10...v0.40.11) (2026-11-11)
+
+### Bug Fixes
+
+* **NEWS-211:** on-demand Ollama summary and full-story loads after refresh ([#269](https://github.com/philga7/informed-news/issues/269)) ([6874f73](https://github.com/philga7/informed-news/commit/6874f7372cf2baff04cbf79114ecb3cf13e0c77a)), closes [#264](https://github.com/philga7/informed-news/issues/264)
+
 ## [0.40.10](https://github.com/philga7/informed-news/compare/v0.40.9...v0.40.10) (2026-11-11)
 
 ### Bug Fixes
