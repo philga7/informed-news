@@ -1244,8 +1244,8 @@ describe('BriefScreen status banner and Refresh control', () => {
 		});
 		render(BriefScreen);
 		const banner = await screen.findByTestId('brief-status');
-		expect(banner).toHaveTextContent('Keys off');
 		expect(banner).toHaveTextContent('Provider keys off');
+		expect(screen.queryByText('Keys off', { exact: true })).not.toBeInTheDocument();
 		const button = screen.getByRole('button', { name: /^Refresh$/ });
 		expect(button).toBeDisabled();
 		await fireEvent.click(button);

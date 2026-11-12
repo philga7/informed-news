@@ -957,7 +957,7 @@
 		<div class="status" data-testid="brief-status">
 			<p>Version {status.version}</p>
 			{#if status.signedIn}
-				<p>{status.keysOn ? 'Keys on' : 'Keys off'}</p>
+				<p>{status.keysOn ? 'Keys on' : 'Provider keys off'}</p>
 				{#if status.lastFetchAt && status.lastFetchOk !== null}
 					<p>
 						<span>{status.lastFetchOk ? 'Last fetch succeeded' : 'Last fetch failed'}</span>
@@ -965,9 +965,6 @@
 					</p>
 				{:else}
 					<p>No fetch yet</p>
-				{/if}
-				{#if !status.keysOn}
-					<p>Provider keys off</p>
 				{/if}
 				<button
 					type="button"
