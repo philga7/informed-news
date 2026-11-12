@@ -1329,6 +1329,54 @@ describe('BriefScreen status banner and Refresh control', () => {
 		mock.restore();
 	});
 
+	it('follows a fetch that is still running when Refresh returns', async () => {
+		vi.useFakeTimers({ shouldAdvanceTime: true });
+		let posts = 0;
+		let reads = 0;
+		const mock = install({
+			stories: [story({ informed_summary_status: 'ok' })],
+			onFetch: () => {
+				posts += 1;
+				return jsonResponse(200, { ok: true });
+			},
+			overviewNow: () => {
+				reads += 1;
+				const running = reads === 2;
+				const finished = reads >= 3;
+				return overview({
+					sections: GRID_SECTION,
+					quiet: [],
+					refresh: {
+						lastSuccess: finished ? { completedAt: LAST_COMPLETED_AT } : null,
+						nextAt: null,
+						running,
+						last: finished
+							? {
+									ok: true,
+									startedAt: '2026-11-12T03:00:00.000Z',
+									completedAt: LAST_COMPLETED_AT,
+									error: null,
+								}
+							: null,
+					},
+				});
+			},
+		});
+		try {
+			render(BriefScreen);
+			await screen.findByRole('button', { name: /^Refresh$/ });
+			await fireEvent.click(screen.getByRole('button', { name: /^Refresh$/ }));
+			expect(posts).toBe(1);
+			expect(screen.getByRole('button', { name: 'Refreshing…' })).toBeDisabled();
+			await vi.advanceTimersByTimeAsync(REFRESH_POLL_MS);
+			expect(await screen.findByText('Last fetch succeeded')).toBeVisible();
+			expect(posts).toBe(1);
+		} finally {
+			mock.restore();
+			vi.useRealTimers();
+		}
+	});
+
 	it('shows Refreshing… when a fetch is already running and a click does not POST', async () => {
 		let posts = 0;
 		const mock = install({

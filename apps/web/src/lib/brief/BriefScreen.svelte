@@ -628,6 +628,9 @@
 		await reload();
 		refreshing = false;
 		if (outcome === 'failed') refreshMessage = REFRESH_ERROR;
+		// reload() ran while this click was still in flight, so it did not start
+		// a watch. If that reload found a fetch still running, follow it.
+		watchRunningFetch();
 	}
 
 	async function loadFiltered(): Promise<void> {
