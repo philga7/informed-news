@@ -4,6 +4,7 @@ import { page } from '$app/state';
 import { tick } from 'svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { installBriefFetchMock, jsonResponse } from '$lib/brief/fetchMock';
+import { REFRESH_POLL_MS } from './briefClient';
 import { CONTENT_FILTER_STORAGE_KEY, SHARED_STORY_NOT_FOUND } from './assemble';
 import { resetFeedbackCache } from './FeedbackButtons.svelte';
 import BriefScreen from './BriefScreen.svelte';
@@ -42,6 +43,10 @@ type Overview = {
 		running?: boolean;
 		last?: { ok: boolean; startedAt: string; completedAt: string; error: string | null } | null;
 	};
+	signedIn?: boolean;
+	keysOn?: boolean;
+	version?: string;
+	fixture?: boolean;
 };
 
 function setPath(path: string): void {
@@ -49,8 +54,19 @@ function setPath(path: string): void {
 	page.url.href = `http://localhost${path}`;
 }
 
-function overview(partial: Pick<Overview, 'sections' | 'quiet'> & Partial<Pick<Overview, 'refresh' | 'notices'>>): Overview {
-	return { ok: true, filteredOut: 0, notices: [], ...partial };
+function overview(
+	partial: Pick<Overview, 'sections' | 'quiet'> &
+		Partial<Pick<Overview, 'refresh' | 'notices' | 'signedIn' | 'keysOn' | 'version' | 'fixture'>>,
+): Overview {
+	return {
+		ok: true,
+		filteredOut: 0,
+		notices: [],
+		signedIn: true,
+		keysOn: true,
+		version: '0.41.0',
+		...partial,
+	};
 }
 
 function story(partial: Record<string, unknown> = {}) {
@@ -1182,6 +1198,274 @@ describe('BriefScreen refresh with an unreadable first status read (NEWS-213)', 
 		await fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
 		await vi.advanceTimersByTimeAsync(POLL_MS);
 		expect(await screen.findByText('Refresh failed. Try again.')).toBeVisible();
+		mock.restore();
+	});
+});
+
+const GRID_SECTION = [
+	{ topicId: 'grid', name: 'Grid', level: 'core' as const, storyIds: ['story-1'], moreIds: [] },
+];
+const LAST_COMPLETED_AT = '2026-11-12T03:04:05.000Z';
+
+describe('BriefScreen status banner and Refresh control', () => {
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
+	function fetchPosts(mock: ReturnType<typeof install>) {
+		return mock.fetchMock.mock.calls.filter((call) => {
+			const init = call[1] as RequestInit | undefined;
+			return call[0] === '/api/fetch' && init?.method === 'POST';
+		});
+	}
+
+	it('shows only the version when signed out', async () => {
+		const mock = install({
+			stories: [story({ informed_summary_status: 'ok' })],
+			brief: overview({ sections: GRID_SECTION, quiet: [], signedIn: false }),
+		});
+		render(BriefScreen);
+		const banner = await screen.findByTestId('brief-status');
+		expect(banner).toHaveTextContent('Version 0.41.0');
+		expect(screen.queryByRole('button', { name: /^Refresh$/ })).not.toBeInTheDocument();
+		expect(screen.queryByRole('button', { name: 'Refreshing…' })).not.toBeInTheDocument();
+		expect(screen.queryByText('Keys on')).not.toBeInTheDocument();
+		expect(screen.queryByText('Keys off')).not.toBeInTheDocument();
+		expect(screen.queryByText('No fetch yet')).not.toBeInTheDocument();
+		expect(screen.queryByText(/Last fetch/)).not.toBeInTheDocument();
+		expect(screen.queryByText('Provider keys off')).not.toBeInTheDocument();
+		mock.restore();
+	});
+
+	it('disables Refresh when keys are off and does not POST', async () => {
+		const mock = install({
+			stories: [story({ informed_summary_status: 'ok' })],
+			brief: overview({ sections: GRID_SECTION, quiet: [], keysOn: false }),
+		});
+		render(BriefScreen);
+		const banner = await screen.findByTestId('brief-status');
+		expect(banner).toHaveTextContent('Keys off');
+		expect(banner).toHaveTextContent('Provider keys off');
+		const button = screen.getByRole('button', { name: /^Refresh$/ });
+		expect(button).toBeDisabled();
+		await fireEvent.click(button);
+		await tick();
+		expect(fetchPosts(mock)).toHaveLength(0);
+		mock.restore();
+	});
+
+	it.each([
+		['succeeded', true, 'Last fetch succeeded'],
+		['failed', false, 'Last fetch failed'],
+	] as const)('one click POSTs once and the banner shows the fetch %s', async (_name, ok, label) => {
+		let posted = false;
+		const mock = install({
+			stories: [story({ informed_summary_status: 'ok' })],
+			onFetch: () => {
+				posted = true;
+				return jsonResponse(ok ? 200 : 500, { ok });
+			},
+			overviewNow: () =>
+				overview({
+					sections: GRID_SECTION,
+					quiet: [],
+					refresh: {
+						lastSuccess: posted && ok ? { completedAt: LAST_COMPLETED_AT } : null,
+						nextAt: null,
+						running: false,
+						last: posted
+							? {
+									ok,
+									startedAt: new Date().toISOString(),
+									completedAt: LAST_COMPLETED_AT,
+									error: ok ? null : 'fetch failed',
+								}
+							: null,
+					},
+				}),
+		});
+		render(BriefScreen);
+		await screen.findByRole('heading', { name: 'Your topics', level: 2 });
+		expect(screen.getByText('No fetch yet')).toBeVisible();
+		expect(screen.getByText('Keys on')).toBeVisible();
+		await fireEvent.click(screen.getByRole('button', { name: /^Refresh$/ }));
+		expect(await screen.findByText(label)).toBeVisible();
+		expect(screen.getByTestId('brief-status').querySelector('time')).toHaveAttribute(
+			'datetime',
+			LAST_COMPLETED_AT,
+		);
+		const posts = fetchPosts(mock);
+		expect(posts).toHaveLength(1);
+		const init = posts[0]?.[1] as RequestInit;
+		expect(init.credentials).toBe('include');
+		expect(init.headers).toEqual({ 'Content-Type': 'application/json' });
+		expect(init.body).toBe('{}');
+		mock.restore();
+	});
+
+	it('does not send a second POST while the first is still in flight', async () => {
+		let posts = 0;
+		let release: (response: Response) => void = () => {};
+		const pending = new Promise<Response>((resolve) => {
+			release = resolve;
+		});
+		const mock = install({
+			stories: [story({ informed_summary_status: 'ok' })],
+			onFetch: () => {
+				posts += 1;
+				return pending;
+			},
+		});
+		render(BriefScreen);
+		await screen.findByRole('button', { name: /^Refresh$/ });
+		await fireEvent.click(screen.getByRole('button', { name: /^Refresh$/ }));
+		await vi.waitFor(() => expect(posts).toBe(1));
+		const refreshing = screen.getByRole('button', { name: 'Refreshing…' });
+		expect(refreshing).toBeDisabled();
+		await fireEvent.click(refreshing);
+		expect(posts).toBe(1);
+		release(jsonResponse(200, { ok: true }));
+		await vi.waitFor(() => expect(screen.getByRole('button', { name: /^Refresh$/ })).toBeEnabled());
+		mock.restore();
+	});
+
+	it('shows Refreshing… when a fetch is already running and a click does not POST', async () => {
+		let posts = 0;
+		const mock = install({
+			stories: [story({ informed_summary_status: 'ok' })],
+			onFetch: () => {
+				posts += 1;
+				return jsonResponse(200, { ok: true });
+			},
+			brief: overview({
+				sections: GRID_SECTION,
+				quiet: [],
+				refresh: { lastSuccess: null, nextAt: null, running: true, last: null },
+			}),
+		});
+		render(BriefScreen);
+		const button = await screen.findByRole('button', { name: 'Refreshing…' });
+		expect(button).toBeDisabled();
+		await fireEvent.click(button);
+		await tick();
+		expect(posts).toBe(0);
+		mock.restore();
+	});
+
+	it.each([
+		['succeeded', true, 'Last fetch succeeded'],
+		['failed', false, 'Last fetch failed'],
+	] as const)(
+		'shows Last fetch %s after a load into a running fetch finishes, and does not POST',
+		async (_name, ok, label) => {
+			vi.useFakeTimers({ shouldAdvanceTime: true });
+			let finished = false;
+			const mock = install({
+				stories: [story({ informed_summary_status: 'ok' })],
+				overviewNow: () =>
+					overview({
+						sections: GRID_SECTION,
+						quiet: [],
+						refresh: {
+							lastSuccess: finished && ok ? { completedAt: LAST_COMPLETED_AT } : null,
+							nextAt: null,
+							running: !finished,
+							last: finished
+								? {
+										ok,
+										startedAt: '2026-11-12T03:00:00.000Z',
+										completedAt: LAST_COMPLETED_AT,
+										error: ok ? null : 'fetch failed',
+									}
+								: null,
+						},
+					}),
+			});
+			try {
+				render(BriefScreen);
+				const button = await screen.findByRole('button', { name: 'Refreshing…' });
+				expect(button).toBeDisabled();
+				finished = true;
+				await vi.advanceTimersByTimeAsync(REFRESH_POLL_MS);
+				expect(await screen.findByText(label)).toBeVisible();
+				expect(screen.getByTestId('brief-status').querySelector('time')).toHaveAttribute(
+					'datetime',
+					LAST_COMPLETED_AT,
+				);
+				expect(screen.queryByText('Refresh failed. Try again.')).not.toBeInTheDocument();
+				expect(fetchPosts(mock)).toHaveLength(0);
+			} finally {
+				mock.restore();
+				vi.useRealTimers();
+			}
+		},
+	);
+
+	it('shows the banner and Refresh for a signed-in fixture without the topic heading', async () => {
+		const mock = install({
+			stories: [],
+			brief: overview({ sections: [], quiet: [], fixture: true }),
+		});
+		render(BriefScreen);
+		const banner = await screen.findByTestId('brief-status');
+		expect(banner).toHaveTextContent('Version 0.41.0');
+		expect(screen.getByRole('button', { name: /^Refresh$/ })).toBeEnabled();
+		expect(screen.queryByRole('heading', { name: 'Your topics', level: 2 })).not.toBeInTheDocument();
+		mock.restore();
+	});
+
+	it('shows the login alert on an empty fixture when the fetch returns 401', async () => {
+		const mock = install({
+			stories: [],
+			brief: overview({ sections: [], quiet: [], fixture: true }),
+			onFetch: () => jsonResponse(401, { ok: false }),
+		});
+		render(BriefScreen);
+		const banner = await screen.findByTestId('brief-status');
+		await fireEvent.click(screen.getByRole('button', { name: /^Refresh$/ }));
+		const alert = await screen.findByRole('alert');
+		expect(alert).toHaveTextContent('Log in on Topics to refresh');
+		expect(banner).toContainElement(alert);
+		expect(screen.queryByRole('heading', { name: 'Your topics', level: 2 })).not.toBeInTheDocument();
+		expect(fetchPosts(mock)).toHaveLength(1);
+		mock.restore();
+	});
+
+	it('keeps Refresh and the failure message when the overview read after a failed fetch fails', async () => {
+		let reads = 0;
+		const mock = install({
+			stories: [],
+			brief: overview({ sections: [], quiet: [], fixture: true }),
+			onFetch: () => jsonResponse(500, { ok: false }),
+			overviewNow: () => {
+				reads += 1;
+				if (reads <= 2) return overview({ sections: [], quiet: [], fixture: true });
+				return null;
+			},
+		});
+		render(BriefScreen);
+		const banner = await screen.findByTestId('brief-status');
+		await fireEvent.click(screen.getByRole('button', { name: /^Refresh$/ }));
+		const alert = await screen.findByRole('alert');
+		expect(alert).toHaveTextContent('Refresh failed. Try again.');
+		expect(banner).toContainElement(alert);
+		expect(screen.getByRole('button', { name: /^Refresh$/ })).toBeEnabled();
+		mock.restore();
+	});
+
+	it('shows Refresh failed on an empty fixture when the fetch returns 500', async () => {
+		const mock = install({
+			stories: [],
+			brief: overview({ sections: [], quiet: [], fixture: true }),
+			onFetch: () => jsonResponse(500, { ok: false }),
+		});
+		render(BriefScreen);
+		const banner = await screen.findByTestId('brief-status');
+		await fireEvent.click(screen.getByRole('button', { name: /^Refresh$/ }));
+		const alert = await screen.findByRole('alert');
+		expect(alert).toHaveTextContent('Refresh failed. Try again.');
+		expect(banner).toContainElement(alert);
+		expect(screen.queryByRole('heading', { name: 'Your topics', level: 2 })).not.toBeInTheDocument();
 		mock.restore();
 	});
 });

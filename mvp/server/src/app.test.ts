@@ -3,7 +3,7 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
-import { get as httpGet, type Server } from 'node:http';
+import { get as httpGet, request as httpRequest, type Server } from 'node:http';
 import express from 'express';
 
 import type { CreateAppDeps } from './app.js';
@@ -69,6 +69,7 @@ import { createKiteBriefRouter, type CreateKiteBriefRouterDeps } from './service
 import { createManualSeed, removeManualSeed } from './services/manualBriefSeed.js';
 import { composeTopicBrief } from './services/topicBrief.js';
 import { articleIdFromCanonicalUrl } from './store/articleId.js';
+import { readAppVersion } from './appVersion.js';
 
 function tempMembershipPath(): string {
   const dir = mkdtempSync(path.join(tmpdir(), 'brief-membership-'));
@@ -822,6 +823,115 @@ test('POST /api/fetch with an injected refresh group runs every step from that g
     await close();
   }
 });
+
+test('POST /api/fetch: overlapping authenticated calls join one fetchAll; anonymous POST is 401', async () => {
+  process.env.SESSION_SECRET = 'test-secret';
+  process.env.MVP_PASSWORD = 'pw';
+  delete process.env.MVP_PASSWORD_HASH;
+
+  let fetchCalls = 0;
+  let releaseFetch: (result: ReturnType<typeof stubFetchResult>) => void = () => {};
+  const fetchGate = new Promise<ReturnType<typeof stubFetchResult>>((resolve) => {
+    releaseFetch = resolve;
+  });
+
+  const { createApp } = await import('./app.js');
+  const app = createApp({
+    refresh: refreshSteps({
+      fetchAll: async () => {
+        fetchCalls += 1;
+        return fetchGate;
+      },
+    }),
+  });
+
+  const { baseUrl, close } = await startServer(app);
+  try {
+    const cookie = await login(baseUrl);
+    const first = postFetch(baseUrl, cookie);
+    await waitFor(() => fetchCalls === 1);
+    const second = postFetch(baseUrl, cookie);
+    await second.sent;
+    await nextTicks(15);
+    assert.equal(fetchCalls, 1);
+
+    releaseFetch(stubFetchResult());
+    const [firstBody, secondBody] = await Promise.all([first.done, second.done]);
+    assert.equal(firstBody.status, 200);
+    assert.equal(secondBody.status, 200);
+    assert.equal(secondBody.json.refresh.joined, true);
+    assert.equal(fetchCalls, 1);
+
+    const anon = await fetch(`${baseUrl}/api/fetch`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: '{}',
+    });
+    assert.equal(anon.status, 401);
+    assert.equal(fetchCalls, 1);
+  } finally {
+    releaseFetch(stubFetchResult());
+    await close();
+  }
+});
+
+function postFetch(baseUrl: string, cookie: string): {
+  sent: Promise<void>;
+  done: Promise<{ status: number; json: { refresh: { joined: boolean } } }>;
+} {
+  const url = new URL('/api/fetch', baseUrl);
+  let markSent: () => void = () => {};
+  const sent = new Promise<void>((resolve) => {
+    markSent = resolve;
+  });
+  const done = new Promise<{ status: number; json: { refresh: { joined: boolean } } }>((resolve, reject) => {
+    const req = httpRequest(
+      {
+        hostname: url.hostname,
+        port: url.port,
+        path: url.pathname,
+        method: 'POST',
+        headers: { 'content-type': 'application/json', cookie },
+      },
+      (res) => {
+        const chunks: Buffer[] = [];
+        res.on('data', (chunk: Buffer) => chunks.push(chunk));
+        res.on('end', () => {
+          const text = Buffer.concat(chunks).toString('utf8');
+          resolve({
+            status: res.statusCode ?? 0,
+            json: JSON.parse(text) as { refresh: { joined: boolean } },
+          });
+        });
+      },
+    );
+    req.on('error', reject);
+    req.write('{}');
+    req.end(() => markSent());
+  });
+  return { sent, done };
+}
+
+function nextTicks(times: number): Promise<void> {
+  return new Promise((resolve) => {
+    const step = (left: number) => {
+      if (left === 0) {
+        resolve();
+        return;
+      }
+      setTimeout(() => step(left - 1), 0);
+    };
+    step(times);
+  });
+}
+
+async function waitFor(predicate: () => boolean): Promise<void> {
+  const deadline = Date.now() + 2000;
+  while (!predicate()) {
+    if (Date.now() > deadline) throw new Error('timed out waiting for fetchAll');
+    await nextTicks(1);
+  }
+}
 
 function stubFetchResult(): RefreshResult['fetch'] {
   return {
@@ -3318,7 +3428,10 @@ test('GET /api/brief/overview: sections with More split, quiet, notices, nextAt,
     },
   );
   try {
-    const overview = await getJson<unknown>(`${baseUrl}/api/brief/overview`);
+    const resp = await fetch(`${baseUrl}/api/brief/overview`);
+    assert.equal(resp.status, 200);
+    assert.match(resp.headers.get('cache-control') ?? '', /no-store/);
+    const overview: unknown = await resp.json();
     assert.deepEqual(overview, {
       ok: true,
       fixture: false,
@@ -3336,7 +3449,75 @@ test('GET /api/brief/overview: sections with More split, quiet, notices, nextAt,
       ],
       quiet: [{ id: 'quiet', name: 'Palantir', level: 'core' }],
       filteredOut: null,
+      version: readAppVersion(),
+      keysOn: true,
+      signedIn: false,
     });
+  } finally {
+    await close();
+  }
+});
+
+const OVERVIEW_SECRET = 'typesafe-secret-value';
+
+test('GET /api/brief/overview keysOn is true only when both provider keys are set, and the body does not contain them', async () => {
+  const off: NodeJS.ProcessEnv[] = [
+    {},
+    { TYPESAFE_API_KEY: '   ', OLLAMA_API_KEY: ' \t' },
+    { TYPESAFE_API_KEY: OVERVIEW_SECRET },
+    { OLLAMA_API_KEY: 'ollama-secret-value' },
+    { TYPESAFE_API_KEY: ' ', OLLAMA_API_KEY: OVERVIEW_SECRET },
+    { TYPESAFE_API_KEY: OVERVIEW_SECRET, OLLAMA_API_KEY: '' },
+  ];
+  for (const env of off) {
+    const { baseUrl, close } = await startBriefRouter({ articles: [] }, { env });
+    try {
+      const resp = await fetch(`${baseUrl}/api/brief/overview`);
+      const text = await resp.text();
+      assert.equal(resp.status, 200);
+      const body = JSON.parse(text) as { keysOn: boolean };
+      assert.equal(body.keysOn, false, JSON.stringify(env));
+      assert.equal(text.includes(OVERVIEW_SECRET), false);
+      assert.equal(text.includes('ollama-secret-value'), false);
+    } finally {
+      await close();
+    }
+  }
+
+  const { baseUrl, close } = await startBriefRouter(
+    { articles: [] },
+    { env: { TYPESAFE_API_KEY: OVERVIEW_SECRET, OLLAMA_API_KEY: 'ollama-secret-value' } },
+  );
+  try {
+    const resp = await fetch(`${baseUrl}/api/brief/overview`);
+    const text = await resp.text();
+    assert.equal(resp.status, 200);
+    const body = JSON.parse(text) as { keysOn: boolean };
+    assert.equal(body.keysOn, true);
+    assert.equal(text.includes(OVERVIEW_SECRET), false);
+    assert.equal(text.includes('ollama-secret-value'), false);
+  } finally {
+    await close();
+  }
+});
+
+test('GET /api/brief/overview signedIn follows the session cookie', async () => {
+  process.env.SESSION_SECRET = 'test-secret';
+  process.env.MVP_PASSWORD = 'pw';
+  delete process.env.MVP_PASSWORD_HASH;
+
+  const { createApp } = await import('./app.js');
+  const app = createApp(briefReads({ articles: [] }));
+  const { baseUrl, close } = await startServer(app);
+  try {
+    const anon = await fetch(`${baseUrl}/api/brief/overview`);
+    assert.equal(anon.status, 200);
+    assert.equal(((await anon.json()) as { signedIn: boolean }).signedIn, false);
+
+    const cookie = await login(baseUrl);
+    const authed = await fetch(`${baseUrl}/api/brief/overview`, { headers: { cookie } });
+    assert.equal(authed.status, 200);
+    assert.equal(((await authed.json()) as { signedIn: boolean }).signedIn, true);
   } finally {
     await close();
   }

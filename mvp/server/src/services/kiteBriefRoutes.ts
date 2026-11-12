@@ -21,6 +21,7 @@ import type { Article, StoreMeta } from '../types/article.js';
 import type { BriefSeenStore, BriefSummariesStore } from '../types/brief.js';
 import type { BriefFullStoriesStore } from '../types/briefFullStory.js';
 import type { CitationCheckLogStore } from '../types/citationGuard.js';
+import { readAppVersion } from '../appVersion.js';
 import {
   OWNED_BATCH_ID,
   type BriefDegradedStore,
@@ -39,7 +40,7 @@ import {
 import { loadBriefClaims } from './briefClaims.js';
 import { resolveRefreshIntervalHours } from './briefConfig.js';
 import { getRefreshRunner } from './refreshRunner.js';
-import { composeTopicBrief, currentProviderConfig, type TopicBrief } from './topicBrief.js';
+import { composeTopicBrief, currentProviderConfig, providerKeysOn, type TopicBrief } from './topicBrief.js';
 
 export type CreateKiteBriefRouterDeps = {
   loadBriefClaims?: typeof loadBriefClaims;
@@ -299,20 +300,26 @@ export function createKiteBriefRouter(
    * Topic Brief layout for Kite (NEWS-88): section order, top/"More" split,
    * quiet topics, refresh status and plain-language notices.
    */
-  router.get('/brief/overview', async (_req, res) => {
+  router.get('/brief/overview', async (req, res) => {
     try {
+      const env = deps.env ?? process.env;
       const owned = await loadOwnedBrief(now());
       const meta = owned.fixture ? await readServerMeta() : owned.meta;
-      res.json(
-        buildBriefOverview({
-          brief: owned.fixture ? null : owned.brief,
-          meta,
-          intervalHours: resolveRefreshIntervalHours(deps.env ?? process.env),
-          running: isRefreshRunning(),
-          degraded: owned.fixture ? [] : owned.degraded,
-          providers: currentProviderConfig(deps.env ?? process.env),
-        }),
-      );
+      const overview = buildBriefOverview({
+        brief: owned.fixture ? null : owned.brief,
+        meta,
+        intervalHours: resolveRefreshIntervalHours(env),
+        running: isRefreshRunning(),
+        degraded: owned.fixture ? [] : owned.degraded,
+        providers: currentProviderConfig(env),
+      });
+      res.set('Cache-Control', 'private, no-store');
+      res.json({
+        ...overview,
+        version: readAppVersion(),
+        keysOn: providerKeysOn(env),
+        signedIn: req.session?.authenticated === true,
+      });
     } catch (err) {
       res.status(500).json({ ok: false, error: errorMessage(err) });
     }

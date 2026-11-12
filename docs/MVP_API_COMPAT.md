@@ -114,12 +114,17 @@ With a non-empty article store, `GET /api/batches/:batchId/categories` returns o
 
 ```
 { ok: true, fixture: boolean,
+  version: string,
+  keysOn: boolean,
+  signedIn: boolean,
   refresh: { last, lastSuccess, nextAt, intervalHours, running },
   notices: string[],
   sections: [{ topicId, name, level: 'core' | 'watch', storyIds, moreIds }],
   quiet: [{ id, name, level }],
   filteredOut: number | null }
 ```
+
+The response sets `Cache-Control: private, no-store` because `signedIn` follows the cookie.
 
 `last` / `lastSuccess` are `meta.json` → `refresh` runs (or `null`); `nextAt` = `lastSuccess.completedAt` + interval (`null` when auto-refresh is off or nothing has succeeded); `intervalHours` is `null` when off; `running` is true while a refresh runs in this process. `notices` are plain-language status lines (provider down/partial, TypeSafe or Ollama not configured, stories not scored for budget, last refresh failed, `brief-seen.json` / `brief-summaries.json` unreadable). An unreadable seen or summaries file is read as empty (stories and overview still return 200); other store read failures → 500. `fixture: true` (empty store) → empty `sections` / `quiet`. `filteredOut` ([NEWS-90](https://informedcrew.atlassian.net/browse/NEWS-90)) is `meta.json` → `triage.dropped` when a triage run exists and wasn't skipped, else `null`; Kite's refresh bar shows it as the **N filtered out** link to `/filtered`. Kite proxy: `apps/kite/src/routes/api/brief/overview/+server.ts`. Guide: [BRIEF.md](BRIEF.md).
 

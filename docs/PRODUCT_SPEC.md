@@ -56,7 +56,7 @@ Stories are from about the last two days. Older ones drop off.
 
 **Scenario:** Given you have topics and nothing new for them, when you open the Brief on the shell at `/`, then it says “No new stories for your topics” and lists the quiet topics.
 
-**Scenario:** Given no stories have been saved yet, when you open the shell at `/`, then you see the owned-brief fixture: a single sample story (“Owned brief fixture — CFP sample…”) and no topic sections or refresh bar.
+**Scenario:** Given no stories have been saved yet, when you open the shell at `/`, then you see the owned-brief fixture: a single sample story (“Owned brief fixture — CFP sample…”) and no topic sections, plus the status line and, when signed in, Refresh.
 
 **Scenario:** Given you open a shared article link (`/latest/…`), when the page loads, then that story is on the shell.
 
@@ -217,7 +217,15 @@ Before the first successful refresh, nothing is hidden as already seen.
 
 ## Refresh
 
-While the server is running, the Brief refreshes on a timer. The bar above the sections shows when it last updated and when the next refresh is due. **Refresh** runs one immediately and reloads the Brief, including the Filtered list when Filtered or All is showing. It needs a sign-in; otherwise the bar says “Log in on Topics to refresh.” While a refresh is running the button says “Refreshing…” and is disabled. A refresh can take minutes. If the connection drops while the server is still refreshing, the button keeps saying “Refreshing…”, the page checks every few seconds, and the Brief reloads when the run ends. The bar says “Refresh failed. Try again.” only when the run itself failed, or when the refresh never started.
+While the server is running, the Brief refreshes on a timer. The bar above the sections shows when it last updated and when the next refresh is due. A status line shows the app version.
+
+Signed out, there is no **Refresh** control. The status line shows the app version only.
+
+Signed in and the provider keys are off: **Refresh** is disabled and the page says `Provider keys off`. It does not start a fetch.
+
+Signed in and the keys are on: one click starts one fetch, and the button stays disabled until that fetch finishes. The status line says whether the keys are on and shows the last fetch time and result (`Last fetch succeeded`, `Last fetch failed`, or `No fetch yet`). **Refresh** reloads the Brief, including the Filtered list when Filtered or All is showing. While a refresh is running the button says “Refreshing…” and is disabled. A refresh can take minutes. If the connection drops while the server is still refreshing, the button keeps saying “Refreshing…”, the page checks every few seconds, and the Brief reloads when the run ends. The page says “Refresh failed. Try again.” only when the run itself failed, or when the refresh never started. That line sits with Refresh, including on an empty Brief.
+
+The empty Brief (no stories saved yet) shows the same status line and, when signed in, the same button.
 
 The bar links to Filtered out and, beside it, to Feedback. It says **N filtered out** when the last refresh dropped stories, and **Filtered out** otherwise.
 
@@ -225,15 +233,21 @@ Beside that link, an **Approved / Filtered / All** toggle chooses what the Brief
 
 The bar also says, in plain language, when a search source failed, when stories could not be scored, when summaries could not be written, or when the last refresh failed.
 
-**Scenario:** Given you are signed in and no refresh is running, when you press Refresh, then the button shows “Refreshing…” and the Brief reloads when the run finishes.
+**Scenario:** Given you are signed out, when you open the Brief, then there is no Refresh control and the status line shows the app version only.
+
+**Scenario:** Given you are signed in and the provider keys are off, when you look at Refresh, then it is disabled, the page says `Provider keys off`, and it does not start a fetch.
+
+**Scenario:** Given you are signed in, the keys are on, and no refresh is running, when you press Refresh, then one click starts one fetch, the button shows “Refreshing…” and stays disabled until that fetch finishes, and the Brief reloads when the run finishes. The status line says whether the keys are on and shows the last fetch time and result (`Last fetch succeeded`, `Last fetch failed`, or `No fetch yet`).
+
+**Scenario:** Given no stories have been saved yet, when you open the Brief, then you see the same status line and, when signed in, the same Refresh button.
 
 **Scenario:** Given you pressed Refresh and the connection drops or times out while the server is still refreshing, when you wait, then the button keeps saying “Refreshing…” with no failure message, and the Brief reloads with the new stories when the run finishes.
 
-**Scenario:** Given a refresh run failed on the server, or could not start and nothing is running, when the page finds out, then the bar says “Refresh failed. Try again.”
+**Scenario:** Given a refresh run failed on the server, or could not start and nothing is running, when the page finds out, then it says “Refresh failed. Try again.” next to Refresh, including on an empty Brief.
 
-**Scenario:** Given a refresh is already running, when you press Refresh, then you join that run instead of starting a second one.
+**Scenario:** Given a refresh is already running, when you look at Refresh, then the button says “Refreshing…” and stays disabled, the page checks until that fetch finishes, then the status line shows the result, and a click does not start a second fetch.
 
-**Scenario:** Given you open the Brief on the shell at `/`, when the page loads, then Approved is selected and you see topic sections, not the Filtered list.
+**Scenario:** Given stories have been saved and you open the Brief on the shell at `/`, when the page loads, then Approved is selected and you see topic sections, not the Filtered list.
 
 **Scenario:** Given the last refresh dropped stories, when you choose Filtered, then you see those drops with an advisory reason expander, and topic sections are hidden.
 

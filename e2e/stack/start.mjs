@@ -6,8 +6,8 @@
 // baseURL stays the public port. No Kite vite process.
 //
 // Also: a fresh data dir seeded with E2E_SCENARIO (default "topics"), a
-// generated env file in place of mvp/.env (no Ollama / TypeSafe keys,
-// auto-refresh off, test-only password), and a local fixture page server for
+// generated env file in place of mvp/.env (no AI keys, auto-refresh off,
+// test-only password), and a local fixture page server for
 // manual-seed scrapes (never the internet).
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, rmSync, writeFileSync } from 'node:fs';

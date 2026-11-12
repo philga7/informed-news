@@ -19,6 +19,7 @@ import {
   composeTopicBrief,
   isSignificantlyUpdated,
   markBriefSeen,
+  providerKeysOn,
   summarySourceFor,
   type ComposeTopicBriefInput,
 } from './topicBrief.js';
@@ -802,4 +803,33 @@ test('markBriefSeen snapshots kept records, ignores unknown ids, prunes old and 
     fresh: { seenAt: NOW.toISOString(), outletCount: null, significance: null },
   });
   assert.equal(seen.seen.old !== undefined, true, 'input store is not mutated');
+});
+
+const TYPE_KEY = 'typesafe-secret-value';
+const OLLAMA_KEY = 'ollama-secret-value';
+
+test('providerKeysOn is true only when both provider keys are set', () => {
+  const on = providerKeysOn({ TYPESAFE_API_KEY: TYPE_KEY, OLLAMA_API_KEY: OLLAMA_KEY });
+  assert.equal(typeof on, 'boolean');
+  assert.equal(on, true);
+  assert.equal(String(on).includes(TYPE_KEY), false);
+  assert.equal(String(on).includes(OLLAMA_KEY), false);
+
+  const off: NodeJS.ProcessEnv[] = [
+    {},
+    { TYPESAFE_API_KEY: TYPE_KEY },
+    { OLLAMA_API_KEY: OLLAMA_KEY },
+    { TYPESAFE_API_KEY: '', OLLAMA_API_KEY: OLLAMA_KEY },
+    { TYPESAFE_API_KEY: TYPE_KEY, OLLAMA_API_KEY: '' },
+    { TYPESAFE_API_KEY: '   ', OLLAMA_API_KEY: OLLAMA_KEY },
+    { TYPESAFE_API_KEY: TYPE_KEY, OLLAMA_API_KEY: ' \t' },
+    { TYPESAFE_API_KEY: ' \n ', OLLAMA_API_KEY: ' \n ' },
+  ];
+  for (const env of off) {
+    const result = providerKeysOn(env);
+    assert.equal(typeof result, 'boolean');
+    assert.equal(result, false, JSON.stringify(env));
+    assert.equal(String(result).includes(TYPE_KEY), false);
+    assert.equal(String(result).includes(OLLAMA_KEY), false);
+  }
 });

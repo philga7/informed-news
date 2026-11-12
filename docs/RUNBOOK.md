@@ -165,7 +165,9 @@ A ready QA process returns 200. This document does not claim that curl has been 
 
 ### Scheduler
 
-`REFRESH_INTERVAL_HOURS=off` keeps the timer and the startup catch-up off. A signed-in Refresh on the QA URL still runs. Do that only during a capped window.
+`REFRESH_INTERVAL_HOURS=off` keeps the timer and the startup catch-up off. Refresh only during a capped window.
+
+QA Bot refreshes from the Brief button, not a raw POST. Sign in on Topics, open the Brief at `/`, and read the status line (version, keys on or off, last fetch). If it says the keys are off, Refresh is disabled. Turn the two provider keys on in `/opt/informed-news/qa.env` and run the QA start command again, then press Refresh once. One press starts one fetch. Do not send a raw `POST /api/fetch`. The live env file stays untouched. Keys off remains the standing state outside a capped window.
 
 ### Tailscale Serve
 

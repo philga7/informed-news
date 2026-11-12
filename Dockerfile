@@ -24,6 +24,7 @@ WORKDIR /app
 COPY mvp/server/package.json mvp/server/package-lock.json /app/mvp/server/
 WORKDIR /app/mvp/server
 RUN npm ci --omit=dev && npm cache clean --force
+COPY package.json /app/package.json
 COPY mvp/server/config /app/mvp/server/config
 COPY --from=server-build /src/mvp/server/dist /app/mvp/server/dist
 COPY --from=kite-build /src/apps/kite/build /app/apps/kite/build
