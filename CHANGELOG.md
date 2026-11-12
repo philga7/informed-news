@@ -1,3 +1,9 @@
+## [0.42.0](https://github.com/philga7/informed-news/compare/v0.41.0...v0.42.0) (2026-11-12)
+
+### Features
+
+* **NEWS-218:** add a signed-in Refresh control and status banner ([#275](https://github.com/philga7/informed-news/issues/275)) ([64e0ee8](https://github.com/philga7/informed-news/commit/64e0ee8529729c3d90fdc01ae1c7fad877cb49eb))
+
 ## [0.41.0](https://github.com/philga7/informed-news/compare/v0.40.12...v0.41.0) (2026-11-11)
 
 ### Features
