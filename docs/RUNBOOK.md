@@ -150,6 +150,8 @@ INFORMED_NEWS_IMAGE=informed-news:qa \
 docker compose --env-file /opt/informed-news/qa.env -p informed-news-qa up -d --build
 ```
 
+That `--build` command is the first start only. It builds `informed-news:qa`. A later recreate, including turning provider keys on or off for a capped window, uses the command in [Recreate without a build](#recreate-without-a-build). It does not build and it does not pull.
+
 - Project name: `informed-news-qa`. A second project does not mount `informed-news-data`. With no volume override, project `informed-news-qa` uses volume `informed-news-qa-data`. The prefix sets that name anyway.
 - That volume split needs Compose to set `COMPOSE_PROJECT_NAME` from `-p` (or the top-level `name`) before it interpolates the file. Checked with Docker Compose v2.40.3. Before the first QA start, run `docker compose -p informed-news-qa config` and confirm the volume name is `informed-news-qa-data`. If it is still `informed-news-data`, stop. That Compose build would mount the live volume.
 - Host port: `127.0.0.1:3002`, forwarded to port 3001 inside the container. The live publish stays `127.0.0.1:3001`.
@@ -167,7 +169,22 @@ A ready QA process returns 200. This document does not claim that curl has been 
 
 `REFRESH_INTERVAL_HOURS=off` keeps the timer and the startup catch-up off. Refresh only during a capped window.
 
-QA Bot refreshes from the Brief button, not a raw POST. Sign in on Topics, open the Brief at `/`, and read the status line (version, keys on or off, last fetch). If it says the keys are off, Refresh is disabled. Turn the two provider keys on in `/opt/informed-news/qa.env` and run the QA start command again, then press Refresh once. One press starts one fetch. Do not send a raw `POST /api/fetch`. The live env file stays untouched. Keys off remains the standing state outside a capped window.
+QA Bot refreshes from the Brief button, not a raw POST. Sign in on Topics, open the Brief at `/`, and read the status line (version, keys on or off, last fetch). If it says the keys are off, Refresh is disabled. Turn the two provider keys on in `/opt/informed-news/qa.env` and recreate the container with the command in [Recreate without a build](#recreate-without-a-build), then press Refresh once. One press starts one fetch. Do not send a raw `POST /api/fetch`. The live env file stays untouched. Keys off remains the standing state outside a capped window.
+
+### Recreate without a build
+
+A paid window recreates the QA container so it picks up `qa.env`. Do not pull an image and do not build. The `informed-news:qa` image from the first start stays. From `/opt/informed-news`, the same prefixes as the first start:
+
+```bash
+COMPOSE_PROJECT_NAME=informed-news-qa \
+INFORMED_NEWS_ENV_FILE=/opt/informed-news/qa.env \
+INFORMED_NEWS_DATA_VOLUME=informed-news-qa-data \
+INFORMED_NEWS_PORT=3002 \
+INFORMED_NEWS_IMAGE=informed-news:qa \
+docker compose --env-file /opt/informed-news/qa.env -p informed-news-qa up -d
+```
+
+There is no `--build` and no `--pull`. Do not use the first-start command for this. That command builds.
 
 ### Tailscale Serve
 
@@ -185,8 +202,8 @@ tailscale serve status
 Provider keys are changed only in `/opt/informed-news/qa.env`. Leave `/opt/informed-news/.env` alone. Live checks stay keys-off.
 
 - Off: `OLLAMA_API_KEY` and `TYPESAFE_API_KEY` empty, as in the placeholder block.
-- On, for a capped window: set those two values in the QA file, then run the start command again so the container picks them up.
-- Off again: clear the two values and run the start command again.
+- On, for a capped window: set those two values in the QA file, then run the [recreate command](#recreate-without-a-build) so the container picks them up. Do not build and do not pull.
+- Off again: clear the two values and run that same recreate command.
 
 ### Teardown
 
