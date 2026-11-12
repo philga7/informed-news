@@ -41,11 +41,32 @@ export type RefreshState = BriefRefreshClock & {
 	lastStartedAt: string | null;
 };
 
+/**
+ * Sign-in, provider keys, and the last fetch, read from the overview JSON.
+ * Present even when the topic overview itself is dropped (empty-store fixture).
+ */
+export type BriefStatus = {
+	/** App version string. `unknown` when the field is missing or not a string. */
+	version: string;
+	/** True only when the overview field is exactly `true`. */
+	signedIn: boolean;
+	/** True only when the overview field is exactly `true`. */
+	keysOn: boolean;
+	/** True while `refresh.running` is exactly `true`. */
+	running: boolean;
+	/** `refresh.last.completedAt` when it is a string; otherwise null. */
+	lastFetchAt: string | null;
+	/** `refresh.last.ok` when it is a boolean; otherwise null. */
+	lastFetchOk: boolean | null;
+};
+
 export type LoadedBrief = {
 	categoryName: string;
 	stories: BriefStory[];
 	/** Null when the overview is missing, not ok, or the empty-store fixture. */
 	overview: TopicOverview | null;
+	/** Null when the overview response cannot be read. */
+	status: BriefStatus | null;
 };
 
 export type FilteredVerdictItem = {
@@ -224,6 +245,21 @@ function parseRefresh(value: unknown): RefreshState | null {
 	return { lastSuccess: completedAt ? { completedAt } : null, nextAt, running, lastOk, lastStartedAt };
 }
 
+/** Status line fields. Missing flags are signed out and keys off; a missing version is `unknown`. */
+export function parseBriefStatus(body: unknown): BriefStatus | null {
+	if (!isRecord(body)) return null;
+	const refresh = isRecord(body.refresh) ? body.refresh : null;
+	const last = refresh && isRecord(refresh.last) ? refresh.last : null;
+	return {
+		version: typeof body.version === 'string' ? body.version : 'unknown',
+		signedIn: body.signedIn === true,
+		keysOn: body.keysOn === true,
+		running: refresh?.running === true,
+		lastFetchAt: last && typeof last.completedAt === 'string' ? last.completedAt : null,
+		lastFetchOk: last && typeof last.ok === 'boolean' ? last.ok : null,
+	};
+}
+
 function parseOverview(body: unknown): TopicOverview | null {
 	if (!isRecord(body) || body.ok !== true || body.fixture === true) return null;
 	if (!Array.isArray(body.sections) || !Array.isArray(body.quiet)) return null;
@@ -282,20 +318,28 @@ export async function loadBrief(): Promise<LoadedBrief> {
 			)
 		: null;
 	let overview: TopicOverview | null = null;
+	let status: BriefStatus | null = null;
 	try {
 		const response = await fetch('/api/brief/overview', {
 			credentials: 'include',
 			// The provider status line must reflect the server now, never a cached copy.
 			cache: 'no-store',
 		});
-		if (response.ok) overview = parseOverview(await response.json());
+		if (response.ok) {
+			const body: unknown = await response.json();
+			// Fixture (and any other dropped topic layout) still carries the status line.
+			overview = parseOverview(body);
+			status = parseBriefStatus(body);
+		}
 	} catch {
 		overview = null;
+		status = null;
 	}
 	return {
 		categoryName: category?.name ?? 'Brief',
 		stories: parseStories(storiesBody),
 		overview,
+		status,
 	};
 }
 

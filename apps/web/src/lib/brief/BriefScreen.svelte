@@ -37,6 +37,7 @@
 	import {
 		buildSeedPayload,
 		fetchFilteredVerdicts,
+		fetchRefreshState,
 		fetchSeedTopics,
 		filteredOutLinkLabel,
 		deleteBriefSeen,
@@ -51,10 +52,13 @@
 		REFRESH_ERROR,
 		REFRESH_LABEL,
 		REFRESH_LOGIN,
+		REFRESH_POLL_MAX_MS,
+		REFRESH_POLL_MS,
 		REFRESHING_LABEL,
 		settleRefresh,
 		sharedHrefVisit,
 		storyIndexFromPath,
+		type BriefStatus,
 		type BriefStory,
 		type FilteredVerdictItem,
 		type SeedTopic,
@@ -90,6 +94,7 @@
 
 	let stories = $state<BriefStory[]>([]);
 	let overview = $state<Awaited<ReturnType<typeof loadBrief>>['overview']>(null);
+	let status = $state<BriefStatus | null>(null);
 	let categoryName = $state('Brief');
 	let loaded = $state(false);
 	let contentFilter = $state<ContentFilterSettings>(EMPTY_FILTER);
@@ -140,6 +145,10 @@
 	let filteredLoadSeq = 0;
 	let refreshing = $state(false);
 	let refreshMessage = $state<string | null>(null);
+	/** False after destroy so an in-flight overview read does not reload or start another poll. */
+	let refreshWatchAlive = true;
+	/** The single poll while the loaded status says a fetch is already running. */
+	let runningWatch: { timer: number | null; waited: number } | null = null;
 	let selectedIndex = $state(-1);
 	let announcement = $state('');
 	let sharedActive = $state(false);
@@ -540,6 +549,8 @@
 			readStories = { ...readStories, ...Object.fromEntries(serverSeen.map((id) => [id, true])) };
 		}
 		overview = data.overview;
+		// A failed overview read must not hide Refresh or its failure message.
+		status = data.status ?? status;
 		categoryName = data.categoryName;
 		loaded = true;
 		expandedStories = survivingExpandedStories(previous, data.stories);
@@ -547,10 +558,60 @@
 		// only when Filtered or All is already showing.
 		filteredRequested = false;
 		if (showsFiltered(verdictView)) void loadFiltered();
+		watchRunningFetch();
+	}
+
+	function clearRunningWatch(): void {
+		if (!runningWatch) return;
+		if (runningWatch.timer !== null) window.clearTimeout(runningWatch.timer);
+		runningWatch = null;
+	}
+
+	/**
+	 * A load that found a fetch already running has no click to settle. Read the
+	 * overview until that run stops, then reload. Do not POST. Do not call
+	 * settleRefresh: an older finished run is this run's result, not a failure.
+	 * At the poll cap, leave “Refreshing…” and do not invent a failure.
+	 */
+	function watchRunningFetch(): void {
+		// The click path awaits postRefresh and settleRefresh itself.
+		if (!browser || !refreshWatchAlive || refreshing) return;
+		if (!status?.running) {
+			clearRunningWatch();
+			return;
+		}
+		if (runningWatch) return;
+		const watch: { timer: number | null; waited: number } = { timer: null, waited: 0 };
+		runningWatch = watch;
+		const schedule = (): void => {
+			watch.timer = window.setTimeout(() => {
+				watch.timer = null;
+				void readRunningFetch();
+			}, REFRESH_POLL_MS);
+		};
+		const readRunningFetch = async (): Promise<void> => {
+			if (runningWatch !== watch) return;
+			watch.waited += REFRESH_POLL_MS;
+			const state = await fetchRefreshState();
+			if (!refreshWatchAlive || runningWatch !== watch) return;
+			if (state && !state.running) {
+				runningWatch = null;
+				await reload();
+				return;
+			}
+			if (!refreshWatchAlive || runningWatch !== watch) return;
+			if (watch.waited >= REFRESH_POLL_MAX_MS) {
+				runningWatch = null;
+				return;
+			}
+			schedule();
+		};
+		schedule();
 	}
 
 	async function refreshBrief(): Promise<void> {
-		if (refreshing) return;
+		// One control: signed in, keys on, and neither a click nor a server run already in flight.
+		if (refreshing || !status?.signedIn || !status.keysOn || status.running) return;
 		refreshing = true;
 		refreshMessage = null;
 		await seen.flush();
@@ -567,6 +628,9 @@
 		await reload();
 		refreshing = false;
 		if (outcome === 'failed') refreshMessage = REFRESH_ERROR;
+		// reload() ran while this click was still in flight, so it did not start
+		// a watch. If that reload found a fetch still running, follow it.
+		watchRunningFetch();
 	}
 
 	async function loadFiltered(): Promise<void> {
@@ -846,6 +910,8 @@
 		}, 30_000);
 		void reload();
 		return () => {
+			refreshWatchAlive = false;
+			clearRunningWatch();
 			window.removeEventListener('hashchange', onHash);
 			window.removeEventListener('keydown', onKeyDown);
 			window.clearInterval(clock);
@@ -886,6 +952,36 @@
 			{/if}
 		</div>
 	</header>
+
+	{#if status}
+		<div class="status" data-testid="brief-status">
+			<p>Version {status.version}</p>
+			{#if status.signedIn}
+				<p>{status.keysOn ? 'Keys on' : 'Provider keys off'}</p>
+				{#if status.lastFetchAt && status.lastFetchOk !== null}
+					<p>
+						<span>{status.lastFetchOk ? 'Last fetch succeeded' : 'Last fetch failed'}</span>
+						<time datetime={status.lastFetchAt}>{status.lastFetchAt}</time>
+					</p>
+				{:else}
+					<p>No fetch yet</p>
+				{/if}
+				<button
+					type="button"
+					disabled={refreshing || status.running || !status.keysOn}
+					aria-busy={refreshing || status.running}
+					onclick={refreshBrief}
+				>
+					{refreshing || status.running ? REFRESHING_LABEL : REFRESH_LABEL}
+				</button>
+				{#if refreshMessage === REFRESH_LOGIN}
+					<p role="alert"><a href="/topics">{REFRESH_LOGIN}</a></p>
+				{:else if refreshMessage}
+					<p role="alert">{refreshMessage}</p>
+				{/if}
+			{/if}
+		</div>
+	{/if}
 
 	{#if !sharedActive}
 		<ul aria-label="News categories">
@@ -943,15 +1039,7 @@
 						</button>
 					{/each}
 				</div>
-				<button type="button" disabled={refreshing} aria-busy={refreshing} onclick={refreshBrief}>
-					{refreshing ? REFRESHING_LABEL : REFRESH_LABEL}
-				</button>
 			</div>
-			{#if refreshMessage === REFRESH_LOGIN}
-				<p role="alert"><a href="/topics">{REFRESH_LOGIN}</a></p>
-			{:else if refreshMessage}
-				<p role="alert">{refreshMessage}</p>
-			{/if}
 		</div>
 
 		{#if showsApproved(verdictView)}
@@ -1166,6 +1254,15 @@
 		margin: 0;
 		font-size: 1.25rem;
 		font-weight: 700;
+	}
+
+	.status {
+		margin: 0.75rem 0 0;
+		font-size: 0.875rem;
+	}
+
+	.status p {
+		margin: 0.15rem 0;
 	}
 
 	.topics-heading h2 {

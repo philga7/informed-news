@@ -206,9 +206,12 @@ test.describe('Topic Brief (NEWS-88)', () => {
 			'unavailable',
 		]);
 
+		const status = page.getByTestId('brief-status');
+		await expect(status).toBeVisible({ timeout: 60_000 });
+		await expect(status).toContainText(/Version\s+\S+/);
 		const bar = page.getByTestId('brief-refresh-bar');
 		await expect(bar).toBeVisible({ timeout: 60_000 });
-		await expect(bar.getByRole('button', { name: /^Refresh/ })).toBeVisible();
+		await expect(bar.getByRole('button', { name: /^Refresh/ })).toHaveCount(0);
 
 		const sections = page.getByTestId('topic-brief-section');
 		await expect(sections).toHaveCount(2);
@@ -1279,6 +1282,15 @@ test.describe('Kite content filter on the topic Brief (NEWS-141)', () => {
 				}),
 			);
 			await filterKeywords(page, ['ratepayers', 'battery'], filterMode, 'all');
+			await logIn(page);
+			// Keys stay empty on the hermetic server. This test only needs the
+			// button enabled, so the overview the page reads says keysOn.
+			await page.route('**/api/brief/overview', async (route) => {
+				const response = await route.fetch();
+				const body = (await response.json()) as { keysOn?: boolean };
+				body.keysOn = true;
+				await route.fulfill({ response, json: body });
+			});
 			await page.goto('/');
 			await expect(page.getByTestId('topic-brief-section').first()).toBeVisible({ timeout: 60_000 });
 			const count = page.getByText(filterMode === 'hide' ? '1 story hidden' : '1 story filtered', {
@@ -1304,7 +1316,7 @@ test.describe('Kite content filter on the topic Brief (NEWS-141)', () => {
 				await route.fulfill({ response, json: body });
 			});
 			await page.route('**/api/fetch', (route) => route.fulfill({ json: { ok: true } }));
-			await page.getByTestId('brief-refresh-bar').getByRole('button', { name: 'Refresh' }).click();
+			await page.getByTestId('brief-status').getByRole('button', { name: 'Refresh' }).click();
 
 			const demandAfter = card(page, DEMAND);
 			await expect(demandAfter).toBeVisible();

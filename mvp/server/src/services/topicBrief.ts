@@ -452,6 +452,12 @@ export function currentProviderConfig(env: NodeJS.ProcessEnv = process.env): Pro
   };
 }
 
+/** True only when both TypeSafe and Ollama keys are configured. Returns a boolean, never the key text. */
+export function providerKeysOn(env: NodeJS.ProcessEnv = process.env): boolean {
+  const config = currentProviderConfig(env);
+  return config.typesafe && config.ollama;
+}
+
 /**
  * Plain-language status lines for the refresh bar. Search/budget/refresh lines
  * come from meta.json; "not configured" lines come from current key presence,
