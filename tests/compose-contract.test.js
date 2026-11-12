@@ -246,9 +246,22 @@ describe('QA instance runbook', () => {
 			.filter((line) => line.includes('INFORMED_NEWS_IMAGE=informed-news:qa'));
 		assert.equal(
 			imageTagLines.length,
-			2,
-			'QA image tag belongs in the env placeholder and the start command',
+			3,
+			'QA image tag belongs in the env placeholder, the first start, and the recreate command',
 		);
+
+		const recreateAt = section.indexOf('### Recreate without a build');
+		assert.ok(recreateAt !== -1, 'missing recreate-without-a-build section');
+		const recreateNext = section.indexOf('\n### ', recreateAt + 1);
+		const recreate = section.slice(recreateAt, recreateNext === -1 ? undefined : recreateNext);
+		const command = recreate.match(/```bash\n([\s\S]*?)```/);
+		assert.ok(command, 'recreate section needs a command');
+		assert.match(
+			command[1],
+			/docker compose --env-file \/opt\/informed-news\/qa.env -p informed-news-qa up -d\n$/,
+		);
+		assert.doesNotMatch(command[1], /--build/);
+		assert.doesNotMatch(command[1], /--pull/);
 
 		assert.doesNotMatch(section, /\$2[aby]\$/);
 		assert.doesNotMatch(section, /SESSION_SECRET=(?!<)[^\s<]/);
