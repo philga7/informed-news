@@ -302,7 +302,8 @@ describe('NEWS-165 vision and decisions', () => {
 		assert.match(link, /highlighted/);
 
 		const hold = nov12.find((entry) => entry.includes('Feature tickets are on hold'));
-		assert.match(hold, /until the UI build tickets are sequenced/);
+		assert.match(hold, /These feature tickets are on hold until the UI build tickets are sequenced/);
+		assert.match(hold, /Tickets that are not on this list are not on hold/);
 		assert.match(hold, /superseded on that point/);
 		assert.match(hold, /does not change their Jira status/);
 		assert.match(hold, /recorded exception to the header rule/);
@@ -334,6 +335,12 @@ describe('NEWS-165 vision and decisions', () => {
 		assert.doesNotMatch(roadmap, /\*\*Current next\*\* is \[NEWS-201\]/);
 
 		const agents = read('AGENTS.md');
+		const claude = read('CLAUDE.md');
+		assert.match(
+			claude,
+			/Do not build NEWS-201, NEWS-202, NEWS-203, or NEWS-219 through NEWS-223 while the 2026-11-12 next-wave pause holds/,
+		);
+
 		assert.match(agents, /\*\*Current next\*\* is the UI build/);
 		assert.match(
 			agents,

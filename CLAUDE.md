@@ -80,6 +80,7 @@ Rules for `claude-build`:
 - Never merge PRs or push to main. Open a PR and stop; Phil decides when it merges.
 - Anything under `.github/workflows` goes to Cursor, not Claude.
 - Claude builds only tickets labeled `builder-claude`.
+- Do not build NEWS-201, NEWS-202, NEWS-203, or NEWS-219 through NEWS-223 while the 2026-11-12 next-wave pause holds. Comment and stop.
 - The label is on the NEWS ticket in Jira, which Claude cannot read from GitHub. The issue or comment that mentions `@claude` names the NEWS key, and that mention confirms the label. If no key is named, comment and stop.
 - Small means: one area, under about 300 lines, clear acceptance criteria and a test, no auth, secrets, CI, release config, migrations or deploys, and no design call.
 - The build job pins `--model claude-sonnet-5-5` in `claude_args`. `--max-turns` stays 100. Small TDD tickets stay on Sonnet. A big or unsplittable ticket may use Opus (`claude-opus-5-5`) as the builder by setting that model for the one run. Use Fable 5.2 (`claude-fable-5-2`) only if a ticket stalls twice on Opus. That switch is not automated. This is a pilot in this repo to judge review quality over a few pull requests.
