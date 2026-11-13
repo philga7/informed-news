@@ -173,7 +173,7 @@ describe('NEWS-165 vision and decisions', () => {
 		);
 		assert.match(
 			combined,
-			/\*\*Current next\*\* \(paused 2026-11-12; see the next-wave note\) is \[NEWS-201\]\([^)]+\): Story Desk at `\/story`/,
+			/\*\*Former current next\*\* \(paused 2026-11-12; see the next-wave note\) is \[NEWS-201\]\([^)]+\): Story Desk at `\/story`/,
 		);
 		assert.match(roadmap, /NEWS-175[\s\S]{0,400}\*\*Done\*\*/);
 		assert.match(roadmap, /NEWS-182[\s\S]{0,200}\*\*Done\*\*/);
@@ -308,7 +308,9 @@ describe('NEWS-165 vision and decisions', () => {
 		assert.match(hold, /recorded exception to the header rule/);
 
 		const roadmap = read('docs/ROADMAP.md');
+		assert.match(roadmap, /\*\*Current next\*\* is the UI build/);
 		assert.match(roadmap, /next wave is the UI build/);
+		assert.doesNotMatch(roadmap, /\*\*Current next\*\* \(paused/);
 		assert.match(roadmap, /order will be proposed separately/);
 		assert.match(roadmap, /paused pending re-sequencing/);
 		assert.match(roadmap, /remove Kite Brief routes/);
@@ -327,7 +329,7 @@ describe('NEWS-165 vision and decisions', () => {
 		assert.match(roadmap, /Last fetch shows raw UTC/);
 		assert.match(
 			roadmap,
-			/\*\*Current next\*\* \(paused 2026-11-12; see the next-wave note\) is \[NEWS-201\]\([^)]+\): Story Desk at `\/story`/,
+			/\*\*Former current next\*\* \(paused 2026-11-12; see the next-wave note\) is \[NEWS-201\]\([^)]+\): Story Desk at `\/story`/,
 		);
 		assert.doesNotMatch(roadmap, /\*\*Current next\*\* is \[NEWS-201\]/);
 
