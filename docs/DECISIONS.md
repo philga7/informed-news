@@ -64,7 +64,7 @@ Binding choices for Informed News. Newest first. When one of these changes, upda
 
 **Why:** The Nov 12 UI direction changes what gets built next. Starting the current feature queue would build the old sequence.
 
-**What it rules out:** Starting feature work, including [NEWS-201](https://informedcrew.atlassian.net/browse/NEWS-201) and [NEWS-219](https://informedcrew.atlassian.net/browse/NEWS-219) through [NEWS-223](https://informedcrew.atlassian.net/browse/NEWS-223), before that sequence is proposed. It does not close those tickets and it does not reorder the existing list in [ROADMAP.md](ROADMAP.md).
+**What it rules out:** Starting feature work, including [NEWS-201](https://informedcrew.atlassian.net/browse/NEWS-201) and [NEWS-219](https://informedcrew.atlassian.net/browse/NEWS-219) through [NEWS-223](https://informedcrew.atlassian.net/browse/NEWS-223), before that sequence is proposed. It does not close those tickets, it does not change their Jira status, and it does not reorder the existing list in [ROADMAP.md](ROADMAP.md). Jira stays as it is until the sequence is proposed.
 
 ## 2026-11-12 — Brief refresh banner (NEWS-218)
 

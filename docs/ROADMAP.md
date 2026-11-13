@@ -9,7 +9,14 @@ Claims spine plan: [`.cursor/plans/claims_evidence_spine_8f4cde15.plan.md`](../.
 
 ## Current next
 
-**Next wave (2026-11-12).** The next wave is the UI build. The order will be proposed separately. Existing To Do items [NEWS-201](https://informedcrew.atlassian.net/browse/NEWS-201) and [NEWS-219](https://informedcrew.atlassian.net/browse/NEWS-219) through [NEWS-223](https://informedcrew.atlassian.net/browse/NEWS-223) are paused pending re-sequencing. This note does not reorder the list below. See [DECISIONS.md](DECISIONS.md) and [VISION.md](VISION.md).
+**Next wave (2026-11-12).** The next wave is the UI build. The order will be proposed separately. Existing To Do items are paused pending re-sequencing. Jira is unchanged until that proposal: these tickets stay To Do there. This note does not reorder the list below. See [DECISIONS.md](DECISIONS.md) and [VISION.md](VISION.md).
+
+- [NEWS-201](https://informedcrew.atlassian.net/browse/NEWS-201) — Story Desk at its own link
+- [NEWS-219](https://informedcrew.atlassian.net/browse/NEWS-219) — Brief banner shows no status while a refresh is running
+- [NEWS-220](https://informedcrew.atlassian.net/browse/NEWS-220) — show the build commit SHA with the version
+- [NEWS-221](https://informedcrew.atlassian.net/browse/NEWS-221) — Mark as read and Mark all as read while signed out
+- [NEWS-222](https://informedcrew.atlassian.net/browse/NEWS-222) — log provider call counts per refresh
+- [NEWS-223](https://informedcrew.atlassian.net/browse/NEWS-223) — Last fetch shows raw UTC
 
 ### Combined order (Oct 23, 2026; citation guard added Oct 26)
 

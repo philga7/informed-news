@@ -308,6 +308,14 @@ describe('NEWS-165 vision and decisions', () => {
 		assert.match(roadmap, /NEWS-219/);
 		assert.match(roadmap, /NEWS-223/);
 		assert.match(roadmap, /paused pending re-sequencing/);
+		assert.match(roadmap, /Jira is unchanged until that proposal/);
+		assert.match(roadmap, /Story Desk at its own link/);
+		assert.match(roadmap, /Brief banner shows no status while a refresh is running/);
+		assert.match(roadmap, /build commit SHA with the version/);
+		assert.match(roadmap, /Mark as read and Mark all as read while signed out/);
+		assert.match(roadmap, /log provider call counts per refresh/);
+		assert.match(roadmap, /Last fetch shows raw UTC/);
+		assert.match(hold, /does not change their Jira status/);
 		assert.match(
 			roadmap,
 			/\*\*Current next\*\* \(paused 2026-11-12; see the next-wave note\) is \[NEWS-201\]\([^)]+\): Story Desk at `\/story`/,
