@@ -313,6 +313,7 @@ describe('NEWS-165 vision and decisions', () => {
 		assert.match(roadmap, /next wave is the UI build/);
 		assert.doesNotMatch(roadmap, /\*\*Current next\*\* \(paused/);
 		assert.match(roadmap, /order will be proposed separately/);
+		assert.match(roadmap, /No ticket is current next until that sequence is proposed/);
 		assert.match(roadmap, /paused pending re-sequencing/);
 		assert.match(roadmap, /remove Kite Brief routes/);
 		assert.match(roadmap, /Kite Brief cleanup/);
@@ -342,6 +343,7 @@ describe('NEWS-165 vision and decisions', () => {
 		);
 
 		assert.match(agents, /\*\*Current next\*\* is the UI build/);
+		assert.match(agents, /No ticket is current next until that sequence is proposed/);
 		assert.match(
 			agents,
 			/\[NEWS-201\]\([^)]+\), \[NEWS-202\]\([^)]+\), \[NEWS-203\]\([^)]+\), and \[NEWS-219\]\([^)]+\) through \[NEWS-223\]\([^)]+\) are paused/,
