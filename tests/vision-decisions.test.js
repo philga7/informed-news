@@ -173,7 +173,7 @@ describe('NEWS-165 vision and decisions', () => {
 		);
 		assert.match(
 			combined,
-			/\*\*Current next\*\* is \[NEWS-201\]\([^)]+\): Story Desk at `\/story`/,
+			/\*\*Former current next\*\* \(paused 2026-11-12; see the next-wave note\) is \[NEWS-201\]\([^)]+\): Story Desk at `\/story`/,
 		);
 		assert.match(roadmap, /NEWS-175[\s\S]{0,400}\*\*Done\*\*/);
 		assert.match(roadmap, /NEWS-182[\s\S]{0,200}\*\*Done\*\*/);
@@ -223,5 +223,139 @@ describe('NEWS-165 vision and decisions', () => {
 		assert.match(decisions, /duplicate grouping stays/);
 		assert.match(decisions, /\[TRIAGE\.md\]\(TRIAGE\.md\)/);
 		assert.match(decisions, /not the live triage record/);
+	});
+
+	it('records the Nov 12 UI direction and leaves the data layer proposed', () => {
+		const vision = read('docs/VISION.md');
+		assert.match(vision, /## UI direction/);
+		assert.match(vision, /OSINT-style news dashboard/);
+		assert.match(vision, /dark and minimalist/);
+		assert.match(vision, /grok\.com\/dashboard/);
+		assert.match(vision, /cfbtrack\.com/);
+		assert.match(vision, /stocknear\.com/);
+		assert.match(vision, /Telegram pings/);
+		assert.match(vision, /Grok Bot chats and Pages/);
+		assert.match(vision, /one-glance overview/);
+		assert.match(vision, /stories that update in place/i);
+		assert.match(vision, /what changed since you last looked/);
+		assert.match(vision, /visible sources and filters/i);
+		assert.match(vision, /Telegram stays for pings/);
+		assert.match(vision, /Each ping deep-links to the new entry on the site/);
+		assert.match(vision, /paused until the UI build is sequenced/);
+		assert.doesNotMatch(vision, /Story Desk is next/);
+
+		const decisions = read('docs/DECISIONS.md');
+		const entries = decisions.split(/^## /m).slice(1);
+		const nov12 = entries.filter((entry) => entry.startsWith('2026-11-12'));
+		const headings = nov12.map((entry) => entry.split('\n', 1)[0]);
+		for (const title of [
+			'Dashboard home is one screen',
+			'Story page is a timeline',
+			'Each tracker has its own +N new count',
+			'CFP is one merged list',
+			'Morning Telegram messages stay',
+			'Telegram deep link opens at the new entry',
+			'Data layer is proposed',
+			'Feature tickets are on hold',
+		]) {
+			assert.ok(
+				headings.some((heading) => heading.includes(title)),
+				`missing 2026-11-12 decision: ${title}`,
+			);
+		}
+		const proposed = nov12.find((entry) => entry.includes('Data layer is proposed'));
+		assert.ok(proposed, 'data-layer decision missing');
+		assert.match(proposed, /PROPOSED/);
+		assert.match(proposed, /not decided/);
+		assert.match(proposed, /Supabase \(Postgres\)/);
+		assert.match(proposed, /Phil's Vercel account/);
+		assert.match(proposed, /pending a design review/);
+		assert.match(proposed, /no-Supabase-on-the-live-path invariant in \[AGENTS\.md\]/);
+		assert.match(proposed, /design review has to decide that explicitly/);
+		assert.match(proposed, /passed design review is not permission to wire Supabase in/);
+		assert.match(proposed, /Phil has to change that invariant first/);
+		assert.match(proposed, /developing stories, Morning items, and CFP roundups/);
+
+		const home = nov12.find((entry) => entry.includes('Dashboard home is one screen'));
+		assert.match(home, /N trackers have news/);
+		assert.match(home, /Breaking/);
+		assert.match(home, /Developing stories/);
+		assert.match(home, /BLUF, weather, market brief, OSINT brief/);
+		assert.match(home, /Citizen Free Press/);
+		assert.match(home, /My topics/);
+
+		const story = nov12.find((entry) => entry.includes('Story page is a timeline'));
+		assert.match(story, /dated entries with sources/);
+		assert.match(story, /part of/);
+
+		const count = nov12.find((entry) => entry.includes('+N new count'));
+		assert.match(count, /scrolls past the new entries/);
+		assert.match(count, /not when the story is opened/);
+
+		const cfp = nov12.find((entry) => entry.includes('CFP is one merged list'));
+		assert.match(cfp, /newest first/);
+		assert.match(cfp, /roundup time/);
+
+		const morning = nov12.find((entry) => entry.includes('Morning Telegram messages stay'));
+		assert.match(morning, /one line each/);
+		assert.match(morning, /plus a link into the site/);
+
+		const link = nov12.find((entry) => entry.includes('Telegram deep link'));
+		assert.match(link, /highlighted/);
+
+		const hold = nov12.find((entry) => entry.includes('Feature tickets are on hold'));
+		assert.match(hold, /These feature tickets are on hold until the UI build tickets are sequenced/);
+		assert.match(hold, /Tickets that are not on this list are not on hold/);
+		assert.match(hold, /ask Phil before picking anything outside the dev-tooling queue or Epic K intake/);
+		assert.match(hold, /superseded on that point/);
+		assert.match(hold, /does not change their Jira status/);
+		assert.match(hold, /recorded exception to the header rule/);
+
+		const roadmap = read('docs/ROADMAP.md');
+		assert.match(roadmap, /\*\*Current next\*\* is the UI build/);
+		assert.match(roadmap, /next wave is the UI build/);
+		assert.doesNotMatch(roadmap, /\*\*Current next\*\* \(paused/);
+		assert.match(roadmap, /order will be proposed separately/);
+		assert.match(roadmap, /No ticket is current next until that sequence is proposed/);
+		assert.match(roadmap, /paused pending re-sequencing/);
+		assert.match(roadmap, /remove Kite Brief routes/);
+		assert.match(roadmap, /Kite Brief cleanup/);
+		assert.match(roadmap, /are not paused by this note/);
+		assert.match(roadmap, /all paused 2026-11-12 \(see the next-wave note\)/);
+		assert.match(roadmap, /product next \(now paused; see the next-wave note\)/);
+		assert.doesNotMatch(roadmap, /as the product next\./);
+		assert.match(roadmap, /Jira is unchanged until that proposal/);
+		assert.match(roadmap, /overrides the Jira-wins rule for these tickets/);
+		assert.match(roadmap, /Story Desk at its own link/);
+		assert.match(roadmap, /Brief banner shows no status while a refresh is running/);
+		assert.match(roadmap, /build commit SHA with the version/);
+		assert.match(roadmap, /Mark as read and Mark all as read while signed out/);
+		assert.match(roadmap, /log provider call counts per refresh/);
+		assert.match(roadmap, /Last fetch shows raw UTC/);
+		assert.match(
+			roadmap,
+			/\*\*Former current next\*\* \(paused 2026-11-12; see the next-wave note\) is \[NEWS-201\]\([^)]+\): Story Desk at `\/story`/,
+		);
+		assert.doesNotMatch(roadmap, /\*\*Current next\*\* is \[NEWS-201\]/);
+
+		const agents = read('AGENTS.md');
+		const claude = read('CLAUDE.md');
+		assert.match(
+			claude,
+			/Do not build NEWS-201, NEWS-202, NEWS-203, or NEWS-219 through NEWS-223 while the 2026-11-12 next-wave pause holds/,
+		);
+
+		assert.match(agents, /\*\*Current next\*\* is the UI build/);
+		assert.match(agents, /No ticket is current next until that sequence is proposed/);
+		assert.match(
+			agents,
+			/\[NEWS-201\]\([^)]+\), \[NEWS-202\]\([^)]+\), \[NEWS-203\]\([^)]+\), and \[NEWS-219\]\([^)]+\) through \[NEWS-223\]\([^)]+\) are paused/,
+		);
+		assert.doesNotMatch(agents, /\*\*Current next\*\* is \[NEWS-200\]/);
+
+		const whatsNew = read('docs/WHATS_NEW.md');
+		const nov13Notes = whatsNew.split(/^## /m).find((entry) => entry.startsWith('2026-11-13'));
+		assert.ok(nov13Notes, '2026-11-13 what\'s-new entry missing');
+		assert.match(nov13Notes, /\*\*No user-visible change\.\*\*/);
 	});
 });

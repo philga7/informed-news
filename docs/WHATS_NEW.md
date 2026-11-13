@@ -6,6 +6,10 @@ Each ship-loop pull request adds an entry for what is true at merge for that rea
 
 This is not the release log. Releases are recorded in `CHANGELOG.md` by semantic-release. Do not hand-edit `CHANGELOG.md` to mirror these notes.
 
+## 2026-11-13
+
+**No user-visible change.** Recording the dashboard direction does not change the Brief.
+
 ## 2026-11-12
 
 The Brief shows the app version. After you sign in, it also says whether the provider keys are on and how the last fetch ended. Refresh is only there once you are signed in. If the keys are off, the button is disabled and the status line says the provider keys are off. While a fetch is running, the button stays disabled. Opening the Brief during that fetch keeps “Refreshing…”, checks until the fetch finishes, then shows the result, and does not start another fetch.

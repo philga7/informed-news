@@ -43,7 +43,7 @@ Set `REFRESH_INTERVAL_HOURS=off` when you need the server up without spending re
 | `mvp/server/` | Express API + pipeline |
 | `mvp/data/` | Runtime JSON (never commit) |
 | `mvp/.env` | Secrets (never commit); see `mvp/.env.example` |
-| `docs/ROADMAP.md` | Preferred item order; Jira wins on disagreement |
+| `docs/ROADMAP.md` | Preferred item order; Jira wins on disagreement, except the 2026-11-12 next-wave pause |
 | `docs/PRODUCT_SPEC.md` | What the product does now, in plain language (updated when behavior changes) |
 | `docs/WHATS_NEW.md` | Reader-facing changelog (not semantic-release `CHANGELOG.md`) |
 | `docs/` | Brief, triage, owned-brief, birdclaw, etc. |
@@ -56,7 +56,7 @@ Set `REFRESH_INTERVAL_HOURS=off` when you need the server up without spending re
 
 The full ritual is in `.cursor/skills/news-ship-loop/SKILL.md`. Repo skills win over legacy `.cursor/rules/` where they conflict; `AGENTS.md` still wins over skills on product invariants.
 
-- **Order:** take the current next item in `docs/ROADMAP.md` and confirm it in Jira. If they disagree, Jira wins; fix ROADMAP in the same change.
+- **Order:** take the current next item in `docs/ROADMAP.md` and confirm it in Jira. If they disagree, Jira wins; fix ROADMAP in the same change. The 2026-11-12 next-wave pause is the exception: NEWS-201, NEWS-202, NEWS-203, and NEWS-219 through NEWS-223 stay To Do in Jira on purpose until the UI build order is proposed. Dev-tooling NEWS-139, NEWS-128, and NEWS-121 are not paused. Do not start them, and do not rewrite ROADMAP to match that To Do status.
 - **Approach** per ticket (`ticket → approach → reason`). TDD for one module/seam, no new public interfaces or dependencies, about 3 tasks or fewer; otherwise SDD. An explicit `Approach:` in the prompt overrides.
 - Branch `feat/news-<N>-…` (or `ci/news-<N>-…` for tooling) from `main`. One Conventional Commit per ticket on the branch; the PR title is the squash subject on `main` and names every key, e.g. `fix(NEWS-131, NEWS-155): …`.
 - PR body: Summary, a Test plan with every item ticked, and `Closes NEWS-N` when the PR fully completes the story. The test plan includes a `docs/PRODUCT_SPEC.md` update when behavior changed (scenarios edited; leave the file unchanged when it did not; no **Last checked** bump) and a `docs/WHATS_NEW.md` entry for what is true at merge, or **No user-visible change.** Tick the CI item only with the green Actions run link. Do not hand-edit semantic-release `CHANGELOG.md` for that note.
@@ -80,6 +80,7 @@ Rules for `claude-build`:
 - Never merge PRs or push to main. Open a PR and stop; Phil decides when it merges.
 - Anything under `.github/workflows` goes to Cursor, not Claude.
 - Claude builds only tickets labeled `builder-claude`.
+- Do not build NEWS-201, NEWS-202, NEWS-203, or NEWS-219 through NEWS-223 while the 2026-11-12 next-wave pause holds. Comment and stop.
 - The label is on the NEWS ticket in Jira, which Claude cannot read from GitHub. The issue or comment that mentions `@claude` names the NEWS key, and that mention confirms the label. If no key is named, comment and stop.
 - Small means: one area, under about 300 lines, clear acceptance criteria and a test, no auth, secrets, CI, release config, migrations or deploys, and no design call.
 - The build job pins `--model claude-sonnet-5-5` in `claude_args`. `--max-turns` stays 100. Small TDD tickets stay on Sonnet. A big or unsplittable ticket may use Opus (`claude-opus-5-5`) as the builder by setting that model for the one run. Use Fable 5.2 (`claude-fable-5-2`) only if a ticket stalls twice on Opus. That switch is not automated. This is a pilot in this repo to judge review quality over a few pull requests.
