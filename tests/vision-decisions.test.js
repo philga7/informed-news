@@ -305,6 +305,7 @@ describe('NEWS-165 vision and decisions', () => {
 		assert.match(hold, /until the UI build tickets are sequenced/);
 		assert.match(hold, /superseded on that point/);
 		assert.match(hold, /does not change their Jira status/);
+		assert.match(hold, /recorded exception to the header rule/);
 
 		const roadmap = read('docs/ROADMAP.md');
 		assert.match(roadmap, /next wave is the UI build/);
@@ -314,7 +315,8 @@ describe('NEWS-165 vision and decisions', () => {
 		assert.match(roadmap, /Kite Brief cleanup/);
 		assert.match(roadmap, /are not paused by this note/);
 		assert.match(roadmap, /all paused 2026-11-12 \(see the next-wave note\)/);
-		assert.match(hold, /recorded exception to the header rule/);
+		assert.match(roadmap, /product next \(now paused; see the next-wave note\)/);
+		assert.doesNotMatch(roadmap, /as the product next\./);
 		assert.match(roadmap, /Jira is unchanged until that proposal/);
 		assert.match(roadmap, /overrides the Jira-wins rule for these tickets/);
 		assert.match(roadmap, /Story Desk at its own link/);
