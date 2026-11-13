@@ -322,6 +322,14 @@ describe('NEWS-165 vision and decisions', () => {
 		);
 		assert.doesNotMatch(roadmap, /\*\*Current next\*\* is \[NEWS-201\]/);
 
+		const agents = read('AGENTS.md');
+		assert.match(agents, /\*\*Current next\*\* is the UI build/);
+		assert.match(
+			agents,
+			/\[NEWS-201\]\([^)]+\) and \[NEWS-219\]\([^)]+\) through \[NEWS-223\]\([^)]+\) are paused/,
+		);
+		assert.doesNotMatch(agents, /\*\*Current next\*\* is \[NEWS-200\]/);
+
 		const whatsNew = read('docs/WHATS_NEW.md');
 		const nov12Notes = whatsNew.split(/^## /m).find((entry) => entry.startsWith('2026-11-12'));
 		assert.ok(nov12Notes, '2026-11-12 what\'s-new entry missing');
