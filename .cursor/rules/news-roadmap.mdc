@@ -9,4 +9,4 @@ Before choosing “what to build next”, read [docs/ROADMAP.md](../../docs/ROAD
 
 - **Current next** is the preferred order; Jira is status source of truth
 - Parked epics stay parked unless the user explicitly reorders
-- If Jira and the doc disagree, **Jira wins** — update `docs/ROADMAP.md` in the same change set. Exception: the 2026-11-12 next-wave pause. Those tickets stay To Do in Jira until the UI build order is proposed. Do not start them, and do not rewrite the roadmap to match that To Do status.
+- If Jira and the doc disagree, **Jira wins** — update `docs/ROADMAP.md` in the same change set. Exception: the 2026-11-12 next-wave pause (NEWS-201, NEWS-202, NEWS-203, and NEWS-219 through NEWS-223). Those tickets stay To Do in Jira until the UI build order is proposed. Dev-tooling NEWS-139, NEWS-128, and NEWS-121 are not paused. Do not start them, and do not rewrite the roadmap to match that To Do status.

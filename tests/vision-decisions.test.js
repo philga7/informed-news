@@ -310,6 +310,11 @@ describe('NEWS-165 vision and decisions', () => {
 		assert.match(roadmap, /next wave is the UI build/);
 		assert.match(roadmap, /order will be proposed separately/);
 		assert.match(roadmap, /paused pending re-sequencing/);
+		assert.match(roadmap, /remove Kite Brief routes/);
+		assert.match(roadmap, /Kite Brief cleanup/);
+		assert.match(roadmap, /are not paused by this note/);
+		assert.match(roadmap, /all paused 2026-11-12 \(see the next-wave note\)/);
+		assert.match(hold, /recorded exception to the header rule/);
 		assert.match(roadmap, /Jira is unchanged until that proposal/);
 		assert.match(roadmap, /overrides the Jira-wins rule for these tickets/);
 		assert.match(roadmap, /Story Desk at its own link/);
@@ -328,7 +333,7 @@ describe('NEWS-165 vision and decisions', () => {
 		assert.match(agents, /\*\*Current next\*\* is the UI build/);
 		assert.match(
 			agents,
-			/\[NEWS-201\]\([^)]+\) and \[NEWS-219\]\([^)]+\) through \[NEWS-223\]\([^)]+\) are paused/,
+			/\[NEWS-201\]\([^)]+\), \[NEWS-202\]\([^)]+\), \[NEWS-203\]\([^)]+\), and \[NEWS-219\]\([^)]+\) through \[NEWS-223\]\([^)]+\) are paused/,
 		);
 		assert.doesNotMatch(agents, /\*\*Current next\*\* is \[NEWS-200\]/);
 
