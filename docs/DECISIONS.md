@@ -52,11 +52,11 @@ Binding choices for Informed News. Newest first. When one of these changes, upda
 
 ## 2026-11-12 — Data layer is proposed
 
-**Decision:** The data layer is **PROPOSED**, not decided. The leading option is Supabase (Postgres) provisioned through Phil's Vercel account, so developing stories, Morning items, and CFP roundups become structured, queryable data. This is pending a design review. Until that review, the live path stays the JSON files under `mvp/data`. Adopting Supabase requires changing the no-Supabase-on-the-live-path invariant in [AGENTS.md](../AGENTS.md). The design review has to decide that explicitly.
+**Decision:** The data layer is **PROPOSED**, not decided. The leading option is Supabase (Postgres) provisioned through Phil's Vercel account, so developing stories, Morning items, and CFP roundups become structured, queryable data. This is pending a design review. Until that review, the live path stays the JSON files under `mvp/data`. Adopting Supabase requires changing the no-Supabase-on-the-live-path invariant in [AGENTS.md](../AGENTS.md). The design review has to decide that explicitly. A passed design review is not permission to wire Supabase in. Phil has to change that invariant first.
 
 **Why:** Those three are the records the dashboard has to query. Today they are not a queryable store: developing stories are not dated entries with sources, Morning items are not stored, and CFP items are articles in the shared JSON file. The review has to settle the store before any migration.
 
-**What it rules out:** Treating Supabase as chosen, calling Supabase from the live path before the review, moving the app off the VPS in this note, and starting a migration before the design review.
+**What it rules out:** Treating Supabase as chosen, calling Supabase from the live path, treating a passed design review as permission to wire it in, moving the app off the VPS in this note, and starting a migration before the design review. Wiring it in also needs Phil to change the no-Supabase-on-the-live-path invariant in [AGENTS.md](../AGENTS.md).
 
 ## 2026-11-12 — Feature tickets are on hold
 

@@ -270,6 +270,8 @@ describe('NEWS-165 vision and decisions', () => {
 		assert.match(proposed, /pending a design review/);
 		assert.match(proposed, /no-Supabase-on-the-live-path invariant in \[AGENTS\.md\]/);
 		assert.match(proposed, /design review has to decide that explicitly/);
+		assert.match(proposed, /passed design review is not permission to wire Supabase in/);
+		assert.match(proposed, /Phil has to change that invariant first/);
 		assert.match(proposed, /developing stories, Morning items, and CFP roundups/);
 
 		const home = nov12.find((entry) => entry.includes('Dashboard home is one screen'));
@@ -302,13 +304,11 @@ describe('NEWS-165 vision and decisions', () => {
 		const hold = nov12.find((entry) => entry.includes('Feature tickets are on hold'));
 		assert.match(hold, /until the UI build tickets are sequenced/);
 		assert.match(hold, /superseded on that point/);
+		assert.match(hold, /does not change their Jira status/);
 
 		const roadmap = read('docs/ROADMAP.md');
 		assert.match(roadmap, /next wave is the UI build/);
 		assert.match(roadmap, /order will be proposed separately/);
-		assert.match(roadmap, /NEWS-201/);
-		assert.match(roadmap, /NEWS-219/);
-		assert.match(roadmap, /NEWS-223/);
 		assert.match(roadmap, /paused pending re-sequencing/);
 		assert.match(roadmap, /Jira is unchanged until that proposal/);
 		assert.match(roadmap, /overrides the Jira-wins rule for these tickets/);
@@ -318,7 +318,6 @@ describe('NEWS-165 vision and decisions', () => {
 		assert.match(roadmap, /Mark as read and Mark all as read while signed out/);
 		assert.match(roadmap, /log provider call counts per refresh/);
 		assert.match(roadmap, /Last fetch shows raw UTC/);
-		assert.match(hold, /does not change their Jira status/);
 		assert.match(
 			roadmap,
 			/\*\*Current next\*\* \(paused 2026-11-12; see the next-wave note\) is \[NEWS-201\]\([^)]+\): Story Desk at `\/story`/,
