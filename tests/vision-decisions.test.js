@@ -173,7 +173,7 @@ describe('NEWS-165 vision and decisions', () => {
 		);
 		assert.match(
 			combined,
-			/\*\*Current next\*\* is \[NEWS-201\]\([^)]+\): Story Desk at `\/story`/,
+			/\*\*Current next\*\* \(paused 2026-11-12; see the next-wave note\) is \[NEWS-201\]\([^)]+\): Story Desk at `\/story`/,
 		);
 		assert.match(roadmap, /NEWS-175[\s\S]{0,400}\*\*Done\*\*/);
 		assert.match(roadmap, /NEWS-182[\s\S]{0,200}\*\*Done\*\*/);
@@ -299,6 +299,7 @@ describe('NEWS-165 vision and decisions', () => {
 
 		const hold = nov12.find((entry) => entry.includes('Feature tickets are on hold'));
 		assert.match(hold, /until the UI build tickets are sequenced/);
+		assert.match(hold, /superseded on that point/);
 
 		const roadmap = read('docs/ROADMAP.md');
 		assert.match(roadmap, /next wave is the UI build/);
@@ -309,8 +310,9 @@ describe('NEWS-165 vision and decisions', () => {
 		assert.match(roadmap, /paused pending re-sequencing/);
 		assert.match(
 			roadmap,
-			/\*\*Current next\*\* is \[NEWS-201\]\([^)]+\): Story Desk at `\/story`/,
+			/\*\*Current next\*\* \(paused 2026-11-12; see the next-wave note\) is \[NEWS-201\]\([^)]+\): Story Desk at `\/story`/,
 		);
+		assert.doesNotMatch(roadmap, /\*\*Current next\*\* is \[NEWS-201\]/);
 
 		const whatsNew = read('docs/WHATS_NEW.md');
 		const nov12Notes = whatsNew.split(/^## /m).find((entry) => entry.startsWith('2026-11-12'));

@@ -60,7 +60,7 @@ Binding choices for Informed News. Newest first. When one of these changes, upda
 
 ## 2026-11-12 — Feature tickets are on hold
 
-**Decision:** All feature tickets are on hold until the UI build tickets are sequenced. The next wave is the UI build. The order will be proposed separately.
+**Decision:** All feature tickets are on hold until the UI build tickets are sequenced. The next wave is the UI build. The order will be proposed separately. This pauses [NEWS-201](https://informedcrew.atlassian.net/browse/NEWS-201) as the product next. Earlier entries that call it the product next are superseded on that point. The list order in [ROADMAP.md](ROADMAP.md) is unchanged.
 
 **Why:** The Nov 12 UI direction changes what gets built next. Starting the current feature queue would build the old sequence.
 
