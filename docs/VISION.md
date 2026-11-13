@@ -27,7 +27,7 @@ One SPA shell in this repo replaces Kite one view at a time. When the image is s
 - Map ([NEWS-35](https://informedcrew.atlassian.net/browse/NEWS-35)), on hold
 - Signals ([NEWS-34](https://informedcrew.atlassian.net/browse/NEWS-34)), on hold
 
-Story Desk is next and has not shipped. The Briefs module matches the Kite Brief (keyboard, filters, shared links, accessibility) before [NEWS-202](https://informedcrew.atlassian.net/browse/NEWS-202) removes that view. Map and Signals have not shipped and get no chrome until their epics have data.
+Story Desk has not shipped and is paused until the UI build is sequenced (see UI direction below). The Briefs module matches the Kite Brief (keyboard, filters, shared links, accessibility) before [NEWS-202](https://informedcrew.atlassian.net/browse/NEWS-202) removes that view. Map and Signals have not shipped and get no chrome until their epics have data.
 
 ## Alerts
 
@@ -35,7 +35,7 @@ The app scores alerts as FLASH, PRIORITY, or ROUTINE. News Desk Bot and Election
 
 ## News section first
 
-The news section is Briefs, the three triage items ([NEWS-167](https://informedcrew.atlassian.net/browse/NEWS-167), [NEWS-168](https://informedcrew.atlassian.net/browse/NEWS-168), [NEWS-169](https://informedcrew.atlassian.net/browse/NEWS-169)), and Story Desk. News section first. Signals, Map, and cross-domain correlation stay on hold. Correlation has no ticket. It needs stored history from both raw layers.
+The news section is Briefs, the three triage items ([NEWS-167](https://informedcrew.atlassian.net/browse/NEWS-167), [NEWS-168](https://informedcrew.atlassian.net/browse/NEWS-168), [NEWS-169](https://informedcrew.atlassian.net/browse/NEWS-169)), and Story Desk. News section first. Story Desk is paused until the UI build is sequenced. Signals, Map, and cross-domain correlation stay on hold. Correlation has no ticket. It needs stored history from both raw layers.
 
 ## UI direction
 

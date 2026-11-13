@@ -241,6 +241,8 @@ describe('NEWS-165 vision and decisions', () => {
 		assert.match(vision, /visible sources and filters/i);
 		assert.match(vision, /Telegram stays for pings/);
 		assert.match(vision, /Each ping deep-links to the new entry on the site/);
+		assert.match(vision, /paused until the UI build is sequenced/);
+		assert.doesNotMatch(vision, /Story Desk is next/);
 
 		const decisions = read('docs/DECISIONS.md');
 		const entries = decisions.split(/^## /m).slice(1);
@@ -304,6 +306,7 @@ describe('NEWS-165 vision and decisions', () => {
 		const hold = nov12.find((entry) => entry.includes('Feature tickets are on hold'));
 		assert.match(hold, /These feature tickets are on hold until the UI build tickets are sequenced/);
 		assert.match(hold, /Tickets that are not on this list are not on hold/);
+		assert.match(hold, /ask Phil before picking anything outside the dev-tooling queue or Epic K intake/);
 		assert.match(hold, /superseded on that point/);
 		assert.match(hold, /does not change their Jira status/);
 		assert.match(hold, /recorded exception to the header rule/);
