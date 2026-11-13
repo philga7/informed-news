@@ -9,6 +9,8 @@ Claims spine plan: [`.cursor/plans/claims_evidence_spine_8f4cde15.plan.md`](../.
 
 ## Current next
 
+**Next wave (2026-11-12).** The next wave is the UI build. The order will be proposed separately. Existing To Do items [NEWS-201](https://informedcrew.atlassian.net/browse/NEWS-201) and [NEWS-219](https://informedcrew.atlassian.net/browse/NEWS-219) through [NEWS-223](https://informedcrew.atlassian.net/browse/NEWS-223) are paused pending re-sequencing. This note does not reorder the list below. See [DECISIONS.md](DECISIONS.md) and [VISION.md](VISION.md).
+
 ### Combined order (Oct 23, 2026; citation guard added Oct 26)
 
 Product direction: [VISION.md](VISION.md). Binding choices: [DECISIONS.md](DECISIONS.md).

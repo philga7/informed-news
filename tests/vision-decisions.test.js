@@ -224,4 +224,97 @@ describe('NEWS-165 vision and decisions', () => {
 		assert.match(decisions, /\[TRIAGE\.md\]\(TRIAGE\.md\)/);
 		assert.match(decisions, /not the live triage record/);
 	});
+
+	it('records the Nov 12 UI direction and leaves the data layer proposed', () => {
+		const vision = read('docs/VISION.md');
+		assert.match(vision, /## UI direction/);
+		assert.match(vision, /OSINT-style news dashboard/);
+		assert.match(vision, /dark and minimalist/);
+		assert.match(vision, /grok\.com\/dashboard/);
+		assert.match(vision, /cfbtrack\.com/);
+		assert.match(vision, /stocknear\.com/);
+		assert.match(vision, /Telegram pings/);
+		assert.match(vision, /Grok Bot chats and Pages/);
+		assert.match(vision, /one-glance overview/);
+		assert.match(vision, /stories that update in place/i);
+		assert.match(vision, /what changed since you last looked/);
+		assert.match(vision, /visible sources and filters/i);
+		assert.match(vision, /Telegram stays for pings/);
+		assert.match(vision, /Each ping deep-links to the new entry on the site/);
+
+		const decisions = read('docs/DECISIONS.md');
+		const entries = decisions.split(/^## /m).slice(1);
+		const nov12 = entries.filter((entry) => entry.startsWith('2026-11-12'));
+		const headings = nov12.map((entry) => entry.split('\n', 1)[0]);
+		for (const title of [
+			'Dashboard home is one screen',
+			'Story page is a timeline',
+			'Each tracker has its own +N new count',
+			'CFP is one merged list',
+			'Morning Telegram messages stay',
+			'Telegram deep link opens at the new entry',
+			'Data layer is proposed',
+			'Feature tickets are on hold',
+		]) {
+			assert.ok(
+				headings.some((heading) => heading.includes(title)),
+				`missing 2026-11-12 decision: ${title}`,
+			);
+		}
+		const proposed = nov12.find((entry) => entry.includes('Data layer is proposed'));
+		assert.ok(proposed, 'data-layer decision missing');
+		assert.match(proposed, /PROPOSED/);
+		assert.match(proposed, /not decided/);
+		assert.match(proposed, /Supabase \(Postgres\)/);
+		assert.match(proposed, /Phil's Vercel account/);
+		assert.match(proposed, /pending a design review/);
+		assert.match(proposed, /developing stories, Morning items, and CFP roundups/);
+
+		const home = nov12.find((entry) => entry.includes('Dashboard home is one screen'));
+		assert.match(home, /N trackers have news/);
+		assert.match(home, /Breaking/);
+		assert.match(home, /Developing stories/);
+		assert.match(home, /BLUF, weather, market brief, OSINT brief/);
+		assert.match(home, /Citizen Free Press/);
+		assert.match(home, /My topics/);
+
+		const story = nov12.find((entry) => entry.includes('Story page is a timeline'));
+		assert.match(story, /dated entries with sources/);
+		assert.match(story, /part of/);
+
+		const count = nov12.find((entry) => entry.includes('+N new count'));
+		assert.match(count, /scrolls past the new entries/);
+		assert.match(count, /not when the story is opened/);
+
+		const cfp = nov12.find((entry) => entry.includes('CFP is one merged list'));
+		assert.match(cfp, /newest first/);
+		assert.match(cfp, /roundup time/);
+
+		const morning = nov12.find((entry) => entry.includes('Morning Telegram messages stay'));
+		assert.match(morning, /one line each/);
+		assert.match(morning, /plus a link into the site/);
+
+		const link = nov12.find((entry) => entry.includes('Telegram deep link'));
+		assert.match(link, /highlighted/);
+
+		const hold = nov12.find((entry) => entry.includes('Feature tickets are on hold'));
+		assert.match(hold, /until the UI build tickets are sequenced/);
+
+		const roadmap = read('docs/ROADMAP.md');
+		assert.match(roadmap, /next wave is the UI build/);
+		assert.match(roadmap, /order will be proposed separately/);
+		assert.match(roadmap, /NEWS-201/);
+		assert.match(roadmap, /NEWS-219/);
+		assert.match(roadmap, /NEWS-223/);
+		assert.match(roadmap, /paused pending re-sequencing/);
+		assert.match(
+			roadmap,
+			/\*\*Current next\*\* is \[NEWS-201\]\([^)]+\): Story Desk at `\/story`/,
+		);
+
+		const whatsNew = read('docs/WHATS_NEW.md');
+		const nov12Notes = whatsNew.split(/^## /m).find((entry) => entry.startsWith('2026-11-12'));
+		assert.ok(nov12Notes, '2026-11-12 what\'s-new entry missing');
+		assert.match(nov12Notes, /\*\*No user-visible change\.\*\*/);
+	});
 });

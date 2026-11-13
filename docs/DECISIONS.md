@@ -2,6 +2,70 @@
 
 Binding choices for Informed News. Newest first. When one of these changes, update this file in the same change as [ROADMAP.md](ROADMAP.md) and Jira. What the product does now, in plain language, is [PRODUCT_SPEC.md](PRODUCT_SPEC.md). Pipeline detail remains in [NEWS-84](https://informedcrew.atlassian.net/browse/NEWS-84), [TRIAGE.md](TRIAGE.md), and [BRIEF.md](BRIEF.md). The target is [VISION.md](VISION.md).
 
+## 2026-11-12 — Dashboard home is one screen
+
+**Decision:** The dashboard home is one screen of cards, in this order, top to bottom: a “N trackers have news” line, then Breaking, then Developing stories, then Morning (BLUF, weather, market brief, OSINT brief), then the CFP (Citizen Free Press) roundups, then My topics.
+
+**Why:** The home has to be a one-glance overview. That is the first way the site beats Telegram pings plus developing stories kept as Grok Bot chats and Pages. The reference look is the dark, minimalist dashboards named in [VISION.md](VISION.md).
+
+**What it rules out:** A multi-page home, a different card order, and splitting Morning, CFP, or My topics onto their own first screens.
+
+## 2026-11-12 — Story page is a timeline
+
+**Decision:** The story page is a timeline of dated entries with sources. Hub stories and branch stories are separate cards linked with “part of” links.
+
+**Why:** A developing story is the sequence of updates, and a branch is its own story that still points at the hub. Sources stay on the entry they support.
+
+**What it rules out:** Folding a hub and its branches into one card, and a story page that shows only the latest writeup.
+
+## 2026-11-12 — Each tracker has its own +N new count
+
+**Decision:** Each tracker has its own “+N new” count. The count clears once the reader scrolls past the new entries, not when the story is opened.
+
+**Why:** Opening a story is not the same as having seen the new entries. The count is how the reader sees what changed since they last looked, per tracker.
+
+**What it rules out:** Clearing the count on open, and one shared count across trackers.
+
+## 2026-11-12 — CFP is one merged list
+
+**Decision:** CFP (Citizen Free Press) is shown as one merged list, newest first, with each item’s roundup time on it.
+
+**Why:** The reader needs one list and the time of the roundup on the item, not a stack of separate roundup pages.
+
+**What it rules out:** A separate list per roundup, and hiding the roundup time.
+
+## 2026-11-12 — Morning Telegram messages stay
+
+**Decision:** The morning Telegram messages stay for now, shortened to one line each plus a link into the site.
+
+**Why:** Telegram stays the ping. The long morning text (BLUF, weather, market brief, OSINT brief) lives on the site, and the message points at it.
+
+**What it rules out:** Dropping the morning Telegram messages in this direction, and keeping the long message body in Telegram.
+
+## 2026-11-12 — Telegram deep link opens at the new entry
+
+**Decision:** A Telegram deep link opens at the new entry, with that entry highlighted.
+
+**Why:** The ping names one update. The link lands on that entry so the reader does not hunt for it.
+
+**What it rules out:** Opening the story at the top with no highlight, and a link that only opens the home screen.
+
+## 2026-11-12 — Data layer is proposed
+
+**Decision:** The data layer is **PROPOSED**, not decided. The leading option is Supabase (Postgres) provisioned through Phil's Vercel account, so developing stories, Morning items, and CFP roundups become structured, queryable data. This is pending a design review. Until that review, the live path stays the JSON files under `mvp/data`.
+
+**Why:** Those three are the records the dashboard has to query. Today they are not a queryable store: developing stories are not dated entries with sources, Morning items are not stored, and CFP items are articles in the shared JSON file. The review has to settle the store before any migration.
+
+**What it rules out:** Treating Supabase as chosen, calling Supabase from the live path before the review, moving the app off the VPS in this note, and starting a migration before the design review.
+
+## 2026-11-12 — Feature tickets are on hold
+
+**Decision:** All feature tickets are on hold until the UI build tickets are sequenced. The next wave is the UI build. The order will be proposed separately.
+
+**Why:** The Nov 12 UI direction changes what gets built next. Starting the current feature queue would build the old sequence.
+
+**What it rules out:** Starting feature work, including [NEWS-201](https://informedcrew.atlassian.net/browse/NEWS-201) and [NEWS-219](https://informedcrew.atlassian.net/browse/NEWS-219) through [NEWS-223](https://informedcrew.atlassian.net/browse/NEWS-223), before that sequence is proposed. It does not close those tickets and it does not reorder the existing list in [ROADMAP.md](ROADMAP.md).
+
 ## 2026-11-12 — Brief refresh banner (NEWS-218)
 
 **Decision:** The Brief status line and signed-in Refresh button follow these four choices. This does not replace [NEWS-201](https://informedcrew.atlassian.net/browse/NEWS-201) as the product next.

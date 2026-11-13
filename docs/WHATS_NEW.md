@@ -10,6 +10,8 @@ This is not the release log. Releases are recorded in `CHANGELOG.md` by semantic
 
 The Brief shows the app version. After you sign in, it also says whether the provider keys are on and how the last fetch ended. Refresh is only there once you are signed in. If the keys are off, the button is disabled and the status line says the provider keys are off. While a fetch is running, the button stays disabled. Opening the Brief during that fetch keeps “Refreshing…”, checks until the fetch finishes, then shows the result, and does not start another fetch.
 
+**No user-visible change.** Recording the dashboard direction does not change the Brief. The note above is an earlier change from this date.
+
 ## 2026-11-11
 
 On the Brief, if the model answers a full-story request with a response the app cannot read, the card now says the full story could not be built because the AI response was malformed. Before, it showed the generic “could not be loaded right now” message. It does not retry on its own, and you can try again.

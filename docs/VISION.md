@@ -36,3 +36,17 @@ The app scores alerts as FLASH, PRIORITY, or ROUTINE. News Desk Bot and Election
 ## News section first
 
 The news section is Briefs, the three triage items ([NEWS-167](https://informedcrew.atlassian.net/browse/NEWS-167), [NEWS-168](https://informedcrew.atlassian.net/browse/NEWS-168), [NEWS-169](https://informedcrew.atlassian.net/browse/NEWS-169)), and Story Desk. News section first. Signals, Map, and cross-domain correlation stay on hold. Correlation has no ticket. It needs stored history from both raw layers.
+
+## UI direction
+
+Phil approved this on Nov 12, 2026. Informed News becomes an OSINT-style news dashboard: dark and minimalist. The reference sites are [grok.com/dashboard](https://grok.com/dashboard), [cfbtrack.com](https://cfbtrack.com), and [stocknear.com](https://stocknear.com).
+
+The site has to beat Phil's current setup, which is Telegram pings plus developing stories kept as Grok Bot chats and Pages. It wins on three things:
+
+1. A one-glance overview.
+2. Stories that update in place, with a timeline and what changed since you last looked.
+3. Visible sources and filters.
+
+Telegram stays for pings. Each ping deep-links to the new entry on the site.
+
+The home screen, the story page, the per-tracker new count, CFP, and the morning messages are recorded in [DECISIONS.md](DECISIONS.md). The data layer is proposed there, not decided. Feature tickets stay on hold until the UI build tickets are sequenced ([ROADMAP.md](ROADMAP.md)).
