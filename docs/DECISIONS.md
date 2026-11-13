@@ -52,7 +52,7 @@ Binding choices for Informed News. Newest first. When one of these changes, upda
 
 ## 2026-11-12 — Data layer is proposed
 
-**Decision:** The data layer is **PROPOSED**, not decided. The leading option is Supabase (Postgres) provisioned through Phil's Vercel account, so developing stories, Morning items, and CFP roundups become structured, queryable data. This is pending a design review. Until that review, the live path stays the JSON files under `mvp/data`.
+**Decision:** The data layer is **PROPOSED**, not decided. The leading option is Supabase (Postgres) provisioned through Phil's Vercel account, so developing stories, Morning items, and CFP roundups become structured, queryable data. This is pending a design review. Until that review, the live path stays the JSON files under `mvp/data`. Adopting Supabase requires changing the no-Supabase-on-the-live-path invariant in [AGENTS.md](../AGENTS.md). The design review has to decide that explicitly.
 
 **Why:** Those three are the records the dashboard has to query. Today they are not a queryable store: developing stories are not dated entries with sources, Morning items are not stored, and CFP items are articles in the shared JSON file. The review has to settle the store before any migration.
 
@@ -64,7 +64,7 @@ Binding choices for Informed News. Newest first. When one of these changes, upda
 
 **Why:** The Nov 12 UI direction changes what gets built next. Starting the current feature queue would build the old sequence.
 
-**What it rules out:** Starting feature work, including [NEWS-201](https://informedcrew.atlassian.net/browse/NEWS-201) and [NEWS-219](https://informedcrew.atlassian.net/browse/NEWS-219) through [NEWS-223](https://informedcrew.atlassian.net/browse/NEWS-223), before that sequence is proposed. It does not close those tickets, it does not change their Jira status, and it does not reorder the existing list in [ROADMAP.md](ROADMAP.md). Jira stays as it is until the sequence is proposed.
+**What it rules out:** Starting feature work, including [NEWS-201](https://informedcrew.atlassian.net/browse/NEWS-201) and [NEWS-219](https://informedcrew.atlassian.net/browse/NEWS-219) through [NEWS-223](https://informedcrew.atlassian.net/browse/NEWS-223), before that sequence is proposed. It does not close those tickets, it does not change their Jira status, and it does not reorder the existing list in [ROADMAP.md](ROADMAP.md). Until that sequence is proposed, this hold overrides the Jira-wins rule for these tickets. Do not start them because Jira says To Do, and do not rewrite [ROADMAP.md](ROADMAP.md) to match that To Do status.
 
 ## 2026-11-12 — Brief refresh banner (NEWS-218)
 

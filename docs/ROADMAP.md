@@ -9,7 +9,7 @@ Claims spine plan: [`.cursor/plans/claims_evidence_spine_8f4cde15.plan.md`](../.
 
 ## Current next
 
-**Next wave (2026-11-12).** The next wave is the UI build. The order will be proposed separately. Existing To Do items are paused pending re-sequencing. Jira is unchanged until that proposal: these tickets stay To Do there. This note does not reorder the list below. See [DECISIONS.md](DECISIONS.md) and [VISION.md](VISION.md).
+**Next wave (2026-11-12).** The next wave is the UI build. The order will be proposed separately. Existing To Do items are paused pending re-sequencing. Jira is unchanged until that proposal: these tickets stay To Do there. Until that proposal, this note overrides the Jira-wins rule for these tickets. Do not start them from To Do, and do not rewrite this note to match Jira. This note does not reorder the list below. See [DECISIONS.md](DECISIONS.md) and [VISION.md](VISION.md).
 
 - [NEWS-201](https://informedcrew.atlassian.net/browse/NEWS-201) — Story Desk at its own link
 - [NEWS-219](https://informedcrew.atlassian.net/browse/NEWS-219) — Brief banner shows no status while a refresh is running
@@ -236,7 +236,7 @@ Former [NEWS-53](https://informedcrew.atlassian.net/browse/NEWS-53) (Brief sourc
 ## Agent rules of thumb
 
 1. Read this file before inventing a “next ticket” from open To Do alone.
-2. Confirm live status with Jira (`statusCategory != Done`); if this file and Jira disagree, **Jira wins** and update this file in the same change set when you learn the board moved.
+2. Confirm live status with Jira (`statusCategory != Done`); if this file and Jira disagree, **Jira wins** and update this file in the same change set when you learn the board moved. The 2026-11-12 next-wave note is the exception: those paused tickets stay To Do in Jira on purpose, and this file is not rewritten to match that.
 3. Ship via `/news-ship-loop`. Mid-epic discoveries → new NEWS items, not silent rewrites of Done work.
 4. When the image is served, `/` is the SPA Briefs module. Kite Brief code remains in the repo until [NEWS-202](https://informedcrew.atlassian.net/browse/NEWS-202) and [NEWS-203](https://informedcrew.atlassian.net/browse/NEWS-203). `npm run dev` is still mvp/server + Kite ([AGENTS.md](../AGENTS.md)). [NEWS-200](https://informedcrew.atlassian.net/browse/NEWS-200) is **Done**. **Current next** (paused 2026-11-12; see the next-wave note) is [NEWS-201](https://informedcrew.atlassian.net/browse/NEWS-201): Story Desk at `/story`. Target direction: [VISION.md](VISION.md). Binding choices: [DECISIONS.md](DECISIONS.md).
 5. Ask before NEWS-57 Later/Parked children or Epics **B–G** — do not start them from open To Do alone.

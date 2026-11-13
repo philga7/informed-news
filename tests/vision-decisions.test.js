@@ -268,6 +268,8 @@ describe('NEWS-165 vision and decisions', () => {
 		assert.match(proposed, /Supabase \(Postgres\)/);
 		assert.match(proposed, /Phil's Vercel account/);
 		assert.match(proposed, /pending a design review/);
+		assert.match(proposed, /no-Supabase-on-the-live-path invariant in \[AGENTS\.md\]/);
+		assert.match(proposed, /design review has to decide that explicitly/);
 		assert.match(proposed, /developing stories, Morning items, and CFP roundups/);
 
 		const home = nov12.find((entry) => entry.includes('Dashboard home is one screen'));
@@ -309,6 +311,7 @@ describe('NEWS-165 vision and decisions', () => {
 		assert.match(roadmap, /NEWS-223/);
 		assert.match(roadmap, /paused pending re-sequencing/);
 		assert.match(roadmap, /Jira is unchanged until that proposal/);
+		assert.match(roadmap, /overrides the Jira-wins rule for these tickets/);
 		assert.match(roadmap, /Story Desk at its own link/);
 		assert.match(roadmap, /Brief banner shows no status while a refresh is running/);
 		assert.match(roadmap, /build commit SHA with the version/);
@@ -331,8 +334,8 @@ describe('NEWS-165 vision and decisions', () => {
 		assert.doesNotMatch(agents, /\*\*Current next\*\* is \[NEWS-200\]/);
 
 		const whatsNew = read('docs/WHATS_NEW.md');
-		const nov12Notes = whatsNew.split(/^## /m).find((entry) => entry.startsWith('2026-11-12'));
-		assert.ok(nov12Notes, '2026-11-12 what\'s-new entry missing');
-		assert.match(nov12Notes, /\*\*No user-visible change\.\*\*/);
+		const nov13Notes = whatsNew.split(/^## /m).find((entry) => entry.startsWith('2026-11-13'));
+		assert.ok(nov13Notes, '2026-11-13 what\'s-new entry missing');
+		assert.match(nov13Notes, /\*\*No user-visible change\.\*\*/);
 	});
 });
