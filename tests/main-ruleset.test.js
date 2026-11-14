@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 const root = join(fileURLToPath(new URL('.', import.meta.url)), '..');
 const read = (path) => readFileSync(join(root, path), 'utf8');
 
-describe('NEWS-178 main requires a PR, one approval, PR title, and squash by title', () => {
+describe('NEWS-178 main requires a PR, PR title, and squash by title', () => {
 	it('requires both GitHub Actions checks on the default branch', () => {
 		const ruleset = JSON.parse(read('.github/rulesets/main-requires-ci.json'));
 		assert.equal(ruleset.name, 'main requires CI');
@@ -41,12 +41,12 @@ describe('NEWS-178 main requires a PR, one approval, PR title, and squash by tit
 		}
 	});
 
-	it('requires one approval of the last push, dismisses stale approvals, and allows squash only', () => {
+	it('requires no approving review, dismisses stale approvals, and allows squash only', () => {
 		const ruleset = JSON.parse(read('.github/rulesets/main-requires-ci.json'));
 		const pullRequest = ruleset.rules.find((rule) => rule.type === 'pull_request');
 		assert.ok(pullRequest, 'pull_request');
-		assert.equal(pullRequest.parameters.required_approving_review_count, 1);
-		assert.equal(pullRequest.parameters.require_last_push_approval, true);
+		assert.equal(pullRequest.parameters.required_approving_review_count, 0);
+		assert.equal(pullRequest.parameters.require_last_push_approval, false);
 		assert.equal(pullRequest.parameters.dismiss_stale_reviews_on_push, true);
 		assert.deepEqual(pullRequest.parameters.required_reviewers, []);
 		assert.deepEqual(pullRequest.parameters.allowed_merge_methods, ['squash']);
@@ -125,7 +125,8 @@ printf '%s\\n' '{"squash_merge_commit_title":"COMMIT_OR_PR_TITLE","squash_merge_
 		const contributing = read('CONTRIBUTING.md');
 		assert.match(contributing, /\*\*PR title\*\* is required/);
 		assert.doesNotMatch(contributing, /once it is added/);
-		assert.match(contributing, /One approving review/);
+		assert.match(contributing, /No approving review is required/);
+		assert.match(contributing, /admin bypass is not used for merges/);
 		assert.match(contributing, /scripts\/apply-repo-settings\.sh --apply/);
 		assert.match(contributing, /squash_merge_commit_title: PR_TITLE/);
 		assert.match(contributing, /squash_merge_commit_message=PR_BODY/);
@@ -134,7 +135,9 @@ printf '%s\\n' '{"squash_merge_commit_title":"COMMIT_OR_PR_TITLE","squash_merge_
 	it('CLAUDE.md says the builder never approves, merges, or enables auto-merge', () => {
 		const claudeMd = read('CLAUDE.md');
 		assert.match(claudeMd, /never approves, never merges, and never enables auto-merge/);
-		assert.match(claudeMd, /Its pull requests need Phil's approval/);
+		assert.match(claudeMd, /No GitHub review approval is required/);
+		assert.match(claudeMd, /shows as mergeable without the admin bypass/);
+		assert.doesNotMatch(claudeMd, /need Phil's approval/);
 	});
 
 	it('DECISIONS records the ruleset choice and leaves the product direction unchanged', () => {
@@ -147,6 +150,25 @@ printf '%s\\n' '{"squash_merge_commit_title":"COMMIT_OR_PR_TITLE","squash_merge_
 		assert.match(entry, /Bots must not merge their own green pull requests/);
 		assert.match(entry, /\[VISION\.md\]\(VISION\.md\) is unchanged/);
 		assert.match(entry, /\*\*What it rules out:\*\*/);
+		assert.match(
+			entry,
+			/superseded by \[2026-11-13 — No pull request approval; merges on Phil's ship word\]\(#2026-11-13--no-pull-request-approval-merges-on-phils-ship-word\)/,
+		);
+	});
+
+	it('DECISIONS records that no pull request approval is required', () => {
+		const decisions = read('docs/DECISIONS.md');
+		const heading = "## 2026-11-13 — No pull request approval; merges on Phil's ship word";
+		assert.ok(decisions.includes(heading));
+		const next = decisions.indexOf('\n## ', decisions.indexOf(heading) + heading.length);
+		const entry = decisions.slice(decisions.indexOf(heading), next);
+		assert.match(entry, /No pull request approval is required/);
+		assert.match(entry, /The admin bypass is not used for merges/);
+		assert.match(entry, /Phil's ship word/);
+		assert.match(
+			entry,
+			/#2026-11-01--main-requires-a-pr-one-approval-pr-title-and-build-checks-squash-by-pr-title-no-bot-bypass-news-178/,
+		);
 	});
 
 	it('ROADMAP says NEWS-183 runs after Phil applies the NEWS-178 settings', () => {

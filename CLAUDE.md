@@ -66,7 +66,7 @@ The full ritual is in `.cursor/skills/news-ship-loop/SKILL.md`. Repo skills win 
 
 ## Claude-eligible work
 
-Claude builds on GitHub only when someone mentions `@claude`, and only for tickets labeled `builder-claude`. The workflow is `.github/workflows/claude.yml`. It opens a pull request. The builder never approves, never merges, and never enables auto-merge. Its pull requests need Phil's approval. Phil merges.
+Claude builds on GitHub only when someone mentions `@claude`, and only for tickets labeled `builder-claude`. The workflow is `.github/workflows/claude.yml`. It opens a pull request. The builder never approves, never merges, and never enables auto-merge. No GitHub review approval is required, and only Phil merges, on his ship word, after confirming the PR shows as mergeable without the admin bypass.
 
 Which workflow runs:
 
@@ -93,7 +93,7 @@ Rules for `claude-build`:
 - The build job installs Node 22 and runs `npm ci` at the repo root and `npm ci --prefix mvp/server` before Claude starts, with the setup-node npm cache. That is what `npm test` and `npm run test:kite` need. `npm ci` and `npm install` stay disallowed for Claude.
 - The build job installs Bun 1.4.3 and runs `bun install --frozen-lockfile --cwd apps/kite` before Claude starts. It also installs `apps/web` with `bun install --frozen-lockfile --cwd apps/web` before Claude starts. Claude may run the allowed Kite `bun run` scripts, and may run `bun run --cwd apps/web test:unit` and `bun run --cwd apps/web check`. `bun install` stays disallowed for Claude.
 - `node --test` and `node --test …` are allowed, so `tests/*.test.js` can run. Any other `node` command, `Bash(node:*)`, and `Bash(git:*)` stay disallowed. Edit, Write, `git add`, and `git commit` are allowed. The only pushes allowed are `git push origin HEAD` and `git push -u origin HEAD`, with no flags, so a follow-up commit is `claude[bot]` on the action app token. A bare `git push` is not allowed. Pushes to `main`, force pushes, and remote branch deletes stay disallowed. npx, curl, and installs stay disallowed. `gh pr edit` may change only Claude's own pull request title and body.
-- Open a PR with `gh pr create` after the push. Do not post a compare link. The author stays claude[bot] via the action's app token. Do not pass a personal access token. The builder never approves, never merges, and never enables auto-merge. Its pull requests need Phil's approval, and only Phil merges.
+- Open a PR with `gh pr create` after the push. Do not post a compare link. The author stays claude[bot] via the action's app token. Do not pass a personal access token. The builder never approves, never merges, and never enables auto-merge. No GitHub review approval is required, and only Phil merges, on his ship word, after confirming the PR shows as mergeable without the admin bypass.
 
 ## When reviewing a PR
 

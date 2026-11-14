@@ -6,6 +6,10 @@ Each ship-loop pull request adds an entry for what is true at merge for that rea
 
 This is not the release log. Releases are recorded in `CHANGELOG.md` by semantic-release. Do not hand-edit `CHANGELOG.md` to mirror these notes.
 
+## 2026-11-14
+
+**No user-visible change.**
+
 ## 2026-11-13
 
 **No user-visible change.** Recording the dashboard direction does not change the Brief.

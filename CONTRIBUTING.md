@@ -74,11 +74,11 @@ The repository ruleset **main requires CI** (Settings → Rules → Rulesets, id
 
 - The CI job **MVP build & typecheck** and the **PR title** check, both reported by GitHub Actions (`integration_id` 15368, the id the live ruleset already uses for the build check). **PR title** is required. A pull request cannot merge while either check is missing, pending, or red.
 - A pull request before any update to `main`. Direct pushes are rejected (`push declined due to repository rule violations`), admins included. Land everything, including plan-file cleanups and doc fixes, through a PR.
-- One approving review, and an approval of the latest push from someone other than the person who pushed it. A later push dismisses earlier approvals.
+- No approving review is required (`required_approving_review_count` is 0 and `require_last_push_approval` is false). Phil set that on live ruleset 24903925 on 2026-11-13. A later push still dismisses earlier approvals. A pull request merges on Phil's ship word when **MVP build & typecheck** and **PR title** are green. The admin bypass is not used for merges.
 - Squash as the only merge method onto `main`. The squash commit title is the pull request title.
 - No force-push and no deletion of `main`.
 
-The repository admin role (GitHub base role id 5) may bypass these rules when merging a pull request, and only then. That is how Phil can merge his own pull request when he was the last person to push. Agents never use that bypass. No bot and no GitHub App is a bypass actor.
+The repository admin role (GitHub base role id 5) may bypass these rules when merging a pull request, and only then. As of 2026-11-13 that bypass is not used for merges. Agents never use that bypass. No bot and no GitHub App is a bypass actor.
 
 The Release job checks out with the write deploy key **semantic-release (NEWS-124)**, whose private half is the Actions secret `RELEASE_DEPLOY_KEY`, so its `chore(release)` commit and tag push over SSH. That deploy key is a bypass actor (`bypass_mode: always`) so the pull-request rule does not stop the release commit. GitHub does not allow the GitHub Actions app as a ruleset bypass on a personal-account repo, so `GITHUB_TOKEN` can't push the release commit.
 
