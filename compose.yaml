@@ -39,9 +39,11 @@ services:
       start_period: 20s
 
   postgres:
+    profiles:
+      - ${COMPOSE_PROJECT_NAME:-informed-news}-postgres
     image: postgres:16-alpine
     env_file:
-      - ${INFORMED_NEWS_ENV_FILE:-/opt/informed-news/.env}
+      - ${INFORMED_NEWS_POSTGRES_ENV_FILE:-/opt/informed-news/postgres.env}
     environment:
       POSTGRES_USER: informed_news
     command: ["postgres", "-c", "shared_buffers=128MB"]
@@ -79,3 +81,4 @@ networks:
     name: nanobot-mem0
   informed-news-db:
     name: ${INFORMED_NEWS_DB_NETWORK:-${COMPOSE_PROJECT_NAME:-informed-news}-db}
+    external: ${INFORMED_NEWS_DB_EXTERNAL:-false}

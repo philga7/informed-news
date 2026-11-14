@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -14,6 +15,21 @@ const forbiddenSecrets = [
 	'OLLAMA_API_KEY',
 	'TS_AUTHKEY',
 ];
+
+const SECRET_KEYS = [
+	'POSTGRES_PASSWORD',
+	'MVP_PASSWORD',
+	'SESSION_SECRET',
+	'TYPESAFE_API_KEY',
+	'OLLAMA_API_KEY',
+	'COURTLISTENER_API_TOKEN',
+	'TS_AUTHKEY',
+];
+
+const DEFAULT_POSTGRES_ENV = `POSTGRES_PASSWORD=change-me
+POSTGRES_USER=informed_news
+POSTGRES_DB=informed_news
+`;
 
 describe('NEWS-109 compose.yaml contract', () => {
 	it('matches the isolated Compose project requirements', () => {
@@ -145,7 +161,22 @@ function composeCli() {
 	return null;
 }
 
-function renderedCompose(extraEnv, project) {
+function redactSecrets(text, literals) {
+	let out = text;
+	for (const [key, value] of Object.entries(literals)) {
+		if (value) out = out.split(value).join(`<redacted:${key}>`);
+	}
+	return out;
+}
+
+function postgresPasswordFromEnvFile(filePath) {
+	if (!existsSync(filePath)) return undefined;
+	const text = readFileSync(filePath, 'utf8');
+	const match = text.match(/^POSTGRES_PASSWORD=(.*)$/m);
+	return match ? match[1].trim() : undefined;
+}
+
+function renderedCompose(extraEnv, project, configArgs = ['config']) {
 	const cli = composeCli();
 	assert.ok(cli, 'docker compose is required for this test');
 	const env = { ...process.env };
@@ -154,14 +185,87 @@ function renderedCompose(extraEnv, project) {
 	delete env.INFORMED_NEWS_IMAGE;
 	delete env.COMPOSE_PROJECT_NAME;
 	delete env.COMPOSE_FILE;
+	delete env.INFORMED_NEWS_DB_NETWORK;
+	delete env.INFORMED_NEWS_DB_EXTERNAL;
+	delete env.INFORMED_NEWS_POSTGRES_ENV_FILE;
+	delete env.COMPOSE_PROFILES;
 	Object.assign(env, extraEnv);
+
+	const redactLiterals = {};
+	for (const key of SECRET_KEYS) {
+		if (env[key]) redactLiterals[key] = env[key];
+		delete env[key];
+	}
+
 	env.INFORMED_NEWS_ENV_FILE = join(root, 'mvp/.env.example');
+
+	const hasProfilesKey = Object.prototype.hasOwnProperty.call(extraEnv, 'COMPOSE_PROFILES');
+	if (!hasProfilesKey) {
+		env.COMPOSE_PROFILES = 'informed-news-postgres';
+	}
+
+	const hasPostgresEnvKey = Object.prototype.hasOwnProperty.call(
+		extraEnv,
+		'INFORMED_NEWS_POSTGRES_ENV_FILE',
+	);
+	let tempDir;
+	if (!hasPostgresEnvKey) {
+		tempDir = mkdtempSync(join(tmpdir(), 'informed-news-pg-env-'));
+		const postgresEnvPath = join(tempDir, 'postgres.env');
+		writeFileSync(postgresEnvPath, DEFAULT_POSTGRES_ENV, { mode: 0o600 });
+		env.INFORMED_NEWS_POSTGRES_ENV_FILE = postgresEnvPath;
+	}
+	const postgresEnvPath = env.INFORMED_NEWS_POSTGRES_ENV_FILE;
+	if (postgresEnvPath) {
+		const fromFile = postgresPasswordFromEnvFile(postgresEnvPath);
+		if (fromFile && !redactLiterals.POSTGRES_PASSWORD) {
+			redactLiterals.POSTGRES_PASSWORD = fromFile;
+		}
+	}
+	redactLiterals.MVP_PASSWORD = 'change-me';
+	redactLiterals.SESSION_SECRET = 'change-me-to-a-long-random-string';
+
 	const args = [...cli.prefix];
 	if (project) args.push('-p', project);
-	args.push('config');
-	const result = spawnSync(cli.command, args, { cwd: root, env, encoding: 'utf8' });
-	assert.equal(result.status, 0, result.stderr);
-	return result.stdout;
+	args.push(...configArgs);
+	try {
+		const result = spawnSync(cli.command, args, { cwd: root, env, encoding: 'utf8' });
+		const redactedStderr = redactSecrets(result.stderr, redactLiterals);
+		if (result.status !== 0) {
+			assert.fail(`compose exited ${result.status}: ${redactedStderr}`);
+		}
+		return redactSecrets(result.stdout, redactLiterals);
+	} finally {
+		if (tempDir) {
+			rmSync(tempDir, { recursive: true, force: true });
+		}
+	}
+}
+
+function renderedComposeServices(extraEnv, project, extraArgs = []) {
+	return renderedCompose(extraEnv, project, ['config', '--services', ...extraArgs]);
+}
+
+function postgresServiceBlock(contents) {
+	const start = contents.indexOf('\n  postgres:\n');
+	assert.ok(start !== -1, 'missing postgres service');
+	const rest = contents.slice(start);
+	const end = rest.indexOf('\nvolumes:\n');
+	assert.ok(end !== -1, 'postgres service must stay above the volumes block');
+	return rest.slice(0, end);
+}
+
+function postgresEnvironmentKeys(config) {
+	const start = config.indexOf('\n  postgres:\n');
+	if (start === -1) return [];
+	const rest = config.slice(start);
+	const envHeader = '\n    environment:\n';
+	const envStart = rest.indexOf(envHeader);
+	if (envStart === -1) return [];
+	const afterEnv = rest.slice(envStart + envHeader.length);
+	const nextServiceKey = afterEnv.search(/\n    [a-z]/);
+	const body = nextServiceKey === -1 ? afterEnv : afterEnv.slice(0, nextServiceKey);
+	return [...body.matchAll(/^\s+([A-Z][A-Z0-9_]*):/gm)].map((match) => match[1]);
 }
 
 function volumeNames(config) {
@@ -202,9 +306,13 @@ describe('QA instance rendered by docker compose', { skip: composeCli() ? false 
 		const config = renderedCompose({}, QA_PROJECT);
 		assert.equal(configuredVolume(config), QA_VOLUME);
 		assert.notEqual(configuredVolume(config), LIVE_VOLUME);
-		assert.equal(configuredPostgresVolume(config), 'informed-news-qa-postgres');
-		assert.notEqual(configuredPostgresVolume(config), 'informed-news-postgres');
+		assert.doesNotMatch(config, /\n  postgres:\n/);
 		assert.match(config, /^name: informed-news-qa$/m);
+	});
+
+	it('still has the live postgres volume when the live postgres profile is on', () => {
+		const config = renderedCompose({}, undefined);
+		assert.equal(configuredPostgresVolume(config), 'informed-news-postgres');
 	});
 
 	it('uses a QA port and volume override that are not the live ones', () => {
@@ -223,17 +331,21 @@ describe('QA instance rendered by docker compose', { skip: composeCli() ? false 
 describe('NEWS-224 postgres compose service', () => {
 	it('caps memory, sets shared_buffers, and does not publish the database port', () => {
 		const contents = composeText();
-		const start = contents.indexOf('\n  postgres:\n');
-		assert.ok(start !== -1, 'missing postgres service');
-		const rest = contents.slice(start);
-		const end = rest.indexOf('\nvolumes:\n');
-		assert.ok(end !== -1, 'postgres service must stay above the volumes block');
-		const service = rest.slice(0, end);
+		const service = postgresServiceBlock(contents);
 		assert.match(service, /image: postgres:16-alpine/);
 		assert.match(service, /mem_limit: 512m/);
 		assert.match(service, /shm_size: 256mb/);
 		assert.match(service, /shared_buffers=128MB/);
 		assert.match(service, /POSTGRES_USER: informed_news/);
+		assert.match(
+			service,
+			/\$\{COMPOSE_PROJECT_NAME:-informed-news\}-postgres/,
+		);
+		assert.match(
+			service,
+			/\$\{INFORMED_NEWS_POSTGRES_ENV_FILE:-\/opt\/informed-news\/postgres\.env\}/,
+		);
+		assert.doesNotMatch(service, /INFORMED_NEWS_ENV_FILE/);
 		assert.doesNotMatch(service, /^\s*ports:/m);
 		assert.doesNotMatch(service, /POSTGRES_PASSWORD/);
 		assert.match(
@@ -245,6 +357,59 @@ describe('NEWS-224 postgres compose service', () => {
 			/name: \$\{INFORMED_NEWS_DATA_VOLUME:-\$\{COMPOSE_PROJECT_NAME:-informed-news\}-data\}/,
 		);
 		assert.doesNotMatch(contents, /informed-news-qa/);
+	});
+});
+
+describe('NEWS-230 postgres env and QA compose contract', { skip: composeCli() ? false : 'docker compose is not installed' }, () => {
+	it('QA config --services lists only app, even with COMPOSE_PROFILES=informed-news-postgres', () => {
+		assert.equal(renderedComposeServices({}, QA_PROJECT), 'app\n');
+		assert.equal(
+			renderedComposeServices({ COMPOSE_PROFILES: 'informed-news-postgres' }, QA_PROJECT),
+			'app\n',
+		);
+	});
+
+	it('QA joins the external live db network when configured', () => {
+		const config = renderedCompose(
+			{
+				INFORMED_NEWS_DB_NETWORK: 'informed-news-db',
+				INFORMED_NEWS_DB_EXTERNAL: 'true',
+				COMPOSE_PROFILES: '',
+			},
+			QA_PROJECT,
+		);
+		assert.match(config, /name: informed-news-db/);
+		assert.match(config, /external: true/);
+		assert.match(config, /informed-news-db/);
+	});
+
+	it('live postgres profile renders only POSTGRES_* keys on the postgres service', () => {
+		const config = renderedCompose({}, undefined);
+		const keys = postgresEnvironmentKeys(config);
+		assert.deepEqual(keys.sort(), ['POSTGRES_DB', 'POSTGRES_PASSWORD', 'POSTGRES_USER']);
+		assert.ok(!keys.includes('MVP_PASSWORD'));
+		assert.ok(!keys.includes('SESSION_SECRET'));
+	});
+
+	it('postgres.env.example holds POSTGRES_* placeholders only', () => {
+		const text = readFileSync(join(root, 'mvp/postgres.env.example'), 'utf8');
+		const keys = [...text.matchAll(/^([A-Z][A-Z0-9_]*)=/gm)].map((match) => match[1]);
+		for (const key of keys) {
+			assert.match(key, /^POSTGRES_/);
+		}
+		assert.ok(keys.includes('POSTGRES_USER'));
+		assert.ok(keys.includes('POSTGRES_PASSWORD'));
+		assert.ok(keys.includes('POSTGRES_DB'));
+		assert.match(text, /POSTGRES_PASSWORD=change-me/);
+	});
+
+	it('QA backstop profile names the QA postgres volume, not the live one', () => {
+		const config = renderedCompose(
+			{ COMPOSE_PROFILES: 'informed-news-qa-postgres' },
+			QA_PROJECT,
+		);
+		assert.equal(configuredPostgresVolume(config), 'informed-news-qa-postgres');
+		assert.notEqual(configuredPostgresVolume(config), 'informed-news-postgres');
 	});
 });
 
@@ -316,5 +481,53 @@ describe('QA instance runbook', () => {
 		assert.match(startSection, /must not pass `-p`/);
 		assert.match(startSection, /must not set `COMPOSE_PROJECT_NAME`/);
 		assert.match(startSection, /volume `informed-news-data`/);
+	});
+});
+
+describe('NEWS-230 runbook postgres env', () => {
+	it('documents live env ownership, postgres env layout, and QA db join', () => {
+		const runbook = readFileSync(join(root, 'docs/RUNBOOK.md'), 'utf8');
+
+		const envStart = runbook.indexOf('## Env file');
+		assert.ok(envStart !== -1, 'missing Env file section');
+		const envNext = runbook.indexOf('\n## ', envStart + 1);
+		const envSection = runbook.slice(envStart, envNext);
+		assert.match(envSection, /owner `root:root`/);
+		assert.match(envSection, /mode `600`/);
+		assert.match(envSection, /Do not recreate it from scratch or chown it to `deploy`/);
+		assert.doesNotMatch(
+			envSection,
+			/set owner `deploy:deploy` and mode `600`, then edit the placeholders/,
+		);
+
+		const pgStart = runbook.indexOf('## Postgres env');
+		assert.ok(pgStart !== -1, 'missing Postgres env section');
+		const pgNext = runbook.indexOf('\n## ', pgStart + 1);
+		const pgSection = runbook.slice(pgStart, pgNext);
+		for (const phrase of [
+			'informed-news-postgres-1',
+			'postgres.env',
+			'COMPOSE_PROFILES=informed-news-postgres',
+			'root:root',
+			"Phil's approval",
+			'Do not print the file',
+			'Do not print the rendered config',
+		]) {
+			assert.ok(pgSection.includes(phrase), `Postgres env missing: ${phrase}`);
+		}
+
+		const qaStart = runbook.indexOf('## QA instance');
+		const qaNext = runbook.indexOf('\n## ', qaStart + 1);
+		const qaSection = runbook.slice(qaStart, qaNext);
+		for (const phrase of [
+			'INFORMED_NEWS_DB_NETWORK=informed-news-db',
+			'INFORMED_NEWS_DB_EXTERNAL=true',
+			'POSTGRES_HOST=postgres',
+			'informed-news-qa-postgres',
+			'(bare, or naming `app`) does not start Postgres, and naming `postgres` does',
+			'Never name `postgres` on a QA command',
+		]) {
+			assert.ok(qaSection.includes(phrase), `QA section missing: ${phrase}`);
+		}
 	});
 });

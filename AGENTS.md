@@ -73,7 +73,7 @@ Do **not** treat `_legacy/` (including `_legacy/mvp-web`) as the primary product
 ### Data & API
 
 - Persist the running Brief via `mvp/server` store helpers — flat JSON files
-- New UI records (stories and entries, Morning items, CFP roundups) go through the Postgres store. App code calls that store and does not write SQL. Postgres is chosen over SQLite and Supabase. The data-layer memo's SQLite recommendation is superseded, and the 2026-11-12 proposed Supabase entry is superseded. Do not call Supabase. Do not stand Postgres up on the VPS without Phil's approval. The password stays in `POSTGRES_PASSWORD` in the env file, not in the repo.
+- New UI records (stories and entries, Morning items, CFP roundups) go through the Postgres store. App code calls that store and does not write SQL. Postgres is chosen over SQLite and Supabase. The data-layer memo's SQLite recommendation is superseded, and the 2026-11-12 proposed Supabase entry is superseded. Do not call Supabase. Do not stand Postgres up on the VPS without Phil's approval. The password stays in `POSTGRES_PASSWORD` in the env file, not in the repo. The Postgres container receives only `POSTGRES_*` values from its own env file (`postgres.env` on the VPS). The QA app uses `informed_news_qa` on the shared `informed-news-db` network and still refuses `informed_news`.
 - Protect mutating/list APIs with session middleware (`requireApiSession`)
 - Env vars load from `mvp/.env` (see `mvp/.env.example`)
 - Dual citations on articles when scrape succeeds (`cfpUrl`, `publisherUrl`)

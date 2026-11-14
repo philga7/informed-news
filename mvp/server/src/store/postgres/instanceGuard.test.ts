@@ -142,6 +142,51 @@ test('a missing password fails closed before a pool is opened', () => {
   );
 });
 
+test('QA pool targets informed_news_qa on host postgres and refuses the live database first', () => {
+  const password = 'placeholder';
+  openDashboardPool(
+    {
+      INFORMED_NEWS_INSTANCE: 'qa',
+      POSTGRES_DB: QA_DATABASE,
+      POSTGRES_HOST: 'postgres',
+      POSTGRES_USER: 'informed_news',
+      POSTGRES_PASSWORD: password,
+    },
+    (config) => {
+      assert.equal(config.database, QA_DATABASE);
+      assert.equal(config.host, 'postgres');
+      assert.equal(config.user, 'informed_news');
+      assert.equal(config.password, password);
+      return {} as Pool;
+    },
+  );
+
+  let opened = false;
+  assert.throws(
+    () =>
+      openDashboardPool(
+        {
+          INFORMED_NEWS_INSTANCE: 'qa',
+          POSTGRES_DB: LIVE_DATABASE,
+          POSTGRES_HOST: 'postgres',
+          POSTGRES_USER: 'informed_news',
+          POSTGRES_PASSWORD: password,
+        },
+        () => {
+          opened = true;
+          throw new Error('pool should not be constructed');
+        },
+      ),
+    (err: unknown) => {
+      assert.equal(opened, false);
+      assert.ok(err instanceof DashboardConfigError);
+      assert.equal(err.message.includes(password), false);
+      assert.match(err.message, /refused database informed_news$/);
+      return true;
+    },
+  );
+});
+
 test('a guarded connection opens the instance database', () => {
   const live = openDashboardPool({ POSTGRES_PASSWORD: 'placeholder' }, (config) => {
     assert.equal(config.database, LIVE_DATABASE);
