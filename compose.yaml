@@ -1,10 +1,16 @@
 # Informed News. Separate from Nanobot.
-# Local or VPS, after the env file and the nanobot-mem0 network exist:
+# Local or VPS, after the env file and the nanobot-mem0 and informed-news-db networks exist:
 #   docker compose up -d --build
 # SEARXNG_URL and TOPIC_SEARCH_ENABLED come from the env file only.
 # Unset SEARXNG_URL stays unset (Google News RSS only). Do not default it to localhost.
 # VPS env file value: SEARXNG_URL=http://searxng:8080 on Docker network nanobot-mem0.
 name: informed-news
+
+# Only `informed-news` and `informed-news-qa` are supported project names.
+# `informed-news` includes the Postgres service. `informed-news-qa` includes a file with none.
+# Any other name fails because its include file is missing.
+include:
+  - path: compose.postgres.${COMPOSE_PROJECT_NAME:-informed-news}.yaml
 
 services:
   app:
@@ -38,47 +44,17 @@ services:
       retries: 3
       start_period: 20s
 
-  postgres:
-    profiles:
-      - ${COMPOSE_PROJECT_NAME:-informed-news}-postgres
-    image: postgres:16-alpine
-    env_file:
-      - ${INFORMED_NEWS_POSTGRES_ENV_FILE:-/opt/informed-news/postgres.env}
-    environment:
-      POSTGRES_USER: informed_news
-    command: ["postgres", "-c", "shared_buffers=128MB"]
-    mem_limit: 512m
-    shm_size: 256mb
-    volumes:
-      - informed-news-postgres:/var/lib/postgresql/data
-    networks:
-      - informed-news-db
-    restart: unless-stopped
-    healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "pg_isready -U informed_news",
-        ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 20s
-
 volumes:
   informed-news-data:
     # Unset on project informed-news stays informed-news-data.
-    # Any other project name gets its own volume, so -p cannot mount the live one.
+    # Project informed-news-qa gets its own volume, so -p cannot mount the live one.
+    # Any other project name fails first, because its include file is missing.
     name: ${INFORMED_NEWS_DATA_VOLUME:-${COMPOSE_PROJECT_NAME:-informed-news}-data}
-  informed-news-postgres:
-    # Unset on project informed-news stays informed-news-postgres.
-    # A second project name gets its own volume and cannot mount the live one.
-    name: ${INFORMED_NEWS_POSTGRES_VOLUME:-${COMPOSE_PROJECT_NAME:-informed-news}-postgres}
 
 networks:
   nanobot-mem0:
     external: true
     name: nanobot-mem0
   informed-news-db:
-    name: ${INFORMED_NEWS_DB_NETWORK:-${COMPOSE_PROJECT_NAME:-informed-news}-db}
-    external: ${INFORMED_NEWS_DB_EXTERNAL:-false}
+    name: informed-news-db
+    external: true

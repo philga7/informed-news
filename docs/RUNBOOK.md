@@ -83,6 +83,7 @@ Create the shared network once, then use the same compose command with an env fi
 
 ```bash
 docker network create nanobot-mem0
+docker network create informed-news-db
 COMPOSE_PROFILES=informed-news-postgres INFORMED_NEWS_POSTGRES_ENV_FILE=./mvp/postgres.env INFORMED_NEWS_ENV_FILE=./mvp/.env docker compose up -d --build
 ```
 
@@ -118,8 +119,8 @@ chmod 600 /opt/informed-news/qa.env
 - Compose interpolates `$` in env values. A bcrypt `MVP_PASSWORD_HASH` must be single-quoted, or each `$` written as `$$`, or login breaks. Generate the hash the same way `mvp/.env.example` describes, on the VPS. Put only the hash in this file. The password itself does not go in the repo, a pull request, a ticket, or a log.
 - Do not set `INFORMED_NEWS_DATA_VOLUME` to `informed-news-data`. That name is the live volume.
 - Set `INFORMED_NEWS_INSTANCE=qa` and `POSTGRES_DB=informed_news_qa`. Do not set `POSTGRES_DB` to `informed_news`. That name is the live database. QA refuses to open it.
-- The QA app joins the existing network `informed-news-db` (`external: true`). It does not create `informed-news-qa-db`. `POSTGRES_HOST=postgres` is the live Postgres alias on that network. `POSTGRES_DB` is `informed_news_qa`. Do not set `POSTGRES_DB=informed_news`. QA refuses that database.
-- Do not set `COMPOSE_PROFILES` to `informed-news-qa-postgres`. A QA `docker compose --env-file /opt/informed-news/qa.env -p informed-news-qa up` (bare, or naming `app`) does not start Postgres, and naming `postgres` does. Never name `postgres` on a QA command. `COMPOSE_PROFILES=informed-news-postgres` does not start one either, because the QA profile name is `informed-news-qa-postgres`.
+- The QA app joins the external network `informed-news-db`. It does not create `informed-news-qa-db`. See [Database network](#database-network). `POSTGRES_HOST=postgres` is the live Postgres alias on that network. `POSTGRES_DB` is `informed_news_qa`. Do not set `POSTGRES_DB=informed_news`. QA refuses that database. Do not set `INFORMED_NEWS_DB_NETWORK` or `INFORMED_NEWS_DB_EXTERNAL`. Those names are unused. If an existing `qa.env` already has them, leave those two lines. Do not print the file.
+- The QA project includes `compose.postgres.informed-news-qa.yaml`. That file defines no Postgres service. `docker compose --env-file /opt/informed-news/qa.env -p informed-news-qa up postgres` exits with `no such service: postgres`. A bare `up`, naming `app`, `COMPOSE_PROFILES=informed-news-postgres`, and `COMPOSE_PROFILES=informed-news-qa-postgres` do not start Postgres either.
 - Do not point QA at `INFORMED_NEWS_POSTGRES_ENV_FILE`. QA does not start Postgres.
 
 Placeholders only:
@@ -135,8 +136,6 @@ REFRESH_INTERVAL_HOURS=off
 MVP_PASSWORD_HASH='<bcrypt hash>'
 SESSION_SECRET=<long random string>
 INFORMED_NEWS_INSTANCE=qa
-INFORMED_NEWS_DB_NETWORK=informed-news-db
-INFORMED_NEWS_DB_EXTERNAL=true
 POSTGRES_USER=informed_news
 POSTGRES_PASSWORD=<postgres password>
 POSTGRES_DB=informed_news_qa
@@ -165,9 +164,9 @@ docker compose --env-file /opt/informed-news/qa.env -p informed-news-qa up -d --
 That `--build` command is the first start only. It builds `informed-news:qa`. A later recreate, including turning provider keys on or off for a capped window, uses the command in [Recreate without a build](#recreate-without-a-build). It does not build and it does not pull.
 
 - Project name: `informed-news-qa`. A second project does not mount `informed-news-data`. With no volume override, project `informed-news-qa` uses volume `informed-news-qa-data`. The prefix sets that name anyway.
-- That volume split needs Compose to set `COMPOSE_PROJECT_NAME` from `-p` (or the top-level `name`) before it interpolates the file. Checked with Docker Compose v2.40.3. Before the first QA start, run `docker compose -p informed-news-qa config` and confirm the volume name is `informed-news-qa-data`. If it is still `informed-news-data`, stop. That Compose build would mount the live volume.
+- That volume split, and the Postgres include path, need Compose to set `COMPOSE_PROJECT_NAME` from `-p` before it interpolates the file. Checked with Docker Compose v2.40.3. Before the first QA start, run `docker compose --env-file /opt/informed-news/qa.env -p informed-news-qa config` and confirm the volume name is `informed-news-qa-data`. If it is still `informed-news-data`, stop. That Compose build would mount the live volume. Run `docker compose --env-file /opt/informed-news/qa.env -p informed-news-qa config --services`. It must print only `app`. If `postgres` is listed, stop. The include path would have loaded the live Postgres file.
 - Host port: `127.0.0.1:3002`, forwarded to port 3001 inside the container. The live publish stays `127.0.0.1:3001`.
-- Same `compose.yaml` and Dockerfile. There is no second compose file. The QA image tag is `informed-news:qa`. A QA build must not retag `informed-news:local`, which is what the live project uses. The running live container keeps its current image, and the next live `docker compose up` does not pick up a QA build.
+- Same Dockerfile. Live and QA both use `compose.yaml`. Project `informed-news` includes `compose.postgres.informed-news.yaml`. Project `informed-news-qa` includes `compose.postgres.informed-news-qa.yaml`, which defines no Postgres service. There is no compose override file. The QA image tag is `informed-news:qa`. A QA build must not retag `informed-news:local`, which is what the live project uses. The running live container keeps its current image, and the next live `docker compose up` does not pick up a QA build.
 
 Health check, on the VPS:
 
@@ -225,7 +224,25 @@ docker compose --env-file /opt/informed-news/qa.env -p informed-news-qa down
 docker volume rm informed-news-qa-data
 ```
 
-`docker volume rm` is optional and names only the QA volume. Never remove `informed-news-data`. Do not run `docker compose down` without `-p informed-news-qa`; that stops the live project.
+`docker volume rm` is optional and names only the QA volume. Never remove `informed-news-data`. Do not run `docker compose down` without `-p informed-news-qa`; that stops the live project. QA `down` does not remove `informed-news-db`.
+
+## Database network
+
+`informed-news-db` is an external network. Neither the live project nor the QA project creates it, and `docker compose down` does not remove it. Live `down` can run while the QA app is attached. QA `down` can run while live Postgres and the live app are attached. Each project stays connected to the network the other did not tear down.
+
+The VPS already has this network. Do not create a second one. On a new machine, create it once before the first `up`:
+
+```bash
+docker network create informed-news-db
+```
+
+Confirm it before the first `up` after this change:
+
+```bash
+docker network inspect informed-news-db
+```
+
+If that inspect fails, create the network with the command above. Do not run `docker network rm informed-news-db` while Postgres or either app is attached. Applying this on the VPS waits for Phil's approval. This repo change does not SSH, does not edit the server `.env`, and does not delete it.
 
 ## Postgres env
 

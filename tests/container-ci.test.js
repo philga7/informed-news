@@ -26,6 +26,7 @@ describe('NEWS-109 CI builds and starts the container', () => {
 			'container_start_seconds',
 			'docker compose up -d --wait --no-build',
 			'nanobot-mem0',
+			'docker network create informed-news-db',
 		];
 		for (const substring of requiredSubstrings) {
 			assert.ok(contents.includes(substring), `missing required substring: ${substring}`);

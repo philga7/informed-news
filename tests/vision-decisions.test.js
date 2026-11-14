@@ -402,8 +402,8 @@ describe('NEWS-165 vision and decisions', () => {
 	it('records NEWS-230 Postgres env layout alongside NEWS-224', () => {
 		const decisions = read('docs/DECISIONS.md');
 		const entries = decisions.split(/^## /m).slice(1);
-		const news230 = entries.find(
-			(entry) => entry.startsWith('2026-11-14') && entry.includes('NEWS-230'),
+		const news230 = entries.find((entry) =>
+			entry.startsWith('2026-11-14 — QA uses the live Postgres'),
 		);
 		assert.ok(news230, '2026-11-14 NEWS-230 decision missing');
 		assert.match(news230, /\*\*Decision:\*\*/);
@@ -428,5 +428,33 @@ describe('NEWS-165 vision and decisions', () => {
 		const nov14 = whatsNew.split(/^## /m).find((entry) => entry.startsWith('2026-11-14'));
 		assert.ok(nov14, '2026-11-14 whats-new entry missing');
 		assert.match(nov14, /\*\*No user-visible change\.\*\*/);
+	});
+
+	it('records that QA compose cannot start Postgres (NEWS-231)', () => {
+		const decisions = read('docs/DECISIONS.md');
+		const entries = decisions.split(/^## /m).slice(1);
+		const news231 = entries.find((entry) => entry.includes('NEWS-231'));
+		assert.ok(news231, 'NEWS-231 decision missing');
+		assert.match(news231, /\*\*Decision:\*\*/);
+		assert.match(news231, /\*\*Why:\*\*/);
+		assert.match(news231, /\*\*What it rules out:\*\*/);
+		assert.match(news231, /no such service: postgres/);
+		assert.match(news231, /informed_news_qa/);
+		assert.match(news231, /instanceGuard/);
+		assert.match(news231, /does not edit the server/);
+	});
+
+	it('records that informed-news-db is external (NEWS-232)', () => {
+		const decisions = read('docs/DECISIONS.md');
+		const entries = decisions.split(/^## /m).slice(1);
+		const news232 = entries.find((entry) => entry.includes('NEWS-232'));
+		assert.ok(news232, 'NEWS-232 decision missing');
+		assert.match(news232, /\*\*Decision:\*\*/);
+		assert.match(news232, /\*\*Why:\*\*/);
+		assert.match(news232, /\*\*What it rules out:\*\*/);
+		assert.match(news232, /docker network create informed-news-db/);
+		assert.match(news232, /does not remove it/);
+		assert.match(news232, /does not edit the server/);
+		assert.match(news232, /Phil's approval/);
 	});
 });

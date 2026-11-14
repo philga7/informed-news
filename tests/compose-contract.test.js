@@ -97,6 +97,13 @@ function composeText() {
 	return readFileSync(join(root, 'compose.yaml'), 'utf8');
 }
 
+function nonCommentText(text) {
+	return text
+		.split('\n')
+		.filter((line) => !/^\s*#/.test(line))
+		.join('\n');
+}
+
 function resolveVolumeName(contents, env) {
 	assert.ok(
 		contents.includes(`name: ${VOLUME_EXPR}`),
@@ -151,7 +158,9 @@ describe('QA instance compose isolation', () => {
 		assert.notEqual(qaPort, livePort);
 		assert.notEqual(QA_PROJECT, LIVE_PROJECT);
 		assert.match(contents, /\$\{INFORMED_NEWS_ENV_FILE:-\/opt\/informed-news\/\.env\}/);
-		assert.doesNotMatch(contents, /informed-news-qa/);
+		assert.doesNotMatch(nonCommentText(contents), /informed-news-qa/);
+		assert.match(contents, /Only `informed-news` and `informed-news-qa` are supported project names/);
+		assert.match(contents, /Any other name fails because its include file is missing/);
 	});
 });
 
@@ -176,7 +185,7 @@ function postgresPasswordFromEnvFile(filePath) {
 	return match ? match[1].trim() : undefined;
 }
 
-function renderedCompose(extraEnv, project, configArgs = ['config']) {
+function composeInvocation(extraEnv, project, configArgs = ['config']) {
 	const cli = composeCli();
 	assert.ok(cli, 'docker compose is required for this test');
 	const env = { ...process.env };
@@ -190,6 +199,7 @@ function renderedCompose(extraEnv, project, configArgs = ['config']) {
 	delete env.INFORMED_NEWS_POSTGRES_ENV_FILE;
 	delete env.COMPOSE_PROFILES;
 	Object.assign(env, extraEnv);
+	env.COMPOSE_ANSI = 'never';
 
 	const redactLiterals = {};
 	for (const key of SECRET_KEYS) {
@@ -229,17 +239,30 @@ function renderedCompose(extraEnv, project, configArgs = ['config']) {
 	if (project) args.push('-p', project);
 	args.push(...configArgs);
 	try {
-		const result = spawnSync(cli.command, args, { cwd: root, env, encoding: 'utf8' });
-		const redactedStderr = redactSecrets(result.stderr, redactLiterals);
-		if (result.status !== 0) {
-			assert.fail(`compose exited ${result.status}: ${redactedStderr}`);
-		}
-		return redactSecrets(result.stdout, redactLiterals);
+		const result = spawnSync(cli.command, args, {
+			cwd: root,
+			env,
+			encoding: 'utf8',
+			timeout: 20000,
+		});
+		return {
+			status: result.status,
+			stdout: redactSecrets(result.stdout ?? '', redactLiterals),
+			stderr: redactSecrets(result.stderr ?? '', redactLiterals),
+		};
 	} finally {
 		if (tempDir) {
 			rmSync(tempDir, { recursive: true, force: true });
 		}
 	}
+}
+
+function renderedCompose(extraEnv, project, configArgs = ['config']) {
+	const result = composeInvocation(extraEnv, project, configArgs);
+	if (result.status !== 0) {
+		assert.fail(`compose exited ${result.status}: ${result.stderr}`);
+	}
+	return result.stdout;
 }
 
 function renderedComposeServices(extraEnv, project, extraArgs = []) {
@@ -291,6 +314,18 @@ function configuredPort(config) {
 	return match[1];
 }
 
+function declaredNetwork(config, name) {
+	const parts = config.split(/\nnetworks:\n/);
+	assert.equal(parts.length, 2, 'rendered config should have one networks block');
+	const section = parts[1];
+	const header = `  ${name}:\n`;
+	const start = section.indexOf(header);
+	assert.ok(start !== -1, `missing network ${name}`);
+	const rest = section.slice(start + header.length);
+	const next = rest.search(/\n  [A-Za-z0-9_-]+:\n|\nvolumes:\n/);
+	return rest.slice(0, next === -1 ? undefined : next);
+}
+
 describe('QA instance rendered by docker compose', { skip: composeCli() ? false : 'docker compose is not installed' }, () => {
 	it('keeps the live volume, port, and image when the new vars are unset', () => {
 		const config = renderedCompose({}, undefined);
@@ -330,7 +365,7 @@ describe('QA instance rendered by docker compose', { skip: composeCli() ? false 
 
 describe('NEWS-224 postgres compose service', () => {
 	it('caps memory, sets shared_buffers, and does not publish the database port', () => {
-		const contents = composeText();
+		const contents = readFileSync(join(root, 'compose.postgres.informed-news.yaml'), 'utf8');
 		const service = postgresServiceBlock(contents);
 		assert.match(service, /image: postgres:16-alpine/);
 		assert.match(service, /mem_limit: 512m/);
@@ -352,11 +387,19 @@ describe('NEWS-224 postgres compose service', () => {
 			contents,
 			/\$\{INFORMED_NEWS_POSTGRES_VOLUME:-\$\{COMPOSE_PROJECT_NAME:-informed-news\}-postgres\}/,
 		);
+		const appFile = composeText();
 		assert.match(
-			contents,
+			appFile,
 			/name: \$\{INFORMED_NEWS_DATA_VOLUME:-\$\{COMPOSE_PROJECT_NAME:-informed-news\}-data\}/,
 		);
+		assert.match(
+			appFile,
+			/compose\.postgres\.\$\{COMPOSE_PROJECT_NAME:-informed-news\}\.yaml/,
+		);
+		assert.doesNotMatch(nonCommentText(appFile), /informed-news-qa/);
 		assert.doesNotMatch(contents, /informed-news-qa/);
+		const qaInclude = readFileSync(join(root, 'compose.postgres.informed-news-qa.yaml'), 'utf8');
+		assert.doesNotMatch(qaInclude, /^\s*postgres:/m);
 	});
 });
 
@@ -369,18 +412,12 @@ describe('NEWS-230 postgres env and QA compose contract', { skip: composeCli() ?
 		);
 	});
 
-	it('QA joins the external live db network when configured', () => {
-		const config = renderedCompose(
-			{
-				INFORMED_NEWS_DB_NETWORK: 'informed-news-db',
-				INFORMED_NEWS_DB_EXTERNAL: 'true',
-				COMPOSE_PROFILES: '',
-			},
-			QA_PROJECT,
-		);
-		assert.match(config, /name: informed-news-db/);
-		assert.match(config, /external: true/);
-		assert.match(config, /informed-news-db/);
+	it('QA joins informed-news-db without a project-owned network', () => {
+		const config = renderedCompose({ COMPOSE_PROFILES: '' }, QA_PROJECT);
+		const network = declaredNetwork(config, 'informed-news-db');
+		assert.match(network, /name: informed-news-db$/m);
+		assert.match(network, /external: true/);
+		assert.doesNotMatch(network, /informed-news-qa-db/);
 	});
 
 	it('live postgres profile renders only POSTGRES_* keys on the postgres service', () => {
@@ -403,14 +440,74 @@ describe('NEWS-230 postgres env and QA compose contract', { skip: composeCli() ?
 		assert.match(text, /POSTGRES_PASSWORD=change-me/);
 	});
 
-	it('QA backstop profile names the QA postgres volume, not the live one', () => {
+	it('a QA profile does not render a Postgres service or volume', () => {
 		const config = renderedCompose(
 			{ COMPOSE_PROFILES: 'informed-news-qa-postgres' },
 			QA_PROJECT,
 		);
-		assert.equal(configuredPostgresVolume(config), 'informed-news-qa-postgres');
-		assert.notEqual(configuredPostgresVolume(config), 'informed-news-postgres');
+		assert.doesNotMatch(config, /\n  postgres:\n/);
+		assert.equal(
+			volumeNames(config).find((name) => name.endsWith('-postgres')),
+			undefined,
+		);
 	});
+});
+
+describe('NEWS-231 QA compose cannot start Postgres', { skip: composeCli() ? false : 'docker compose is not installed' }, () => {
+	const profiles = ['', 'informed-news-postgres', 'informed-news-qa-postgres'];
+
+	for (const profile of profiles) {
+		it(`project informed-news-qa with COMPOSE_PROFILES=${profile || '(unset)'} has no postgres service`, () => {
+			assert.equal(
+				renderedComposeServices({ COMPOSE_PROFILES: profile }, QA_PROJECT),
+				'app\n',
+			);
+			const named = composeInvocation({ COMPOSE_PROFILES: profile }, QA_PROJECT, [
+				'up',
+				'--dry-run',
+				'--no-deps',
+				'postgres',
+			]);
+			assert.notEqual(named.status, 0);
+			assert.match(`${named.stderr}\n${named.stdout}`, /no such service: postgres/);
+		});
+	}
+
+	it('an unknown project name fails because the include file is missing', () => {
+		const result = composeInvocation({ COMPOSE_PROFILES: '' }, 'informed-news-other', [
+			'config',
+			'--services',
+		]);
+		assert.notEqual(result.status, 0);
+		assert.match(
+			`${result.stderr}\n${result.stdout}`,
+			/compose\.postgres\.informed-news-other\.yaml: no such file or directory/,
+		);
+	});
+
+	it('live profile still renders the live Postgres service and an external db network', () => {
+		const services = renderedComposeServices({}, undefined);
+		assert.match(services, /^app\npostgres\n$|^postgres\napp\n$/);
+		const config = renderedCompose({}, undefined);
+		assert.equal(configuredPostgresVolume(config), 'informed-news-postgres');
+		const network = declaredNetwork(config, 'informed-news-db');
+		assert.match(network, /name: informed-news-db$/m);
+		assert.match(network, /external: true/);
+	});
+});
+
+describe('NEWS-232 informed-news-db is external', { skip: composeCli() ? false : 'docker compose is not installed' }, () => {
+	for (const project of [undefined, QA_PROJECT]) {
+		const label = project ?? LIVE_PROJECT;
+		it(`project ${label} joins informed-news-db and does not own it`, () => {
+			const config = renderedCompose({ COMPOSE_PROFILES: project ? '' : 'informed-news-postgres' }, project);
+			const network = declaredNetwork(config, 'informed-news-db');
+			assert.match(network, /name: informed-news-db$/m);
+			assert.match(network, /external: true/);
+			assert.doesNotMatch(config, /informed-news-qa-db/);
+			assert.doesNotMatch(network, /external:\s*false/);
+		});
+	}
 });
 
 describe('QA instance runbook', () => {
@@ -520,14 +617,30 @@ describe('NEWS-230 runbook postgres env', () => {
 		const qaNext = runbook.indexOf('\n## ', qaStart + 1);
 		const qaSection = runbook.slice(qaStart, qaNext);
 		for (const phrase of [
-			'INFORMED_NEWS_DB_NETWORK=informed-news-db',
-			'INFORMED_NEWS_DB_EXTERNAL=true',
 			'POSTGRES_HOST=postgres',
-			'informed-news-qa-postgres',
-			'(bare, or naming `app`) does not start Postgres, and naming `postgres` does',
-			'Never name `postgres` on a QA command',
+			'compose.postgres.informed-news-qa.yaml',
+			'no such service: postgres',
+			'COMPOSE_PROFILES=informed-news-postgres',
+			'COMPOSE_PROFILES=informed-news-qa-postgres',
+			'do not start Postgres',
+			'docker compose --env-file /opt/informed-news/qa.env -p informed-news-qa config --services',
+			'must print only `app`',
 		]) {
 			assert.ok(qaSection.includes(phrase), `QA section missing: ${phrase}`);
 		}
+		for (const phrase of [
+			'## Database network',
+			'docker network create informed-news-db',
+			'does not remove it',
+			'already has this network',
+			"Phil's approval",
+		]) {
+			assert.ok(runbook.includes(phrase), `runbook missing: ${phrase}`);
+		}
+		assert.doesNotMatch(
+			qaSection,
+			/naming `postgres` does/,
+			'QA runbook must not say naming postgres starts a database',
+		);
 	});
 });
