@@ -83,6 +83,7 @@ Create the shared network once, then use the same compose command with an env fi
 
 ```bash
 docker network create nanobot-mem0
+docker network create informed-news-db
 COMPOSE_PROFILES=informed-news-postgres INFORMED_NEWS_POSTGRES_ENV_FILE=./mvp/postgres.env INFORMED_NEWS_ENV_FILE=./mvp/.env docker compose up -d --build
 ```
 
@@ -118,7 +119,7 @@ chmod 600 /opt/informed-news/qa.env
 - Compose interpolates `$` in env values. A bcrypt `MVP_PASSWORD_HASH` must be single-quoted, or each `$` written as `$$`, or login breaks. Generate the hash the same way `mvp/.env.example` describes, on the VPS. Put only the hash in this file. The password itself does not go in the repo, a pull request, a ticket, or a log.
 - Do not set `INFORMED_NEWS_DATA_VOLUME` to `informed-news-data`. That name is the live volume.
 - Set `INFORMED_NEWS_INSTANCE=qa` and `POSTGRES_DB=informed_news_qa`. Do not set `POSTGRES_DB` to `informed_news`. That name is the live database. QA refuses to open it.
-- The QA app joins the existing network `informed-news-db` (`external: true`). It does not create `informed-news-qa-db`. `POSTGRES_HOST=postgres` is the live Postgres alias on that network. `POSTGRES_DB` is `informed_news_qa`. Do not set `POSTGRES_DB=informed_news`. QA refuses that database.
+- The QA app joins the external network `informed-news-db`. It does not create `informed-news-qa-db`. See [Database network](#database-network). `POSTGRES_HOST=postgres` is the live Postgres alias on that network. `POSTGRES_DB` is `informed_news_qa`. Do not set `POSTGRES_DB=informed_news`. QA refuses that database. Do not set `INFORMED_NEWS_DB_NETWORK` or `INFORMED_NEWS_DB_EXTERNAL`. Those names are unused. If an existing `qa.env` already has them, leave those two lines. Do not print the file.
 - The QA project includes `compose.postgres.informed-news-qa.yaml`. That file defines no Postgres service. `docker compose --env-file /opt/informed-news/qa.env -p informed-news-qa up postgres` exits with `no such service: postgres`. A bare `up`, naming `app`, `COMPOSE_PROFILES=informed-news-postgres`, and `COMPOSE_PROFILES=informed-news-qa-postgres` do not start Postgres either.
 - Do not point QA at `INFORMED_NEWS_POSTGRES_ENV_FILE`. QA does not start Postgres.
 
@@ -135,8 +136,6 @@ REFRESH_INTERVAL_HOURS=off
 MVP_PASSWORD_HASH='<bcrypt hash>'
 SESSION_SECRET=<long random string>
 INFORMED_NEWS_INSTANCE=qa
-INFORMED_NEWS_DB_NETWORK=informed-news-db
-INFORMED_NEWS_DB_EXTERNAL=true
 POSTGRES_USER=informed_news
 POSTGRES_PASSWORD=<postgres password>
 POSTGRES_DB=informed_news_qa
@@ -225,7 +224,25 @@ docker compose --env-file /opt/informed-news/qa.env -p informed-news-qa down
 docker volume rm informed-news-qa-data
 ```
 
-`docker volume rm` is optional and names only the QA volume. Never remove `informed-news-data`. Do not run `docker compose down` without `-p informed-news-qa`; that stops the live project.
+`docker volume rm` is optional and names only the QA volume. Never remove `informed-news-data`. Do not run `docker compose down` without `-p informed-news-qa`; that stops the live project. QA `down` does not remove `informed-news-db`.
+
+## Database network
+
+`informed-news-db` is an external network. Neither the live project nor the QA project creates it, and `docker compose down` does not remove it. Live `down` can run while the QA app is attached. QA `down` can run while live Postgres and the live app are attached. Each project stays connected to the network the other did not tear down.
+
+The VPS already has this network. Do not create a second one. On a new machine, create it once before the first `up`:
+
+```bash
+docker network create informed-news-db
+```
+
+Confirm it before the first `up` after this change:
+
+```bash
+docker network inspect informed-news-db
+```
+
+If that inspect fails, create the network with the command above. Do not run `docker network rm informed-news-db` while Postgres or either app is attached. Applying this on the VPS waits for Phil's approval. This repo change does not SSH, does not edit the server `.env`, and does not delete it.
 
 ## Postgres env
 

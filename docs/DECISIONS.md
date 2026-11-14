@@ -2,6 +2,14 @@
 
 Binding choices for Informed News. Newest first. When one of these changes, update this file in the same change as [ROADMAP.md](ROADMAP.md) and Jira. What the product does now, in plain language, is [PRODUCT_SPEC.md](PRODUCT_SPEC.md). Pipeline detail remains in [NEWS-84](https://informedcrew.atlassian.net/browse/NEWS-84), [TRIAGE.md](TRIAGE.md), and [BRIEF.md](BRIEF.md). The target is [VISION.md](VISION.md).
 
+## 2026-11-14 — informed-news-db belongs to neither Compose project (NEWS-232)
+
+**Decision:** Network `informed-news-db` is external. Create it once with `docker network create informed-news-db`. Live `docker compose down` does not remove it, and QA `docker compose down` does not remove it either, so either project can be torn down while the other stays attached. The VPS already has this network. Do not create a second one. This change does not edit the server, does not edit the server env file, and does not delete it. Applying it on the VPS waits for Phil's approval.
+
+**Why:** The live project owned the network, so `docker compose down` tried to remove it and failed while the QA app was still attached.
+
+**What it rules out:** A project-owned database network, `down` removing `informed-news-db`, and a separate QA database network.
+
 ## 2026-11-14 — QA compose cannot start Postgres (NEWS-231)
 
 **Decision:** The QA Compose project does not include a Postgres service. `docker compose -p informed-news-qa up postgres` exits with `no such service: postgres`. A bare QA `up` still starts no Postgres. `COMPOSE_PROFILES=informed-news-postgres` and `COMPOSE_PROFILES=informed-news-qa-postgres` do not add one. Live Postgres still starts only when `COMPOSE_PROFILES=informed-news-postgres` on project `informed-news`. QA still uses database `informed_news_qa` and `instanceGuard` still refuses `informed_news`. This supersedes the sentence in the 2026-11-14 QA database entry that said naming `postgres` starts a second Postgres. That entry stays as the record of the env layout. This change does not edit the server, does not edit the server env file, and does not delete it.

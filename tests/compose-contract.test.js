@@ -305,6 +305,18 @@ function configuredPort(config) {
 	return match[1];
 }
 
+function declaredNetwork(config, name) {
+	const parts = config.split(/\nnetworks:\n/);
+	assert.equal(parts.length, 2, 'rendered config should have one networks block');
+	const section = parts[1];
+	const header = `  ${name}:\n`;
+	const start = section.indexOf(header);
+	assert.ok(start !== -1, `missing network ${name}`);
+	const rest = section.slice(start + header.length);
+	const next = rest.search(/\n  [A-Za-z0-9_-]+:\n|\nvolumes:\n/);
+	return rest.slice(0, next === -1 ? undefined : next);
+}
+
 describe('QA instance rendered by docker compose', { skip: composeCli() ? false : 'docker compose is not installed' }, () => {
 	it('keeps the live volume, port, and image when the new vars are unset', () => {
 		const config = renderedCompose({}, undefined);
@@ -391,18 +403,12 @@ describe('NEWS-230 postgres env and QA compose contract', { skip: composeCli() ?
 		);
 	});
 
-	it('QA joins the external live db network when configured', () => {
-		const config = renderedCompose(
-			{
-				INFORMED_NEWS_DB_NETWORK: 'informed-news-db',
-				INFORMED_NEWS_DB_EXTERNAL: 'true',
-				COMPOSE_PROFILES: '',
-			},
-			QA_PROJECT,
-		);
-		assert.match(config, /name: informed-news-db/);
-		assert.match(config, /external: true/);
-		assert.match(config, /informed-news-db/);
+	it('QA joins informed-news-db without a project-owned network', () => {
+		const config = renderedCompose({ COMPOSE_PROFILES: '' }, QA_PROJECT);
+		const network = declaredNetwork(config, 'informed-news-db');
+		assert.match(network, /name: informed-news-db$/m);
+		assert.match(network, /external: true/);
+		assert.doesNotMatch(network, /informed-news-qa-db/);
 	});
 
 	it('live postgres profile renders only POSTGRES_* keys on the postgres service', () => {
@@ -458,12 +464,29 @@ describe('NEWS-231 QA compose cannot start Postgres', { skip: composeCli() ? fal
 		});
 	}
 
-	it('live profile still renders the live Postgres service', () => {
+	it('live profile still renders the live Postgres service and an external db network', () => {
 		const services = renderedComposeServices({}, undefined);
 		assert.match(services, /^app\npostgres\n$|^postgres\napp\n$/);
 		const config = renderedCompose({}, undefined);
 		assert.equal(configuredPostgresVolume(config), 'informed-news-postgres');
+		const network = declaredNetwork(config, 'informed-news-db');
+		assert.match(network, /name: informed-news-db$/m);
+		assert.match(network, /external: true/);
 	});
+});
+
+describe('NEWS-232 informed-news-db is external', { skip: composeCli() ? false : 'docker compose is not installed' }, () => {
+	for (const project of [undefined, QA_PROJECT]) {
+		const label = project ?? LIVE_PROJECT;
+		it(`project ${label} joins informed-news-db and does not own it`, () => {
+			const config = renderedCompose({ COMPOSE_PROFILES: project ? '' : 'informed-news-postgres' }, project);
+			const network = declaredNetwork(config, 'informed-news-db');
+			assert.match(network, /name: informed-news-db$/m);
+			assert.match(network, /external: true/);
+			assert.doesNotMatch(config, /informed-news-qa-db/);
+			assert.doesNotMatch(network, /external:\s*false/);
+		});
+	}
 });
 
 describe('QA instance runbook', () => {
@@ -573,8 +596,6 @@ describe('NEWS-230 runbook postgres env', () => {
 		const qaNext = runbook.indexOf('\n## ', qaStart + 1);
 		const qaSection = runbook.slice(qaStart, qaNext);
 		for (const phrase of [
-			'INFORMED_NEWS_DB_NETWORK=informed-news-db',
-			'INFORMED_NEWS_DB_EXTERNAL=true',
 			'POSTGRES_HOST=postgres',
 			'compose.postgres.informed-news-qa.yaml',
 			'no such service: postgres',
@@ -583,6 +604,15 @@ describe('NEWS-230 runbook postgres env', () => {
 			'do not start Postgres',
 		]) {
 			assert.ok(qaSection.includes(phrase), `QA section missing: ${phrase}`);
+		}
+		for (const phrase of [
+			'## Database network',
+			'docker network create informed-news-db',
+			'does not remove it',
+			'already has this network',
+			"Phil's approval",
+		]) {
+			assert.ok(runbook.includes(phrase), `runbook missing: ${phrase}`);
 		}
 		assert.doesNotMatch(
 			qaSection,

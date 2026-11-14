@@ -1,5 +1,5 @@
 # Informed News. Separate from Nanobot.
-# Local or VPS, after the env file and the nanobot-mem0 network exist:
+# Local or VPS, after the env file and the nanobot-mem0 and informed-news-db networks exist:
 #   docker compose up -d --build
 # SEARXNG_URL and TOPIC_SEARCH_ENABLED come from the env file only.
 # Unset SEARXNG_URL stays unset (Google News RSS only). Do not default it to localhost.
@@ -54,5 +54,5 @@ networks:
     external: true
     name: nanobot-mem0
   informed-news-db:
-    name: ${INFORMED_NEWS_DB_NETWORK:-${COMPOSE_PROJECT_NAME:-informed-news}-db}
-    external: ${INFORMED_NEWS_DB_EXTERNAL:-false}
+    name: informed-news-db
+    external: true

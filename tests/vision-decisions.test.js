@@ -443,4 +443,18 @@ describe('NEWS-165 vision and decisions', () => {
 		assert.match(news231, /instanceGuard/);
 		assert.match(news231, /does not edit the server/);
 	});
+
+	it('records that informed-news-db is external (NEWS-232)', () => {
+		const decisions = read('docs/DECISIONS.md');
+		const entries = decisions.split(/^## /m).slice(1);
+		const news232 = entries.find((entry) => entry.includes('NEWS-232'));
+		assert.ok(news232, 'NEWS-232 decision missing');
+		assert.match(news232, /\*\*Decision:\*\*/);
+		assert.match(news232, /\*\*Why:\*\*/);
+		assert.match(news232, /\*\*What it rules out:\*\*/);
+		assert.match(news232, /docker network create informed-news-db/);
+		assert.match(news232, /does not remove it/);
+		assert.match(news232, /does not edit the server/);
+		assert.match(news232, /Phil's approval/);
+	});
 });
