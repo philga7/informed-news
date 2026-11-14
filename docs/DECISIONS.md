@@ -2,6 +2,16 @@
 
 Binding choices for Informed News. Newest first. When one of these changes, update this file in the same change as [ROADMAP.md](ROADMAP.md) and Jira. What the product does now, in plain language, is [PRODUCT_SPEC.md](PRODUCT_SPEC.md). Pipeline detail remains in [NEWS-84](https://informedcrew.atlassian.net/browse/NEWS-84), [TRIAGE.md](TRIAGE.md), and [BRIEF.md](BRIEF.md). The target is [VISION.md](VISION.md).
 
+## 2026-11-13 — No pull request approval; merges on Phil's ship word
+
+**Decision:** No pull request approval is required. In [`.github/rulesets/main-requires-ci.json`](../.github/rulesets/main-requires-ci.json), `required_approving_review_count` is 0 and `require_last_push_approval` is false. That matches live ruleset 24903925, which Phil changed on 2026-11-13. Merges happen on Phil's ship word, with the required checks (**MVP build & typecheck**, **PR title**) green. The admin bypass is not used for merges. Before merging, confirm the pull request shows as mergeable without the admin bypass.
+
+This supersedes the approval count in [2026-11-01 — main requires a PR, one approval, PR title and build checks; squash by PR title; no bot bypass (NEWS-178)](#2026-11-01--main-requires-a-pr-one-approval-pr-title-and-build-checks-squash-by-pr-title-no-bot-bypass-news-178). A pull request, those two checks, squash-only merges, and the blocks on force-push and deleting `main` stay. The admin role stays a pull-request bypass actor in the ruleset file. Merges do not use it. No NEWS key. [VISION.md](VISION.md) is unchanged. This is dev tooling, not the product direction.
+
+**Why:** The checked-in file still required one approval of the latest push. `scripts/apply-repo-settings.sh` would put that old rule back over the live ruleset.
+
+**What it rules out:** Requiring an approving review, merging through the admin bypass, and merging while **MVP build & typecheck** or **PR title** is missing, pending, or red.
+
 ## 2026-11-12 — Dashboard home is one screen
 
 **Decision:** The dashboard home is one screen of cards, in this order, top to bottom: a “N trackers have news” line, then Breaking, then Developing stories, then Morning (BLUF, weather, market brief, OSINT brief), then the CFP (Citizen Free Press) roundups, then My topics.
@@ -262,7 +272,7 @@ This replaces the [NEWS-180](https://informedcrew.atlassian.net/browse/NEWS-180)
 
 ## 2026-11-01 — main requires a PR, one approval, PR title and build checks; squash by PR title; no bot bypass (NEWS-178)
 
-**Decision:** `main` requires a pull request, one approval, approval of the latest push, the **PR title** check, and **MVP build & typecheck**. A later push dismisses earlier approvals. Only squash merges are allowed, and the squash commit title is the pull request title. Force-pushes and deleting `main` are blocked. The only human bypass is the repository admin role, and only when merging a pull request. No bot or GitHub App is a bypass actor. The release deploy key remains a bypass actor so the release job can still push `chore(release)`. Phil answered the grill with the recommended answers (Sunday 2026-11-01). The deploy key is kept in addition so [NEWS-124](https://informedcrew.atlassian.net/browse/NEWS-124)'s release push still has a bypass once a pull request is required.
+**Decision:** `main` requires a pull request, one approval, approval of the latest push, the **PR title** check, and **MVP build & typecheck**. A later push dismisses earlier approvals. Only squash merges are allowed, and the squash commit title is the pull request title. Force-pushes and deleting `main` are blocked. The only human bypass is the repository admin role, and only when merging a pull request. No bot or GitHub App is a bypass actor. The release deploy key remains a bypass actor so the release job can still push `chore(release)`. Phil answered the grill with the recommended answers (Sunday 2026-11-01). The deploy key is kept in addition so [NEWS-124](https://informedcrew.atlassian.net/browse/NEWS-124)'s release push still has a bypass once a pull request is required. The approval count is superseded by [2026-11-13 — No pull request approval; merges on Phil's ship word](#2026-11-13--no-pull-request-approval-merges-on-phils-ship-word).
 
 1. **Required checks:** `MVP build & typecheck` and `PR title`, both from GitHub Actions.
 2. **Pull request:** required. Without it a green branch can land on `main` by push.

@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 const root = join(fileURLToPath(new URL('.', import.meta.url)), '..');
 const read = (path) => readFileSync(join(root, path), 'utf8');
 
-describe('NEWS-178 main requires a PR, one approval, PR title, and squash by title', () => {
+describe('NEWS-178 main requires a PR, PR title, and squash by title', () => {
 	it('requires both GitHub Actions checks on the default branch', () => {
 		const ruleset = JSON.parse(read('.github/rulesets/main-requires-ci.json'));
 		assert.equal(ruleset.name, 'main requires CI');
@@ -41,12 +41,12 @@ describe('NEWS-178 main requires a PR, one approval, PR title, and squash by tit
 		}
 	});
 
-	it('requires one approval of the last push, dismisses stale approvals, and allows squash only', () => {
+	it('requires no approving review, dismisses stale approvals, and allows squash only', () => {
 		const ruleset = JSON.parse(read('.github/rulesets/main-requires-ci.json'));
 		const pullRequest = ruleset.rules.find((rule) => rule.type === 'pull_request');
 		assert.ok(pullRequest, 'pull_request');
-		assert.equal(pullRequest.parameters.required_approving_review_count, 1);
-		assert.equal(pullRequest.parameters.require_last_push_approval, true);
+		assert.equal(pullRequest.parameters.required_approving_review_count, 0);
+		assert.equal(pullRequest.parameters.require_last_push_approval, false);
 		assert.equal(pullRequest.parameters.dismiss_stale_reviews_on_push, true);
 		assert.deepEqual(pullRequest.parameters.required_reviewers, []);
 		assert.deepEqual(pullRequest.parameters.allowed_merge_methods, ['squash']);
@@ -125,7 +125,8 @@ printf '%s\\n' '{"squash_merge_commit_title":"COMMIT_OR_PR_TITLE","squash_merge_
 		const contributing = read('CONTRIBUTING.md');
 		assert.match(contributing, /\*\*PR title\*\* is required/);
 		assert.doesNotMatch(contributing, /once it is added/);
-		assert.match(contributing, /One approving review/);
+		assert.match(contributing, /No approving review is required/);
+		assert.match(contributing, /admin bypass is not used for merges/);
 		assert.match(contributing, /scripts\/apply-repo-settings\.sh --apply/);
 		assert.match(contributing, /squash_merge_commit_title: PR_TITLE/);
 		assert.match(contributing, /squash_merge_commit_message=PR_BODY/);
