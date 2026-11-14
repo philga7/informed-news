@@ -116,6 +116,7 @@ chmod 600 /opt/informed-news/qa.env
 
 - Compose interpolates `$` in env values. A bcrypt `MVP_PASSWORD_HASH` must be single-quoted, or each `$` written as `$$`, or login breaks. Generate the hash the same way `mvp/.env.example` describes, on the VPS. Put only the hash in this file. The password itself does not go in the repo, a pull request, a ticket, or a log.
 - Do not set `INFORMED_NEWS_DATA_VOLUME` to `informed-news-data`. That name is the live volume.
+- Set `INFORMED_NEWS_INSTANCE=qa` and `POSTGRES_DB=informed_news_qa`. Do not set `POSTGRES_DB` to `informed_news`. That name is the live database. QA refuses to open it.
 
 Placeholders only:
 
@@ -129,6 +130,9 @@ SESSION_COOKIE_NAME=mvp_qa_session
 REFRESH_INTERVAL_HOURS=off
 MVP_PASSWORD_HASH='<bcrypt hash>'
 SESSION_SECRET=<long random string>
+INFORMED_NEWS_INSTANCE=qa
+POSTGRES_DB=informed_news_qa
+POSTGRES_PASSWORD=<postgres password>
 OLLAMA_API_KEY=
 TYPESAFE_API_KEY=
 ```
@@ -215,6 +219,18 @@ docker volume rm informed-news-qa-data
 
 `docker volume rm` is optional and names only the QA volume. Never remove `informed-news-data`. Do not run `docker compose down` without `-p informed-news-qa`; that stops the live project.
 
+## Postgres backups
+
+The Compose file defines the Postgres container. It does not start that container on the VPS. Standing Postgres up on the VPS is a later step and needs Phil's approval.
+
+A nightly dump writes `informed-news-YYYY-MM-DD.sql` into a directory you pass to `scripts/pg-dump.sh`. Pass the directory that already holds the JSON data tarball, so the dump lands next to that tarball. This repo does not name that directory. The script exits if the directory is missing. It dumps the live database `informed_news` with `docker compose exec -T postgres pg_dump`. Do not install the cron on the VPS in this change. Do not put the database password in the command line. The container reads `POSTGRES_PASSWORD` from the env file.
+
+From the checkout, after Postgres is running:
+
+```bash
+scripts/pg-dump.sh <directory-that-holds-the-json-tarball>
+```
+
 ## Out of scope
 
-Off-box backups and key rotation. Standing up the QA instance on the VPS is a separate operator step. The repo change does not SSH to the host or create the instance.
+Key rotation. Standing up the QA instance on the VPS is a separate operator step. Standing up Postgres on the VPS is a separate operator step and needs Phil's approval. The repo change does not SSH to the host or create either instance.

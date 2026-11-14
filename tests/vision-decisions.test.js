@@ -358,4 +358,44 @@ describe('NEWS-165 vision and decisions', () => {
 		assert.ok(nov13Notes, '2026-11-13 what\'s-new entry missing');
 		assert.match(nov13Notes, /\*\*No user-visible change\.\*\*/);
 	});
+
+	it('records Postgres as the chosen data layer and keeps the proposed Supabase entry', () => {
+		const decisions = read('docs/DECISIONS.md');
+		const entries = decisions.split(/^## /m).slice(1);
+		const chosen = entries.find(
+			(entry) => entry.startsWith('2026-11-14') && entry.includes('Postgres is the data layer'),
+		);
+		assert.ok(chosen, '2026-11-14 Postgres decision missing');
+		assert.match(chosen, /\*\*Decision:\*\*/);
+		assert.match(chosen, /\*\*Why:\*\*/);
+		assert.match(chosen, /\*\*What it rules out:\*\*/);
+		assert.match(chosen, /SQLite is not chosen/);
+		assert.match(chosen, /Supabase is not chosen/);
+		assert.match(chosen, /data-layer memo's SQLite recommendation/);
+		assert.match(chosen, /2026-11-12 — Data layer is proposed/);
+		assert.match(chosen, /informed_news_qa/);
+		assert.match(chosen, /does not stand Postgres up on the VPS/);
+		assert.match(chosen, /informed-news-YYYY-MM-DD\.sql/);
+
+		const proposed = entries.find((entry) => entry.startsWith('2026-11-12 — Data layer is proposed'));
+		assert.ok(proposed, 'proposed Supabase entry was removed');
+		assert.match(proposed, /PROPOSED/);
+		assert.match(proposed, /not decided/);
+
+		const vision = read('docs/VISION.md');
+		assert.match(vision, /The data layer is Postgres on the VPS/);
+		assert.match(vision, /SQLite and Supabase are not chosen/);
+		assert.doesNotMatch(vision, /data layer is proposed there, not decided/);
+
+		const agents = read('AGENTS.md');
+		assert.match(agents, /Postgres is chosen over SQLite and Supabase/);
+		assert.match(agents, /data-layer memo's SQLite recommendation is superseded/);
+		assert.match(agents, /Do not call Supabase/);
+		assert.match(agents, /Using SQLite for stories, Morning items, or CFP roundups/);
+
+		const roadmap = read('docs/ROADMAP.md');
+		assert.match(roadmap, /NEWS-224/);
+		assert.match(roadmap, /does not become current next/);
+		assert.match(roadmap, /\*\*Current next\*\* is the UI build/);
+	});
 });

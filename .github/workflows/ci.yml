@@ -12,6 +12,22 @@ jobs:
   validate:
     name: MVP build & typecheck
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: ci-dummy
+          POSTGRES_USER: informed_news
+          POSTGRES_DB: informed_news_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U informed_news -d informed_news_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      INFORMED_NEWS_TEST_DATABASE_URL: postgres://informed_news:ci-dummy@127.0.0.1:5432/informed_news_test
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -94,6 +110,10 @@ jobs:
           (umask 077; cat > "$env_file" <<'EOF'
           MVP_PASSWORD=ci-dummy
           SESSION_SECRET=ci-dummy-secret
+          POSTGRES_PASSWORD=ci-dummy
+          POSTGRES_USER=informed_news
+          POSTGRES_DB=informed_news
+          INFORMED_NEWS_INSTANCE=live
           REFRESH_INTERVAL_HOURS=off
           TOPIC_SEARCH_ENABLED=true
           SEARXNG_URL=http://searxng:8080

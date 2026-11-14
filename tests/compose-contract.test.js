@@ -164,11 +164,21 @@ function renderedCompose(extraEnv, project) {
 	return result.stdout;
 }
 
-function configuredVolume(config) {
+function volumeNames(config) {
 	const volumes = config.split(/^volumes:\s*$/m)[1] ?? '';
-	const match = volumes.match(/^\s+name:\s*(\S+)\s*$/m);
-	assert.ok(match, 'rendered config has no volume name');
-	return match[1];
+	return [...volumes.matchAll(/^\s+name:\s*(\S+)\s*$/gm)].map((match) => match[1]);
+}
+
+function configuredVolume(config) {
+	const data = volumeNames(config).find((name) => name.endsWith('-data'));
+	assert.ok(data, 'rendered config has no data volume name');
+	return data;
+}
+
+function configuredPostgresVolume(config) {
+	const postgres = volumeNames(config).find((name) => name.endsWith('-postgres'));
+	assert.ok(postgres, 'rendered config has no postgres volume name');
+	return postgres;
 }
 
 function configuredPort(config) {
@@ -181,6 +191,8 @@ describe('QA instance rendered by docker compose', { skip: composeCli() ? false 
 	it('keeps the live volume, port, and image when the new vars are unset', () => {
 		const config = renderedCompose({}, undefined);
 		assert.equal(configuredVolume(config), LIVE_VOLUME);
+		assert.equal(configuredPostgresVolume(config), 'informed-news-postgres');
+		assert.notEqual(configuredPostgresVolume(config), LIVE_VOLUME);
 		assert.equal(configuredPort(config), LIVE_PORT);
 		assert.match(config, /informed-news:local/);
 		assert.doesNotMatch(config, /informed-news:qa/);
@@ -190,6 +202,8 @@ describe('QA instance rendered by docker compose', { skip: composeCli() ? false 
 		const config = renderedCompose({}, QA_PROJECT);
 		assert.equal(configuredVolume(config), QA_VOLUME);
 		assert.notEqual(configuredVolume(config), LIVE_VOLUME);
+		assert.equal(configuredPostgresVolume(config), 'informed-news-qa-postgres');
+		assert.notEqual(configuredPostgresVolume(config), 'informed-news-postgres');
 		assert.match(config, /^name: informed-news-qa$/m);
 	});
 
@@ -203,6 +217,34 @@ describe('QA instance rendered by docker compose', { skip: composeCli() ? false 
 		assert.equal(configuredPort(config), QA_PORT);
 		assert.notEqual(configuredPort(config), LIVE_PORT);
 		assert.match(config, /informed-news:qa/);
+	});
+});
+
+describe('NEWS-224 postgres compose service', () => {
+	it('caps memory, sets shared_buffers, and does not publish the database port', () => {
+		const contents = composeText();
+		const start = contents.indexOf('\n  postgres:\n');
+		assert.ok(start !== -1, 'missing postgres service');
+		const rest = contents.slice(start);
+		const end = rest.indexOf('\nvolumes:\n');
+		assert.ok(end !== -1, 'postgres service must stay above the volumes block');
+		const service = rest.slice(0, end);
+		assert.match(service, /image: postgres:16-alpine/);
+		assert.match(service, /mem_limit: 512m/);
+		assert.match(service, /shm_size: 256mb/);
+		assert.match(service, /shared_buffers=128MB/);
+		assert.match(service, /POSTGRES_USER: informed_news/);
+		assert.doesNotMatch(service, /^\s*ports:/m);
+		assert.doesNotMatch(service, /POSTGRES_PASSWORD/);
+		assert.match(
+			contents,
+			/\$\{INFORMED_NEWS_POSTGRES_VOLUME:-\$\{COMPOSE_PROJECT_NAME:-informed-news\}-postgres\}/,
+		);
+		assert.match(
+			contents,
+			/name: \$\{INFORMED_NEWS_DATA_VOLUME:-\$\{COMPOSE_PROJECT_NAME:-informed-news\}-data\}/,
+		);
+		assert.doesNotMatch(contents, /informed-news-qa/);
 	});
 });
 
