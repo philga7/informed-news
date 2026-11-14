@@ -23,6 +23,7 @@ services:
       - informed-news-data:/app/mvp/data
     networks:
       - nanobot-mem0
+      - informed-news-db
     restart: unless-stopped
     healthcheck:
       test:
@@ -37,13 +38,44 @@ services:
       retries: 3
       start_period: 20s
 
+  postgres:
+    image: postgres:16-alpine
+    env_file:
+      - ${INFORMED_NEWS_ENV_FILE:-/opt/informed-news/.env}
+    environment:
+      POSTGRES_USER: informed_news
+    command: ["postgres", "-c", "shared_buffers=128MB"]
+    mem_limit: 512m
+    shm_size: 256mb
+    volumes:
+      - informed-news-postgres:/var/lib/postgresql/data
+    networks:
+      - informed-news-db
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U informed_news",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
 volumes:
   informed-news-data:
     # Unset on project informed-news stays informed-news-data.
     # Any other project name gets its own volume, so -p cannot mount the live one.
     name: ${INFORMED_NEWS_DATA_VOLUME:-${COMPOSE_PROJECT_NAME:-informed-news}-data}
+  informed-news-postgres:
+    # Unset on project informed-news stays informed-news-postgres.
+    # A second project name gets its own volume and cannot mount the live one.
+    name: ${INFORMED_NEWS_POSTGRES_VOLUME:-${COMPOSE_PROJECT_NAME:-informed-news}-postgres}
 
 networks:
   nanobot-mem0:
     external: true
     name: nanobot-mem0
+  informed-news-db:
+    name: ${INFORMED_NEWS_DB_NETWORK:-${COMPOSE_PROJECT_NAME:-informed-news}-db}

@@ -72,7 +72,8 @@ Do **not** treat `_legacy/` (including `_legacy/mvp-web`) as the primary product
 
 ### Data & API
 
-- Persist via `mvp/server` store helpers — flat JSON files
+- Persist the running Brief via `mvp/server` store helpers — flat JSON files
+- New UI records (stories and entries, Morning items, CFP roundups) go through the Postgres store. App code calls that store and does not write SQL. Postgres is chosen over SQLite and Supabase. The data-layer memo's SQLite recommendation is superseded, and the 2026-11-12 proposed Supabase entry is superseded. Do not call Supabase. Do not stand Postgres up on the VPS without Phil's approval. The password stays in `POSTGRES_PASSWORD` in the env file, not in the repo.
 - Protect mutating/list APIs with session middleware (`requireApiSession`)
 - Env vars load from `mvp/.env` (see `mvp/.env.example`)
 - Dual citations on articles when scrape succeeds (`cfpUrl`, `publisherUrl`)
@@ -106,6 +107,7 @@ Do **not** treat `_legacy/` (including `_legacy/mvp-web`) as the primary product
 
 - Making `_legacy/` or `_legacy/mvp-web` the default `npm run dev` target
 - Calling Supabase from the live path
+- Using SQLite for stories, Morning items, or CFP roundups
 - Porting full OSINT workflows into the product without a new epic decision
 - Committing `mvp/data/*.json` or `.env` files
 - Defaulting the product UI at `kite.kagi.com` CC BY-NC data after owned-brief work (NEWS-44)

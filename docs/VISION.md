@@ -49,4 +49,4 @@ The site has to beat Phil's current setup, which is Telegram pings plus developi
 
 Telegram stays for pings. Each ping deep-links to the new entry on the site.
 
-The home screen, the story page, the per-tracker new count, CFP, and the morning messages are recorded in [DECISIONS.md](DECISIONS.md). The data layer is proposed there, not decided. Feature tickets stay on hold until the UI build tickets are sequenced ([ROADMAP.md](ROADMAP.md)).
+The home screen, the story page, the per-tracker new count, CFP, and the morning messages are recorded in [DECISIONS.md](DECISIONS.md). The data layer is Postgres on the VPS for stories and entries, Morning items, and CFP roundups. SQLite and Supabase are not chosen. The dashboard UI is not built yet. Feature tickets stay on hold until the UI build tickets are sequenced ([ROADMAP.md](ROADMAP.md)).

@@ -2,6 +2,14 @@
 
 Binding choices for Informed News. Newest first. When one of these changes, update this file in the same change as [ROADMAP.md](ROADMAP.md) and Jira. What the product does now, in plain language, is [PRODUCT_SPEC.md](PRODUCT_SPEC.md). Pipeline detail remains in [NEWS-84](https://informedcrew.atlassian.net/browse/NEWS-84), [TRIAGE.md](TRIAGE.md), and [BRIEF.md](BRIEF.md). The target is [VISION.md](VISION.md).
 
+## 2026-11-14 — Postgres is the data layer (NEWS-224)
+
+**Decision:** Postgres is chosen for the new UI records: stories and their dated entries (a hub, or a branch that points at its hub, with sources on the entry), Morning items (BLUF, weather, market, OSINT), and CFP roundup items (one merged list, each item carrying its roundup time). SQLite is not chosen. Supabase is not chosen. This supersedes the data-layer memo's SQLite recommendation and the [2026-11-12 — Data layer is proposed](#2026-11-12--data-layer-is-proposed) entry. That entry stays below as the record of the earlier proposal. The live database name is `informed_news`. QA uses `informed_news_qa` and refuses the live database. The password is `POSTGRES_PASSWORD` in the env file. Compose adds a Postgres container capped at 512 MB, with `shared_buffers` at 128MB, its own volume, and no published port. A nightly `pg_dump` writes `informed-news-YYYY-MM-DD.sql` into the directory the operator passes. That directory is the one that already holds the JSON data tarball, and this repo does not name it. Existing JSON stores under `mvp/data` stay. This change does not stand Postgres up on the VPS.
+
+**Why:** Phil chose Postgres on November 13, 2026, so developing stories, Morning items, and CFP roundups can be queried. The data-layer memo had recommended SQLite on the existing volume. The November 12 note had left Supabase as a proposal through Phil's Vercel account. The JSON files remain the live Brief store until a later ticket reads the new tables.
+
+**What it rules out:** SQLite for these records, calling Supabase, migrating the JSON stores in this change, publishing the database port, putting the password in the repo, standing Postgres up on the VPS without Phil's approval, and inventing the directory of the existing JSON tarball.
+
 ## 2026-11-13 — No pull request approval; merges on Phil's ship word
 
 **Decision:** No pull request approval is required. In [`.github/rulesets/main-requires-ci.json`](../.github/rulesets/main-requires-ci.json), `required_approving_review_count` is 0 and `require_last_push_approval` is false. That matches live ruleset 24903925, which Phil changed on 2026-11-13. Merges happen on Phil's ship word, with the required checks (**MVP build & typecheck**, **PR title**) green. The admin bypass is not used for merges. Before merging, confirm the pull request shows as mergeable without the admin bypass.
