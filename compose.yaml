@@ -6,8 +6,9 @@
 # VPS env file value: SEARXNG_URL=http://searxng:8080 on Docker network nanobot-mem0.
 name: informed-news
 
-# The include path follows the project name. Only project informed-news
-# gets a Postgres service. Any other project name includes a file with none.
+# Only `informed-news` and `informed-news-qa` are supported project names.
+# `informed-news` includes the Postgres service. `informed-news-qa` includes a file with none.
+# Any other name fails because its include file is missing.
 include:
   - path: compose.postgres.${COMPOSE_PROJECT_NAME:-informed-news}.yaml
 
@@ -46,7 +47,8 @@ services:
 volumes:
   informed-news-data:
     # Unset on project informed-news stays informed-news-data.
-    # Any other project name gets its own volume, so -p cannot mount the live one.
+    # Project informed-news-qa gets its own volume, so -p cannot mount the live one.
+    # Any other project name fails first, because its include file is missing.
     name: ${INFORMED_NEWS_DATA_VOLUME:-${COMPOSE_PROJECT_NAME:-informed-news}-data}
 
 networks:
