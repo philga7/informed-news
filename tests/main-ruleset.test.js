@@ -135,7 +135,9 @@ printf '%s\\n' '{"squash_merge_commit_title":"COMMIT_OR_PR_TITLE","squash_merge_
 	it('CLAUDE.md says the builder never approves, merges, or enables auto-merge', () => {
 		const claudeMd = read('CLAUDE.md');
 		assert.match(claudeMd, /never approves, never merges, and never enables auto-merge/);
-		assert.match(claudeMd, /Its pull requests need Phil's approval/);
+		assert.match(claudeMd, /No GitHub review approval is required/);
+		assert.match(claudeMd, /shows as mergeable without the admin bypass/);
+		assert.doesNotMatch(claudeMd, /need Phil's approval/);
 	});
 
 	it('DECISIONS records the ruleset choice and leaves the product direction unchanged', () => {
