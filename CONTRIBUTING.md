@@ -78,7 +78,7 @@ The repository ruleset **main requires CI** (Settings → Rules → Rulesets, id
 - Squash as the only merge method onto `main`. The squash commit title is the pull request title.
 - No force-push and no deletion of `main`.
 
-The repository admin role (GitHub base role id 5) may bypass these rules when merging a pull request, and only then. As of 2026-11-13 that bypass is not used for merges. No approving review is required, so a pull request merges on Phil's ship word when **MVP build & typecheck** and **PR title** are green. Agents never use that bypass. No bot and no GitHub App is a bypass actor.
+The repository admin role (GitHub base role id 5) may bypass these rules when merging a pull request, and only then. As of 2026-11-13 that bypass is not used for merges. Agents never use that bypass. No bot and no GitHub App is a bypass actor.
 
 The Release job checks out with the write deploy key **semantic-release (NEWS-124)**, whose private half is the Actions secret `RELEASE_DEPLOY_KEY`, so its `chore(release)` commit and tag push over SSH. That deploy key is a bypass actor (`bypass_mode: always`) so the pull-request rule does not stop the release commit. GitHub does not allow the GitHub Actions app as a ruleset bypass on a personal-account repo, so `GITHUB_TOKEN` can't push the release commit.
 

@@ -150,6 +150,25 @@ printf '%s\\n' '{"squash_merge_commit_title":"COMMIT_OR_PR_TITLE","squash_merge_
 		assert.match(entry, /Bots must not merge their own green pull requests/);
 		assert.match(entry, /\[VISION\.md\]\(VISION\.md\) is unchanged/);
 		assert.match(entry, /\*\*What it rules out:\*\*/);
+		assert.match(
+			entry,
+			/superseded by \[2026-11-13 — No pull request approval; merges on Phil's ship word\]\(#2026-11-13--no-pull-request-approval-merges-on-phils-ship-word\)/,
+		);
+	});
+
+	it('DECISIONS records that no pull request approval is required', () => {
+		const decisions = read('docs/DECISIONS.md');
+		const heading = "## 2026-11-13 — No pull request approval; merges on Phil's ship word";
+		assert.ok(decisions.includes(heading));
+		const next = decisions.indexOf('\n## ', decisions.indexOf(heading) + heading.length);
+		const entry = decisions.slice(decisions.indexOf(heading), next);
+		assert.match(entry, /No pull request approval is required/);
+		assert.match(entry, /The admin bypass is not used for merges/);
+		assert.match(entry, /Phil's ship word/);
+		assert.match(
+			entry,
+			/#2026-11-01--main-requires-a-pr-one-approval-pr-title-and-build-checks-squash-by-pr-title-no-bot-bypass-news-178/,
+		);
 	});
 
 	it('ROADMAP says NEWS-183 runs after Phil applies the NEWS-178 settings', () => {
