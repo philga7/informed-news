@@ -119,7 +119,16 @@ jobs:
           SEARXNG_URL=http://searxng:8080
           EOF
           )
+          postgres_env_file="$RUNNER_TEMP/informed-news-ci-postgres.env"
+          (umask 077; cat > "$postgres_env_file" <<'EOF'
+          POSTGRES_PASSWORD=ci-dummy
+          POSTGRES_USER=informed_news
+          POSTGRES_DB=informed_news
+          EOF
+          )
           export INFORMED_NEWS_ENV_FILE="$env_file"
+          export INFORMED_NEWS_POSTGRES_ENV_FILE="$postgres_env_file"
+          export COMPOSE_PROFILES=informed-news-postgres
           export INFORMED_NEWS_IMAGE=informed-news:ci
           rendered=$(docker compose config)
           echo "$rendered" | grep -q 'http://searxng:8080'

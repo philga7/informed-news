@@ -23,6 +23,7 @@ const ALLOWED_VALUES = [
 const KEY_VALUES = {
   SESSION_COOKIE_NAME: /^mvp_session$/,
   INFORMED_NEWS_DATA_VOLUME: /^informed-news-data$/,
+  COMPOSE_PROFILES: /^informed-news-postgres$/,
 };
 
 function sourceFiles(dir) {

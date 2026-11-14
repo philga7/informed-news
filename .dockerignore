@@ -1,6 +1,7 @@
 **/.env
 **/.env.*
 !**/.env.example
+**/postgres.env
 mvp/data
 **/node_modules
 .git

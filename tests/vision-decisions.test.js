@@ -398,4 +398,35 @@ describe('NEWS-165 vision and decisions', () => {
 		assert.match(roadmap, /does not become current next/);
 		assert.match(roadmap, /\*\*Current next\*\* is the UI build/);
 	});
+
+	it('records NEWS-230 Postgres env layout alongside NEWS-224', () => {
+		const decisions = read('docs/DECISIONS.md');
+		const entries = decisions.split(/^## /m).slice(1);
+		const news230 = entries.find(
+			(entry) => entry.startsWith('2026-11-14') && entry.includes('NEWS-230'),
+		);
+		assert.ok(news230, '2026-11-14 NEWS-230 decision missing');
+		assert.match(news230, /\*\*Decision:\*\*/);
+		assert.match(news230, /\*\*Why:\*\*/);
+		assert.match(news230, /\*\*What it rules out:\*\*/);
+		assert.match(news230, /informed_news_qa/);
+		assert.match(news230, /informed-news-db/);
+		assert.match(news230, /postgres\.env/);
+
+		const news224 = entries.find(
+			(entry) => entry.startsWith('2026-11-14') && entry.includes('Postgres is the data layer'),
+		);
+		assert.ok(news224, 'NEWS-224 decision still present');
+		assert.match(news224, /does not stand Postgres up on the VPS/);
+
+		const roadmap = read('docs/ROADMAP.md');
+		assert.match(roadmap, /NEWS-230/);
+		assert.match(roadmap, /\*\*Current next\*\* is the UI build/);
+		assert.match(roadmap, /NEWS-224/);
+
+		const whatsNew = read('docs/WHATS_NEW.md');
+		const nov14 = whatsNew.split(/^## /m).find((entry) => entry.startsWith('2026-11-14'));
+		assert.ok(nov14, '2026-11-14 whats-new entry missing');
+		assert.match(nov14, /\*\*No user-visible change\.\*\*/);
+	});
 });

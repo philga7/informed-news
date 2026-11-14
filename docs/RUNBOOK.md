@@ -13,8 +13,9 @@ git clone https://github.com/philga7/informed-news.git /opt/informed-news
 
 ## Env file
 
-- Path: `/opt/informed-news/.env`, owner `deploy:deploy`, mode `600`.
-- Create it by copying `mvp/.env.example` to `/opt/informed-news/.env`, set owner `deploy:deploy` and mode `600`, then edit the placeholders. Do not paste a real password into any doc.
+- Path: `/opt/informed-news/.env`, owner `root:root`, mode `600`.
+- The file is already on the server. Do not recreate it from scratch or chown it to `deploy`.
+- First-time laptop/VPS setup: create it by copying `mvp/.env.example` to `/opt/informed-news/.env`, set owner `root:root` and mode `600`, then edit the placeholders. Do not paste a real password into any doc. Do not print the file.
 - Compose interpolates `$` in env values. A bcrypt `MVP_PASSWORD_HASH` must be single-quoted, or each `$` written as `$$`, or login breaks.
 - The key list lives in `mvp/.env.example`. Required: a password (`MVP_PASSWORD` or `MVP_PASSWORD_HASH`) and `SESSION_SECRET`. Everything else is optional.
 - On the VPS set `SEARXNG_URL=http://searxng:8080`.
@@ -23,7 +24,7 @@ git clone https://github.com/philga7/informed-news.git /opt/informed-news
 
 ## Start, logs, stop
 
-From `/opt/informed-news`:
+From `/opt/informed-news`. Live `docker compose` commands run as root, because the live `.env` and `postgres.env` are not readable by `deploy`.
 
 ```bash
 docker compose up -d --build
@@ -78,11 +79,11 @@ Then open `http://localhost:3001`.
 
 ## Laptop
 
-Create the shared network once, then use the same compose command with an env file. There is no override file.
+Create the shared network once, then use the same compose command with an env file. There is no override file. Copy `mvp/postgres.env.example` to `mvp/postgres.env` (not committed). Export `COMPOSE_PROFILES=informed-news-postgres` when Postgres should start, and point `INFORMED_NEWS_POSTGRES_ENV_FILE` at that copy because the compose default is the VPS path. Placeholders only.
 
 ```bash
 docker network create nanobot-mem0
-INFORMED_NEWS_ENV_FILE=./mvp/.env docker compose up -d --build
+COMPOSE_PROFILES=informed-news-postgres INFORMED_NEWS_POSTGRES_ENV_FILE=./mvp/postgres.env INFORMED_NEWS_ENV_FILE=./mvp/.env docker compose up -d --build
 ```
 
 ## Healthy Brief
@@ -117,6 +118,9 @@ chmod 600 /opt/informed-news/qa.env
 - Compose interpolates `$` in env values. A bcrypt `MVP_PASSWORD_HASH` must be single-quoted, or each `$` written as `$$`, or login breaks. Generate the hash the same way `mvp/.env.example` describes, on the VPS. Put only the hash in this file. The password itself does not go in the repo, a pull request, a ticket, or a log.
 - Do not set `INFORMED_NEWS_DATA_VOLUME` to `informed-news-data`. That name is the live volume.
 - Set `INFORMED_NEWS_INSTANCE=qa` and `POSTGRES_DB=informed_news_qa`. Do not set `POSTGRES_DB` to `informed_news`. That name is the live database. QA refuses to open it.
+- The QA app joins the existing network `informed-news-db` (`external: true`). It does not create `informed-news-qa-db`. `POSTGRES_HOST=postgres` is the live Postgres alias on that network. `POSTGRES_DB` is `informed_news_qa`. Do not set `POSTGRES_DB=informed_news`. QA refuses that database.
+- Do not set `COMPOSE_PROFILES` to `informed-news-qa-postgres`. A QA `docker compose --env-file /opt/informed-news/qa.env -p informed-news-qa up` (bare, or naming `app`) does not start Postgres, and naming `postgres` does. Never name `postgres` on a QA command. `COMPOSE_PROFILES=informed-news-postgres` does not start one either, because the QA profile name is `informed-news-qa-postgres`.
+- Do not point QA at `INFORMED_NEWS_POSTGRES_ENV_FILE`. QA does not start Postgres.
 
 Placeholders only:
 
@@ -131,8 +135,12 @@ REFRESH_INTERVAL_HOURS=off
 MVP_PASSWORD_HASH='<bcrypt hash>'
 SESSION_SECRET=<long random string>
 INFORMED_NEWS_INSTANCE=qa
-POSTGRES_DB=informed_news_qa
+INFORMED_NEWS_DB_NETWORK=informed-news-db
+INFORMED_NEWS_DB_EXTERNAL=true
+POSTGRES_USER=informed_news
 POSTGRES_PASSWORD=<postgres password>
+POSTGRES_DB=informed_news_qa
+POSTGRES_HOST=postgres
 OLLAMA_API_KEY=
 TYPESAFE_API_KEY=
 ```
@@ -219,11 +227,25 @@ docker volume rm informed-news-qa-data
 
 `docker volume rm` is optional and names only the QA volume. Never remove `informed-news-data`. Do not run `docker compose down` without `-p informed-news-qa`; that stops the live project.
 
+## Postgres env
+
+Postgres is already running on the VPS as container `informed-news-postgres-1` (`postgres:16-alpine`, 512 MB cap) on network `informed-news-db`, with databases `informed_news` and `informed_news_qa`, and no published port. No schema is applied. The app is not wired to Postgres yet.
+
+This section is the layout for VPS Manager Bot to apply later, with Phil's approval. This repo change does not SSH, does not edit the server `.env`, and does not delete it.
+
+Create `/opt/informed-news/postgres.env`, owner `root:root`, mode `600`, by copying `mvp/postgres.env.example` and setting the three values from the live `.env`: `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB=informed_news`. Copy the three lines exactly as written in the live `.env`, including any quotes or `$$`. Compose reads `postgres.env` with the same `$` rules, so the value is unchanged. Do not add any other key. Do not print the values. Compose passes this file only to the Postgres container. The app keeps the full `.env`.
+
+Before the next live `docker compose up` or `docker compose down`, add `COMPOSE_PROFILES=informed-news-postgres` to `/opt/informed-news/.env`. Leave owner `root:root` and mode `600`. Do not print the file. Without that line, `up` does not start Postgres, and `down` can stop the container that is already running.
+
+Set `INFORMED_NEWS_POSTGRES_ENV_FILE=/opt/informed-news/postgres.env` only if the file is not at that default path. The default in compose is that path.
+
+After that, `docker compose config --services` includes `app` and `postgres`. Check key names on the postgres service only. The keys are `POSTGRES_USER`, `POSTGRES_PASSWORD`, and `POSTGRES_DB`. Do not print the rendered config.
+
+`scripts/pg-dump.sh` is unchanged and is not installed. It runs `docker compose exec -T postgres pg_dump`, which sees the service when `COMPOSE_PROFILES=informed-news-postgres` is in the live env file. Do not install the cron.
+
 ## Postgres backups
 
-The Compose file defines the Postgres container. It does not start that container on the VPS. Standing Postgres up on the VPS is a later step and needs Phil's approval.
-
-A nightly dump writes `informed-news-YYYY-MM-DD.sql` into a directory you pass to `scripts/pg-dump.sh`. Pass the directory that already holds the JSON data tarball, so the dump lands next to that tarball. This repo does not name that directory. The script exits if the directory is missing. It dumps the live database `informed_news` with `docker compose exec -T postgres pg_dump`. Do not install the cron on the VPS in this change. Do not put the database password in the command line. The container reads `POSTGRES_PASSWORD` from the env file.
+A nightly dump writes `informed-news-YYYY-MM-DD.sql` into a directory you pass to `scripts/pg-dump.sh`. Pass the directory that already holds the JSON data tarball, so the dump lands next to that tarball. This repo does not name that directory. The script exits if the directory is missing. It dumps the live database `informed_news` with `docker compose exec -T postgres pg_dump`. Do not install the cron on the VPS in this change. Do not put the database password in the command line. The Postgres container reads its password from `postgres.env`. See [Postgres env](#postgres-env) for the profile and env file layout.
 
 From the checkout, after Postgres is running:
 
@@ -233,4 +255,4 @@ scripts/pg-dump.sh <directory-that-holds-the-json-tarball>
 
 ## Out of scope
 
-Key rotation. Standing up the QA instance on the VPS is a separate operator step. Standing up Postgres on the VPS is a separate operator step and needs Phil's approval. The repo change does not SSH to the host or create either instance.
+Key rotation. Standing up the QA instance on the VPS is a separate operator step. Applying this Postgres env layout on the VPS needs Phil's approval. Do not delete the server `.env`. The repo change does not SSH to the host or create the QA instance.
