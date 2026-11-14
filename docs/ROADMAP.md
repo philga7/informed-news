@@ -22,7 +22,7 @@ Claims spine plan: [`.cursor/plans/claims_evidence_spine_8f4cde15.plan.md`](../.
 
 [NEWS-224](https://informedcrew.atlassian.net/browse/NEWS-224) is the Postgres store for stories and entries, Morning items, and CFP roundups. It does not become current next, and it does not lift the pause above.
 
-[NEWS-230](https://informedcrew.atlassian.net/browse/NEWS-230) scopes the Postgres env and wires the QA app to `informed_news_qa` in the repo. It does not become current next, it does not lift the pause, and applying it on the VPS waits for Phil's approval.
+[NEWS-230](https://informedcrew.atlassian.net/browse/NEWS-230) scopes the Postgres env and wires the QA app to `informed_news_qa` in the repo. [NEWS-231](https://informedcrew.atlassian.net/browse/NEWS-231) keeps a QA compose command from starting Postgres. Neither becomes current next, neither lifts the pause, and applying the layout on the VPS waits for Phil's approval.
 
 ### Combined order (Oct 23, 2026; citation guard added Oct 26)
 
@@ -167,6 +167,7 @@ Unscheduled: Watchers stay on [NEWS-84](https://informedcrew.atlassian.net/brows
 | 80b | [NEWS-182](https://informedcrew.atlassian.net/browse/NEWS-182) | CI: print `docker compose logs` when the post-start `/healthz` check fails — **Done** |
 | 80c | [NEWS-224](https://informedcrew.atlassian.net/browse/NEWS-224) | Postgres store for stories and entries, Morning items, and CFP roundups. Does not stand Postgres up on the VPS and does not become current next |
 | 80d | [NEWS-230](https://informedcrew.atlassian.net/browse/NEWS-230) | Postgres env layout and QA app on `informed_news_qa` in the repo; not current next; applying on the VPS waits for Phil's approval |
+| 80e | [NEWS-231](https://informedcrew.atlassian.net/browse/NEWS-231) | QA compose cannot start Postgres; not current next |
 | — | [NEWS-93](https://informedcrew.atlassian.net/browse/NEWS-93) | Always-on hosting decision — **Done**; hosting complete, runbook [docs/RUNBOOK.md](RUNBOOK.md) (see [Always-on hosting](#always-on-hosting-news-93)) |
 | Later | [NEWS-92](https://informedcrew.atlassian.net/browse/NEWS-92) | USAspending contract awards source for company Watch topics |
 | Later | [NEWS-163](https://informedcrew.atlassian.net/browse/NEWS-163) | Optional birdclaw → Brief handoff for tweet evidence (NEWS-123 follow-up; not an xcancel scrape) |

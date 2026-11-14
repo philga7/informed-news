@@ -1,0 +1,4 @@
+# Included only when the Compose project name is informed-news-qa.
+# This file defines no Postgres service. A QA command that names postgres
+# exits with "no such service: postgres".
+services: {}

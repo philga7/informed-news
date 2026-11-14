@@ -8,7 +8,7 @@ This is not the release log. Releases are recorded in `CHANGELOG.md` by semantic
 
 ## 2026-11-14
 
-**No user-visible change.** The Brief is unchanged. Wiring QA to its database is an operator step.
+**No user-visible change.** The Brief is unchanged. Wiring QA to its database is an operator step. A QA command cannot start its own database.
 
 ## 2026-11-13
 

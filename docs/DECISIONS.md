@@ -2,6 +2,14 @@
 
 Binding choices for Informed News. Newest first. When one of these changes, update this file in the same change as [ROADMAP.md](ROADMAP.md) and Jira. What the product does now, in plain language, is [PRODUCT_SPEC.md](PRODUCT_SPEC.md). Pipeline detail remains in [NEWS-84](https://informedcrew.atlassian.net/browse/NEWS-84), [TRIAGE.md](TRIAGE.md), and [BRIEF.md](BRIEF.md). The target is [VISION.md](VISION.md).
 
+## 2026-11-14 — QA compose cannot start Postgres (NEWS-231)
+
+**Decision:** The QA Compose project does not include a Postgres service. `docker compose -p informed-news-qa up postgres` exits with `no such service: postgres`. A bare QA `up` still starts no Postgres. `COMPOSE_PROFILES=informed-news-postgres` and `COMPOSE_PROFILES=informed-news-qa-postgres` do not add one. Live Postgres still starts only when `COMPOSE_PROFILES=informed-news-postgres` on project `informed-news`. QA still uses database `informed_news_qa` and `instanceGuard` still refuses `informed_news`. This supersedes the sentence in the 2026-11-14 QA database entry that said naming `postgres` starts a second Postgres. That entry stays as the record of the env layout. This change does not edit the server, does not edit the server env file, and does not delete it.
+
+**Why:** A profile hides Postgres from a bare `up`, and Compose still starts a service when the command names it. The QA project includes an empty file instead of the live Postgres file, so the service is not there to start.
+
+**What it rules out:** A second Postgres container for QA, a QA profile that starts Postgres, and editing the server or the server env file in this change.
+
 ## 2026-11-14 — QA uses the live Postgres, and the container env is Postgres-only (NEWS-230)
 
 **Decision:** QA joins network `informed-news-db` and uses database `informed_news_qa`. `instanceGuard` still refuses `informed_news`. Postgres starts only under the project profile `${COMPOSE_PROJECT_NAME}-postgres`. Live sets `COMPOSE_PROFILES=informed-news-postgres`. A QA `up` does not start a second Postgres unless the command names `postgres`. The Postgres container's env file is `/opt/informed-news/postgres.env` (mode `600`, owner `root:root`) and holds only `POSTGRES_USER`, `POSTGRES_PASSWORD`, and `POSTGRES_DB`. It does not receive the app env file. Copy the three lines exactly as written in the live `.env`, including any quotes or `$$`. Compose reads `postgres.env` with the same `$` rules, so the value is unchanged. The server `.env` is `root:root` mode `600`. This corrects the owner in the 2026-10-31 private-network entry, which said `deploy:deploy`. That entry stays as the record of what was written then. This change does not edit the server, does not install `pg_dump` cron, and does not wire the dashboard store.
