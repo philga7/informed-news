@@ -1,0 +1,71 @@
+name: Pre-Release Validation
+
+# Shared by Release (workflow_call) and by a pull request that edits this
+# file or release.yml. The release job, its deploy key, and its permissions
+# stay in release.yml and run only on a push to main.
+on:
+  workflow_call:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/pre-release-validate.yml
+      - .github/workflows/release.yml
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Pre-Release Validation
+    runs-on: ubuntu-latest
+    services:
+      # Same dummy CI database as .github/workflows/ci.yml. Do not point this
+      # at a live database. Services cannot move into a composite action.
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: ci-dummy
+          POSTGRES_USER: informed_news
+          POSTGRES_DB: informed_news_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U informed_news -d informed_news_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      INFORMED_NEWS_TEST_DATABASE_URL: postgres://informed_news:ci-dummy@127.0.0.1:5432/informed_news_test
+      INFORMED_NEWS_TEST_ALLOW_ROLE_PROVISION: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install MVP server
+        run: npm ci --prefix mvp/server
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Test
+        run: npm test
+
+      - name: Install & build archived React feed (Vercel artifact until hosting cutover)
+        run: |
+          npm ci --prefix _legacy/mvp-web
+          npm run build

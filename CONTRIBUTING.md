@@ -64,7 +64,7 @@ The **PR title** workflow (`.github/workflows/pr-title.yml`, running `scripts/ch
 ## Why both CI and Release?
 
 - **CI** (`.github/workflows/ci.yml`): every PR into `main` and every push to `main` — install (root, `mvp/server`, `apps/kite`, `apps/web`), MVP server typecheck + `npm test`, `npm run test:kite`, Kite `bun run test:unit` + `bun run check`, product-path `bun run build` in `apps/kite`, and `apps/web` install, `bun run check`, `bun run build`, `bun run test:unit`, and `npm run test:shell-build`. No secrets. Fast review feedback; no publish.
-- **Release** (`.github/workflows/release.yml`): after merge to `main` — re-validate, then `semantic-release`.
+- **Release** (`.github/workflows/release.yml`): after merge to `main` — re-validate, then `semantic-release`. Pre-Release Validation is [`.github/workflows/pre-release-validate.yml`](.github/workflows/pre-release-validate.yml). It runs `npm test` with the same Postgres 16 service as CI: `postgres:16-alpine`, dummy user `informed_news`, password `ci-dummy`, database `informed_news_test`, `INFORMED_NEWS_TEST_DATABASE_URL`, `INFORMED_NEWS_TEST_ALLOW_ROLE_PROVISION=1`, and the PostgreSQL client. A pull request that changes that workflow or `release.yml` runs the same validation with read-only contents permission. `semantic-release` still runs only from the Release job on a push to `main`.
 
 Overlap on validation is intentional: a green PR does not skip the final gate before tagging.
 
