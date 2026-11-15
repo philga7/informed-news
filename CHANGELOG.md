@@ -1,3 +1,15 @@
+## [0.43.0](https://github.com/philga7/informed-news/compare/v0.42.0...v0.43.0) (2026-11-15)
+
+### Features
+
+* **NEWS-224:** add Postgres store layer for stories, Morning, and CFP ([#278](https://github.com/philga7/informed-news/issues/278)) ([45baafb](https://github.com/philga7/informed-news/commit/45baafb00ce9d8e1f8292feb216bd194432a4376)), closes [#277](https://github.com/philga7/informed-news/issues/277) [#277](https://github.com/philga7/informed-news/issues/277)
+
+### Bug Fixes
+
+* **NEWS-230:** scope Postgres env and wire QA database ([#279](https://github.com/philga7/informed-news/issues/279)) ([3dbaaf9](https://github.com/philga7/informed-news/commit/3dbaaf90c5ee00598a54fbc293ffb3fddf57bd27))
+* **NEWS-231, NEWS-232:** isolate QA compose from Postgres and the shared DB network ([#280](https://github.com/philga7/informed-news/issues/280)) ([c0b6e3c](https://github.com/philga7/informed-news/commit/c0b6e3c19f6af2677c5c19530d6a9826f051f931))
+* **NEWS-233:** give QA its own Postgres role ([#281](https://github.com/philga7/informed-news/issues/281)) ([669063b](https://github.com/philga7/informed-news/commit/669063b47e9f6475e34eb5ea180f72b4aa9b0738))
+
 ## [0.42.0](https://github.com/philga7/informed-news/compare/v0.41.0...v0.42.0) (2026-11-12)
 
 ### Features
