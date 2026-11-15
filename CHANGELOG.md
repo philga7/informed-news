@@ -1,3 +1,9 @@
+## [0.43.1](https://github.com/philga7/informed-news/compare/v0.43.0...v0.43.1) (2026-11-15)
+
+### Bug Fixes
+
+* **NEWS-235:** revoke public connect on QA database ([1a53cdb](https://github.com/philga7/informed-news/commit/1a53cdbbb19bfd7d9c413bffe789ffa894a18e30)), closes [#283](https://github.com/philga7/informed-news/issues/283)
+
 ## [0.43.0](https://github.com/philga7/informed-news/compare/v0.42.0...v0.43.0) (2026-11-15)
 
 ### Features
