@@ -49,6 +49,11 @@ function readAdminConnection(): AdminConnection {
   if (url.hostname !== '127.0.0.1' && url.hostname !== 'localhost') {
     throw new Error('INFORMED_NEWS_TEST_DATABASE_URL must point at 127.0.0.1 or localhost');
   }
+  if (process.env.INFORMED_NEWS_TEST_ALLOW_ROLE_PROVISION !== '1') {
+    throw new Error(
+      'INFORMED_NEWS_TEST_ALLOW_ROLE_PROVISION=1 is required before the QA role test changes a cluster',
+    );
+  }
   return {
     host: url.hostname,
     port: url.port || '5432',
@@ -172,6 +177,25 @@ async function dropQa(admin: AdminConnection, dropLive: boolean): Promise<void> 
     }
   });
 }
+
+test('the role test refuses a cluster unless provisioning is explicitly allowed', () => {
+  const previousUrl = process.env.INFORMED_NEWS_TEST_DATABASE_URL;
+  const previousAllow = process.env.INFORMED_NEWS_TEST_ALLOW_ROLE_PROVISION;
+  process.env.INFORMED_NEWS_TEST_DATABASE_URL =
+    'postgres://informed_news:ci-dummy@127.0.0.1:5432/informed_news_test';
+  delete process.env.INFORMED_NEWS_TEST_ALLOW_ROLE_PROVISION;
+  try {
+    assert.throws(
+      () => readAdminConnection(),
+      /INFORMED_NEWS_TEST_ALLOW_ROLE_PROVISION=1 is required/,
+    );
+  } finally {
+    if (previousUrl === undefined) delete process.env.INFORMED_NEWS_TEST_DATABASE_URL;
+    else process.env.INFORMED_NEWS_TEST_DATABASE_URL = previousUrl;
+    if (previousAllow === undefined) delete process.env.INFORMED_NEWS_TEST_ALLOW_ROLE_PROVISION;
+    else process.env.INFORMED_NEWS_TEST_ALLOW_ROLE_PROVISION = previousAllow;
+  }
+});
 
 test('the provision script requires the QA password', () => {
   const result = runScript({ PATH: process.env.PATH });

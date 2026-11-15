@@ -199,6 +199,8 @@ There is no `--build` and no `--pull`. Do not use the first-start command for th
 
 ### QA Postgres role
 
+Run these steps in a root shell (`sudo -i`), the same way live `docker compose` commands run. Do not prefix `docker` with `sudo`. `sudo`'s default `env_reset` drops `INFORMED_NEWS_QA_PASSWORD` and `PGPASSWORD`, and the script then exits with `INFORMED_NEWS_QA_PASSWORD is required`.
+
 QA logs in as its own role, `informed_news_qa`, not the live one. Postgres itself refuses role `informed_news_qa` on database `informed_news`. The dashboard store refuses to open a pool when `POSTGRES_USER` is `informed_news`, and the app does not open that pool yet. Applying these steps on the VPS needs Phil's approval. Do not print any env file or password.
 
 1. Back up the env files before editing: `cp -a /opt/informed-news/.env /opt/informed-news/.env.bak`, `cp -a /opt/informed-news/qa.env /opt/informed-news/qa.env.bak`, and `cp -a /opt/informed-news/postgres.env /opt/informed-news/postgres.env.bak`. `cp -a` keeps each file's owner and mode. `qa.env` is `deploy:deploy`, so `qa.env.bak` stays deploy-readable and will hold the live password until step 7 removes it. The `.env` and `postgres.env` backups stay `root:root` mode `600` and are not deleted. Do not print the files. Never delete `/opt/informed-news/.env`.
