@@ -60,9 +60,17 @@ jobs:
       group: claude-build-${{ github.event.issue.number || github.event.pull_request.number }}
       cancel-in-progress: false
     steps:
+      # persist-credentials stays false. actions/checkout@v7 stores the
+      # workflow token in an includeIf.gitdir file. claude-code-action@v1
+      # only clears include.path, so that header wins over the app token
+      # and git push is github-actions[bot], which does not run CI.
+      # scripts/stage-claude-checkout-auth.mjs puts the workflow token on
+      # the origin URL so this action can fetch, then the action replaces
+      # that URL with its app token. Do not pass a token input or a PAT.
       - uses: actions/checkout@v7
         with:
           fetch-depth: 1
+          persist-credentials: false
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -89,6 +97,11 @@ jobs:
       - name: Install shell dependencies
         run: bun install --frozen-lockfile --cwd apps/web
 
+      - name: Stage workflow token until the Claude app token replaces it
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/stage-claude-checkout-auth.mjs
+
       - uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -100,12 +113,18 @@ jobs:
           # branch and commits as claude[bot] with its app token. A prompt
           # without this switches an issue to agent mode, which does not
           # create that branch. Do not pass a token input or a PAT.
-          # Follow-up commits (NEWS-193): Claude runs git add, git commit, and
-          # git push on its own branch, with Edit and Write allowed, so the
-          # push uses that same app token. The action's own commit path on a
-          # later push was github-actions[bot] (PR #230), which held CI and
-          # failed claude-review. Pushes to main and force pushes stay
-          # disallowed. gh pr edit is this pull request's title and body only.
+          # Follow-up commits (NEWS-193, NEWS-237): Claude runs git add, git
+          # commit, and git push on its own branch. The pusher is the token
+          # on origin after the action runs configureGitAuth or
+          # replaceCheckoutCredentials and rewrites that URL. If that rewrite
+          # does not run, the workflow token stays on origin and the push is
+          # github-actions[bot] again. bot_id sets the commit author email
+          # only. 209825114 is the claude[bot] user id (noreply email on
+          # ee87d60). The action default bot id is github-actions[bot].
+          # Pushes to main and force pushes stay disallowed. gh pr edit is
+          # this pull request's title and body only.
+          bot_id: "209825114"
+          bot_name: "claude[bot]"
           track_progress: true
           prompt: |
             The steps above that say to post a "Create a PR" compare link are wrong for this repo.

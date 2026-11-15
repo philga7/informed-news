@@ -8,6 +8,8 @@ This is not the release log. Releases are recorded in `CHANGELOG.md` by semantic
 
 ## 2026-11-15
 
+**No user-visible change.** A follow-up from Claude on an open pull request runs the same checks as the first push. The Brief is unchanged.
+
 **No user-visible change.** VPS checkout updates are done by release tag. The Brief is unchanged.
 
 **No user-visible change.** Release checks on main can run the database tests again, so a version can be cut. The Brief is unchanged.

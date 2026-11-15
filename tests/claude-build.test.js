@@ -92,6 +92,7 @@ describe('NEWS-180 claude build workflow', () => {
 			'npm ci --prefix mvp/server',
 			'bun install --frozen-lockfile --cwd apps/kite',
 			'bun install --frozen-lockfile --cwd apps/web',
+			'node scripts/stage-claude-checkout-auth.mjs',
 		]);
 		const allowed = claudeArgsToolString(workflow, '--allowedTools');
 		const disallowed = claudeArgsToolString(workflow, '--disallowedTools');
@@ -220,6 +221,26 @@ describe('NEWS-180 claude build workflow', () => {
 		assert.match(workflow, /claude-mention/);
 		assert.match(workflow, /name:\s*claude-build/);
 		assert.match(workflow, /only this job \(name claude-build\)/);
+	});
+
+	it('hands follow-up pushes to the Claude app token without a new secret', () => {
+		const checkout = workflow.indexOf('uses: actions/checkout@v7');
+		const stage = workflow.indexOf('node scripts/stage-claude-checkout-auth.mjs');
+		const action = workflow.indexOf('uses: anthropics/claude-code-action@v1');
+		assert.ok(checkout !== -1 && stage > checkout && stage < action, 'stage after checkout, before the action');
+		const checkoutBlock = workflow.slice(checkout, workflow.indexOf('- name: Setup Node.js', checkout));
+		assert.match(checkoutBlock, /persist-credentials:\s*false/);
+		assert.match(workflow, /bot_id:\s*"209825114"/);
+		assert.match(workflow, /bot_name:\s*"claude\[bot\]"/);
+		assert.doesNotMatch(workflow, /41898282/);
+		assert.doesNotMatch(workflow, /github_token/);
+		assert.doesNotMatch(workflow, /secrets\.(?!CLAUDE_CODE_OAUTH_TOKEN)/);
+		assert.match(workflow, /\njobs:\n  build:\n/);
+		assert.doesNotMatch(workflow, /\n {2}review:\n/);
+		assert.doesNotMatch(review, /issue_comment:/);
+		assert.doesNotMatch(review, /pull_request_review_comment:/);
+		assert.doesNotMatch(review, /pull_request_review:/);
+		assert.match(review, /\non:\n {2}pull_request:\n/);
 	});
 
 	it('evaluates the workflow if against sample payloads', () => {
