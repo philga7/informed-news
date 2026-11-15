@@ -136,8 +136,8 @@ REFRESH_INTERVAL_HOURS=off
 MVP_PASSWORD_HASH='<bcrypt hash>'
 SESSION_SECRET=<long random string>
 INFORMED_NEWS_INSTANCE=qa
-POSTGRES_USER=informed_news
-POSTGRES_PASSWORD=<postgres password>
+POSTGRES_USER=informed_news_qa
+POSTGRES_PASSWORD=<qa role password>
 POSTGRES_DB=informed_news_qa
 POSTGRES_HOST=postgres
 OLLAMA_API_KEY=
@@ -196,6 +196,30 @@ docker compose --env-file /opt/informed-news/qa.env -p informed-news-qa up -d
 ```
 
 There is no `--build` and no `--pull`. Do not use the first-start command for this. That command builds.
+
+### QA Postgres role
+
+QA logs in as its own role, `informed_news_qa`, not the live one. Postgres itself refuses role `informed_news_qa` on database `informed_news`. The dashboard store refuses to open a pool when `POSTGRES_USER` is `informed_news`, and the app does not open that pool yet. Applying these steps on the VPS needs Phil's approval. Do not print any env file or password.
+
+1. Back up the env files before editing: `cp -a /opt/informed-news/.env /opt/informed-news/.env.bak`, `cp -a /opt/informed-news/qa.env /opt/informed-news/qa.env.bak`, and `cp -a /opt/informed-news/postgres.env /opt/informed-news/postgres.env.bak`. `cp -a` keeps each file's owner and mode. `qa.env` is `deploy:deploy`, so `qa.env.bak` stays deploy-readable and will hold the live password until step 7 removes it. The `.env` and `postgres.env` backups stay `root:root` mode `600` and are not deleted. Do not print the files. Never delete `/opt/informed-news/.env`.
+2. Export `INFORMED_NEWS_QA_PASSWORD` in the shell. Do not echo it. Do not write it into `/opt/informed-news/.env` or `/opt/informed-news/postgres.env`.
+3. From `/opt/informed-news`, run:
+
+```bash
+docker exec -i -e INFORMED_NEWS_QA_PASSWORD informed-news-postgres-1 sh -s < scripts/provision-qa-role.sh
+```
+
+   The script is safe to run again.
+4. Rewrite `qa.env` so `POSTGRES_USER=informed_news_qa` and `POSTGRES_PASSWORD` is that same QA password. Do not print the file.
+5. Recreate QA with the existing command in [Recreate without a build](#recreate-without-a-build). Do not build. Do not delete the server `.env`.
+6. Check the role over TCP, not the local socket (the image trusts local sockets). With `INFORMED_NEWS_QA_PASSWORD` still exported and not echoed:
+
+```bash
+PGPASSWORD="$INFORMED_NEWS_QA_PASSWORD" docker run --rm --network informed-news-db -e PGPASSWORD postgres:16-alpine psql -h postgres -U informed_news_qa -d informed_news_qa -c 'SELECT 1'
+```
+
+   The password is the shell environment of `docker`, not an argument. This should succeed. The same command with `-d informed_news` should fail with `permission denied`. That message does not include the password. Do not print the password.
+7. After the role check and the QA recreate, remove the deploy-readable backup: `rm /opt/informed-news/qa.env.bak`. Do not delete `/opt/informed-news/.env`, `.env.bak`, or `postgres.env.bak`.
 
 ### Tailscale Serve
 

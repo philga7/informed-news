@@ -73,6 +73,9 @@ jobs:
       - name: Test shell build
         run: npm run test:shell-build --prefix mvp/server
 
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
       - name: Test
         run: npm test
 

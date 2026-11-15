@@ -6,6 +6,10 @@ Each ship-loop pull request adds an entry for what is true at merge for that rea
 
 This is not the release log. Releases are recorded in `CHANGELOG.md` by semantic-release. Do not hand-edit `CHANGELOG.md` to mirror these notes.
 
+## 2026-11-15
+
+**No user-visible change.** QA signing in as its own database role is an operator step. The Brief is unchanged.
+
 ## 2026-11-14
 
 **No user-visible change.** The Brief is unchanged. Wiring QA to its database is an operator step. A QA command cannot start its own database. Stopping one copy of the app leaves the shared database network in place.

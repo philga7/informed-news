@@ -2,6 +2,8 @@ import { Pool, type PoolConfig } from 'pg';
 
 export const LIVE_DATABASE = 'informed_news';
 export const QA_DATABASE = 'informed_news_qa';
+export const LIVE_ROLE = 'informed_news';
+export const QA_ROLE = 'informed_news_qa';
 
 export type NewsInstance = 'live' | 'qa';
 
@@ -81,7 +83,11 @@ export function readDashboardConnection(env: NodeJS.ProcessEnv): DashboardConnec
     throw new DashboardConfigError('POSTGRES_PORT must be a positive integer');
   }
 
-  const user = env.POSTGRES_USER?.trim() || 'informed_news';
+  const user = env.POSTGRES_USER?.trim() || LIVE_ROLE;
+  if (instance === 'qa' && user === LIVE_ROLE) {
+    throw new DashboardConfigError(`qa instance refused live role ${LIVE_ROLE}`);
+  }
+
   const host = env.POSTGRES_HOST?.trim() || 'postgres';
 
   return { host, port, user, password, database, instance };

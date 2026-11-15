@@ -4,7 +4,9 @@ import { Pool } from 'pg';
 import {
   DashboardConfigError,
   LIVE_DATABASE,
+  LIVE_ROLE,
   QA_DATABASE,
+  QA_ROLE,
   assertInstanceDatabase,
   openDashboardPool,
   readDashboardConnection,
@@ -93,10 +95,88 @@ test('defaults are the live database, user informed_news, host postgres, and por
 test('QA defaults to the QA database when POSTGRES_DB is unset', () => {
   const connection = readDashboardConnection({
     INFORMED_NEWS_INSTANCE: 'qa',
+    POSTGRES_USER: QA_ROLE,
     POSTGRES_PASSWORD: 'placeholder',
   });
   assert.equal(connection.instance, 'qa');
   assert.equal(connection.database, QA_DATABASE);
+  assert.equal(connection.user, QA_ROLE);
+});
+
+test('QA with live role informed_news is refused before a pool is opened', () => {
+  const password = 'not-a-real-live-role-password';
+  let opened = false;
+  assert.throws(
+    () =>
+      openDashboardPool(
+        {
+          INFORMED_NEWS_INSTANCE: 'qa',
+          POSTGRES_DB: QA_DATABASE,
+          POSTGRES_USER: LIVE_ROLE,
+          POSTGRES_PASSWORD: password,
+        },
+        () => {
+          opened = true;
+          throw new Error('pool should not be constructed');
+        },
+      ),
+    (err: unknown) => {
+      assert.equal(opened, false);
+      assert.ok(err instanceof DashboardConfigError);
+      assert.equal(err.message, 'qa instance refused live role informed_news');
+      assert.equal(err.message.includes(password), false);
+      return true;
+    },
+  );
+});
+
+test('QA with unset POSTGRES_USER is refused because default user is the live role', () => {
+  const password = 'not-a-real-default-user-password';
+  let opened = false;
+  assert.throws(
+    () =>
+      openDashboardPool(
+        {
+          INFORMED_NEWS_INSTANCE: 'qa',
+          POSTGRES_PASSWORD: password,
+        },
+        () => {
+          opened = true;
+          throw new Error('pool should not be constructed');
+        },
+      ),
+    (err: unknown) => {
+      assert.equal(opened, false);
+      assert.ok(err instanceof DashboardConfigError);
+      assert.equal(err.message, 'qa instance refused live role informed_news');
+      assert.equal(err.message.includes(password), false);
+      return true;
+    },
+  );
+});
+
+test('QA with informed_news_qa user returns connection and passes user to pool factory', () => {
+  const password = 'placeholder';
+  openDashboardPool(
+    {
+      INFORMED_NEWS_INSTANCE: 'qa',
+      POSTGRES_USER: QA_ROLE,
+      POSTGRES_PASSWORD: password,
+    },
+    (config) => {
+      assert.equal(config.database, QA_DATABASE);
+      assert.equal(config.user, QA_ROLE);
+      assert.equal(config.password, password);
+      return {} as Pool;
+    },
+  );
+});
+
+test('live with unset POSTGRES_USER still defaults to informed_news', () => {
+  const connection = readDashboardConnection({ POSTGRES_PASSWORD: 'placeholder' });
+  assert.equal(connection.instance, 'live');
+  assert.equal(connection.user, LIVE_ROLE);
+  assert.equal(connection.database, LIVE_DATABASE);
 });
 
 function refusesBeforePool(env: NodeJS.ProcessEnv): void {
@@ -149,13 +229,13 @@ test('QA pool targets informed_news_qa on host postgres and refuses the live dat
       INFORMED_NEWS_INSTANCE: 'qa',
       POSTGRES_DB: QA_DATABASE,
       POSTGRES_HOST: 'postgres',
-      POSTGRES_USER: 'informed_news',
+      POSTGRES_USER: QA_ROLE,
       POSTGRES_PASSWORD: password,
     },
     (config) => {
       assert.equal(config.database, QA_DATABASE);
       assert.equal(config.host, 'postgres');
-      assert.equal(config.user, 'informed_news');
+      assert.equal(config.user, QA_ROLE);
       assert.equal(config.password, password);
       return {} as Pool;
     },
@@ -200,10 +280,15 @@ test('a guarded connection opens the instance database', () => {
 
   let qaOpened = false;
   openDashboardPool(
-    { INFORMED_NEWS_INSTANCE: 'qa', POSTGRES_PASSWORD: 'placeholder' },
+    {
+      INFORMED_NEWS_INSTANCE: 'qa',
+      POSTGRES_USER: QA_ROLE,
+      POSTGRES_PASSWORD: 'placeholder',
+    },
     (config) => {
       qaOpened = true;
       assert.equal(config.database, QA_DATABASE);
+      assert.equal(config.user, QA_ROLE);
       return {} as Pool;
     },
   );
