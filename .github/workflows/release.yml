@@ -8,35 +8,9 @@ on:
 jobs:
   validate:
     name: Pre-Release Validation
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'npm'
-
-      - name: Install root dependencies
-        run: npm ci
-
-      - name: Install MVP server
-        run: npm ci --prefix mvp/server
-
-      - name: Typecheck
-        run: npm run typecheck
-
-      - name: Test
-        run: npm test
-
-      - name: Install & build archived React feed (Vercel artifact until hosting cutover)
-        run: |
-          npm ci --prefix _legacy/mvp-web
-          npm run build
+    permissions:
+      contents: read
+    uses: ./.github/workflows/pre-release-validate.yml
 
   release:
     name: Semantic Release

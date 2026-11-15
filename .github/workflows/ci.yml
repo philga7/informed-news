@@ -13,6 +13,7 @@ jobs:
     name: MVP build & typecheck
     runs-on: ubuntu-latest
     services:
+      # Same service and env as .github/workflows/pre-release-validate.yml.
       postgres:
         image: postgres:16-alpine
         env:

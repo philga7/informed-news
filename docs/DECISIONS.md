@@ -2,6 +2,14 @@
 
 Binding choices for Informed News. Newest first. When one of these changes, update this file in the same change as [ROADMAP.md](ROADMAP.md) and Jira. What the product does now, in plain language, is [PRODUCT_SPEC.md](PRODUCT_SPEC.md). Pipeline detail remains in [NEWS-84](https://informedcrew.atlassian.net/browse/NEWS-84), [TRIAGE.md](TRIAGE.md), and [BRIEF.md](BRIEF.md). The target is [VISION.md](VISION.md).
 
+## 2026-11-15 — Release validation uses the CI Postgres service (NEWS-234)
+
+**Decision:** Pre-Release Validation is one workflow, [`.github/workflows/pre-release-validate.yml`](../.github/workflows/pre-release-validate.yml). Release calls it before semantic-release. It runs `npm test` with the same Postgres 16 service as CI: `postgres:16-alpine`, dummy user `informed_news`, password `ci-dummy`, database `informed_news_test`, `INFORMED_NEWS_TEST_DATABASE_URL`, `INFORMED_NEWS_TEST_ALLOW_ROLE_PROVISION=1`, and the PostgreSQL client. A pull request that changes that workflow or `release.yml` runs it with contents read. semantic-release, the release deploy key, and the Release job permissions stay in `release.yml` and still run only on a push to `main`. `ci.yml`'s job and check names are unchanged (only a cross-reference comment is added), so the required checks stay **MVP build & typecheck** and **PR title**.
+
+**Why:** A composite action cannot declare a service container. Moving the CI job into this workflow would risk those required check names. After the Postgres store tests landed, Release validation failed on every main push, so semantic-release did not run.
+
+**What it rules out:** Skipping or loosening `npm test`, putting the release deploy key on the shared workflow, and renaming the CI checks.
+
 ## 2026-11-15 — QA has its own Postgres role (NEWS-233)
 
 **Decision:** QA logs in as `informed_news_qa` and owns `informed_news_qa`. QA cannot `CONNECT` to `informed_news` or to the `postgres` maintenance database, so Postgres refuses QA on the live database. `template1` keeps `PUBLIC` `CONNECT`. `PUBLIC` `CONNECT` on `postgres` is revoked, and `informed_news` gets an explicit `CONNECT` grant on it. The live role keeps `CONNECT` on `informed_news`. `instanceGuard` stays fail-closed and also refuses QA when `POSTGRES_USER` is `informed_news`. The QA password is read from `INFORMED_NEWS_QA_PASSWORD` by `scripts/provision-qa-role.sh` and is not echoed. After that it lives only as `POSTGRES_PASSWORD` in `/opt/informed-news/qa.env` with `POSTGRES_USER=informed_news_qa`. The live `.env` and `postgres.env` do not hold it. The script is rerunnable on the existing volume and on a fresh volume. Init scripts are not used. Applying it on the VPS waits for Phil's approval. This change does not edit the server and does not delete the server `.env`.
