@@ -409,4 +409,18 @@ test('provisioning gives QA only its own database and reruns cleanly', async (t:
   const restored = runScript(scriptEnv(admin, QA_PASSWORD));
   assertProvisioned(restored, QA_PASSWORD);
   assert.deepEqual(await readSnapshot(admin), snapshot);
+
+  // NEWS-235: the PUBLIC revoke still holds after the reruns.
+  const rerunRefusal = await withClient(
+    connect(admin, { user: standIn, password: standInPassword, database: 'informed_news_qa' }),
+    async () => null,
+  ).then(
+    () => {
+      assert.fail('a non-superuser live-style role connected to informed_news_qa after reruns');
+    },
+    (error: unknown) => error,
+  );
+  assert.equal((rerunRefusal as Error & { code?: string }).code, '42501');
+  const [qaPublicAfter] = await readPublicGrants(admin, ['informed_news_qa']);
+  assert.deepEqual(qaPublicAfter?.privileges, [], 'PUBLIC holds privileges on informed_news_qa after reruns');
 });
