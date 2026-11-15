@@ -44,7 +44,9 @@ The checkout moves by release tag, detached. Find the tag on the GitHub releases
 scripts/vps-update-checkout.sh vX.Y.Z
 ```
 
-The script runs `git fetch --tags origin`, then checks the tag exists, the working tree is clean, and the move is a fast-forward from the current HEAD. It refuses otherwise and changes nothing. It checks the tag out detached and prints the old and new SHA and tag. Running it again with the same tag succeeds and leaves HEAD on that tag.
+The script runs `git fetch --tags origin`, then checks the tag exists, there are no changes to tracked files (untracked files such as `qa.env`, `.env.bak`, and `postgres.env.bak` are left alone), and the move is a fast-forward from the current HEAD. It refuses otherwise and changes nothing. It checks the tag out detached and prints the old and new SHA and tag. Running it again with the same tag succeeds and leaves HEAD on that tag.
+
+If HEAD is on a commit of `main` that is past the latest release tag (for example a `docs:` or `chore:` merge, which semantic-release does not tag), the first move to that tag is not a fast-forward and the script refuses it. Wait for the next release, or do a one-time manual move that Phil approves.
 
 The script only moves the checkout. Switching the running server is a separate step that Phil approves. Do not run either from CI or from a pull request. After Phil approves the switch:
 

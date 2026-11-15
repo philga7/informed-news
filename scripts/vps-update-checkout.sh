@@ -10,8 +10,11 @@ fi
 tag="$1"
 cd "${REPO_DIR:-.}"
 
-if [ -n "$(git status --porcelain)" ]; then
-	echo "working tree is not clean; refusing to move" >&2
+# Untracked files (qa.env, .env.bak, postgres.env.bak) live in the checkout on
+# purpose. Only tracked changes block a move; git checkout itself refuses if a
+# move would overwrite an untracked file.
+if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+	echo "working tree is not clean (tracked changes); refusing to move" >&2
 	exit 1
 fi
 

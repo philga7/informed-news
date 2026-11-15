@@ -112,4 +112,15 @@ describe('NEWS-236 VPS checkout update by release tag', () => {
 		const ok = run(checkout, 'v0.3.0');
 		assert.equal(ok.status, 0, ok.stderr);
 	});
+
+	it('ignores untracked files such as qa.env and still moves forward', () => {
+		commit(origin, 'e');
+		git(origin, 'tag', 'v0.4.0');
+		const v4 = git(origin, 'rev-parse', 'HEAD');
+		writeFileSync(join(checkout, 'qa.env'), 'SECRET=1');
+		writeFileSync(join(checkout, '.env.bak'), 'SECRET=1');
+		const r = run(checkout, 'v0.4.0');
+		assert.equal(r.status, 0, r.stderr);
+		assert.equal(git(checkout, 'rev-parse', 'HEAD'), v4);
+	});
 });
