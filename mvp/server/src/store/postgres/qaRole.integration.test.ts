@@ -357,6 +357,36 @@ test('provisioning gives QA only its own database and reruns cleanly', async (t:
     assert.equal(rows[0]?.one, 1);
   });
 
+  // NEWS-235: PUBLIC must not be able to connect to the QA database. The live
+  // role is the cluster superuser in CI and on the VPS, and Postgres never
+  // refuses a superuser, so a non-superuser stand-in proves the PUBLIC revoke.
+  const standIn = 'informed_news_live_probe';
+  const standInPassword = 'ci-live-probe-dummy';
+  await withClient(connect(admin, {}), async (client) => {
+    await client.query(`DROP ROLE IF EXISTS ${standIn}`);
+    await client.query(`CREATE ROLE ${standIn} LOGIN NOSUPERUSER PASSWORD '${standInPassword}'`);
+  });
+  t.after(async () => {
+    await withClient(connect(admin, {}), (client) => client.query(`DROP ROLE IF EXISTS ${standIn}`));
+  });
+  const qaRefusal = await withClient(
+    connect(admin, { user: standIn, password: standInPassword, database: 'informed_news_qa' }),
+    async () => null,
+  ).then(
+    () => {
+      assert.fail('a non-superuser live-style role connected to informed_news_qa');
+    },
+    (error: unknown) => error,
+  );
+  assert.equal((qaRefusal as Error & { code?: string }).code, '42501');
+  const [qaPublic] = await readPublicGrants(admin, ['informed_news_qa']);
+  assert.deepEqual(qaPublic?.privileges, [], 'PUBLIC still holds privileges on informed_news_qa');
+  // Owner and superuser keep access.
+  await withClient(connect(admin, { database: 'informed_news_qa' }), async (client) => {
+    const { rows } = await client.query<{ one: number }>('SELECT 1 AS one');
+    assert.equal(rows[0]?.one, 1);
+  });
+
   const second = runScript(scriptEnv(admin, QA_PASSWORD));
   assertProvisioned(second, QA_PASSWORD);
   assert.deepEqual(await readSnapshot(admin), snapshot);
