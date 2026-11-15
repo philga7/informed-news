@@ -8,6 +8,8 @@ This is not the release log. Releases are recorded in `CHANGELOG.md` by semantic
 
 ## 2026-11-15
 
+**No user-visible change.** VPS checkout updates are done by release tag. The Brief is unchanged.
+
 **No user-visible change.** Release checks on main can run the database tests again, so a version can be cut. The Brief is unchanged.
 
 **No user-visible change.** QA signing in as its own database role is an operator step. The Brief is unchanged.

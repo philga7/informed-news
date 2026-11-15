@@ -4,7 +4,7 @@ Plain-language steps for running Informed News in Docker on the VPS and reaching
 
 ## Repo
 
-- Path: `/opt/informed-news`, branch `main`, owner `deploy`.
+- Path: `/opt/informed-news`, owner `deploy`. The checkout stays detached on purpose, pinned to a release tag (`vX.Y.Z`, cut by semantic-release), not to `main` or a bare SHA.
 - One-time clone if the directory is missing:
 
 ```bash
@@ -38,12 +38,19 @@ Live commands must not pass `-p` and must not set `COMPOSE_PROJECT_NAME`. Either
 
 ## Update
 
-The checkout may be a single-branch clone. Fetch `main` into the local `main` ref before checking it out.
+The checkout moves by release tag, detached. Find the tag on the GitHub releases page (or `git tag --list 'v*' --sort=-v:refname` after a fetch). Then, from `/opt/informed-news`:
 
 ```bash
-git fetch origin main:main
-git checkout main
-git pull --ff-only origin main
+scripts/vps-update-checkout.sh vX.Y.Z
+```
+
+The script runs `git fetch --tags origin`, then checks the tag exists, there are no changes to tracked files (untracked files such as `qa.env`, `.env.bak`, and `postgres.env.bak` are left alone), and the move is a fast-forward from the current HEAD. It refuses otherwise and changes nothing. It checks the tag out detached and prints the old and new SHA and tag. Running it again with the same tag succeeds and leaves HEAD on that tag.
+
+If HEAD is on a commit of `main` that is past the latest release tag (for example a `docs:` or `chore:` merge, which semantic-release does not tag), the first move to that tag is not a fast-forward and the script refuses it. Wait for the next release, or do a one-time manual move that Phil approves.
+
+The script only moves the checkout. Switching the running server is a separate step that Phil approves. Do not run either from CI or from a pull request. After Phil approves the switch:
+
+```bash
 docker compose up -d --build
 ```
 
