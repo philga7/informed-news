@@ -2,6 +2,14 @@
 
 Binding choices for Informed News. Newest first. When one of these changes, update this file in the same change as [ROADMAP.md](ROADMAP.md) and Jira. What the product does now, in plain language, is [PRODUCT_SPEC.md](PRODUCT_SPEC.md). Pipeline detail remains in [NEWS-84](https://informedcrew.atlassian.net/browse/NEWS-84), [TRIAGE.md](TRIAGE.md), and [BRIEF.md](BRIEF.md). The target is [VISION.md](VISION.md).
 
+## 2026-11-15 — QA has its own Postgres role (NEWS-233)
+
+**Decision:** QA logs in as `informed_news_qa` and owns `informed_news_qa`. QA cannot `CONNECT` to `informed_news` or to the `postgres` maintenance database, so Postgres refuses QA on the live database. `template1` keeps `PUBLIC` `CONNECT`. `PUBLIC` `CONNECT` on `postgres` is revoked, and `informed_news` gets an explicit `CONNECT` grant on it. The live role keeps `CONNECT` on `informed_news`. `instanceGuard` stays fail-closed and also refuses QA when `POSTGRES_USER` is `informed_news`. The QA password is read from `INFORMED_NEWS_QA_PASSWORD` by `scripts/provision-qa-role.sh` and is not echoed. After that it lives only as `POSTGRES_PASSWORD` in `/opt/informed-news/qa.env` with `POSTGRES_USER=informed_news_qa`. The live `.env` and `postgres.env` do not hold it. The script is rerunnable on the existing volume and on a fresh volume. Init scripts are not used. Applying it on the VPS waits for Phil's approval. This change does not edit the server and does not delete the server `.env`.
+
+**Why:** After the 2026-11-14 layout, `qa.env` used the live role and password, so only `instanceGuard` kept QA off `informed_news`.
+
+**What it rules out:** QA using the live role, storing the QA password in `postgres.env` or the live `.env`, a provision command that echoes the password, a non-superuser other than `informed_news` connecting to the `postgres` database, and deleting the server `.env`.
+
 ## 2026-11-14 — informed-news-db belongs to neither Compose project (NEWS-232)
 
 **Decision:** Network `informed-news-db` is external. Create it once with `docker network create informed-news-db`. Live `docker compose down` does not remove it, and QA `docker compose down` does not remove it either, so either project can be torn down while the other stays attached. The VPS already has this network. Do not create a second one. This change does not edit the server, does not edit the server env file, and does not delete it. Applying it on the VPS waits for Phil's approval.

@@ -554,6 +554,21 @@ describe('QA instance runbook', () => {
 			'QA image tag belongs in the env placeholder, the first start, and the recreate command',
 		);
 
+		for (const phrase of [
+			'POSTGRES_USER=informed_news_qa',
+			'scripts/provision-qa-role.sh',
+			'INFORMED_NEWS_QA_PASSWORD',
+			'cp -a',
+			'Never delete',
+			'informed-news-postgres-1',
+		]) {
+			assert.ok(section.includes(phrase), `QA instance section missing: ${phrase}`);
+		}
+		assert.ok(
+			!section.split('\n').includes('POSTGRES_USER=informed_news'),
+			'QA env placeholder must not use the live role',
+		);
+
 		const recreateAt = section.indexOf('### Recreate without a build');
 		assert.ok(recreateAt !== -1, 'missing recreate-without-a-build section');
 		const recreateNext = section.indexOf('\n### ', recreateAt + 1);

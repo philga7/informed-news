@@ -457,4 +457,28 @@ describe('NEWS-165 vision and decisions', () => {
 		assert.match(news232, /does not edit the server/);
 		assert.match(news232, /Phil's approval/);
 	});
+
+	it('records that QA has its own Postgres role (NEWS-233)', () => {
+		const decisions = read('docs/DECISIONS.md');
+		const entries = decisions.split(/^## /m).slice(1);
+		const news233 = entries.find((entry) => entry.includes('NEWS-233'));
+		assert.ok(news233, 'NEWS-233 decision missing');
+		assert.match(news233, /\*\*Decision:\*\*/);
+		assert.match(news233, /\*\*Why:\*\*/);
+		assert.match(news233, /\*\*What it rules out:\*\*/);
+		assert.match(news233, /informed_news_qa/);
+		assert.match(news233, /INFORMED_NEWS_QA_PASSWORD/);
+		assert.match(news233, /instanceGuard/);
+		assert.match(news233, /does not delete the server/);
+		assert.match(news233, /Phil's approval/);
+
+		const whatsNew = read('docs/WHATS_NEW.md');
+		const nov15 = whatsNew.split(/^## /m).find((entry) => entry.startsWith('2026-11-15'));
+		assert.ok(nov15, '2026-11-15 whats-new entry missing');
+		assert.match(nov15, /\*\*No user-visible change\.\*\*/);
+
+		const roadmap = read('docs/ROADMAP.md');
+		assert.match(roadmap, /\*\*Current next\*\* is the UI build/);
+		assert.match(roadmap, /NEWS-233/);
+	});
 });

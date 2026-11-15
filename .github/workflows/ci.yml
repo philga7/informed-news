@@ -28,6 +28,7 @@ jobs:
           --health-retries 5
     env:
       INFORMED_NEWS_TEST_DATABASE_URL: postgres://informed_news:ci-dummy@127.0.0.1:5432/informed_news_test
+      INFORMED_NEWS_TEST_ALLOW_ROLE_PROVISION: "1"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -72,6 +73,9 @@ jobs:
 
       - name: Test shell build
         run: npm run test:shell-build --prefix mvp/server
+
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
 
       - name: Test
         run: npm test

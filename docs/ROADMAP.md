@@ -22,7 +22,7 @@ Claims spine plan: [`.cursor/plans/claims_evidence_spine_8f4cde15.plan.md`](../.
 
 [NEWS-224](https://informedcrew.atlassian.net/browse/NEWS-224) is the Postgres store for stories and entries, Morning items, and CFP roundups. It does not become current next, and it does not lift the pause above.
 
-[NEWS-230](https://informedcrew.atlassian.net/browse/NEWS-230) scopes the Postgres env and wires the QA app to `informed_news_qa` in the repo. [NEWS-231](https://informedcrew.atlassian.net/browse/NEWS-231) keeps a QA compose command from starting Postgres. [NEWS-232](https://informedcrew.atlassian.net/browse/NEWS-232) makes `informed-news-db` an external network that neither project's `down` removes. None of these becomes current next or lifts the pause. Applying the layout on the VPS waits for Phil's approval.
+[NEWS-230](https://informedcrew.atlassian.net/browse/NEWS-230) scopes the Postgres env and wires the QA app to `informed_news_qa` in the repo. [NEWS-231](https://informedcrew.atlassian.net/browse/NEWS-231) keeps a QA compose command from starting Postgres. [NEWS-232](https://informedcrew.atlassian.net/browse/NEWS-232) makes `informed-news-db` an external network that neither project's `down` removes. None of these becomes current next or lifts the pause. Applying the layout on the VPS waits for Phil's approval. [NEWS-233](https://informedcrew.atlassian.net/browse/NEWS-233) gives QA its own Postgres role, locked to `informed_news_qa`. It does not become current next or lift the pause. Applying it on the VPS waits for Phil's approval. It lands before NEWS-225.
 
 ### Combined order (Oct 23, 2026; citation guard added Oct 26)
 
@@ -169,6 +169,7 @@ Unscheduled: Watchers stay on [NEWS-84](https://informedcrew.atlassian.net/brows
 | 80d | [NEWS-230](https://informedcrew.atlassian.net/browse/NEWS-230) | Postgres env layout and QA app on `informed_news_qa` in the repo; not current next; applying on the VPS waits for Phil's approval |
 | 80e | [NEWS-231](https://informedcrew.atlassian.net/browse/NEWS-231) | QA compose cannot start Postgres; not current next |
 | 80f | [NEWS-232](https://informedcrew.atlassian.net/browse/NEWS-232) | `informed-news-db` is an external network neither project removes; not current next |
+| 80g | [NEWS-233](https://informedcrew.atlassian.net/browse/NEWS-233) | QA has its own Postgres role, locked to `informed_news_qa`; not current next |
 | — | [NEWS-93](https://informedcrew.atlassian.net/browse/NEWS-93) | Always-on hosting decision — **Done**; hosting complete, runbook [docs/RUNBOOK.md](RUNBOOK.md) (see [Always-on hosting](#always-on-hosting-news-93)) |
 | Later | [NEWS-92](https://informedcrew.atlassian.net/browse/NEWS-92) | USAspending contract awards source for company Watch topics |
 | Later | [NEWS-163](https://informedcrew.atlassian.net/browse/NEWS-163) | Optional birdclaw → Brief handoff for tweet evidence (NEWS-123 follow-up; not an xcancel scrape) |
