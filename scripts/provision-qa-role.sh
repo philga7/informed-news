@@ -110,6 +110,11 @@ WHERE NOT EXISTS (SELECT 1 FROM pg_database WHERE datname = 'informed_news_qa')
 
 ALTER DATABASE informed_news_qa OWNER TO informed_news_qa;
 
+-- A new database grants CONNECT to PUBLIC, so any role could open it. Only the
+-- QA role (and the owner and superusers, who need no grant) may connect.
+REVOKE ALL ON DATABASE informed_news_qa FROM PUBLIC;
+GRANT CONNECT ON DATABASE informed_news_qa TO informed_news_qa;
+
 REVOKE ALL ON DATABASE informed_news FROM PUBLIC;
 REVOKE ALL ON DATABASE informed_news FROM informed_news_qa;
 GRANT CONNECT ON DATABASE informed_news TO informed_news;

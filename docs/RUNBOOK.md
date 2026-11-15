@@ -211,7 +211,9 @@ QA logs in as its own role, `informed_news_qa`, not the live one. Postgres itsel
 docker exec -i -e INFORMED_NEWS_QA_PASSWORD informed-news-postgres-1 sh -s < scripts/provision-qa-role.sh
 ```
 
-   The script is safe to run again.
+   The script is safe to run again. It also revokes `CONNECT` on `informed_news_qa` from `PUBLIC` and grants it only to `informed_news_qa`, so a role other than the QA role, the database owner, or a superuser is refused with `permission denied`. A superuser bypasses every privilege check. That includes `informed_news` while it is the cluster's `POSTGRES_USER`, so Postgres cannot refuse it on `informed_news_qa`. Dropping that superuser access is a separate change.
+
+   **Rerun on the VPS (NEWS-235).** Rerunning this step on the existing volume applies the `PUBLIC` revoke. The server rerun is a separate step and Phil approves it. Do not run it from CI or from a PR. After it runs, check a non-superuser role (not the QA role) with `-d informed_news_qa`. It should fail with `permission denied`.
 4. Rewrite `qa.env` so `POSTGRES_USER=informed_news_qa` and `POSTGRES_PASSWORD` is that same QA password. Do not print the file.
 5. Recreate QA with the existing command in [Recreate without a build](#recreate-without-a-build). Do not build. Do not delete the server `.env`.
 6. Check the role over TCP, not the local socket (the image trusts local sockets). With `INFORMED_NEWS_QA_PASSWORD` still exported and not echoed:
