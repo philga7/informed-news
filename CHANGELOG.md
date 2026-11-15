@@ -1,3 +1,9 @@
+## [0.43.3](https://github.com/philga7/informed-news/compare/v0.43.2...v0.43.3) (2026-11-15)
+
+### Bug Fixes
+
+* **NEWS-237:** run CI on Claude follow-up pushes ([#287](https://github.com/philga7/informed-news/issues/287)) ([729fbe5](https://github.com/philga7/informed-news/commit/729fbe5bec85745b5bdd19c1352289fd9ead7d3a)), closes [#284](https://github.com/philga7/informed-news/issues/284) [#286](https://github.com/philga7/informed-news/issues/286) [#257](https://github.com/philga7/informed-news/issues/257)
+
 ## [0.43.2](https://github.com/philga7/informed-news/compare/v0.43.1...v0.43.2) (2026-11-15)
 
 ### Bug Fixes
