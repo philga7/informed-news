@@ -1,3 +1,9 @@
+## [0.43.2](https://github.com/philga7/informed-news/compare/v0.43.1...v0.43.2) (2026-11-15)
+
+### Bug Fixes
+
+* **NEWS-236:** update VPS checkout by release tag ([#286](https://github.com/philga7/informed-news/issues/286)) ([3247e5d](https://github.com/philga7/informed-news/commit/3247e5dd675b3fc4979f04020fadcc7f0aa375a1)), closes [#285](https://github.com/philga7/informed-news/issues/285)
+
 ## [0.43.1](https://github.com/philga7/informed-news/compare/v0.43.0...v0.43.1) (2026-11-15)
 
 ### Bug Fixes
