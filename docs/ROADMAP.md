@@ -26,9 +26,9 @@ Claims spine plan: [`.cursor/plans/claims_evidence_spine_8f4cde15.plan.md`](../.
 
 ### UI build sequence (2026-11-16)
 
-This is the order the next-wave note above says would be proposed. Phil approved it on 2026-11-16. It comes from the ticket breakdown in "informed-news: data model proposal for the dashboard UI", and the decisions behind it are the four 2026-11-16 entries in [DECISIONS.md](DECISIONS.md). Data work lands before UI work.
+This is the order the next-wave note above says would be proposed. Phil approved it on 2026-11-16. It comes from the ticket breakdown in "informed-news: data model proposal for the dashboard UI", and the decisions behind it are the 2026-11-16 entries in [DECISIONS.md](DECISIONS.md). Data work lands before UI work.
 
-Rows are in build order. One ticket is built at a time, and each starts on Phil's go. The next step is the first row that is not **Done**. A step marked "not filed" has no NEWS key yet. A step marked "widened" or "split" has not been amended in Jira yet. File or amend it in Jira, after Phil confirms, before building it.
+Rows are in build order. One ticket is built at a time, and each starts on Phil's go. Within this sequence, the next step is the first row that is not **Done**. That does not make it current next by itself: the next-wave note above stays authoritative until a follow-up rewords it, and each step still starts only on Phil's go. A step marked "not filed" has no NEWS key yet. A step marked "widened" or "split" has not been amended in Jira yet. File or amend it in Jira, after Phil confirms, before building it.
 
 | Order | Ticket | Scope | Waits on | Builder | Approach |
 |---|---|---|---|---|---|
@@ -45,7 +45,7 @@ Rows are in build order. One ticket is built at a time, and each starts on Phil'
 | 11 | Breaking block (not filed) | Fill the block from Breaking items, with labels and story links | 5, 6 | GitHub Issue | TDD |
 | 12 | [NEWS-229](https://informedcrew.atlassian.net/browse/NEWS-229), as filed | Deep-link format and the one-line morning message contract | 5, 7 | GitHub Issue | TDD |
 | 13 | Topics in the shell (not filed) | Port the Topics page and the filtered-out view; fill the My topics block with its shown and filtered counts | 6 | Session | SDD |
-| 14 | Topic stories page (not filed) | Move today's topic Brief from `/` to a page per topic, opened from the My topics block | 6, 13 | Session | SDD |
+| 14 | Topic stories page (not filed) | Move today's topic Brief from `/` to a page per topic, opened from the My topics block; drop the shell's `/latest/…` routes | 6, 13 | Session | SDD |
 | 15 | Remove Kite (not filed) | `npm run dev` becomes server plus shell; delete `apps/kite`, its unit tests, and the Kite e2e spec; update `AGENTS.md`, `CLAUDE.md`, the README, and the route map. The CI workflow edit goes to Cursor | 13, 14 | Session, with Cursor for CI | SDD |
 
 Builder and approach:
@@ -62,7 +62,7 @@ What this does to the tickets paused on 2026-11-12. None of them is started on i
 - [NEWS-219](https://informedcrew.atlassian.net/browse/NEWS-219) and [NEWS-223](https://informedcrew.atlassian.net/browse/NEWS-223) are folded into step 6.
 - [NEWS-220](https://informedcrew.atlassian.net/browse/NEWS-220), [NEWS-221](https://informedcrew.atlassian.net/browse/NEWS-221), and [NEWS-222](https://informedcrew.atlassian.net/browse/NEWS-222) stay paused.
 
-[NEWS-139](https://informedcrew.atlassian.net/browse/NEWS-139) documents the Kite fork, so it is not worth doing now. Dev-tooling [NEWS-121](https://informedcrew.atlassian.net/browse/NEWS-121) can run at any time.
+Dev tooling: [NEWS-139](https://informedcrew.atlassian.net/browse/NEWS-139) documents the Kite fork, so it is not worth doing now. [NEWS-128](https://informedcrew.atlassian.net/browse/NEWS-128) type-checks `e2e/kite-smoke.spec.ts` and `e2e/stack` in CI. Step 15 deletes that spec, so it is not worth doing against Kite either; revisit it when the shell has its own e2e spec. It touches the CI workflow, so it stays with Cursor. [NEWS-121](https://informedcrew.atlassian.net/browse/NEWS-121) can run at any time. Other lines in this file and in `CLAUDE.md` still list NEWS-139 and NEWS-128 as unpaused dev tooling. Until a follow-up corrects them, ask Phil before starting either.
 
 Not ticketed anywhere yet: the Stories index page, the Sources page, a check of the narrow mobile layout, and the Grok Bot skill that formats and labels posts, which sits outside this repo.
 

@@ -13,6 +13,8 @@ Binding choices for Informed News. Newest first. When one of these changes, upda
 | `/filtered` | Ported to the shell, reached from the My topics block on the dashboard. |
 | `/feedback`, `/transparency`, `/about`, `/contribute` | Dropped. |
 
+The table covers the shell's copies too. When the image is served, the shell already serves the Brief at `/latest/…` (`apps/web/src/routes/latest/`). Those shell routes are dropped in the topic stories page step of the sequence, the same step that moves the Brief off `/`. Kite's copies go with `apps/kite` in the remove-Kite step.
+
 The topic Brief is kept. It already lives in the shell, and it moves from `/` to a page per topic, opened from the My topics block. Its Like and Not relevant buttons stay with it. Only the separate `/feedback` list page goes.
 
 The default dev path changes. `npm run dev` becomes `mvp/server` plus the shell when the remove-Kite step of the [UI build sequence](ROADMAP.md#ui-build-sequence-2026-11-16) ships. Until that step merges, `npm run dev` is unchanged (`mvp/server` plus Kite), and [AGENTS.md](../AGENTS.md) still lists it as a product invariant. The remove-Kite step updates `AGENTS.md`, `CLAUDE.md`, the README, and the route map in the same change. This entry is the product decision that step needs. It does not change the dev path by itself.
@@ -23,7 +25,15 @@ This supersedes the part of [2026-10-23 — The SPA lives in this repo](#2026-10
 
 **Why:** Phil decided on 2026-11-16 to stop using Kite. The Round 2 mockup is the product, and it has no Kite Brief, Feedback, Transparency, About, or Contribute page. Keeping a second UI app means two test suites and two builds for pages nobody will open. `apps/kite` is 754 tracked files with 336 unit tests, and nearly all of the 60 end-to-end tests are in the Kite smoke spec. Coverage moves to shell tests as each page is ported.
 
-**What it rules out:** Building new UI in `apps/kite`, porting the Feedback, Transparency, About, or Contribute pages, changing `npm run dev` before the remove-Kite step, deleting `apps/kite` before Topics, the filtered-out view, and the per-topic Brief page are in the shell, removing the MIT attribution without that check, and Claude editing `.github/workflows` for the removal.
+**What it rules out:** Building new UI in `apps/kite`, porting the Feedback, Transparency, About, or Contribute pages, keeping the shell's `/latest/…` routes after the Brief moves to a page per topic, changing `npm run dev` before the remove-Kite step, deleting `apps/kite` before Topics, the filtered-out view, and the per-topic Brief page are in the shell, removing the MIT attribution without that check, and Claude editing `.github/workflows` for the removal.
+
+## 2026-11-16 — SDD tickets may be built inline in a Claude session (NEWS-238)
+
+**Decision:** An SDD ticket may be built in a Claude session (claude.ai or Claude Code) or in Cursor. Phil picks per ticket, by where he has usage to spare. In a Claude session the default is to build the plan's tasks inline in the main model, then have one fresh sub-agent review the whole branch before the pull request opens. A sub-agent per task is used only for a wide ticket with separate parts, and Phil chooses that per ticket. This is the one exception to [NEWS-179](https://informedcrew.atlassian.net/browse/NEWS-179), which says Approach: SDD dispatches every task through an implementer sub-agent. NEWS-179 still applies in Cursor and everywhere else. Either way the plan is written under `.cursor/plans/` and the `subagent-driven-development` ledger is kept, so a ticket can move between Claude and Cursor midway. The rules are in [CLAUDE.md](../CLAUDE.md#sdd-in-a-claude-session). The skill cheat sheet in [AGENTS.md](../AGENTS.md) still describes the sub-agent-per-task default and is not changed here. No product behavior changes.
+
+**Why:** Phil's priority is being able to run an SDD ticket with either tool. A fresh sub-agent per task and per review costs a new context each time, which works against keeping Claude usage under about half. One independent review of the whole branch keeps a second set of eyes on the work, and the shared plan and ledger keep the handoff between tools possible.
+
+**What it rules out:** Inline SDD in Cursor, skipping the final whole-branch review, a Claude session that keeps no plan file or ledger, the builder reviewing its own branch as the final review, and reading this as a change to TDD tickets, which still go through GitHub Issues and the `@claude` action.
 
 ## 2026-11-16 — Grok Bot posts through one ingest contract, with no page scraper (NEWS-238)
 
