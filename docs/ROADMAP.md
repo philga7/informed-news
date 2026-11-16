@@ -28,25 +28,25 @@ Claims spine plan: [`.cursor/plans/claims_evidence_spine_8f4cde15.plan.md`](../.
 
 This is the order the next-wave note above says would be proposed. Phil approved it on 2026-11-16. It comes from the ticket breakdown in "informed-news: data model proposal for the dashboard UI", and the decisions behind it are the 2026-11-16 entries in [DECISIONS.md](DECISIONS.md). Data work lands before UI work.
 
-Rows are in build order. One ticket is built at a time, and each starts on Phil's go. Within this sequence, the next step is the first row that is not **Done**. That does not make it current next by itself: the next-wave note above stays authoritative until a follow-up rewords it, and each step still starts only on Phil's go. A step marked "not filed" has no NEWS key yet. A step marked "widened" or "split" has not been amended in Jira yet. File or amend it in Jira, after Phil confirms, before building it.
+Rows are in build order. One ticket is built at a time, and each starts on Phil's go. Within this sequence, the next step is the first row whose Status is not **Done**. The pull request that ships a step marks its row **Done**. That does not make it current next by itself: the next-wave note above stays authoritative until a follow-up rewords it, and each step still starts only on Phil's go. A step marked "not filed" has no NEWS key yet. A step marked "widened" or "split" has not been amended in Jira yet. File or amend it in Jira, after Phil confirms, before building it.
 
-| Order | Ticket | Scope | Waits on | Builder | Approach |
-|---|---|---|---|---|---|
-| 1 | [NEWS-238](https://informedcrew.atlassian.net/browse/NEWS-238) | Record decisions: multi-user accounts, the label list and its mapping, the ingest contract, and retiring Kite in `docs/DECISIONS.md`; this sequence; SDD in a Claude session in `CLAUDE.md` | Phil's sign-off | Session | Docs only |
-| 2 | Schema v2 (not filed) | The wider tables and fields, store functions, tests | 1 | Session | SDD |
-| 3 | Users and read markers (not filed) | Accounts, sign-in, per-user markers for stories, CFP, and Weather | 2 | Session | SDD |
-| 4 | Seed fixtures (not filed) | Two real stories written by hand in the v2 shape, to test the schema and build the UI against | 2 | GitHub Issue | TDD |
-| 5 | [NEWS-228](https://informedcrew.atlassian.net/browse/NEWS-228), widened | Ingest contract for stories, entries, Breaking, CFP, and Morning, which Grok Bot also uses to backfill tracked stories; the four Morning cards with the weather grid | 2 | Session | SDD |
-| 6 | [NEWS-225](https://informedcrew.atlassian.net/browse/NEWS-225), widened | Home shell, trackers line, Developing list with category chips and the Quiet group. Folds in [NEWS-219](https://informedcrew.atlassian.net/browse/NEWS-219) and [NEWS-223](https://informedcrew.atlassian.net/browse/NEWS-223) | 2, 3, 4 | Session | SDD |
-| 7 | [NEWS-226](https://informedcrew.atlassian.net/browse/NEWS-226) part a (split) | Timeline page, +N clearing on scroll, "Caught up", deep-link highlight. Absorbs [NEWS-201](https://informedcrew.atlassian.net/browse/NEWS-201) | 6 | Session | SDD |
-| 8 | [NEWS-226](https://informedcrew.atlassian.net/browse/NEWS-226) part b (split) | "What changed" digest, tag and label filters, "New only", paging of older entries | 7 | GitHub Issue | TDD |
-| 9 | [NEWS-226](https://informedcrew.atlassian.net/browse/NEWS-226) part c (split) | Right rail: Seats panel, Next dates, Entries per day, Sources, Related stories | 7 | Session | SDD |
-| 10 | [NEWS-227](https://informedcrew.atlassian.net/browse/NEWS-227), widened | CFP list with topic, source, status, read-up-to line, +N, "Show all", footer notes. Split in two to stay Small | 3, 6 | GitHub Issue | TDD |
-| 11 | Breaking block (not filed) | Fill the block from Breaking items, with labels and story links | 5, 6 | GitHub Issue | TDD |
-| 12 | [NEWS-229](https://informedcrew.atlassian.net/browse/NEWS-229), as filed | Deep-link format and the one-line morning message contract | 5, 7 | GitHub Issue | TDD |
-| 13 | Topics in the shell (not filed) | Port the Topics page and the filtered-out view; fill the My topics block with its shown and filtered counts | 6 | Session | SDD |
-| 14 | Topic stories page (not filed) | Move today's topic Brief from `/` to a page per topic, opened from the My topics block; drop the shell's `/latest/…` routes | 6, 13 | Session | SDD |
-| 15 | Remove Kite (not filed) | `npm run dev` becomes server plus shell; delete `apps/kite`, its unit tests, and the Kite e2e spec; update `AGENTS.md`, `CLAUDE.md`, the README, and the route map. The CI workflow edit goes to Cursor | 13, 14 | Session, with Cursor for CI | SDD |
+| Order | Status | Ticket | Scope | Waits on | Builder | Approach |
+|---|---|---|---|---|---|---|
+| 1 | **Done** (this change) | [NEWS-238](https://informedcrew.atlassian.net/browse/NEWS-238) | Record decisions: multi-user accounts, the label list and its mapping, the ingest contract, and retiring Kite in `docs/DECISIONS.md`; this sequence; SDD in a Claude session in `CLAUDE.md` | Phil's sign-off | Session | Docs only |
+| 2 | To Do | Schema v2 (not filed) | The wider tables and fields, store functions, tests | 1 | Session | SDD |
+| 3 | To Do | Users and read markers (not filed) | Accounts, sign-in, per-user markers for stories, CFP, and Weather | 2 | Session | SDD |
+| 4 | To Do | Seed fixtures (not filed) | Two real stories written by hand in the v2 shape, to test the schema and build the UI against | 2 | GitHub Issue | TDD |
+| 5 | To Do | [NEWS-228](https://informedcrew.atlassian.net/browse/NEWS-228), widened | Ingest contract for stories, entries, Breaking, CFP, and Morning, which Grok Bot also uses to backfill tracked stories; the four Morning cards with the weather grid | 2 | Session | SDD |
+| 6 | To Do | [NEWS-225](https://informedcrew.atlassian.net/browse/NEWS-225), widened | Home shell, trackers line, Developing list with category chips and the Quiet group. Folds in [NEWS-219](https://informedcrew.atlassian.net/browse/NEWS-219) and [NEWS-223](https://informedcrew.atlassian.net/browse/NEWS-223) | 2, 3, 4 | Session | SDD |
+| 7 | To Do | [NEWS-226](https://informedcrew.atlassian.net/browse/NEWS-226) part a (split) | Timeline page, +N clearing on scroll, "Caught up", deep-link highlight. Absorbs [NEWS-201](https://informedcrew.atlassian.net/browse/NEWS-201) | 6 | Session | SDD |
+| 8 | To Do | [NEWS-226](https://informedcrew.atlassian.net/browse/NEWS-226) part b (split) | "What changed" digest, tag and label filters, "New only", paging of older entries | 7 | GitHub Issue | TDD |
+| 9 | To Do | [NEWS-226](https://informedcrew.atlassian.net/browse/NEWS-226) part c (split) | Right rail: Seats panel, Next dates, Entries per day, Sources, Related stories | 7 | Session | SDD |
+| 10 | To Do | [NEWS-227](https://informedcrew.atlassian.net/browse/NEWS-227), widened | CFP list with topic, source, status, read-up-to line, +N, "Show all", footer notes. Split in two to stay Small | 3, 6 | GitHub Issue | TDD |
+| 11 | To Do | Breaking block (not filed) | Fill the block from Breaking items, with labels and story links | 5, 6 | GitHub Issue | TDD |
+| 12 | To Do | [NEWS-229](https://informedcrew.atlassian.net/browse/NEWS-229), as filed | Deep-link format and the one-line morning message contract | 5, 7 | GitHub Issue | TDD |
+| 13 | To Do | Topics in the shell (not filed) | Port the Topics page and the filtered-out view; fill the My topics block with its shown and filtered counts | 6 | Session | SDD |
+| 14 | To Do | Topic stories page (not filed) | Move today's topic Brief from `/` to a page per topic, opened from the My topics block; drop the shell's `/latest/…` routes | 6, 13 | Session | SDD |
+| 15 | To Do | Remove Kite (not filed) | `npm run dev` becomes server plus shell; delete `apps/kite`, its unit tests, and the Kite e2e spec; update `AGENTS.md`, `CLAUDE.md`, the README, and the route map. The CI workflow edit goes to Cursor | 13, 14 | Session, with Cursor for CI | SDD |
 
 Builder and approach:
 
