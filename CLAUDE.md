@@ -95,6 +95,17 @@ Rules for `claude-build`:
 - `node --test` and `node --test …` are allowed, so `tests/*.test.js` can run. Any other `node` command, `Bash(node:*)`, and `Bash(git:*)` stay disallowed. Edit, Write, `git add`, and `git commit` are allowed. The only pushes allowed are `git push origin HEAD` and `git push -u origin HEAD`, with no flags, so a follow-up commit is `claude[bot]` on the action app token. Checkout does not persist the workflow token. `scripts/stage-claude-checkout-auth.mjs` leaves that token on the origin URL only until the action's git auth rewrites origin with the app token. That rewrite is what sets the pusher. `bot_id` `209825114` sets the commit author email only (`209825114+claude[bot]@users.noreply.github.com`, as on `ee87d60`). A bare `git push` is not allowed. Pushes to `main`, force pushes, and remote branch deletes stay disallowed. npx, curl, and installs stay disallowed. `gh pr edit` may change only Claude's own pull request title and body.
 - Open a PR with `gh pr create` after the push. Do not post a compare link. The author stays claude[bot] via the action's app token. Do not pass a personal access token. The builder never approves, never merges, and never enables auto-merge. No GitHub review approval is required, and only Phil merges, on his ship word, after confirming the PR shows as mergeable without the admin bypass.
 
+## SDD in a Claude session
+
+SDD tickets may be built in a Claude session (claude.ai or Claude Code), not only in Cursor. Phil picks Claude or Cursor per ticket, by where he has usage to spare. TDD tickets labeled `builder-claude` still go through GitHub Issues and the `@claude` action above. A session ticket does not carry that label.
+
+- **Inline execution is allowed here.** In a Claude session the default is to build the plan's tasks inline in the main model, then have one fresh sub-agent review the whole branch before the PR opens. This is the exception to NEWS-179, which says Approach: SDD must dispatch every task through an implementer sub-agent. NEWS-179 still applies everywhere else.
+- Use a sub-agent per task only for a wide ticket with separate parts. Phil chooses that per ticket.
+- Always write the plan under `.cursor/plans/` and keep the ledger the `subagent-driven-development` skill uses, so a ticket can move between Claude and Cursor midway. Delete the plan on the branch before merge, as the ship loop says.
+- The ship-loop conventions above apply unchanged: branch name, one Conventional Commit, PR title and body, PRODUCT_SPEC and WHATS_NEW, follow-up tickets proposed and filed only after Phil confirms. Run the tests the ticket touches before opening the PR.
+- Never merge and never push to `main`. Anything under `.github/workflows` goes to Cursor. The work-hours hold applies (weekdays 9 AM–6 PM ET) unless Phil asks directly.
+- The order of the UI build tickets, and who builds each, is in `docs/ROADMAP.md` under "UI build sequence (2026-11-16)".
+
 ## When reviewing a PR
 
 Claude reports findings. It never approves or merges.
