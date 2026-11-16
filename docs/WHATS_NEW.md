@@ -6,6 +6,10 @@ Each ship-loop pull request adds an entry for what is true at merge for that rea
 
 This is not the release log. Releases are recorded in `CHANGELOG.md` by semantic-release. Do not hand-edit `CHANGELOG.md` to mirror these notes.
 
+## 2026-11-16
+
+**No user-visible change.** The decisions behind the new dashboard and the order it will be built in are written down. The Brief is unchanged.
+
 ## 2026-11-15
 
 **No user-visible change.** A follow-up from Claude on an open pull request runs the same checks as the first push. The Brief is unchanged.

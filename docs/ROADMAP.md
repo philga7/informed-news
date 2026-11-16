@@ -24,6 +24,48 @@ Claims spine plan: [`.cursor/plans/claims_evidence_spine_8f4cde15.plan.md`](../.
 
 [NEWS-230](https://informedcrew.atlassian.net/browse/NEWS-230) scopes the Postgres env and wires the QA app to `informed_news_qa` in the repo. [NEWS-231](https://informedcrew.atlassian.net/browse/NEWS-231) keeps a QA compose command from starting Postgres. [NEWS-232](https://informedcrew.atlassian.net/browse/NEWS-232) makes `informed-news-db` an external network that neither project's `down` removes. None of these becomes current next or lifts the pause. Applying the layout on the VPS waits for Phil's approval. [NEWS-233](https://informedcrew.atlassian.net/browse/NEWS-233) gives QA its own Postgres role, locked to `informed_news_qa`. It does not become current next or lift the pause. Applying it on the VPS waits for Phil's approval. It lands before NEWS-225.
 
+### UI build sequence (2026-11-16)
+
+This is the order the next-wave note above says would be proposed. Phil approved it on 2026-11-16. It comes from the ticket breakdown in "informed-news: data model proposal for the dashboard UI", and the decisions behind it are the 2026-11-16 entries in [DECISIONS.md](DECISIONS.md). Data work lands before UI work.
+
+Rows are in build order. One ticket is built at a time, and each starts on Phil's go. Within this sequence, the next step is the first row whose Status is not **Done**. The pull request that ships a step marks its row **Done**. That does not make it current next by itself: the next-wave note above stays authoritative until a follow-up rewords it, and each step still starts only on Phil's go. A step marked "not filed" has no NEWS key yet. A step marked "widened" or "split" has not been amended in Jira yet. File or amend it in Jira, after Phil confirms, before building it.
+
+| Order | Status | Ticket | Scope | Waits on | Builder | Approach |
+|---|---|---|---|---|---|---|
+| 1 | **Done** (this change) | [NEWS-238](https://informedcrew.atlassian.net/browse/NEWS-238) | Record decisions: multi-user accounts, the label list and its mapping, the ingest contract, and retiring Kite in `docs/DECISIONS.md`; this sequence; SDD in a Claude session in `CLAUDE.md` | Phil's sign-off | Session | Docs only |
+| 2 | To Do | Schema v2 (not filed) | The wider tables and fields, store functions, tests | 1 | Session | SDD |
+| 3 | To Do | Users and read markers (not filed) | Accounts, sign-in, per-user markers for stories, CFP, and Weather | 2 | Session | SDD |
+| 4 | To Do | Seed fixtures (not filed) | Two real stories written by hand in the v2 shape, to test the schema and build the UI against | 2 | GitHub Issue | TDD |
+| 5 | To Do | [NEWS-228](https://informedcrew.atlassian.net/browse/NEWS-228), widened | Ingest contract for stories, entries, Breaking, CFP, and Morning, which Grok Bot also uses to backfill tracked stories; the four Morning cards with the weather grid | 2 | Session | SDD |
+| 6 | To Do | [NEWS-225](https://informedcrew.atlassian.net/browse/NEWS-225), widened | Home shell, trackers line, Developing list with category chips and the Quiet group. Folds in [NEWS-219](https://informedcrew.atlassian.net/browse/NEWS-219) and [NEWS-223](https://informedcrew.atlassian.net/browse/NEWS-223) | 2, 3, 4 | Session | SDD |
+| 7 | To Do | [NEWS-226](https://informedcrew.atlassian.net/browse/NEWS-226) part a (split) | Timeline page, +N clearing on scroll, "Caught up", deep-link highlight. Absorbs [NEWS-201](https://informedcrew.atlassian.net/browse/NEWS-201) | 6 | Session | SDD |
+| 8 | To Do | [NEWS-226](https://informedcrew.atlassian.net/browse/NEWS-226) part b (split) | "What changed" digest, tag and label filters, "New only", paging of older entries | 7 | GitHub Issue | TDD |
+| 9 | To Do | [NEWS-226](https://informedcrew.atlassian.net/browse/NEWS-226) part c (split) | Right rail: Seats panel, Next dates, Entries per day, Sources, Related stories | 7 | Session | SDD |
+| 10 | To Do | [NEWS-227](https://informedcrew.atlassian.net/browse/NEWS-227), widened | CFP list with topic, source, status, read-up-to line, +N, "Show all", footer notes. Split in two to stay Small | 3, 6 | GitHub Issue | TDD |
+| 11 | To Do | Breaking block (not filed) | Fill the block from Breaking items, with labels and story links | 5, 6 | GitHub Issue | TDD |
+| 12 | To Do | [NEWS-229](https://informedcrew.atlassian.net/browse/NEWS-229), as filed | Deep-link format and the one-line morning message contract | 5, 7 | GitHub Issue | TDD |
+| 13 | To Do | Topics in the shell (not filed) | Port the Topics page and the filtered-out view; fill the My topics block with its shown and filtered counts | 6 | Session | SDD |
+| 14 | To Do | Topic stories page (not filed) | Move today's topic Brief from `/` to a page per topic, opened from the My topics block; drop the shell's `/latest/…` routes | 6, 13 | Session | SDD |
+| 15 | To Do | Remove Kite (not filed) | `npm run dev` becomes server plus shell; delete `apps/kite`, its unit tests, and the Kite e2e spec; update `AGENTS.md`, `CLAUDE.md`, the README, and the route map. The CI workflow edit goes to Cursor | 13, 14 | Session, with Cursor for CI | SDD |
+
+Builder and approach:
+
+- **GitHub Issue** means a Small TDD ticket built by the `@claude` GitHub action. It carries the `builder-claude` label in Jira, and the issue names the NEWS key.
+- **Session** means the ticket is built in a session, by Claude or by Cursor, whichever has usage to spare. The Claude session rules are in [CLAUDE.md](../CLAUDE.md#sdd-in-a-claude-session).
+- Anything under `.github/workflows` stays with Cursor.
+- Every pull request is reviewed by the Claude GitHub Action, tested on the VPS by Phil's bots, and merged only by Phil.
+
+What this does to the tickets paused on 2026-11-12. None of them is started on its own, and their Jira status is unchanged by this sequence:
+
+- [NEWS-201](https://informedcrew.atlassian.net/browse/NEWS-201) is absorbed by step 7.
+- [NEWS-202](https://informedcrew.atlassian.net/browse/NEWS-202) and [NEWS-203](https://informedcrew.atlassian.net/browse/NEWS-203) are superseded by step 15.
+- [NEWS-219](https://informedcrew.atlassian.net/browse/NEWS-219) and [NEWS-223](https://informedcrew.atlassian.net/browse/NEWS-223) are folded into step 6.
+- [NEWS-220](https://informedcrew.atlassian.net/browse/NEWS-220), [NEWS-221](https://informedcrew.atlassian.net/browse/NEWS-221), and [NEWS-222](https://informedcrew.atlassian.net/browse/NEWS-222) stay paused.
+
+Dev tooling: [NEWS-139](https://informedcrew.atlassian.net/browse/NEWS-139) documents the Kite fork, so it is not worth doing now. [NEWS-128](https://informedcrew.atlassian.net/browse/NEWS-128) (type-check the Playwright e2e specs and `e2e/stack` in CI) still runs. It stays on the dev-tooling queue, does not wait on this sequence, and can run at any time. It touches the CI workflow, so Cursor builds it. Step 15 later deletes `e2e/kite-smoke.spec.ts`, and the check then covers the specs that remain. [NEWS-121](https://informedcrew.atlassian.net/browse/NEWS-121) can run at any time. Other lines in this file and in `CLAUDE.md` still list NEWS-139 as unpaused dev tooling. Until a follow-up corrects them, ask Phil before starting it.
+
+Not ticketed anywhere yet: the Stories index page, the Sources page, a check of the narrow mobile layout, and the Grok Bot skill that formats and labels posts, which sits outside this repo.
+
 ### Combined order (Oct 23, 2026; citation guard added Oct 26)
 
 Product direction: [VISION.md](VISION.md). Binding choices: [DECISIONS.md](DECISIONS.md).

@@ -2,6 +2,133 @@
 
 Binding choices for Informed News. Newest first. When one of these changes, update this file in the same change as [ROADMAP.md](ROADMAP.md) and Jira. What the product does now, in plain language, is [PRODUCT_SPEC.md](PRODUCT_SPEC.md). Pipeline detail remains in [NEWS-84](https://informedcrew.atlassian.net/browse/NEWS-84), [TRIAGE.md](TRIAGE.md), and [BRIEF.md](BRIEF.md). The target is [VISION.md](VISION.md).
 
+## 2026-11-16 — Kite is retired and the default dev path will change (NEWS-238)
+
+**Decision:** The new UI replaces Kite. It is built in the shell app (`apps/web`), and `apps/kite` is removed once its remaining pages are ported or dropped. What happens to each thing Kite serves today:
+
+| Kite serves today | Decision |
+|---|---|
+| Brief routes by date and category (`/latest`, dated batches, category pages) | Dropped. The dashboard home and the story pages replace them. |
+| `/topics` | Ported to the shell. |
+| `/filtered` | Ported to the shell, reached from the My topics block on the dashboard. |
+| `/feedback`, `/transparency`, `/about`, `/contribute` | Dropped. |
+
+The table covers the shell's copies too. When the image is served, the shell already serves the Brief at `/latest/…` (`apps/web/src/routes/latest/`). Those shell routes are dropped in the topic stories page step of the sequence, the same step that moves the Brief off `/`. Kite's copies go with `apps/kite` in the remove-Kite step.
+
+The topic Brief is kept. It already lives in the shell, and it moves from `/` to a page per topic, opened from the My topics block. Its Like and Not relevant buttons stay with it. Only the separate `/feedback` list page goes.
+
+The default dev path changes. `npm run dev` becomes `mvp/server` plus the shell when the remove-Kite step of the [UI build sequence](ROADMAP.md#ui-build-sequence-2026-11-16) ships. Until that step merges, `npm run dev` is unchanged (`mvp/server` plus Kite), and [AGENTS.md](../AGENTS.md) still lists it as a product invariant. The remove-Kite step updates `AGENTS.md`, `CLAUDE.md`, the README, and the route map in the same change. This entry is the product decision that step needs. It does not change the dev path by itself.
+
+[NEWS-202](https://informedcrew.atlassian.net/browse/NEWS-202) and [NEWS-203](https://informedcrew.atlassian.net/browse/NEWS-203) are superseded by full removal. [NEWS-139](https://informedcrew.atlassian.net/browse/NEWS-139) and [NEWS-56](https://informedcrew.atlassian.net/browse/NEWS-56) are no longer needed. [NEWS-170](https://informedcrew.atlassian.net/browse/NEWS-170) stays the umbrella. Their Jira status is not changed here. The MIT attribution in `NOTICE` and `THIRD_PARTY.md` stays while any code derived from Kite remains in the shell, and it is checked before anything is removed. The CI workflow edit that drops the Kite jobs goes to Cursor.
+
+This supersedes the part of [2026-10-23 — The SPA lives in this repo](#2026-10-23--the-spa-lives-in-this-repo) that has the shell replace Kite one view at a time with each view matched first. That bar still holds for the pages that are ported: Kite keeps serving Topics and the filtered-out view until the shell versions ship with their own tests. It does not apply to pages that are dropped. It also supersedes the standalone `/feedback` list page in the [2026-11-05 feedback entry](#2026-11-05--feedback-list-citation-links-and-the-stubbed-end-to-end-check-news-192). Those entries stay as the record of what was written then.
+
+**Why:** Phil decided on 2026-11-16 to stop using Kite. The Round 2 mockup is the product, and it has no Kite Brief, Feedback, Transparency, About, or Contribute page. Keeping a second UI app means two test suites and two builds for pages nobody will open. `apps/kite` is 754 tracked files with 336 unit tests, and nearly all of the 60 end-to-end tests are in the Kite smoke spec. Coverage moves to shell tests as each page is ported.
+
+**What it rules out:** Building new UI in `apps/kite`, porting the Feedback, Transparency, About, or Contribute pages, keeping the shell's `/latest/…` routes after the Brief moves to a page per topic, changing `npm run dev` before the remove-Kite step, deleting `apps/kite` before Topics, the filtered-out view, and the per-topic Brief page are in the shell, removing the MIT attribution without that check, and Claude editing `.github/workflows` for the removal.
+
+## 2026-11-16 — SDD tickets may be built inline in a Claude session (NEWS-238)
+
+**Decision:** An SDD ticket may be built in a Claude session (claude.ai or Claude Code) or in Cursor. Phil picks per ticket, by where he has usage to spare. In a Claude session the default is to build the plan's tasks inline in the main model, then have one fresh sub-agent review the whole branch before the pull request opens. A sub-agent per task is used only for a wide ticket with separate parts, and Phil chooses that per ticket. This is the one exception to [NEWS-179](https://informedcrew.atlassian.net/browse/NEWS-179), which says Approach: SDD dispatches every task through an implementer sub-agent. NEWS-179 still applies in Cursor and everywhere else. Either way the plan is written under `.cursor/plans/` and the `subagent-driven-development` ledger is kept, so a ticket can move between Claude and Cursor midway. The rules are in [CLAUDE.md](../CLAUDE.md#sdd-in-a-claude-session). The skill cheat sheet in [AGENTS.md](../AGENTS.md) still describes the sub-agent-per-task default and is not changed here. No product behavior changes.
+
+**Why:** Phil's priority is being able to run an SDD ticket with either tool. A fresh sub-agent per task and per review costs a new context each time, which works against keeping Claude usage under about half. One independent review of the whole branch keeps a second set of eyes on the work, and the shared plan and ledger keep the handoff between tools possible.
+
+**What it rules out:** Inline SDD in Cursor, skipping the final whole-branch review, a Claude session that keeps no plan file or ledger, the builder reviewing its own branch as the final review, and reading this as a change to TDD tickets, which still go through GitHub Issues and the `@claude` action.
+
+## 2026-11-16 — Grok Bot posts through one ingest contract, with no page scraper (NEWS-238)
+
+**Decision:** One authenticated ingest contract takes everything Grok Bot sends to the site: stories, story updates, Breaking items, CFP items, and Morning items. Grok Bot uses the same contract for the one-time backfill of the stories it already tracks and for its ongoing posts. This widens [NEWS-228](https://informedcrew.atlassian.net/browse/NEWS-228) beyond Morning items.
+
+- A story update carries a time or a date range, a headline, one label from the [fixed list](#2026-11-16--status-labels-are-a-fixed-list-news-238), tags, short change bullets, and its sources.
+- Each post carries its own id, so a retry cannot create a duplicate. Sending the same story twice changes nothing.
+- Bots authenticate with a token held in the env file. That token is separate from user sign-in.
+- Weather and market posts carry structured data, not only a text body.
+- A Grok Bot skill formats and labels each post. The skill lives with Grok Bot, outside this repo.
+- X data stays with Grok Bot's bird API for now. The site needs no X adapter.
+- Until Grok Bot posts, two real stories written by hand in the v2 shape serve as fixtures.
+
+The Round 2 mockup controls what the story screen shows. The dossier blocks on Grok Bot's static pages are not carried over: the events table, the claims tracker, the 5W1H table, evidence tiers, background sections, key actors, and the analyst note.
+
+**Why:** The static pages are long dossiers. They hold more than the mockup shows and less structure than it needs, so a scraper would guess at headlines, labels, and tags. Grok Bot already holds the stories and can send them in the structured shape. One contract for backfill and for ongoing posts means one thing to build, test, and secure.
+
+**What it rules out:** A scraper or importer for the static pages, a separate backfill path, a separate endpoint per stream, bot access through a user account, an X adapter in the site for now, building the Grok Bot skill in this repo, and carrying the dossier blocks into the story screen.
+
+## 2026-11-16 — Status labels are a fixed list (NEWS-238)
+
+**Decision:** Every label is one of a fixed set of values. The allowed values live in the schema. The tone (the color a label is drawn in) lives in UI code. There is no Debunked label and no Rumor label.
+
+| Used on | Value | Tone |
+|---|---|---|
+| Entries and Breaking | Official ruling | Green |
+| Entries and Breaking | Official | Green |
+| Entries and Breaking | On record | Green |
+| Entries and Breaking | Reported | Neutral |
+| Entries and Breaking | Working | Amber |
+| Entries and Breaking | Single outlet | Amber |
+| Entries and Breaking | Claim · no new evidence | Amber |
+| Entries and Breaking | Claim · no evidence shown | Amber |
+| CFP items | Working | Amber |
+| CFP items | Unconfirmed | Red |
+| Story status | Developing | Amber |
+| Story status | Active | Red |
+| Story status | Stalled | Neutral |
+| Story status | Waiting | Neutral |
+| Story role | Hub, Branch | Neutral |
+| Morning kind | BLUF, Weather, Market, OSINT | No tone |
+
+What each entry and Breaking label means. The Grok Bot skill applies these definitions when it labels an update.
+
+| Label | Meaning |
+|---|---|
+| Official ruling | A court or official body decided something |
+| Official | An official act, record, or filing |
+| On record | A named person said it publicly and verifiably |
+| Reported | Reported by two or more outlets with separate sourcing |
+| Single outlet | Only one outlet has it |
+| Working | Reported, but a key element is still being checked |
+| Claim · no new evidence | A repeated allegation with nothing new behind it |
+| Claim · no evidence shown | An allegation with no public evidence at all |
+
+Mapping from the values on Grok Bot's static pages. The static pages mostly record a verdict on a claim. These labels record the basis for an update, so some values map to more than one label.
+
+| Static page value | Where it appears | Maps to |
+|---|---|---|
+| Court order | Timeline tag | Official ruling |
+| Court record, Court filing, Court docket, County record, House record | Timeline tag | Official |
+| DOJ statement, official statement, Letter text (official) | Timeline tag | Official |
+| Truth Social, Video, Self-reported | Timeline tag | On record |
+| Reported, Reported record | Timeline tag, strength | Reported |
+| Partisan, forum | Timeline tag | Claim · no evidence shown |
+| Confirmed | Claim status, strength | Official, On record, or Reported, by what confirms it |
+| Working | Claim status | Working |
+| Partly reported, single-source | Strength | Single outlet |
+| Unconfirmed | Claim status | Single outlet if one outlet reports it; otherwise Claim · no evidence shown |
+| Contested | Strength | Working |
+| Debunked | Claim status | No label of its own. Label by the basis of the refutation (Official or Reported); the headline says the claim was refuted |
+| Documented fact | Evidence tier | Official |
+| Official finding | Evidence tier | Official ruling |
+| Official allegation | Evidence tier | On record, with the caveat kept in the text |
+| Reported, unnamed sources | Evidence tier | Reported, or Single outlet if only one |
+| Partisan claim | Evidence tier | Claim · no evidence shown, or Claim · no new evidence when repeated |
+| Rumor | Evidence tier | Claim · no evidence shown |
+| Developing (slow-moving; weekly checks) | Story status | Developing; "weekly checks" goes in the cadence field |
+| Working | Branch status | Developing |
+| Source group names | Sources | Kept as written; groups are free text per story |
+
+**Why:** The mockup draws a small set of labels, each with one color. Free-text labels would drift between posts, and the reader could not learn what a color means. A label says what an update rests on, which fits the standing rule in [AGENTS.md](../AGENTS.md) that the product shows status and evidence, not verdicts. The two claim labels stay separate because they are different cases: a repeated claim with nothing new, and a claim with no evidence at all.
+
+**What it rules out:** Free-text labels, a Debunked label, a Rumor label, a Verified badge, a label a post invents, merging the two claim labels, and storing the tone in the database.
+
+## 2026-11-16 — Multi-user accounts with per-user read state (NEWS-238)
+
+**Decision:** The site has several users. Accounts are invite-only, with one password each. Read state is stored per user, on the account: which entries a reader has scrolled past on each tracker (stories, CFP, and Weather), and when they last opened it. It survives a new login and follows the reader to a second device. Stories, topics, and trackers are shared by all users. Whether anything besides read state becomes per user is undecided, and shared is the default until Phil chooses. Times are stored in UTC and shown in each viewer's local zone.
+
+This is accounts only. There are no organizations, tenants, or roles, so the [AGENTS.md](../AGENTS.md) rule against multi-tenant orgs on the live path stands. The accounts live in the Postgres store ([2026-11-14 — Postgres is the data layer](#2026-11-14--postgres-is-the-data-layer-news-224)). They replace today's single operator password when the users and read markers step of the [UI build sequence](ROADMAP.md#ui-build-sequence-2026-11-16) ships. Sign-in is unchanged until then.
+
+**Why:** Phil said on 2026-11-16 that the site will have multiple users. The +N counts, the "read up to" line, and the "you last opened" divider ([2026-11-12 — Each tracker has its own +N new count](#2026-11-12--each-tracker-has-its-own-n-new-count)) only mean something per reader. Keeping the markers on the account, not in the browser session, is what lets a count stay cleared on the next login.
+
+**What it rules out:** One shared password for everyone, open sign-up, read state shared between users, read state kept only in the browser or the session, per-user stories, topics, or trackers before Phil decides, organizations, tenants, or roles, and storing times in a local zone.
+
 ## 2026-11-15 — Claude follow-up pushes use the Claude app token (NEWS-237)
 
 **Decision:** A push from `claude-build` authenticates as `claude[bot]`, including a follow-up after an `@claude` comment on an open pull request. Checkout does not persist the workflow token (`persist-credentials: false`). `scripts/stage-claude-checkout-auth.mjs` removes any `includeIf.gitdir` authorization header and puts the workflow token on the origin URL so the action can still fetch. The action then replaces that URL with its own app token. No `github_token` input, no personal token, and no new secret. The commit author email uses Claude's user id `209825114` (`209825114+claude[bot]@users.noreply.github.com`, as on `ee87d60`), not the action default `41898282` (`github-actions[bot]`). That id is the author, not the pusher. The pusher is the token on origin after the action rewrites it. Triggers stay one job per mention. `claude-review` still listens only to `pull_request`. `github-actions[bot]` stays on that job's allow-list until a live follow-up push shows the actor is `claude[bot]`.
