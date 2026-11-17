@@ -31,6 +31,25 @@ describe('NEWS-103 require green CI before merge', () => {
 		assert.doesNotMatch(ci, /_legacy\/mvp-web/);
 	});
 
+	it('typechecks e2e after the server typecheck and leaves Playwright e2e local', () => {
+		const serverTypecheck = ci.indexOf('npm run typecheck\n');
+		const e2eTypecheck = ci.indexOf('npm run typecheck:e2e');
+		assert.ok(serverTypecheck !== -1, 'server Typecheck step is missing');
+		assert.ok(e2eTypecheck !== -1, 'Typecheck e2e step is missing');
+		assert.ok(
+			serverTypecheck < e2eTypecheck,
+			'Typecheck e2e must run after the server Typecheck step',
+		);
+		// The local-stay comment names `npm run test:e2e:kite`. The rest of the workflow must not.
+		const withoutLocalNote = ci.replace(
+			/# Playwright e2e stays local \(`npm run test:e2e:kite`\) until the hermetic\n/,
+			'',
+		);
+		assert.equal(withoutLocalNote.includes('test:e2e:kite'), false);
+		assert.equal(ci.includes('playwright test'), false);
+		assert.match(ci, /Playwright e2e stays local/);
+	});
+
 	it('installs root, mvp/server, and apps/kite with lockfiles', () => {
 		assert.match(ci, /npm ci\b/);
 		assert.match(ci, /npm ci --prefix mvp\/server/);

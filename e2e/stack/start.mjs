@@ -61,8 +61,12 @@ function ensureBuild(appDir) {
 const webBuildDir = ensureBuild('apps/web');
 const kiteBuildDir = ensureBuild('apps/kite');
 
+const scenarioName = process.env.E2E_SCENARIO ?? 'topics';
+if (scenarioName !== 'topics' && scenarioName !== 'empty') {
+	throw new Error(`Unknown e2e scenario: ${scenarioName}`);
+}
 rmSync(E2E_DATA_DIR, { recursive: true, force: true });
-writeScenario(E2E_DATA_DIR, process.env.E2E_SCENARIO ?? 'topics', { imageBaseUrl: kiteBase });
+writeScenario(E2E_DATA_DIR, scenarioName, { imageBaseUrl: kiteBase });
 
 const envFile = path.join(E2E_DATA_DIR, '.env.e2e');
 writeFileSync(
@@ -140,6 +144,9 @@ proxy.listen(E2E_KITE_PORT, () => {
 const children = [api];
 
 let stopping = false;
+/**
+ * @param {number} code
+ */
 function stop(code) {
 	if (stopping) return;
 	stopping = true;

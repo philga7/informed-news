@@ -4,17 +4,79 @@ import { createHash } from 'node:crypto';
 import { mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
-/** Must match mvp/server articleIdFromCanonicalUrl, or the store migration renames ids. */
+/**
+ * @typedef {{ id: string, name: string, level?: string }} TopicDef
+ */
+
+/**
+ * @typedef {{
+ *   slug: string,
+ *   title: string,
+ *   domain: string,
+ *   topicId: string,
+ *   hours: number,
+ *   body: string | null,
+ *   imageBaseUrl: string | null,
+ * }} ArticleInput
+ */
+
+/**
+ * @typedef {{ id: string }} ArticleRef
+ */
+
+/**
+ * @typedef {{ topicId: string, significance: number, memberIds?: string[] }} KeptOptions
+ */
+
+/**
+ * @typedef {{ topicId: string, of: string }} DuplicateOptions
+ */
+
+/**
+ * @typedef {{
+ *   topicId: string,
+ *   reason: string,
+ *   stage: string,
+ *   jevCalls: number,
+ *   final?: boolean,
+ *   triagedHoursAgo?: number,
+ * }} DroppedOptions
+ */
+
+/**
+ * One stored triage row. `reason` is null on kept rows.
+ * @typedef {{
+ *   status: string,
+ *   reason: string | null,
+ *   triagedAt: string,
+ *   jevCalls: number,
+ * }} TriageRecord
+ */
+
+/**
+ * @typedef {{ [articleId: string]: TriageRecord }} TriageRecords
+ */
+
+/** Must match mvp/server articleIdFromCanonicalUrl, or the store migration renames ids.
+ * @param {string} canonicalUrl
+ */
 function articleId(canonicalUrl) {
 	return createHash('sha256').update(canonicalUrl).digest('hex').slice(0, 32);
 }
 
-/** Must match mvp/server summarySourceFor (title + body cap), or the summary reads as stale. */
+/** Must match mvp/server summarySourceFor (title + body cap), or the summary reads as stale.
+ * @param {string} title
+ * @param {string} body
+ */
 function summaryHash(title, body) {
 	const text = `${title}\n\n${body.slice(0, 3000)}`;
 	return createHash('sha256').update(text).digest('hex').slice(0, 16);
 }
 
+/**
+ * @param {Date} now
+ * @param {number} hours
+ */
 function hoursAgo(now, hours) {
 	return new Date(now.getTime() - hours * 60 * 60 * 1000).toISOString();
 }
@@ -82,6 +144,12 @@ export const TOPIC_SCENARIO = {
 	},
 };
 
+/**
+ * @param {TopicDef} def
+ * @param {Date} now
+ * @param {string[]} keywords
+ * @param {'desired' | 'undesired'} [kind]
+ */
 function topic(def, now, keywords, kind = 'desired') {
 	return {
 		id: def.id,
@@ -98,6 +166,10 @@ function topic(def, now, keywords, kind = 'desired') {
 	};
 }
 
+/**
+ * @param {Date} now
+ * @param {ArticleInput} input
+ */
 function article(now, { slug, title, domain, topicId, hours, body, imageBaseUrl }) {
 	const canonicalUrl = `https://${domain}/e2e/${slug}`;
 	return {
@@ -127,6 +199,9 @@ function article(now, { slug, title, domain, topicId, hours, body, imageBaseUrl 
 	};
 }
 
+/**
+ * @param {string} topicId
+ */
 function keptAdvisory(topicId) {
 	return {
 		verdict: 'approved',
@@ -136,6 +211,9 @@ function keptAdvisory(topicId) {
 	};
 }
 
+/**
+ * @param {string} reason
+ */
 function droppedAdvisory(reason) {
 	if (reason.startsWith('muted:')) {
 		const id = reason.slice('muted:'.length);
@@ -170,6 +248,11 @@ function droppedAdvisory(reason) {
 	};
 }
 
+/**
+ * @param {Date} now
+ * @param {ArticleRef} a
+ * @param {KeptOptions} options
+ */
 function kept(now, a, { topicId, significance, memberIds = [] }) {
 	return {
 		articleId: a.id,
@@ -190,6 +273,11 @@ function kept(now, a, { topicId, significance, memberIds = [] }) {
 	};
 }
 
+/**
+ * @param {Date} now
+ * @param {ArticleRef} a
+ * @param {DuplicateOptions} options
+ */
 function duplicate(now, a, { topicId, of }) {
 	return {
 		articleId: a.id,
@@ -210,6 +298,11 @@ function duplicate(now, a, { topicId, of }) {
 	};
 }
 
+/**
+ * @param {Date} now
+ * @param {ArticleRef} a
+ * @param {DroppedOptions} options
+ */
 function dropped(now, a, { topicId, reason, stage, jevCalls, final = true, triagedHoursAgo = 1 }) {
 	return {
 		articleId: a.id,
@@ -230,13 +323,18 @@ function dropped(now, a, { topicId, reason, stage, jevCalls, final = true, triag
 	};
 }
 
-/** `meta.json → triage` for the last run: only records with `triagedAt === at`. */
+/** `meta.json → triage` for the last run: only records with `triagedAt === at`.
+ * @param {Date} now
+ * @param {TriageRecords} records
+ */
 function triageRun(now, records) {
 	const at = hoursAgo(now, 1);
 	const list = Object.values(records).filter((rec) => rec.triagedAt === at);
+	/** @type {{ [reason: string]: number }} */
 	const byReason = {};
 	for (const rec of list) {
 		if (rec.status !== 'dropped') continue;
+		if (typeof rec.reason !== 'string') continue;
 		const key = rec.reason.startsWith('muted:') ? 'muted' : rec.reason;
 		byReason[key] = (byReason[key] ?? 0) + 1;
 	}
@@ -257,6 +355,10 @@ function triageRun(now, records) {
 const BODY =
 	'Grid operators filed updated capacity plans this week. The filing lists new battery storage, transmission upgrades and demand response programs intended to cover the winter peak.';
 
+/**
+ * @param {Date} now
+ * @param {string | null} imageBaseUrl
+ */
 function topicsScenario(now, imageBaseUrl) {
 	const [grid, ports] = TOPIC_SCENARIO.sections;
 	const [space] = TOPIC_SCENARIO.quiet;
@@ -298,6 +400,7 @@ function topicsScenario(now, imageBaseUrl) {
 	});
 
 	const significance = [0.92, 0.81, 0.74, 0.41];
+	/** @type {TriageRecords} */
 	const records = {};
 	gridStories.forEach((a, i) => {
 		records[a.id] = kept(now, a, { topicId: grid.id, significance: significance[i] });
@@ -309,7 +412,15 @@ function topicsScenario(now, imageBaseUrl) {
 	});
 	records[portDuplicate.id] = duplicate(now, portDuplicate, { topicId: ports.id, of: portLead.id });
 
-	const filteredTitle = (label) => TOPIC_SCENARIO.filtered.find((f) => f.label === label).title;
+	/**
+	 * @param {string} label
+	 * @returns {string}
+	 */
+	const filteredTitle = (label) => {
+		const row = TOPIC_SCENARIO.filtered.find((f) => f.label === label);
+		if (!row) throw new Error(`No filtered scenario row for label ${label}`);
+		return row.title;
+	};
 	const droppedStories = [
 		{
 			slug: 'ribbon',
@@ -587,6 +698,9 @@ function topicsScenario(now, imageBaseUrl) {
 	};
 }
 
+/**
+ * @param {Date} now
+ */
 function refreshRunId(now) {
 	return hoursAgo(now, 1);
 }
@@ -607,6 +721,9 @@ function emptyScenario() {
  *   seeds for match / unverified quote / unverified link / unconfirmed (NEWS-172).
  * - `empty`: empty article store → the owned-brief fixture stories (NEWS-44/51).
  * Files not starting with "." are removed first; the generated env file survives.
+ * @param {string} dataDir
+ * @param {'topics' | 'empty'} name
+ * @param {{ now?: Date, imageBaseUrl?: string | null }} [options]
  */
 export function writeScenario(dataDir, name, { now = new Date(), imageBaseUrl = null } = {}) {
 	mkdirSync(dataDir, { recursive: true });

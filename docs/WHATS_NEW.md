@@ -8,6 +8,8 @@ This is not the release log. Releases are recorded in `CHANGELOG.md` by semantic
 
 ## 2026-11-16
 
+**No user-visible change.** CI now type-checks the Playwright test files and their test-stack helpers. The Brief is unchanged.
+
 **No user-visible change.** The decisions behind the new dashboard and the order it will be built in are written down. The Brief is unchanged.
 
 ## 2026-11-15
