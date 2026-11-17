@@ -2,6 +2,27 @@
 
 Binding choices for Informed News. Newest first. When one of these changes, update this file in the same change as [ROADMAP.md](ROADMAP.md) and Jira. What the product does now, in plain language, is [PRODUCT_SPEC.md](PRODUCT_SPEC.md). Pipeline detail remains in [NEWS-84](https://informedcrew.atlassian.net/browse/NEWS-84), [TRIAGE.md](TRIAGE.md), and [BRIEF.md](BRIEF.md). The target is [VISION.md](VISION.md).
 
+## 2026-11-16 — Per-user follow/hide and private stories (NEWS-252)
+
+**Decision:** Stories, topics, and trackers stay shared by default. Each user can follow or hide stories and topics. Follow and hide are stored per user and change only what that user sees. A story can also be private to one user, its owner. In the site, a private story is shown to its owner and to no other user, apart from the operator question still open below. A story with no owner is shared. A private story is written in one of two ways: Grok Bot writes it through the [ingest contract](#2026-11-16--grok-bot-posts-through-one-ingest-contract-with-no-page-scraper-news-238) and names the owner in the post, or a user writes it in the site. Grok Bot, and Phil as its operator, can see every private story the bot writes. Whether Phil also sees them in the site is still open. Topics stay one shared search and triage pipeline. Following or hiding a topic filters what that user sees and does not start a search or triage run of its own.
+
+This supersedes three parts of [2026-11-16 — Multi-user accounts with per-user read state](#2026-11-16--multi-user-accounts-with-per-user-read-state-news-238): the sentence in its Decision that says stories, topics, and trackers are shared by all users (they are now shared by default, and a story can be private), the sentence that leaves anything besides read state undecided, and the item in What it rules out that rules out per-user stories, topics, or trackers before Phil decides. The rest of that entry stands, including invite-only accounts and read state stored per user. That entry stays as the record of what was written then.
+
+Where it lands in the [UI build sequence](ROADMAP.md#ui-build-sequence-2026-11-16): the users and read markers step adds the follow/hide table and the optional story owner, the ingest contract step adds how a post marks a story as private, the home shell step filters the Developing list by hide and owner (what following changes is still open, below), and a new step adds writing a private story in the site. The Round 2 mockup has no screen for that, so the step waits on a mockup from Phil.
+
+Still open, and not decided here:
+
+- Whether a private story can have branches, and whether a private branch can sit under a shared hub.
+- Whether a private story can later be made shared.
+- Whether Breaking items that point at a private story are hidden from other users.
+- Whether Phil, as Grok Bot's operator, sees other users' bot-written private stories in the site, or only outside it.
+- What following a story or topic changes for that user, since shared stories and topics show unless hidden.
+- Which steps build the controls a user clicks to follow or hide, and which step applies topic follow/hide.
+
+**Why:** Phil decided on 2026-11-16. Shared stories keep one copy of each story for every reader, and follow/hide lets each reader trim the dashboard without changing what anyone else sees. Private stories give a user a place for a story that is theirs alone. Keeping topics as one shared pipeline means follow and hide add no search or AI cost.
+
+**What it rules out:** Per-user copies of shared stories, a search or triage pipeline per user or per follow, a private topic, a private story shown in the site to any user other than its owner (apart from the operator question still open above), Grok Bot posting a private story without naming its owner, building the in-site writing screen before Phil supplies a mockup, and treating the open questions above as answered.
+
 ## 2026-11-16 — Kite is retired and the default dev path will change (NEWS-238)
 
 **Decision:** The new UI replaces Kite. It is built in the shell app (`apps/web`), and `apps/kite` is removed once its remaining pages are ported or dropped. What happens to each thing Kite serves today:
