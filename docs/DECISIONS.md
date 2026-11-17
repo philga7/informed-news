@@ -8,7 +8,7 @@ Binding choices for Informed News. Newest first. When one of these changes, upda
 
 This supersedes two parts of [2026-11-16 — Multi-user accounts with per-user read state](#2026-11-16--multi-user-accounts-with-per-user-read-state-news-238): the sentence in its Decision that leaves anything besides read state undecided, and the item in What it rules out that rules out per-user stories, topics, or trackers before Phil decides. The rest of that entry stands, including invite-only accounts and read state stored per user. That entry stays as the record of what was written then.
 
-Where it lands in the [UI build sequence](ROADMAP.md#ui-build-sequence-2026-11-16): the users and read markers step adds the follow/hide table and the optional story owner, the ingest contract step adds how a post marks a story as private, the home shell step filters the Developing list by follow, hide, and owner, and a new step adds writing a private story in the site. The Round 2 mockup has no screen for that, so the step waits on a mockup from Phil.
+Where it lands in the [UI build sequence](ROADMAP.md#ui-build-sequence-2026-11-16): the users and read markers step adds the follow/hide table and the optional story owner, the ingest contract step adds how a post marks a story as private, the home shell step filters the Developing list by hide and owner (what following changes is still open, below), and a new step adds writing a private story in the site. The Round 2 mockup has no screen for that, so the step waits on a mockup from Phil.
 
 Still open, and not decided here:
 
