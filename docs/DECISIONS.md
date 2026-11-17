@@ -17,6 +17,7 @@ Still open, and not decided here:
 - Whether Breaking items that point at a private story are hidden from other users.
 - Whether Phil, as Grok Bot's operator, sees other users' bot-written private stories in the site, or only outside it.
 - What following a story or topic changes for that user, since shared stories and topics show unless hidden.
+- Which steps build the controls a user clicks to follow or hide, and which step applies topic follow/hide.
 
 **Why:** Phil decided on 2026-11-16. Shared stories keep one copy of each story for every reader, and follow/hide lets each reader trim the dashboard without changing what anyone else sees. Private stories give a user a place for a story that is theirs alone. Keeping topics as one shared pipeline means follow and hide add no search or AI cost.
 
