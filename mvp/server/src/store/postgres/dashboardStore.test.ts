@@ -1,113 +1,488 @@
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
-import { Pool } from 'pg';
+import { before, test, type TestContext } from 'node:test';
+import type { Pool } from 'pg';
 import {
+  DashboardStoreError,
+  createBreakingItem,
   createCfpRoundupItem,
   createMorningItem,
   createStory,
   createStoryEntry,
   ensureDashboardSchema,
+  readBreakingItem,
+  readCfpDayNote,
   readCfpRoundupItem,
   readMorningItem,
   readStory,
   readStoryEntry,
+  setCfpDayNote,
+  type EntryLabel,
+  type StoryEntryInput,
+  type StoryStatus,
 } from './dashboardStore.js';
+import { testPool } from '../../testing/dashboardTestDb.js';
+import { createStorySource } from './storyDetailStore.js';
+import { ENTRY_LABELS } from './vocabulary.js';
 
-function testPool(): Pool {
-  const connectionString = process.env.INFORMED_NEWS_TEST_DATABASE_URL?.trim();
-  if (!connectionString) {
-    throw new Error('INFORMED_NEWS_TEST_DATABASE_URL is required');
+before(async () => {
+  const pool = testPool(process.env.INFORMED_NEWS_TEST_DATABASE_URL);
+  try {
+    await ensureDashboardSchema(pool);
+  } finally {
+    await pool.end();
   }
-  return new Pool({ connectionString });
+});
+
+function store(t: TestContext): Pool {
+  const pool = testPool(process.env.INFORMED_NEWS_TEST_DATABASE_URL);
+  t.after(() => pool.end());
+  return pool;
 }
 
-test('create and read a hub story and a branch that is part of it', async (t) => {
-  const pool = testPool();
-  t.after(() => pool.end());
-  await ensureDashboardSchema(pool);
+function hub(pool: Pool, title = 'Hub') {
+  return createStory(pool, { role: 'hub', hubId: null, title, status: 'developing' });
+}
 
-  const hub = await createStory(pool, { role: 'hub', hubId: null, title: 'Gulf talks' });
-  assert.equal(hub.hubId, null);
-  assert.deepEqual(await readStory(pool, hub.id), hub);
+const ENTRY: Omit<StoryEntryInput, 'storyId'> = {
+  occurredAt: '2026-11-14T15:04:00.000Z',
+  precision: 'time',
+  headline: 'Talks end with no breakthrough',
+  label: 'reported',
+  body: 'Talks ended with no breakthrough.',
+  sources: [],
+};
+
+test('create and read a hub story and a branch that is part of it', async (t) => {
+  const pool = store(t);
+
+  const created = await createStory(pool, {
+    role: 'hub',
+    hubId: null,
+    title: 'Gulf talks',
+    status: 'active',
+  });
+  assert.equal(created.hubId, null);
+  assert.equal(created.status, 'active');
+  assert.equal(created.nowSummary, null);
+  assert.equal(created.nextCheckAt, null);
+  assert.deepEqual(await readStory(pool, created.id), created);
 
   const branch = await createStory(pool, {
     role: 'branch',
-    hubId: hub.id,
+    hubId: created.id,
     title: 'Envoy travel',
+    status: 'waiting',
   });
-  assert.equal(branch.hubId, hub.id);
+  assert.equal(branch.hubId, created.id);
   assert.deepEqual(await readStory(pool, branch.id), branch);
   assert.equal(await readStory(pool, 'missing-story'), null);
 });
 
 test('a hub cannot point at another story and a branch needs a hub', async (t) => {
-  const pool = testPool();
-  t.after(() => pool.end());
-  await ensureDashboardSchema(pool);
+  const pool = store(t);
   await assert.rejects(
-    createStory(pool, { role: 'hub', hubId: 'hub-1', title: 'Hub' }),
+    createStory(pool, { role: 'hub', hubId: 'hub-1', title: 'Hub', status: 'developing' }),
     /a hub has no hub/,
   );
   await assert.rejects(
-    createStory(pool, { role: 'branch', hubId: null, title: 'Branch' }),
+    createStory(pool, { role: 'branch', hubId: null, title: 'Branch', status: 'developing' }),
     /a branch requires a hub/,
   );
 });
 
-test('create and read a story entry with its source', async (t) => {
-  const pool = testPool();
-  t.after(() => pool.end());
-  await ensureDashboardSchema(pool);
-  const hub = await createStory(pool, { role: 'hub', hubId: null, title: 'Timeline' });
+test('a story keeps its status, Now summary, cadence, check times and notes', async (t) => {
+  const pool = store(t);
+  const created = await createStory(pool, {
+    role: 'hub',
+    hubId: null,
+    title: 'Recount',
+    status: 'stalled',
+    nowSummary: 'The count is paused pending a ruling.',
+    nowUpdatedAt: '2026-11-14T21:00:00-05:00',
+    cadence: 'twice daily, 9 AM and 9 PM',
+    lastCheckedAt: '2026-11-15T02:00:00Z',
+    nextCheckAt: '2026-11-15T14:00:00Z',
+    unchangedNote: 'No new filings.',
+    earlierSummary: 'count, certification fight',
+    sourcesNote: 'One outlet is behind a paywall.',
+    threadUrl: 'https://example.com/thread/1',
+  });
+  assert.equal(created.nowUpdatedAt, '2026-11-15T02:00:00.000Z');
+  assert.deepEqual(await readStory(pool, created.id), created);
+});
+
+test('a story status outside the fixed list is refused', async (t) => {
+  const pool = store(t);
+  await assert.rejects(
+    createStory(pool, {
+      role: 'hub',
+      hubId: null,
+      title: 'Hub',
+      status: 'working' as StoryStatus,
+    }),
+    { name: 'DashboardStoreError', message: /unexpected story status working/ },
+  );
+});
+
+test('create and read a story entry with its headline, label, change bullets and source', async (t) => {
+  const pool = store(t);
+  const story = await hub(pool, 'Timeline');
   const created = await createStoryEntry(pool, {
-    storyId: hub.id,
-    occurredAt: '2026-11-14T15:04:00.000Z',
-    body: 'Talks ended with no breakthrough.',
+    ...ENTRY,
+    storyId: story.id,
+    label: 'official_ruling',
+    changes: ['Court set a hearing date', 'Count stays paused'],
     sources: [{ url: 'https://example.com/talks', label: 'Wire' }],
   });
   const read = await readStoryEntry(pool, created.id);
-  assert.ok(read);
-  assert.equal(read.storyId, hub.id);
-  assert.equal(read.body, 'Talks ended with no breakthrough.');
-  assert.equal(Date.parse(read.occurredAt), Date.parse('2026-11-14T15:04:00.000Z'));
-  assert.equal(read.sources.length, 1);
-  assert.equal(read.sources[0]?.url, 'https://example.com/talks');
-  assert.equal(read.sources[0]?.label, 'Wire');
-  assert.equal(read.sources[0]?.id, created.sources[0]?.id);
+  assert.deepEqual(read, created);
+  assert.equal(read?.storyId, story.id);
+  assert.equal(read?.headline, 'Talks end with no breakthrough');
+  assert.equal(read?.label, 'official_ruling');
+  assert.equal(read?.precision, 'time');
+  assert.equal(read?.occurredUntil, null);
+  assert.deepEqual(read?.changes, ['Court set a hearing date', 'Count stays paused']);
+  assert.equal(read?.sources[0]?.url, 'https://example.com/talks');
+  assert.equal(read?.sources[0]?.label, 'Wire');
+  assert.equal(read?.sources[0]?.sourceId, null);
   assert.equal(await readStoryEntry(pool, 'missing-entry'), null);
 });
 
+test('entry sources read back in the order they were given', async (t) => {
+  const pool = store(t);
+  const story = await hub(pool);
+  const labels = ['first', 'second', 'third', 'fourth', 'fifth', 'sixth'];
+  const created = await createStoryEntry(pool, {
+    ...ENTRY,
+    storyId: story.id,
+    sources: labels.map((label) => ({ url: `https://example.com/${label}`, label })),
+  });
+  const read = await readStoryEntry(pool, created.id);
+  assert.deepEqual(
+    read?.sources.map((source) => source.label),
+    labels,
+  );
+  assert.deepEqual(read, created);
+});
+
+test('an entry takes each of the eight labels and refuses any other', async (t) => {
+  const pool = store(t);
+  const story = await hub(pool);
+  for (const label of ENTRY_LABELS) {
+    const created = await createStoryEntry(pool, { ...ENTRY, storyId: story.id, label });
+    assert.equal((await readStoryEntry(pool, created.id))?.label, label);
+  }
+  for (const ruledOut of ['debunked', 'rumor', 'Official ruling', 'unconfirmed']) {
+    await assert.rejects(
+      createStoryEntry(pool, { ...ENTRY, storyId: story.id, label: ruledOut as EntryLabel }),
+      DashboardStoreError,
+    );
+  }
+});
+
+test('an entry needs a headline', async (t) => {
+  const pool = store(t);
+  const story = await hub(pool);
+  await assert.rejects(
+    createStoryEntry(pool, { ...ENTRY, storyId: story.id, headline: '  ' }),
+    /headline is required/,
+  );
+});
+
+test('a time given with a zone offset is stored and read back in UTC', async (t) => {
+  const pool = store(t);
+  const story = await hub(pool);
+  const created = await createStoryEntry(pool, {
+    ...ENTRY,
+    storyId: story.id,
+    occurredAt: '2026-11-14T10:04:00-05:00',
+    occurredUntil: '2026-11-14T18:30:00+02:00',
+  });
+  assert.equal(created.occurredAt, '2026-11-14T15:04:00.000Z');
+  assert.equal(created.occurredUntil, '2026-11-14T16:30:00.000Z');
+  assert.deepEqual(await readStoryEntry(pool, created.id), created);
+  const stored = await pool.query<{ at: string }>(
+    `SELECT to_char(occurred_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI') AS at
+     FROM story_entries WHERE id = $1`,
+    [created.id],
+  );
+  assert.equal(stored.rows[0]?.at, '2026-11-14T15:04');
+});
+
+test('a time with no zone is refused, because it would depend on the server clock', async (t) => {
+  const pool = store(t);
+  const story = await hub(pool);
+  await assert.rejects(
+    createStoryEntry(pool, { ...ENTRY, storyId: story.id, occurredAt: '2026-02-30T10:00:00Z' }),
+    /occurredAt must be a timestamp/,
+  );
+  for (const zoneless of ['2026-11-14T15:04:00', '2026-11-14 15:04', 'Nov 14, 2026', '2026-11-14']) {
+    await assert.rejects(
+      createStoryEntry(pool, { ...ENTRY, storyId: story.id, occurredAt: zoneless }),
+      /occurredAt must be a timestamp with a zone offset/,
+    );
+  }
+  await assert.rejects(
+    createMorningItem(pool, { kind: 'bluf', body: 'Body', link: null, postedAt: '2026-11-14T11:00' }),
+    /postedAt must be a timestamp with a zone offset/,
+  );
+});
+
+test('a day entry and a day range keep their calendar days', async (t) => {
+  const pool = store(t);
+  const story = await hub(pool);
+  const day = await createStoryEntry(pool, {
+    ...ENTRY,
+    storyId: story.id,
+    precision: 'day',
+    occurredAt: '2026-11-05',
+  });
+  assert.equal(day.occurredAt, '2026-11-05T00:00:00.000Z');
+  assert.equal(day.occurredUntil, null);
+  assert.deepEqual(await readStoryEntry(pool, day.id), day);
+
+  const range = await createStoryEntry(pool, {
+    ...ENTRY,
+    storyId: story.id,
+    precision: 'day',
+    occurredAt: '2026-11-03',
+    occurredUntil: '2026-11-04',
+  });
+  assert.equal(range.precision, 'day');
+  assert.equal(range.occurredAt, '2026-11-03T00:00:00.000Z');
+  assert.equal(range.occurredUntil, '2026-11-04T00:00:00.000Z');
+  assert.deepEqual(await readStoryEntry(pool, range.id), range);
+
+  await assert.rejects(
+    createStoryEntry(pool, {
+      ...ENTRY,
+      storyId: story.id,
+      precision: 'day',
+      occurredAt: '2026-11-05T09:00:00Z',
+    }),
+    /occurredAt must be a date \(YYYY-MM-DD\)/,
+  );
+  await assert.rejects(
+    createStoryEntry(pool, {
+      ...ENTRY,
+      storyId: story.id,
+      precision: 'day',
+      occurredAt: '2026-02-30',
+    }),
+    /occurredAt must be a date/,
+  );
+  await assert.rejects(
+    createStoryEntry(pool, {
+      ...ENTRY,
+      storyId: story.id,
+      precision: 'day',
+      occurredAt: '2026-11-04',
+      occurredUntil: '2026-11-03',
+    }),
+    /occurredUntil is before occurredAt/,
+  );
+});
+
+test('an entry source can point at a source of the same story, and only that story', async (t) => {
+  const pool = store(t);
+  const story = await hub(pool);
+  const other = await hub(pool, 'Other');
+  const cited = await createStorySource(pool, { storyId: story.id, outlet: 'Wire' });
+  const foreign = await createStorySource(pool, { storyId: other.id, outlet: 'Wire' });
+
+  const created = await createStoryEntry(pool, {
+    ...ENTRY,
+    storyId: story.id,
+    sources: [{ url: 'https://example.com/a', label: 'Wire', sourceId: cited.id }],
+  });
+  assert.equal((await readStoryEntry(pool, created.id))?.sources[0]?.sourceId, cited.id);
+
+  const entries = () =>
+    pool.query('SELECT 1 FROM story_entries WHERE story_id = $1', [story.id]);
+  const before = (await entries()).rowCount;
+  for (const sourceId of [foreign.id, 'missing-source']) {
+    await assert.rejects(
+      createStoryEntry(pool, {
+        ...ENTRY,
+        storyId: story.id,
+        sources: [{ url: 'https://example.com/b', label: 'Wire', sourceId }],
+      }),
+      /an entry can only cite a source from its own story/,
+    );
+  }
+  assert.equal((await entries()).rowCount, before, 'a refused entry leaves nothing behind');
+});
+
 test('create and read a Morning item', async (t) => {
-  const pool = testPool();
-  t.after(() => pool.end());
-  await ensureDashboardSchema(pool);
+  const pool = store(t);
   const created = await createMorningItem(pool, {
     kind: 'bluf',
     body: 'One line for the morning.',
     link: 'https://example.com/morning',
     postedAt: '2026-11-14T11:00:00.000Z',
   });
-  const read = await readMorningItem(pool, created.id);
-  assert.deepEqual(read, {
-    ...created,
-    postedAt: new Date(created.postedAt).toISOString(),
-  });
+  assert.equal(created.data, null);
+  assert.deepEqual(await readMorningItem(pool, created.id), created);
   assert.equal(await readMorningItem(pool, 'missing-morning'), null);
 });
 
+test('a Morning item can carry structured data', async (t) => {
+  const pool = store(t);
+  const data = {
+    grid: [
+      { day: 'Mon', high: 54, low: 41, sky: 'rain' },
+      { day: 'Tue', high: 49, low: 37, sky: null },
+    ],
+    unit: 'F',
+  };
+  const created = await createMorningItem(pool, {
+    kind: 'weather',
+    body: 'Rain today, colder tomorrow.',
+    link: null,
+    postedAt: '2026-11-16T11:00:00Z',
+    data,
+  });
+  assert.deepEqual((await readMorningItem(pool, created.id))?.data, data);
+  await assert.rejects(
+    createMorningItem(pool, {
+      kind: 'market',
+      body: 'Body',
+      link: null,
+      postedAt: '2026-11-16T11:00:00Z',
+      data: ['not', 'an', 'object'] as never,
+    }),
+    /data must be a JSON object/,
+  );
+});
+
 test('create and read a CFP roundup item', async (t) => {
-  const pool = testPool();
-  t.after(() => pool.end());
-  await ensureDashboardSchema(pool);
+  const pool = store(t);
   const created = await createCfpRoundupItem(pool, {
     roundupAt: '2026-11-14T21:02:00.000Z',
     title: 'Evening roundup',
     url: 'https://example.com/cfp',
   });
-  const read = await readCfpRoundupItem(pool, created.id);
-  assert.ok(read);
-  assert.equal(read.title, 'Evening roundup');
-  assert.equal(read.url, 'https://example.com/cfp');
-  assert.equal(Date.parse(read.roundupAt), Date.parse('2026-11-14T21:02:00.000Z'));
+  assert.equal(created.topic, null);
+  assert.equal(created.sourceName, null);
+  assert.equal(created.status, null);
+  assert.deepEqual(await readCfpRoundupItem(pool, created.id), created);
   assert.equal(await readCfpRoundupItem(pool, 'missing-cfp'), null);
+});
+
+test('a CFP item can carry a topic, a source and a status, and can have no link', async (t) => {
+  const pool = store(t);
+  const created = await createCfpRoundupItem(pool, {
+    roundupAt: '2026-11-14T21:02:00Z',
+    title: 'Port closure claim',
+    url: null,
+    topic: 'Shipping',
+    sourceName: '@harbor_watch',
+    status: 'unconfirmed',
+  });
+  assert.equal(created.url, null);
+  assert.deepEqual(await readCfpRoundupItem(pool, created.id), created);
+  const working = await createCfpRoundupItem(pool, {
+    roundupAt: '2026-11-14T21:02:00Z',
+    title: 'Second item',
+    url: null,
+    status: 'working',
+  });
+  assert.equal((await readCfpRoundupItem(pool, working.id))?.status, 'working');
+  await assert.rejects(
+    createCfpRoundupItem(pool, {
+      roundupAt: '2026-11-14T21:02:00Z',
+      title: 'Third item',
+      url: null,
+      status: 'reported' as 'working',
+    }),
+    /unexpected CFP status reported/,
+  );
+});
+
+test('create and read a Breaking item, alone and pointing at a story entry', async (t) => {
+  const pool = store(t);
+  const alone = await createBreakingItem(pool, {
+    occurredAt: '2026-11-16T20:15:00-05:00',
+    headline: 'Court blocks the order',
+    label: 'official_ruling',
+    sourceName: 'Reuters',
+    via: 'CFP',
+    url: 'https://example.com/ruling',
+  });
+  assert.equal(alone.occurredAt, '2026-11-17T01:15:00.000Z');
+  assert.equal(alone.storyId, null);
+  assert.deepEqual(await readBreakingItem(pool, alone.id), alone);
+  assert.equal(await readBreakingItem(pool, 'missing-breaking'), null);
+
+  const story = await hub(pool);
+  const entry = await createStoryEntry(pool, { ...ENTRY, storyId: story.id });
+  const linked = await createBreakingItem(pool, {
+    occurredAt: '2026-11-16T20:20:00Z',
+    headline: 'Hearing set',
+    label: 'single_outlet',
+    storyId: story.id,
+    entryId: entry.id,
+  });
+  assert.deepEqual(await readBreakingItem(pool, linked.id), linked);
+  assert.equal(linked.entryId, entry.id);
+
+  const storyOnly = await createBreakingItem(pool, {
+    occurredAt: '2026-11-16T20:25:00Z',
+    headline: 'More to come',
+    label: 'working',
+    storyId: story.id,
+  });
+  assert.equal((await readBreakingItem(pool, storyOnly.id))?.entryId, null);
+});
+
+test('a Breaking item refuses a label off the list and an entry from another story', async (t) => {
+  const pool = store(t);
+  const story = await hub(pool);
+  const other = await hub(pool, 'Other');
+  const entry = await createStoryEntry(pool, { ...ENTRY, storyId: story.id });
+  const item = { occurredAt: '2026-11-16T20:20:00Z', headline: 'Headline', label: 'reported' } as const;
+
+  await assert.rejects(
+    createBreakingItem(pool, { ...item, label: 'unconfirmed' as EntryLabel }),
+    /unexpected label unconfirmed/,
+  );
+  await assert.rejects(
+    createBreakingItem(pool, { ...item, entryId: entry.id }),
+    /a Breaking item with an entry must name its story/,
+  );
+  await assert.rejects(
+    createBreakingItem(pool, { ...item, storyId: other.id, entryId: entry.id }),
+    /a Breaking item can only point at an entry of its own story/,
+  );
+});
+
+test('set, replace and read the CFP footer for a day', async (t) => {
+  const pool = store(t);
+  // The day is the key and the test database is shared, so take a day no other run has used.
+  let day = '';
+  do {
+    const offset = Math.floor(Math.random() * 2_000_000);
+    day = new Date(Date.UTC(3000, 0, 1) + offset * 86_400_000).toISOString().slice(0, 10);
+  } while ((await readCfpDayNote(pool, day)) !== null);
+
+  const first = await setCfpDayNote(pool, {
+    day,
+    stillWorking: 'Port closure, two sources pending',
+    dropped: null,
+  });
+  assert.deepEqual(first, { day, stillWorking: 'Port closure, two sources pending', dropped: null });
+  assert.deepEqual(await readCfpDayNote(pool, day), first);
+
+  const second = await setCfpDayNote(pool, {
+    day,
+    stillWorking: null,
+    dropped: 'Port closure: could not confirm',
+  });
+  assert.deepEqual(await readCfpDayNote(pool, day), second);
+  assert.equal(second.stillWorking, null);
+
+  await assert.rejects(
+    setCfpDayNote(pool, { day: `${day}T00:00:00Z`, stillWorking: null, dropped: null }),
+    /day must be a date \(YYYY-MM-DD\)/,
+  );
 });

@@ -33,7 +33,7 @@ Rows are in build order. One ticket is built at a time, and each starts on Phil'
 | Order | Status | Ticket | Scope | Waits on | Builder | Approach |
 |---|---|---|---|---|---|---|
 | 1 | **Done** (this change) | [NEWS-238](https://informedcrew.atlassian.net/browse/NEWS-238) | Record decisions: multi-user accounts, the label list and its mapping, the ingest contract, and retiring Kite in `docs/DECISIONS.md`; this sequence; SDD in a Claude session in `CLAUDE.md` | Phil's sign-off | Session | Docs only |
-| 2 | To Do | Schema v2 (not filed) | The wider tables and fields, store functions, tests | 1 | Session | SDD |
+| 2 | **Done** | [NEWS-240](https://informedcrew.atlassian.net/browse/NEWS-240) | Schema v2: the wider tables and fields, store functions, tests. The `users` and `read_markers` tables are left to step 3 | 1 | Session | SDD |
 | 3 | To Do | Users and read markers (not filed) | Accounts, sign-in, per-user markers for stories, CFP, and Weather | 2 | Session | SDD |
 | 4 | To Do | Seed fixtures (not filed) | Two real stories written by hand in the v2 shape, to test the schema and build the UI against | 2 | GitHub Issue | TDD |
 | 5 | To Do | [NEWS-228](https://informedcrew.atlassian.net/browse/NEWS-228), widened | Ingest contract for stories, entries, Breaking, CFP, and Morning, which Grok Bot also uses to backfill tracked stories; the four Morning cards with the weather grid | 2 | Session | SDD |
