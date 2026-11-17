@@ -14,7 +14,7 @@ Jira: project **NEWS** (informedcrew.atlassian.net, cloudId `ebcd227d-1f6d-4a54-
 - **UI:** `apps/kite` — Bun 1.4.3, SvelteKit (vendored kite-public soft fork).
 - **E2E:** Playwright (`npm run test:e2e:kite`) stays local — hermetic `e2e/stack/`, not CI.
 - **Release:** semantic-release on merge to `main` (Conventional Commit squash title sets the bump).
-- **CI:** `.github/workflows/ci.yml` job `MVP build & typecheck` (typecheck, shell install, check, build, and `test:shell-build`, server tests, `test:kite`, Kite unit + check + build).
+- **CI:** `.github/workflows/ci.yml` job `MVP build & typecheck` (typecheck, e2e typecheck, shell install, check, build, and `test:shell-build`, server tests, `test:kite`, Kite unit + check + build).
 
 Do not revive `_legacy/` (including `_legacy/mvp-web`) as the default `npm run dev` path. Do not call Supabase from the live path.
 
@@ -56,7 +56,7 @@ Set `REFRESH_INTERVAL_HOURS=off` when you need the server up without spending re
 
 The full ritual is in `.cursor/skills/news-ship-loop/SKILL.md`. Repo skills win over legacy `.cursor/rules/` where they conflict; `AGENTS.md` still wins over skills on product invariants.
 
-- **Order:** take the current next item in `docs/ROADMAP.md` and confirm it in Jira. If they disagree, Jira wins; fix ROADMAP in the same change. The 2026-11-12 next-wave pause is the exception: NEWS-201, NEWS-202, NEWS-203, and NEWS-219 through NEWS-223 stay To Do in Jira on purpose until the UI build order is proposed. Dev-tooling NEWS-139, NEWS-128, and NEWS-121 are not paused. Do not start them, and do not rewrite ROADMAP to match that To Do status.
+- **Order:** take the current next item in `docs/ROADMAP.md` and confirm it in Jira. If they disagree, Jira wins; fix ROADMAP in the same change. The 2026-11-12 next-wave pause is the exception: NEWS-201, NEWS-202, NEWS-203, and NEWS-219 through NEWS-223 stay To Do in Jira on purpose until the UI build order is proposed. Dev-tooling NEWS-139 and NEWS-121 are not paused. Do not start the paused tickets, and do not rewrite ROADMAP to match that To Do status. NEWS-128 is Done.
 - **Approach** per ticket (`ticket → approach → reason`). TDD for one module/seam, no new public interfaces or dependencies, about 3 tasks or fewer; otherwise SDD. An explicit `Approach:` in the prompt overrides.
 - Branch `feat/news-<N>-…` (or `ci/news-<N>-…` for tooling) from `main`. One Conventional Commit per ticket on the branch; the PR title is the squash subject on `main` and names every key, e.g. `fix(NEWS-131, NEWS-155): …`.
 - PR body: Summary, a Test plan with every item ticked, and `Closes NEWS-N` when the PR fully completes the story. The test plan includes a `docs/PRODUCT_SPEC.md` update when behavior changed (scenarios edited; leave the file unchanged when it did not; no **Last checked** bump) and a `docs/WHATS_NEW.md` entry for what is true at merge, or **No user-visible change.** Tick the CI item only with the green Actions run link. Do not hand-edit semantic-release `CHANGELOG.md` for that note.

@@ -13,6 +13,9 @@ export const E2E_FIXTURE_PORT = Number(process.env.E2E_FIXTURE_PORT ?? E2E_API_P
 
 export const E2E_SEED_ARTICLE_PATH = '/seed-article';
 
+/**
+ * @param {string} pathname
+ */
 export function e2eFixtureUrl(pathname) {
 	return `http://127.0.0.1:${E2E_FIXTURE_PORT}${pathname}`;
 }
