@@ -50,7 +50,7 @@ Rows are in build order. One ticket is built at a time, and each starts on Phil'
 | 15 | To Do | Remove Kite (not filed) | `npm run dev` becomes server plus shell; delete `apps/kite`, its unit tests, and the Kite e2e spec; update `AGENTS.md`, `CLAUDE.md`, the README, and the route map. The CI workflow edit goes to Cursor | 13, 14 | Session, with Cursor for CI | SDD |
 | 16 | To Do | Write a private story in the site (not filed) | A screen where a user writes a private story and its entries. The Round 2 mockup has no such screen, so it needs a mockup from Phil first | 3, 6, a mockup from Phil | Session | SDD |
 
-Row 16 is numbered last only because it was added later. Like row 2a, it is placed by what it waits on: it can start once steps 3 and 6 are **Done** and Phil has supplied the mockup, on Phil's go, without waiting for the rows numbered between 6 and 15.
+Row 16 is numbered last only because it was added later. It is placed by what it waits on: it can start once steps 3 and 6 are **Done** and Phil has supplied the mockup, on Phil's go, without waiting for the rows numbered between 6 and 15.
 
 Builder and approach:
 
