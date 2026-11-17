@@ -242,10 +242,11 @@ const NOT_NULL_VIOLATION = '23502';
  * True when schema.sql has already been applied in full. The file runs in one
  * transaction, so its last table existing means all of it is in place. Then
  * nothing is run: even a no-op ALTER TABLE locks its table, and that can
- * deadlock with a write in progress. When schema.sql grows, point this at the
- * new last statement.
+ * deadlock with a write in progress. When schema.sql grows, name its new last
+ * table here. A test fails if this is not the last statement in the file.
  */
-const SCHEMA_APPLIED_SQL = `SELECT to_regclass('cfp_day_notes') IS NOT NULL AS done`;
+export const SCHEMA_LAST_TABLE = 'cfp_day_notes';
+const SCHEMA_APPLIED_SQL = `SELECT to_regclass('${SCHEMA_LAST_TABLE}') IS NOT NULL AS done`;
 
 function pgErrorCode(error: unknown): string | null {
   if (typeof error !== 'object' || error === null || !('code' in error)) return null;
