@@ -6,6 +6,10 @@ Each ship-loop pull request adds an entry for what is true at merge for that rea
 
 This is not the release log. Releases are recorded in `CHANGELOG.md` by semantic-release. Do not hand-edit `CHANGELOG.md` to mirror these notes.
 
+## 2026-11-17
+
+**No user-visible change.** The choice of what each reader can follow, hide, or keep private on the new dashboard is written down. The Brief is unchanged.
+
 ## 2026-11-16
 
 **No user-visible change.** The database can now hold what the new dashboard and story pages will show. Nothing reads it yet. The Brief is unchanged.
