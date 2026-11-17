@@ -1,3 +1,9 @@
+## [0.44.0](https://github.com/philga7/informed-news/compare/v0.43.3...v0.44.0) (2026-11-17)
+
+### Features
+
+* **NEWS-240:** widen the Postgres store to schema v2 for the dashboard UI ([#290](https://github.com/philga7/informed-news/issues/290)) ([5b82c62](https://github.com/philga7/informed-news/commit/5b82c62d9c69c32ce39145ff70d684a2fbc96bf2))
+
 ## [0.43.3](https://github.com/philga7/informed-news/compare/v0.43.2...v0.43.3) (2026-11-15)
 
 ### Bug Fixes
