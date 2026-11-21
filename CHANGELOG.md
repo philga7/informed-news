@@ -1,3 +1,9 @@
+## [0.45.0](https://github.com/philga7/informed-news/compare/v0.44.0...v0.45.0) (2026-11-21)
+
+### Features
+
+* **NEWS-254:** add user accounts, sign-in, read markers, follow/hide, and story owner ([#292](https://github.com/philga7/informed-news/issues/292)) ([d8ff2a2](https://github.com/philga7/informed-news/commit/d8ff2a2f15ef8d7918064d998525af624bb1553d))
+
 ## [0.44.0](https://github.com/philga7/informed-news/compare/v0.43.3...v0.44.0) (2026-11-17)
 
 ### Features
