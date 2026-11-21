@@ -1,3 +1,5 @@
+import type { Pool, PoolClient } from 'pg';
+
 export class DashboardStoreError extends Error {
   constructor(message: string, options?: { cause?: unknown }) {
     super(message, options);
@@ -92,4 +94,31 @@ export function asJsonObject(value: JsonObject, label: string): JsonObject {
     throw new DashboardStoreError(`${label} must be a JSON object`);
   }
   return value;
+}
+
+export function pgErrorCode(error: unknown): string | null {
+  if (typeof error !== 'object' || error === null || !('code' in error)) return null;
+  return typeof error.code === 'string' ? error.code : null;
+}
+
+/** Runs work in one transaction on one pooled client. */
+export async function inTransaction<T>(pool: Pool, work: (client: PoolClient) => Promise<T>): Promise<T> {
+  const client = await pool.connect();
+  let broken: Error | undefined;
+  try {
+    await client.query('BEGIN');
+    const result = await work(client);
+    await client.query('COMMIT');
+    return result;
+  } catch (error) {
+    try {
+      await client.query('ROLLBACK');
+    } catch (rollbackError) {
+      // Keep the first error. The connection is unusable, so drop it from the pool.
+      broken = rollbackError instanceof Error ? rollbackError : new Error(String(rollbackError));
+    }
+    throw error;
+  } finally {
+    client.release(broken);
+  }
 }

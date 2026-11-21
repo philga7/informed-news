@@ -18,6 +18,16 @@ Topics is the sign-in screen. The password field is labeled “MVP password.” 
 
 Other pages that need a sign-in say **Log in on Topics** and link to Topics.
 
+Accounts are invite-only, one email and password each. The operator makes them with the `npm run users` script; there is no sign-up page. There is no screen yet for signing in with an email: the sign-in request takes one (`POST /api/login` with an email and password), and the Topics form still sends only the password. When the operator's account is named in the server settings, the Topics password signs in as that account. Each account's place on the new dashboard (how far it has read each story, CFP, and Weather, and what it follows or hides) is kept on the account. Nothing shows it yet.
+
+**Scenario:** Given an account exists, when you sign in with its email and the right password, then you are signed in as that account. The email is matched in any case.
+
+**Scenario:** Given you sign in with an email that has no account, or with the wrong password, then you stay signed out and get the same refusal either way.
+
+**Scenario:** Given the operator disables your account, or sets a new password for it, while you are signed in, when you next do something that needs a sign-in, then you are signed out.
+
+**Scenario:** Given the server has no database, when you sign in with an email, then it says accounts are not set up, and the Topics password works as before.
+
 ## Topics
 
 Topics (`/topics`) is your list of what the Brief looks for and what it filters out. Changes save immediately.

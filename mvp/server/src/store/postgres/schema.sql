@@ -232,3 +232,71 @@ CREATE TABLE IF NOT EXISTS cfp_day_notes (
   still_working text,
   dropped text
 );
+
+-- Schema v3 (NEWS-254): user accounts, read markers, follow/hide, story owner.
+-- Decisions: docs/DECISIONS.md, 2026-11-16 multi-user and per-user entries,
+-- and the 2026-11-20 sign-in entry. Like v2, it can be applied again safely.
+
+-- Invite-only accounts. Email is stored trimmed and lowercased by the store;
+-- the unique index on lower(email) holds even for a row written another way.
+CREATE TABLE IF NOT EXISTS users (
+  id text PRIMARY KEY,
+  email text NOT NULL CHECK (email <> ''),
+  password_hash text NOT NULL CHECK (password_hash <> ''),
+  display_name text NOT NULL CHECK (display_name <> ''),
+  created_at timestamptz NOT NULL,
+  disabled_at timestamptz
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS users_email_lower_idx ON users (lower(email));
+
+-- A story with an owner is private to that user; no owner means shared.
+-- Until Phil decides the open branch questions, only a hub may be private.
+-- That a branch's hub is not private is checked by the store.
+ALTER TABLE stories
+  ADD COLUMN IF NOT EXISTS owner_user_id text REFERENCES users (id);
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'stories_branch_not_private'
+      AND conrelid = 'stories'::regclass
+  ) THEN
+    ALTER TABLE stories
+      ADD CONSTRAINT stories_branch_not_private
+      CHECK (role = 'hub' OR owner_user_id IS NULL);
+  END IF;
+END
+$$;
+
+-- One marker per user and tracker. A story tracker names its story; CFP and
+-- Weather are one tracker each, with no id. read_up_to only moves forward.
+CREATE TABLE IF NOT EXISTS read_markers (
+  user_id text NOT NULL REFERENCES users (id),
+  tracker_kind text NOT NULL CHECK (tracker_kind IN ('story', 'cfp', 'weather')),
+  tracker_id text REFERENCES stories (id),
+  read_up_to timestamptz,
+  last_opened_at timestamptz,
+  CHECK ((tracker_kind = 'story') = (tracker_id IS NOT NULL)),
+  UNIQUE NULLS NOT DISTINCT (user_id, tracker_kind, tracker_id)
+);
+
+-- Follow or hide, per user, for a story or a topic. It changes only what that
+-- user sees. Topics live outside Postgres, so topic_id has no foreign key.
+CREATE TABLE IF NOT EXISTS user_follows (
+  user_id text NOT NULL REFERENCES users (id),
+  story_id text REFERENCES stories (id),
+  topic_id text CHECK (topic_id <> ''),
+  state text NOT NULL CHECK (state IN ('follow', 'hide')),
+  updated_at timestamptz NOT NULL,
+  CHECK ((story_id IS NULL) <> (topic_id IS NULL)),
+  UNIQUE NULLS NOT DISTINCT (user_id, story_id, topic_id)
+);
+
+-- One row: the schema version applied. ensureDashboardSchema writes it after
+-- the statements above and runs nothing once it is current.
+CREATE TABLE IF NOT EXISTS dashboard_schema_version (
+  id boolean PRIMARY KEY DEFAULT true CHECK (id),
+  version integer NOT NULL
+);

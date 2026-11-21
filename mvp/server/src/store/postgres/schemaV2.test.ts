@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test, type TestContext } from 'node:test';
 import type { Pool } from 'pg';
-import { SCHEMA_LAST_TABLE, ensureDashboardSchema } from './dashboardStore.js';
+import { ensureDashboardSchema } from './dashboardStore.js';
 import { scratchSchemaPool } from '../../testing/dashboardTestDb.js';
 import { CFP_STATUSES, ENTRY_LABELS, ENTRY_PRECISIONS, STORY_STATUSES } from './vocabulary.js';
 
@@ -95,18 +95,6 @@ test('v2 applies on top of empty NEWS-224 tables and ends in the same shape as a
   assert.ok(upgradedShape.columns.some((column) => column.startsWith('cfp_roundup_items.url text null=YES')));
 });
 
-test('the table that marks the schema as applied is the last statement in schema.sql', () => {
-  // ensureDashboardSchema runs nothing once this table exists. A statement
-  // added after it would never reach a database that already has the table.
-  const sql = readFileSync(new URL('./schema.sql', import.meta.url), 'utf8');
-  const opening = `CREATE TABLE IF NOT EXISTS ${SCHEMA_LAST_TABLE} (`;
-  const start = sql.indexOf(opening);
-  assert.notEqual(start, -1, `schema.sql creates ${SCHEMA_LAST_TABLE}`);
-  const end = sql.indexOf(');', start);
-  assert.notEqual(end, -1);
-  assert.equal(sql.slice(end + 2).trim(), '', 'nothing follows the last table');
-});
-
 test('applying v2 a second time changes nothing', async (t) => {
   const { pool, schema } = await scratch(t);
   await ensureDashboardSchema(pool);
@@ -150,11 +138,16 @@ test('every time column is timestamptz and nothing stores a tone', async (t) => 
       'breaking_items.occurred_at',
       'cfp_roundup_items.roundup_at',
       'morning_items.posted_at',
+      'read_markers.last_opened_at',
+      'read_markers.read_up_to',
       'stories.last_checked_at',
       'stories.next_check_at',
       'stories.now_updated_at',
       'story_entries.occurred_at',
       'story_entries.occurred_until',
+      'user_follows.updated_at',
+      'users.created_at',
+      'users.disabled_at',
     ],
   );
   for (const row of times) {
@@ -164,8 +157,6 @@ test('every time column is timestamptz and nothing stores a tone', async (t) => 
     columns.rows.filter((row) => /tone|colou?r/.test(row.column_name)),
     [],
   );
-  const tables = new Set(columns.rows.map((row) => row.table_name));
-  assert.ok(!tables.has('users') && !tables.has('read_markers'), 'accounts and read markers are step 3');
 });
 
 test('the database takes every value on the fixed lists and refuses anything else', async (t) => {
