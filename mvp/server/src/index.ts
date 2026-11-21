@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import type { RequestHandler } from 'express';
 import { createApp } from './app.js';
+import { openAccounts } from './auth/openAccounts.js';
 import { REFRESH_CHECK_MINUTES } from './services/briefConfig.js';
 import { exitIfRadarConfigInvalid } from './services/loadRadarSources.js';
 import { startRefreshScheduler } from './services/index.js';
@@ -46,7 +47,9 @@ async function loadShellHandler(): Promise<RequestHandler | undefined> {
 const kiteHandler = await loadKiteHandler();
 const shellHandler = await loadShellHandler();
 
-const app = createApp({ kiteHandler, shellHandler });
+const accounts = openAccounts(process.env);
+
+const app = createApp({ kiteHandler, shellHandler, accounts });
 
 app.listen(port, '0.0.0.0', () => {
   console.log(`MVP server listening on http://localhost:${port}`);

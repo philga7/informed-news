@@ -2,9 +2,10 @@ import cors from 'cors';
 import express from 'express';
 import type { Express, RequestHandler, Response } from 'express';
 import {
+  requireApiSession,
   createAuthRouter,
   createSessionMiddleware,
-  requireApiSession,
+  type Accounts,
 } from './auth/index.js';
 import {
   classifyArticleById,
@@ -149,6 +150,11 @@ export type CreateAppDeps = {
    * route and before `kiteHandler`. Brief (`/`, `/latest`, …) and `/shell` paths reach it.
    */
   shellHandler?: RequestHandler;
+  /**
+   * User accounts (NEWS-254), present when the server has a Postgres store.
+   * Absent: email sign-in answers 503 and the MVP password works as before.
+   */
+  accounts?: Accounts;
 };
 
 const SEEN_IDS_MAX = 100;
@@ -372,7 +378,7 @@ export function createApp(deps: CreateAppDeps = {}): Express {
     });
   }
 
-  // Public Kite brief adapter (NEWS-44) — must stay before requireApiSession.
+  // Public Kite brief adapter (NEWS-44) — must stay before the API session guard.
   app.use(
     '/api',
     createKiteBriefRouter({
@@ -390,8 +396,8 @@ export function createApp(deps: CreateAppDeps = {}): Express {
     }),
   );
 
-  app.use('/api', requireApiSession);
-  app.use('/api', createAuthRouter());
+  app.use('/api', requireApiSession(deps.accounts));
+  app.use('/api', createAuthRouter(deps.accounts));
 
   /**
    * Unified refresh: CFP → curated RSS → topic search → triage → Brief summaries

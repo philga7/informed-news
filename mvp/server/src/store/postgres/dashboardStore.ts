@@ -6,7 +6,9 @@ import {
   asCalendarDate,
   asInstant,
   asJsonObject,
+  inTransaction,
   optionalInstant,
+  pgErrorCode,
   optionalText,
   requiredText,
   utcMidnight,
@@ -56,6 +58,8 @@ export type StoryRecord = {
   earlierSummary: string | null;
   sourcesNote: string | null;
   threadUrl: string | null;
+  /** The user a private story belongs to; null means shared. */
+  ownerUserId: string | null;
 };
 
 export type StoryInput = {
@@ -72,6 +76,12 @@ export type StoryInput = {
   earlierSummary?: string | null;
   sourcesNote?: string | null;
   threadUrl?: string | null;
+  /**
+   * Makes the story private to this user. Missing or null means shared. Until
+   * the open branch questions are decided, only a hub may be private, and a
+   * branch may not sit under a private hub.
+   */
+  ownerUserId?: string | null;
 };
 
 export type EntrySourceRecord = {
@@ -168,6 +178,7 @@ type StoryRow = {
   earlier_summary: string | null;
   sources_note: string | null;
   thread_url: string | null;
+  owner_user_id: string | null;
 };
 
 type EntryRow = {
@@ -237,46 +248,36 @@ function dashboardSchemaSql(): string {
 /** Any fixed number: it only has to be the same for every caller. */
 const SCHEMA_LOCK_KEY = 240_224;
 const NOT_NULL_VIOLATION = '23502';
+const FOREIGN_KEY_VIOLATION = '23503';
 
 /**
- * True when schema.sql has already been applied in full. The file runs in one
- * transaction, so its last table existing means all of it is in place. Then
- * nothing is run: even a no-op ALTER TABLE locks its table, and that can
- * deadlock with a write in progress. When schema.sql grows, name its new last
- * table here. A test fails if this is not the last statement in the file.
+ * The version schema.sql brings a database to. NEWS-224 was 1, schema v2
+ * (NEWS-240) was 2, accounts and read markers (NEWS-254) are 3. Bump it in the
+ * same change as any edit to schema.sql: a database whose version row is
+ * current runs nothing, so an edit without a bump never reaches it. A test
+ * pins the file's hash to this number.
  */
-export const SCHEMA_LAST_TABLE = 'cfp_day_notes';
-const SCHEMA_APPLIED_SQL = `SELECT to_regclass('${SCHEMA_LAST_TABLE}') IS NOT NULL AS done`;
+export const DASHBOARD_SCHEMA_VERSION = 3;
 
-function pgErrorCode(error: unknown): string | null {
-  if (typeof error !== 'object' || error === null || !('code' in error)) return null;
-  return typeof error.code === 'string' ? error.code : null;
-}
-
-async function inTransaction<T>(pool: Pool, work: (client: PoolClient) => Promise<T>): Promise<T> {
-  const client = await pool.connect();
-  let broken: Error | undefined;
-  try {
-    await client.query('BEGIN');
-    const result = await work(client);
-    await client.query('COMMIT');
-    return result;
-  } catch (error) {
-    try {
-      await client.query('ROLLBACK');
-    } catch (rollbackError) {
-      // Keep the first error. The connection is unusable, so drop it from the pool.
-      broken = rollbackError instanceof Error ? rollbackError : new Error(String(rollbackError));
-    }
-    throw error;
-  } finally {
-    client.release(broken);
-  }
+/**
+ * The version a database records, or 0 when it has no version row yet (an
+ * empty database, or one built before NEWS-254).
+ */
+async function appliedSchemaVersion(client: PoolClient): Promise<number> {
+  const table = await client.query<{ present: boolean }>(
+    `SELECT to_regclass('dashboard_schema_version') IS NOT NULL AS present`,
+  );
+  if (table.rows[0]?.present !== true) return 0;
+  const row = await client.query<{ version: number }>(
+    'SELECT version FROM dashboard_schema_version WHERE id',
+  );
+  return row.rows[0]?.version ?? 0;
 }
 
 /**
- * Create or widen the dashboard tables. Safe to run again: once the schema is
- * in place it changes and locks nothing. It runs in one transaction, so a
+ * Create or widen the dashboard tables and record DASHBOARD_SCHEMA_VERSION.
+ * Safe to run again: once the version row is current it changes and locks
+ * nothing. It runs in one transaction, so a
  * failure leaves the database as it was. Rows written under
  * the NEWS-224 schema lack the fields v2 requires, and no value is invented
  * for them: applying v2 over such rows fails.
@@ -285,9 +286,13 @@ export async function ensureDashboardSchema(pool: Pool): Promise<void> {
   try {
     await inTransaction(pool, async (client) => {
       await client.query('SELECT pg_advisory_xact_lock($1)', [SCHEMA_LOCK_KEY]);
-      const applied = await client.query<{ done: boolean }>(SCHEMA_APPLIED_SQL);
-      if (applied.rows[0]?.done === true) return;
+      if ((await appliedSchemaVersion(client)) >= DASHBOARD_SCHEMA_VERSION) return;
       await client.query(dashboardSchemaSql());
+      await client.query(
+        `INSERT INTO dashboard_schema_version (id, version) VALUES (true, $1)
+         ON CONFLICT (id) DO UPDATE SET version = EXCLUDED.version`,
+        [DASHBOARD_SCHEMA_VERSION],
+      );
     });
   } catch (error) {
     if (pgErrorCode(error) === NOT_NULL_VIOLATION) {
@@ -301,7 +306,8 @@ export async function ensureDashboardSchema(pool: Pool): Promise<void> {
 }
 
 const STORY_COLUMNS = `id, role, hub_id, title, status, now_summary, now_updated_at, cadence,
-  last_checked_at, next_check_at, unchanged_note, earlier_summary, sources_note, thread_url`;
+  last_checked_at, next_check_at, unchanged_note, earlier_summary, sources_note, thread_url,
+  owner_user_id`;
 
 export async function createStory(pool: Pool, input: StoryInput): Promise<StoryRecord> {
   const title = requiredText(input.title, 'title');
@@ -339,10 +345,36 @@ export async function createStory(pool: Pool, input: StoryInput): Promise<StoryR
     earlierSummary: optionalText(input.earlierSummary),
     sourcesNote: optionalText(input.sourcesNote),
     threadUrl: optionalText(input.threadUrl),
+    ownerUserId: optionalText(input.ownerUserId),
   };
-  await pool.query(
+  if (record.role === 'branch' && record.ownerUserId !== null) {
+    throw new DashboardStoreError('a branch cannot be private yet');
+  }
+  await inTransaction(pool, async (client) => {
+    if (record.hubId !== null) {
+      // Lock the hub so it cannot change between this check and the insert.
+      const hub = await client.query<{ owner_user_id: string | null }>(
+        'SELECT owner_user_id FROM stories WHERE id = $1 FOR SHARE',
+        [record.hubId],
+      );
+      if (hub.rows[0]?.owner_user_id != null) {
+        throw new DashboardStoreError('a branch cannot sit under a private hub yet');
+      }
+    }
+    await insertStory(client, record);
+  }).catch((error: unknown) => {
+    if (pgErrorCode(error) === FOREIGN_KEY_VIOLATION) {
+      throw new DashboardStoreError('story refers to a missing hub or owner', { cause: error });
+    }
+    throw error;
+  });
+  return record;
+}
+
+async function insertStory(client: PoolClient, record: StoryRecord): Promise<void> {
+  await client.query(
     `INSERT INTO stories (${STORY_COLUMNS})
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
     [
       record.id,
       record.role,
@@ -358,9 +390,9 @@ export async function createStory(pool: Pool, input: StoryInput): Promise<StoryR
       record.earlierSummary,
       record.sourcesNote,
       record.threadUrl,
+      record.ownerUserId,
     ],
   );
-  return record;
 }
 
 export async function readStory(pool: Pool, id: string): Promise<StoryRecord | null> {
@@ -385,6 +417,7 @@ export async function readStory(pool: Pool, id: string): Promise<StoryRecord | n
     earlierSummary: row.earlier_summary,
     sourcesNote: row.sources_note,
     threadUrl: row.thread_url,
+    ownerUserId: row.owner_user_id,
   };
 }
 

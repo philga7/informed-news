@@ -66,3 +66,19 @@ export function morningKind(value: string): MorningKind {
 export function entryPrecision(value: string): EntryPrecision {
   return oneOf(ENTRY_PRECISIONS, value, 'entry precision');
 }
+
+/** A read marker's tracker. CFP and Weather are one tracker each per user. */
+export const TRACKER_KINDS = ['story', 'cfp', 'weather'] as const;
+export type TrackerKind = (typeof TRACKER_KINDS)[number];
+
+/** A user's choice for a story or topic. No row means neither. */
+export const FOLLOW_STATES = ['follow', 'hide'] as const;
+export type FollowState = (typeof FOLLOW_STATES)[number];
+
+export function trackerKind(value: string): TrackerKind {
+  return oneOf(TRACKER_KINDS, value, 'tracker kind');
+}
+
+export function followState(value: string): FollowState {
+  return oneOf(FOLLOW_STATES, value, 'follow state');
+}
