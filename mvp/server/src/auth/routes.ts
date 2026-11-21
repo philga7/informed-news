@@ -1,6 +1,6 @@
 import type { Request, RequestHandler, Router } from 'express';
 import { Router as createRouter } from 'express';
-import type { Accounts, SignedIn } from './accounts.js';
+import type { Accounts, SessionUser, SignedIn } from './accounts.js';
 import { verifyMvpPassword } from './password.js';
 
 /**
@@ -26,7 +26,16 @@ function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
-function startSession(req: Request, signedIn: SignedIn | null): boolean {
+/**
+ * `operatorPending` marks a password-only session made while the operator
+ * account could not be looked up. The guard looks it up again on later
+ * requests and turns the session into the operator's, or signs it out.
+ */
+function startSession(
+  req: Request,
+  signedIn: SignedIn | null,
+  operatorPending = false,
+): boolean {
   if (!req.session) return false;
   req.session.authenticated = true;
   if (signedIn) {
@@ -36,8 +45,13 @@ function startSession(req: Request, signedIn: SignedIn | null): boolean {
     delete req.session.userId;
     delete req.session.stamp;
   }
+  if (operatorPending) req.session.operatorPending = true;
+  else delete req.session.operatorPending;
   return true;
 }
+
+/** The account the guard resolved for this request; undefined when unchecked. */
+type CheckedUser = { user: SessionUser | null } | undefined;
 
 export function createAuthRouter(accounts?: Accounts): Router {
   const router = createRouter();
@@ -89,6 +103,7 @@ export function createAuthRouter(accounts?: Accounts): Router {
       }
 
       let signedIn: SignedIn | null = null;
+      let lookupFailedForOperator = false;
       if (accounts?.hasOperator) {
         let lookupFailed = false;
         try {
@@ -99,13 +114,14 @@ export function createAuthRouter(accounts?: Accounts): Router {
           console.error('Operator account lookup failed:', errorMessage(err));
           lookupFailed = true;
         }
+        lookupFailedForOperator = lookupFailed;
         if (!signedIn && !lookupFailed) {
           res.status(401).json({ ok: false, error: 'Operator account is missing or disabled' });
           return;
         }
       }
 
-      if (!startSession(req, signedIn)) {
+      if (!startSession(req, signedIn, lookupFailedForOperator)) {
         res.status(500).json({ ok: false, error: 'Session unavailable' });
         return;
       }
@@ -125,19 +141,21 @@ export function createAuthRouter(accounts?: Accounts): Router {
     res.json({ ok: true });
   });
 
-  /** Who is signed in. `user` is null for a session with no account. */
-  router.get('/me', async (req, res) => {
-    const userId = text(req.session?.userId);
-    if (!userId || !accounts) {
+  /**
+   * Who is signed in. `user` is null for a session with no account. The guard
+   * has already checked the account; when it could not (database down), 503.
+   */
+  router.get('/me', (req, res) => {
+    const checked = res.locals.checkedUser as CheckedUser;
+    if (!text(req.session?.userId)) {
       res.json({ ok: true, user: null });
       return;
     }
-    try {
-      res.json({ ok: true, user: await accounts.activeUser(userId, text(req.session?.stamp)) });
-    } catch (err) {
-      console.error('Account lookup failed:', errorMessage(err));
+    if (checked === undefined) {
       res.status(503).json({ ok: false, error: 'Accounts are unavailable' });
+      return;
     }
+    res.json({ ok: true, user: checked.user });
   });
 
   return router;
@@ -147,8 +165,10 @@ export function createAuthRouter(accounts?: Accounts): Router {
  * Protect every /api/* path except login and logout. A session that names a
  * user is checked against the database on each request: a disabled or deleted
  * account, or one whose password changed since this sign-in, is signed out
- * (401). When the database cannot be reached, the signed
- * cookie is trusted for that request.
+ * (401). A password-only session made while the operator lookup failed is
+ * looked up again: it becomes the operator's session, or is signed out when
+ * that account is missing or disabled. When the database cannot be reached,
+ * the signed cookie is trusted for that request.
  */
 export function requireApiSession(accounts?: Accounts): RequestHandler {
   return (req, res, next) => {
@@ -156,28 +176,46 @@ export function requireApiSession(accounts?: Accounts): RequestHandler {
       next();
       return;
     }
-    if (req.session?.authenticated !== true) {
+    const session = req.session;
+    if (session?.authenticated !== true) {
       res.status(401).json({ ok: false, error: 'Unauthorized' });
       return;
     }
-    const userId = text(req.session.userId);
+    const signOut = () => {
+      req.session = null;
+      res.status(401).json({ ok: false, error: 'Unauthorized' });
+    };
+    const trust = (err: unknown) => {
+      console.error('Account check failed; trusting the session:', errorMessage(err));
+      next();
+    };
+
+    if (accounts && session.operatorPending === true && !text(session.userId)) {
+      // Made while the operator lookup failed: look again now.
+      accounts.operator().then((signedIn) => {
+        if (!signedIn) {
+          signOut();
+          return;
+        }
+        startSession(req, signedIn);
+        res.locals.checkedUser = { user: signedIn.user } satisfies CheckedUser;
+        next();
+      }, trust);
+      return;
+    }
+
+    const userId = text(session.userId);
     if (!userId || !accounts) {
       next();
       return;
     }
-    accounts.activeUser(userId, text(req.session.stamp)).then(
-      (user) => {
-        if (user) {
-          next();
-          return;
-        }
-        req.session = null;
-        res.status(401).json({ ok: false, error: 'Unauthorized' });
-      },
-      (err: unknown) => {
-        console.error('Account check failed; trusting the session:', errorMessage(err));
-        next();
-      },
-    );
+    accounts.activeUser(userId, text(session.stamp)).then((user) => {
+      if (!user) {
+        signOut();
+        return;
+      }
+      res.locals.checkedUser = { user } satisfies CheckedUser;
+      next();
+    }, trust);
   };
 }

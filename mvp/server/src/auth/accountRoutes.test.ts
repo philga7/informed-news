@@ -76,7 +76,7 @@ const PHIL: SessionUser = { id: 'u-phil', email: 'phil@example.com', displayName
 
 /** A fake account list: one user with password "secret". */
 function fakeAccounts(options: { operator?: boolean; failing?: boolean } = {}) {
-  const state = { active: true, stamp: 'stamp-1' };
+  const state = { active: true, stamp: 'stamp-1', activeUserCalls: 0 };
   const phil = () => (state.active ? { user: PHIL, stamp: state.stamp } : null);
   const accounts: Accounts = {
     async prepare() {},
@@ -90,6 +90,7 @@ function fakeAccounts(options: { operator?: boolean; failing?: boolean } = {}) {
       return phil();
     },
     async activeUser(id, stamp) {
+      state.activeUserCalls += 1;
       if (options.failing) throw new Error('database down');
       return id === PHIL.id && state.active && stamp === state.stamp ? PHIL : null;
     },
@@ -196,6 +197,36 @@ test('with OPERATOR_EMAIL set but the database down, the MVP password signs in w
   const resp = await post(base, { password: 'pw' });
   assert.equal(resp.status, 200);
   assert.deepEqual(await resp.json(), { ok: true });
+  assert.equal((await get(base, '/api/protected', cookieOf(resp))).status, 200, 'trusted while down');
+});
+
+test('a session made while the operator lookup failed becomes the operator once the database is back', async (t) => {
+  const down = await serve(t, fakeAccounts({ operator: true, failing: true }).accounts);
+  const cookie = cookieOf(await post(down, { password: 'pw' }));
+
+  const healthy = await serve(t, fakeAccounts({ operator: true }).accounts);
+  const upgraded = await get(healthy, '/api/protected', cookie);
+  assert.equal(upgraded.status, 200);
+  const operatorCookie = cookieOf(upgraded);
+  assert.notEqual(operatorCookie, '', 'the session is rewritten with the operator account');
+  assert.deepEqual(await (await get(healthy, '/api/me', operatorCookie)).json(), {
+    ok: true,
+    user: PHIL,
+  });
+
+  const disabled = fakeAccounts({ operator: true });
+  disabled.state.active = false;
+  const refusing = await serve(t, disabled.accounts);
+  assert.equal((await get(refusing, '/api/protected', cookie)).status, 401);
+});
+
+test('/api/me reuses the account the guard checked', async (t) => {
+  const { accounts, state } = fakeAccounts();
+  const base = await serve(t, accounts);
+  const cookie = cookieOf(await post(base, { email: PHIL.email, password: 'secret' }));
+  state.activeUserCalls = 0;
+  assert.equal((await get(base, '/api/me', cookie)).status, 200);
+  assert.equal(state.activeUserCalls, 1);
 });
 
 test('a password sign-in after an account sign-in drops the old user', async (t) => {
@@ -245,6 +276,33 @@ test('openAccounts keeps the server up when the database cannot be reached', asy
   await new Promise((resolve) => setImmediate(resolve));
   assert.match(warnings.join('\n'), /database is not ready \(connect ECONNREFUSED\); sign-in will retry/);
   await assert.rejects(accounts.signIn(PHIL.email, 'secret'), /ECONNREFUSED/);
+});
+
+test('a database that fails after a good start is also fast-failed until the retry wait', async (t) => {
+  const pool = store(t);
+  await ensureDashboardSchema(pool);
+  let clock = 2_000_000;
+  let calls = 0;
+  let broken = false;
+  const flaky = {
+    query: (...args: Parameters<Pool['query']>) => {
+      calls += 1;
+      if (broken) return Promise.reject(new Error('connection timeout'));
+      return (pool.query as (...a: unknown[]) => unknown)(...args);
+    },
+    connect: () => pool.connect(),
+  } as unknown as Pool;
+  const accounts = createAccounts(flaky, {}, () => clock);
+  assert.equal(await accounts.activeUser(randomUUID(), 's'), null);
+  broken = true;
+  calls = 0;
+  await assert.rejects(accounts.activeUser('u', 's'), /connection timeout/);
+  await assert.rejects(accounts.activeUser('u', 's'), /connection timeout/);
+  await assert.rejects(accounts.signIn(PHIL.email, 'secret'), /connection timeout/);
+  assert.equal(calls, 1, 'one attempt, then fail fast');
+  clock += PREPARE_RETRY_MS;
+  broken = false;
+  assert.equal(await accounts.activeUser(randomUUID(), 's'), null);
 });
 
 test('after a failed prepare, calls fail fast until the retry wait has passed', async () => {

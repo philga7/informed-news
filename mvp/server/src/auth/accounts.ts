@@ -29,8 +29,9 @@ export type SignedIn = { user: SessionUser; stamp: string };
  */
 export interface Accounts {
   /**
-   * Apply the dashboard schema once. After a failure, calls within
-   * PREPARE_RETRY_MS fail at once with the same error; the next one tries again.
+   * Apply the dashboard schema once. After any database failure (here or in
+   * the methods below), calls within PREPARE_RETRY_MS fail at once with the
+   * same error; the next one tries again.
    */
   prepare(): Promise<void>;
   /** The active user for this email and password, or null for any failure. */
@@ -83,18 +84,34 @@ export function createAccounts(
   const decoy = bcrypt.hash('decoy-password-not-used', BCRYPT_ROUNDS);
   decoy.catch(() => undefined);
 
-  let ready: Promise<void> | undefined;
-  let failedAt = 0;
-  function prepare(): Promise<void> {
-    if (ready === undefined || (failedAt !== 0 && now() - failedAt >= PREPARE_RETRY_MS)) {
-      failedAt = 0;
-      const attempt = ensureDashboardSchema(pool);
-      ready = attempt;
-      attempt.catch(() => {
-        if (ready === attempt) failedAt = now();
-      });
+  // After any database failure, calls within PREPARE_RETRY_MS fail at once
+  // with the same error, so an outage does not add a connect timeout to every
+  // request. The first call after the wait tries again.
+  let downSince = 0;
+  let downError: unknown;
+  async function guarded<T>(work: () => Promise<T>): Promise<T> {
+    if (downSince !== 0) {
+      if (now() - downSince < PREPARE_RETRY_MS) throw downError;
+      downSince = 0;
     }
-    return ready;
+    try {
+      return await work();
+    } catch (error) {
+      downSince = now();
+      downError = error;
+      throw error;
+    }
+  }
+
+  let ready: Promise<void> | undefined;
+  function prepare(): Promise<void> {
+    return guarded(() => {
+      ready ??= ensureDashboardSchema(pool).catch((error: unknown) => {
+        ready = undefined;
+        throw error;
+      });
+      return ready;
+    });
   }
 
   return {
@@ -102,7 +119,7 @@ export function createAccounts(
     async signIn(email, password) {
       if (email.trim() === '' || password === '') return null;
       await prepare();
-      const user = await findUserByEmail(pool, email);
+      const user = await guarded(() => findUserByEmail(pool, email));
       if (!user) {
         await bcrypt.compare(password, await decoy);
         return null;
@@ -114,12 +131,12 @@ export function createAccounts(
     async operator() {
       if (operatorEmail === '') return null;
       await prepare();
-      const user = await findUserByEmail(pool, operatorEmail);
+      const user = await guarded(() => findUserByEmail(pool, operatorEmail));
       return user ? signedIn(user) : null;
     },
     async activeUser(id, stamp) {
       await prepare();
-      const user = await readUserWithPasswordHash(pool, id);
+      const user = await guarded(() => readUserWithPasswordHash(pool, id));
       const current = user ? signedIn(user) : null;
       return current && current.stamp === stamp ? current.user : null;
     },
