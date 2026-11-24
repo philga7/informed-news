@@ -1,0 +1,121 @@
+{
+  "category": { "id": "iran", "name": "Iran", "sort": 0 },
+  "items": [
+    {
+      "kind": "story",
+      "id": "fixture:story:iran-war",
+      "role": "hub",
+      "title": "Iran-US-Israel war and hostilities",
+      "status": "active",
+      "nowSummary": "Iran's Nov 18 attacks on US-linked sites in Kuwait and Bahrain were intercepted; USS George Washington has left, two carriers remain; still no major-campaign order",
+      "nowUpdatedAt": "2026-11-20T09:13:00-05:00",
+      "lastCheckedAt": "2026-11-23T09:14:00-05:00",
+      "nextCheckAt": "2026-11-23T21:00:00-05:00",
+      "categoryIds": ["iran"],
+      "sources": [
+        { "id": "fixture:src:iran-war:ap-kuwait", "outlet": "AP", "url": "https://apnews.com/article/iran-us-kuwait-gulf-attacks-bahrain-b1f0b530cffe951e6fcc1e27b2e1af94" },
+        { "id": "fixture:src:iran-war:cbs-live", "outlet": "CBS", "url": "https://www.cbsnews.com/live-updates/iran-war-us-gulf-retaliation-strikes-strait-of-hormuz/" },
+        { "id": "fixture:src:iran-war:nypost-kafd", "outlet": "Reuters via NY Post", "url": "https://nypost.com/2026/11/19/world-news/houthis-strike-saudi-arabia-pif-tower-in-riyadh-causing-damage/" },
+        { "id": "fixture:src:iran-war:aa-mines", "outlet": "Anadolu", "url": "`` https://www.aa.com.tr/en/middle-east/2-oil-tankers-catch-fire-after-hitting-mines-in-waters-east-of-strait-of-hormuz-iranian-army ``/4131604" }
+      ]
+    },
+    {
+      "kind": "entry",
+      "id": "fixture:entry:iran-war:1118",
+      "storyId": "fixture:story:iran-war",
+      "precision": "day",
+      "occurredAt": "2026-11-18",
+      "headline": "Iran attacks on Kuwait and Bahrain intercepted; ADNOC ship hit; UKMTO reports a Khasab tanker strike; George Washington leaves; coalition claims a Saada launcher destroyed",
+      "label": "reported",
+      "changes": [
+        "After a US strike on Qeshm, Iran launched drones at Ali Al-Salem Air Base in Kuwait (the first strike on Kuwait since September) and at sites in Bahrain; Bahrain and Kuwait said the attacks were intercepted, with no damage reported.",
+        "ADNOC said one of its ships was struck in Hormuz on Nov 17: one crew member missing, 11 injured.",
+        "UKMTO reported an outbound tanker hit by an unknown projectile in the engine room north of Khasab, Oman; crew safe.",
+        "A Navy official told CBS the USS George Washington has left the Middle East for the 7th Fleet, leaving two carriers, the USS George H.W. Bush and USS Theodore Roosevelt.",
+        "The Saudi-led coalition said it destroyed a Houthi ballistic-missile launcher in Saada after an attempted attack on southern Saudi Arabia (coalition claim)."
+      ],
+      "sources": [{ "sourceId": "fixture:src:iran-war:ap-kuwait" }, { "sourceId": "fixture:src:iran-war:cbs-live" }]
+    },
+    {
+      "kind": "entry",
+      "id": "fixture:entry:iran-war:1119",
+      "storyId": "fixture:story:iran-war",
+      "precision": "day",
+      "occurredAt": "2026-11-19",
+      "headline": "Shenzhen summit yields no reported Iran breakthrough; Qatar mediation stalled; Saudi authorities report Houthi damage to a Riyadh tower; Houthis reported about 60 km from Aden",
+      "label": "reported",
+      "changes": [
+        "The Trump-Xi-Putin meeting in Shenzhen produced no reported Iran breakthrough, and Qatar's mediation remains stalled.",
+        "Saudi Civil Defense said a Houthi attack damaged several floors of a King Abdullah Financial District tower and adjacent buildings, with no injuries; the Foreign Ministry condemned the attack, the second KAFD hit after the Nov 8 Aramco Tower debris.",
+        "The Nov 19 PM update reported Houthis about 60 km from Aden and Yemeni government forces pulling back from Bab el-Mandeb.",
+        "NPR reported that ship attacks in Hormuz have escalated."
+      ],
+      "sources": [{ "sourceId": "fixture:src:iran-war:cbs-live" }, { "sourceId": "fixture:src:iran-war:nypost-kafd" }]
+    },
+    {
+      "kind": "entry",
+      "id": "fixture:entry:iran-war:1120",
+      "storyId": "fixture:story:iran-war",
+      "precision": "time",
+      "occurredAt": "2026-11-20T09:13:00-05:00",
+      "headline": "Trump claims indications Iran may pursue chemical or biological weapons, citing no evidence; Iran rejects the claim; IRGC mine claims Unconfirmed; Houthi boat-toll claim unverified",
+      "label": "claim_no_evidence_shown",
+      "changes": [
+        "Trump told Fox on Nov 18-19, from Shenzhen, there are 'indications' Iran may be working on biological or chemical weapons because its nuclear program has been damaged; he cited no evidence.",
+        "Foreign Ministry spokesman Baqaei rejected the claim as the 'same fraudulent script' used about Iraq's weapons.",
+        "No supporting evidence has been shown; a denial is not a refutation.",
+        "The IRGC and Iran's navy said two more tankers hit mines near Hormuz on Nov 19 and caught fire, Iranian claims that have not been independently confirmed.",
+        "The Houthi health ministry said a Saudi strike on a civilian boat killed 19 people; that claim is unverified."
+      ],
+      "sources": [{ "sourceId": "fixture:src:iran-war:cbs-live" }, { "sourceId": "fixture:src:iran-war:aa-mines" }]
+    },
+    {
+      "kind": "story",
+      "id": "fixture:story:iran-strike-decision",
+      "role": "branch",
+      "hubId": "fixture:story:iran-war",
+      "title": "US strike decision on Iran",
+      "status": "active",
+      "nowSummary": "After a US strike on Qeshm, Iran launched drones at Ali Al-Salem Air Base in Kuwait and at sites in Bahrain; official accounts say the attacks were intercepted, with no damage. Still no major-campaign order.",
+      "nowUpdatedAt": "2026-11-20T09:13:00-05:00",
+      "lastCheckedAt": "2026-11-23T09:14:00-05:00",
+      "nextCheckAt": "2026-11-23T21:00:00-05:00",
+      "categoryIds": ["iran"],
+      "sources": [
+        { "id": "fixture:src:iran-strike:iranintl-1114", "outlet": "Iran International", "url": "https://www.iranintl.com/en/liveblog/202611143682", "publishedOn": "2026-11-14" },
+        { "id": "fixture:src:iran-strike:cbs-live", "outlet": "CBS", "url": "https://www.cbsnews.com/live-updates/iran-war-us-gulf-retaliation-strikes-strait-of-hormuz/" }
+      ],
+      "links": [{ "toStoryId": "fixture:story:iran-war", "note": "Hub: Iran-US-Israel war and hostilities" }]
+    },
+    {
+      "kind": "entry",
+      "id": "fixture:entry:iran-strike:1114",
+      "storyId": "fixture:story:iran-strike-decision",
+      "precision": "time",
+      "occurredAt": "2026-11-14T09:00:00-05:00",
+      "headline": "Reuters: Trump told advisers he may hold off on renewed strikes unless Iran or the Houthis provoke further; no final decision (reported, not confirmed)",
+      "label": "single_outlet",
+      "changes": [
+        "Reuters, citing three people familiar with the matter, reported that Trump told advisers he may hold off on renewed strikes unless Iran or the Houthis take further provocative action; no final decision has been made (reported, not confirmed).",
+        "Saudi Crown Prince Mohammed bin Salman and Turkey's President Erdogan urged him not to resume attacks; Israel is still pressing for a new campaign.",
+        "Trump is expected to raise Iran with Putin and Xi at their Nov 19 summit."
+      ],
+      "sources": [{ "sourceId": "fixture:src:iran-strike:iranintl-1114" }]
+    },
+    {
+      "kind": "entry",
+      "id": "fixture:entry:iran-strike:1120",
+      "storyId": "fixture:story:iran-strike-decision",
+      "precision": "time",
+      "occurredAt": "2026-11-20T09:13:00-05:00",
+      "headline": "Trump claims indications Iran may pursue chemical or biological weapons, citing no evidence; Iran rejects the claim",
+      "label": "claim_no_evidence_shown",
+      "changes": [
+        "Trump told Fox on Nov 18-19, from Shenzhen, there are 'indications' Iran may be working on biological or chemical weapons because its nuclear program has been damaged; he cited no evidence.",
+        "Foreign Ministry spokesman Baqaei rejected the claim as the 'same fraudulent script' used about Iraq's weapons.",
+        "No supporting evidence has been shown; a denial is not a refutation. Still no major-campaign order."
+      ],
+      "sources": [{ "sourceId": "fixture:src:iran-strike:cbs-live" }]
+    }
+  ]
+}
