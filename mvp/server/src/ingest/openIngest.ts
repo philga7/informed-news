@@ -1,6 +1,7 @@
 import { Pool as PgPool, type Pool, type PoolConfig } from 'pg';
 import { ensureDashboardSchema } from '../store/postgres/dashboardStore.js';
 import { openDashboardPool } from '../store/postgres/instanceGuard.js';
+import { pgErrorCode } from '../store/postgres/storeSupport.js';
 
 type Log = (message: string) => void;
 
@@ -45,7 +46,8 @@ export function openIngest(
         createPool({ ...config, connectionTimeoutMillis: CONNECT_TIMEOUT_MS }),
       );
       // An idle client that loses its connection emits 'error'; unhandled, it would crash the server.
-      pool.on('error', (err) => warn(`Ingest Postgres pool error: ${err.message}`));
+      // Only the error's code is logged: a driver message can carry values.
+      pool.on('error', (err) => warn(`Ingest Postgres pool error (${pgErrorCode(err) ?? err.name})`));
       log('Ingest on');
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

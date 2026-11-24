@@ -193,7 +193,7 @@ test('a batch runs in order with a result per item, and one bad item does not st
   );
   assert.match(results[2]?.error ?? '', /occurredAt must be a timestamp/);
 
-  for (const bad of [{ items: [] }, { items: 'x' }, { items: Array(101).fill(hub) }]) {
+  for (const bad of [{ items: [] }, { items: 'x' }, { items: Array(101).fill(hub) }, { items: [hub], kind: 'story' }]) {
     assert.equal((await post('/api/ingest', { json: bad })).status, 422);
   }
 });

@@ -148,6 +148,11 @@ export function createIngestRouter(
       res.status(status).json(rest);
       return;
     }
+    const extra = Object.keys(body as object).filter((key) => key !== 'items');
+    if (extra.length > 0) {
+      res.status(422).json({ error: `a batch has only items; unknown field ${extra[0]}`, reason: 'invalid' });
+      return;
+    }
     if (!Array.isArray(batch) || batch.length === 0 || batch.length > LIMITS.batch) {
       res.status(422).json({ error: `items must be a list of 1 to ${LIMITS.batch} items`, reason: 'invalid' });
       return;
