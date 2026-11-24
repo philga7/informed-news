@@ -48,7 +48,7 @@ Rows are in build order. One ticket is built at a time, and each starts on Phil'
 | 13 | To Do | Topics in the shell (not filed) | Port the Topics page and the filtered-out view; fill the My topics block with its shown and filtered counts; add topic follow and hide, and apply topic hide (following only records that the user follows the topic) | 6 | Session | SDD |
 | 14 | To Do | Topic stories page (not filed) | Move today's topic Brief from `/` to a page per topic, opened from the My topics block; drop the shell's `/latest/…` routes | 6, 13 | Session | SDD |
 | 15 | To Do | Remove Kite (not filed) | `npm run dev` becomes server plus shell; delete `apps/kite`, its unit tests, and the Kite e2e spec; update `AGENTS.md`, `CLAUDE.md`, the README, and the route map. The CI workflow edit goes to Cursor | 13, 14 | Session, with Cursor for CI | SDD |
-| 16 | To Do | Write a private story in the site (not filed) | A screen where a user writes a private story and its entries. The Round 2 mockup has no such screen, so it needs a mockup from Phil first | 3, 6, a mockup from Phil | Session | SDD |
+| 16 | To Do | Write a private story in the site (not filed) | A screen where a user writes a private story and its entries. The list of private stories it shows is filtered by owner, and the admin (the `OPERATOR_EMAIL` account) sees every user's private stories in it. The Round 2 mockup has no such screen, so it needs a mockup from Phil first | 3, 6, a mockup from Phil | Session | SDD |
 
 Row 16 is numbered last only because it was added later. It is placed by what it waits on: it can start once steps 3 and 6 are **Done** and Phil has supplied the mockup, on Phil's go, without waiting for the rows numbered between 6 and 15.
 
