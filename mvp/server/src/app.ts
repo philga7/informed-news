@@ -83,6 +83,8 @@ import { shellOwnsPath } from './serveShell.js';
 import type { FeedbackSnapshot, FeedbackTopicSnapshot, TrackedEntry } from './store/index.js';
 import type { TrackedClaimEntry } from './store/index.js';
 import type { Article } from './types/article.js';
+import { createIngestRouter } from './ingest/ingestRoutes.js';
+import type { IngestConfig } from './ingest/openIngest.js';
 
 export type CreateAppDeps = {
   /** Default: the process runner, or one built from `refresh` when that is injected */
@@ -155,6 +157,8 @@ export type CreateAppDeps = {
    * Absent: email sign-in answers 503 and the MVP password works as before.
    */
   accounts?: Accounts;
+  /** The ingest contract's token and database (NEWS-228). Missing means the route answers 503. */
+  ingest?: IngestConfig;
 };
 
 const SEEN_IDS_MAX = 100;
@@ -361,6 +365,10 @@ export function createApp(deps: CreateAppDeps = {}): Express {
       credentials: true,
     }),
   );
+  // Ingest contract (NEWS-228): token auth, its own body limit, no session.
+  // Mounted ahead of the /api JSON parser and the session guard.
+  app.use('/api/ingest', createIngestRouter(deps.ingest));
+
   app.use('/api', express.json());
   app.use(createSessionMiddleware());
 

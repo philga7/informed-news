@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { before, test, type TestContext } from 'node:test';
 import type { Pool } from 'pg';
 import { createStory, createStoryEntry, ensureDashboardSchema } from './dashboardStore.js';
+import { DashboardStoreError } from './storeSupport.js';
 import { testPool } from '../../testing/dashboardTestDb.js';
 import {
   addEntryTag,
@@ -245,4 +246,21 @@ test('create and read a link between two stories, with its reason', async (t) =>
     createStoryLink(pool, { fromStoryId: from.id, toStoryId: to.id, note: ' ' }),
     /note is required/,
   );
+});
+
+test('NEWS-228: a story source, date or panel created twice with one id is a conflict, not a raw error', async (t) => {
+  const pool = store(t);
+  const story = await hub(pool);
+  const id = `dup:${Math.random().toString(36).slice(2)}`;
+  await createStorySource(pool, { id, storyId: story.id, outlet: 'Wire' });
+  await assert.rejects(createStorySource(pool, { id, storyId: story.id, outlet: 'Wire' }), (error: unknown) => {
+    assert.ok(error instanceof DashboardStoreError);
+    assert.equal(error.reason, 'conflict');
+    return true;
+  });
+  await assert.rejects(createStoryDate(pool, { storyId: 'no-such-story', startsOn: '2026-11-27', label: 'Vote' }), (error: unknown) => {
+    assert.ok(error instanceof DashboardStoreError);
+    assert.equal(error.reason, 'missing');
+    return true;
+  });
 });

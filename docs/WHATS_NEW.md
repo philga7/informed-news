@@ -6,6 +6,10 @@ Each ship-loop pull request adds an entry for what is true at merge for that rea
 
 This is not the release log. Releases are recorded in `CHANGELOG.md` by semantic-release. Do not hand-edit `CHANGELOG.md` to mirror these notes.
 
+## 2026-11-23
+
+**No user-visible change.** Grok Bot can now send stories, story updates, Breaking items, CFP items, and Morning items to the server, which keeps them for the new dashboard. Nothing shows them yet. The Brief is unchanged.
+
 ## 2026-11-20
 
 **No user-visible change.** The server can now hold user accounts, each reader's place on the new dashboard, and what each reader follows or hides. Signing in on Topics still takes the password. The Brief is unchanged.
