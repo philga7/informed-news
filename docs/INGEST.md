@@ -117,7 +117,7 @@ Nested rows are created or updated by their own id (tags by slug, links by the s
 | `storyId` | story id | Optional. The ping opens this story |
 | `entryId` | entry id | Optional. Needs `storyId`, and must be an entry of that story |
 
-A Breaking item may point at a private story. Other users will not see it; that rule is applied when the Breaking block is built.
+A Breaking item may point at a private story. Users other than its owner and the admin (the `OPERATOR_EMAIL` account) will not see it; that rule is applied when the Breaking block is built.
 
 ### `cfp_item`
 
@@ -191,9 +191,9 @@ A story panel's `payload` is checked by its `kind`:
 
 A story post with `ownerUserId` is private to that user. The id must be an existing account. A disabled account still has an id and is accepted. A later post may change the owner or clear it, which makes the story shared.
 
-Until the open questions in [DECISIONS.md](DECISIONS.md) are decided, a branch cannot be private, a branch cannot sit under a private hub, and a hub that has branches cannot be made private. Each of these is a 422.
+A private story cannot have branches. A branch cannot be private, a branch cannot sit under a private hub, and a hub that has branches cannot be made private. Each of these is a 422. This is settled ([DECISIONS.md](DECISIONS.md#2026-11-23--the-per-user-answers-branches-admin-visibility-following-and-who-builds-the-controls-news-260)).
 
-Grok Bot, and Phil as its operator, can read every private story back through `GET /api/ingest/story/<id>`. Whether Phil also sees other users' bot-written private stories in the site is still open.
+Grok Bot, and Phil as its operator, can read every private story back through `GET /api/ingest/story/<id>`. In the site, the admin (the account named by `OPERATOR_EMAIL`) sees every private story, whoever wrote it, including the ones Grok Bot writes. Any other user sees only their own.
 
 ## Examples
 
