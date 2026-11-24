@@ -16,7 +16,7 @@
         { "id": "fixture:src:iran-war:ap-kuwait", "outlet": "AP", "url": "https://apnews.com/article/iran-us-kuwait-gulf-attacks-bahrain-b1f0b530cffe951e6fcc1e27b2e1af94" },
         { "id": "fixture:src:iran-war:cbs-live", "outlet": "CBS", "url": "https://www.cbsnews.com/live-updates/iran-war-us-gulf-retaliation-strikes-strait-of-hormuz/" },
         { "id": "fixture:src:iran-war:nypost-kafd", "outlet": "Reuters via NY Post", "url": "https://nypost.com/2026/11/19/world-news/houthis-strike-saudi-arabia-pif-tower-in-riyadh-causing-damage/" },
-        { "id": "fixture:src:iran-war:aa-mines", "outlet": "Anadolu", "url": "`` https://www.aa.com.tr/en/middle-east/2-oil-tankers-catch-fire-after-hitting-mines-in-waters-east-of-strait-of-hormuz-iranian-army ``/4131604" }
+        { "id": "fixture:src:iran-war:aa-mines", "outlet": "Anadolu", "url": "https://www.aa.com.tr/en/middle-east/2-oil-tankers-catch-fire-after-hitting-mines-in-waters-east-of-strait-of-hormuz-iranian-army/4131604" }
       ]
     },
     {
