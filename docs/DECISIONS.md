@@ -2,6 +2,25 @@
 
 Binding choices for Informed News. Newest first. When one of these changes, update this file in the same change as [ROADMAP.md](ROADMAP.md) and Jira. What the product does now, in plain language, is [PRODUCT_SPEC.md](PRODUCT_SPEC.md). Pipeline detail remains in [NEWS-84](https://informedcrew.atlassian.net/browse/NEWS-84), [TRIAGE.md](TRIAGE.md), and [BRIEF.md](BRIEF.md). The target is [VISION.md](VISION.md).
 
+## 2026-11-23 — The per-user answers: branches, admin visibility, following, and who builds the controls (NEWS-260)
+
+**Decision:** Phil answered the last four per-user questions on 2026-11-23. No per-user question is left open.
+
+- **Private stories and branches.** A private story cannot have branches. A branch cannot be private, and a branch cannot sit under a private hub. That also settles the shared-hub half of the question: no private branch under any hub. This is what the [2026-11-20 entry](#2026-11-20--sign-in-cut-over-account-creation-read-markers-and-private-hubs-news-254) and the [ingest contract](INGEST.md) already build, so there is no code or schema change. A hub that has branches still cannot be made private.
+- **The admin sees every private story.** The admin is the account named by `OPERATOR_EMAIL`. In the site, that account sees every private story, whoever wrote it, including the ones Grok Bot writes. Every list that filters by owner applies this: the Developing list (home shell step), the Breaking block (Breaking block step), and the list of private stories a user writes (in-site writing step). There is no admin role beyond that one account.
+- **Following only records that the user follows.** Following a story does not filter, reorder, or notify. Hide is what removes a story from that user's view. Following a topic works the same way.
+- **Who builds the controls.** The home shell step adds the follow and hide routes, the controls on each Developing row, and hide filtering. The timeline page step adds the follow and hide controls in the story header. The topics-in-the-shell step adds topic follow and hide, and applies topic hide.
+
+This supersedes the parts of three entries that left these questions open. Each of those entries stays as written.
+
+- [2026-11-16 — Per-user follow/hide and private stories](#2026-11-16--per-user-followhide-and-private-stories-news-252): its "Still open" list (branches, operator visibility, what following changes, and which steps build the controls), the clause that leaves the operator's view of private stories in the site open, and the item in What it rules out that treats the open questions as answered.
+- [2026-11-23 — The ingest contract](#2026-11-23--the-ingest-contract-retries-private-stories-and-the-morning-cards-news-228): the sentence listing the questions that stay open, and the same item in What it rules out. Its sentence that Grok Bot and Phil as its operator can read every private story the bot writes through the read-back stands, and it is no longer the limit of what the operator sees in the site.
+- [2026-11-20 — Sign-in cut-over, account creation, read markers, and private hubs](#2026-11-20--sign-in-cut-over-account-creation-read-markers-and-private-hubs-news-254): "until the open branch questions are decided". They are decided, and the refusals it lists stay as the rule, not as a stopgap.
+
+**Why:** Phil decided on 2026-11-23. Refusing private branches keeps a private story one self-contained thread with nothing to hide or reveal inside it, and it is what is already built. One admin account, the operator's, lets Phil check anything on the site without a role system. Keeping follow separate from hide keeps each action's effect to one thing, so a reader can follow a story without the list changing under them. Naming the step for each control lets each UI ticket build what it needs and no more.
+
+**What it rules out:** A private story with branches, a private branch (under a shared hub or any other), a branch under a private hub, an admin role beyond the `OPERATOR_EMAIL` account, the admin seeing only the private stories Grok Bot writes, following that filters, reorders, or notifies, a hide control that is not built in its named step, and treating any per-user question as still open.
+
 ## 2026-11-23 — The ingest contract: retries, private stories, and the Morning cards (NEWS-228)
 
 **Decision:** Phil chose these on 2026-11-23 for the ingest contract step of the [UI build sequence](ROADMAP.md#ui-build-sequence-2026-11-16). The contract itself is documented in [INGEST.md](INGEST.md).

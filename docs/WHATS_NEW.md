@@ -8,6 +8,8 @@ This is not the release log. Releases are recorded in `CHANGELOG.md` by semantic
 
 ## 2026-11-23
 
+**No user-visible change.** The last open choices about following, hiding, and private stories on the new dashboard are written down. The Brief is unchanged.
+
 **No user-visible change.** Grok Bot can now send stories, story updates, Breaking items, CFP items, and Morning items to the server, which keeps them for the new dashboard. Nothing shows them yet. The Brief is unchanged.
 
 ## 2026-11-20
