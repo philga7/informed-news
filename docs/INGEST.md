@@ -117,7 +117,7 @@ Nested rows are created or updated by their own id (tags by slug, links by the s
 | `storyId` | story id | Optional. The ping opens this story |
 | `entryId` | entry id | Optional. Needs `storyId`, and must be an entry of that story |
 
-A Breaking item may point at a private story. Other users will not see it; that rule is applied when the Breaking block is built.
+A Breaking item may point at a private story. Users other than its owner and the admin (the `OPERATOR_EMAIL` account) will not see it; that rule is applied when the Breaking block is built.
 
 ### `cfp_item`
 
