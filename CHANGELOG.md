@@ -1,3 +1,9 @@
+## [0.46.0](https://github.com/philga7/informed-news/compare/v0.45.0...v0.46.0) (2026-11-24)
+
+### Features
+
+* **NEWS-228:** ingest contract for stories, entries, Breaking, CFP and Morning ([#293](https://github.com/philga7/informed-news/issues/293)) ([b757371](https://github.com/philga7/informed-news/commit/b757371b641be88fcc1cfb6f75f56aea3b421663))
+
 ## [0.45.0](https://github.com/philga7/informed-news/compare/v0.44.0...v0.45.0) (2026-11-21)
 
 ### Features
