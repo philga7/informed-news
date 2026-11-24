@@ -1,13 +1,16 @@
 import { randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
+import { checkPanelPayload } from './jsonShapes.js';
 import {
   DashboardStoreError,
   asCalendarDate,
   asInteger,
   asJsonObject,
+  idOrNew,
   optionalCalendarDate,
   optionalText,
   requiredText,
+  storeErrorFrom,
   type JsonObject,
 } from './storeSupport.js';
 
@@ -106,20 +109,25 @@ export async function listStoryCategories(pool: Pool, storyId: string): Promise<
   return result.rows;
 }
 
-export async function createStoryTag(
-  pool: Pool,
-  input: { storyId: string; slug: string; name: string },
-): Promise<StoryTagRecord> {
+/** Check a tag. Its id is new: tags are keyed by story and slug. */
+export function prepareStoryTag(input: { storyId: string; slug: string; name: string }): StoryTagRecord {
   const slug = requiredText(input.slug, 'slug');
   if (!TAG_SLUG.test(slug)) {
     throw new DashboardStoreError('slug must be lowercase letters, digits and single hyphens');
   }
-  const record: StoryTagRecord = {
+  return {
     id: randomUUID(),
     storyId: requiredText(input.storyId, 'storyId'),
     slug,
     name: requiredText(input.name, 'name'),
   };
+}
+
+export async function createStoryTag(
+  pool: Pool,
+  input: { storyId: string; slug: string; name: string },
+): Promise<StoryTagRecord> {
+  const record = prepareStoryTag(input);
   await pool.query('INSERT INTO story_tags (id, story_id, slug, name) VALUES ($1, $2, $3, $4)', [
     record.id,
     record.storyId,
@@ -139,7 +147,9 @@ export async function readStoryTag(pool: Pool, id: string): Promise<StoryTagReco
   const result = await pool.query<TagRow>(
     'SELECT id, story_id, slug, name FROM story_tags WHERE id = $1',
     [id],
-  );
+  ).catch((error: unknown) => {
+    throw storeErrorFrom(error);
+  });
   const row = result.rows[0];
   return row ? tagFromRow(row) : null;
 }
@@ -181,21 +191,21 @@ export async function listEntryTags(pool: Pool, entryId: string): Promise<StoryT
   return result.rows.map(tagFromRow);
 }
 
-export async function createStorySource(
-  pool: Pool,
-  input: {
-    storyId: string;
-    outlet: string;
-    title?: string | null;
-    url?: string | null;
-    publishedOn?: string | null;
-    via?: string | null;
-    groupLabel?: string | null;
-    note?: string | null;
-  },
-): Promise<StorySourceRecord> {
-  const record: StorySourceRecord = {
-    id: randomUUID(),
+export type StorySourceInput = {
+  id?: string | null;
+  storyId: string;
+  outlet: string;
+  title?: string | null;
+  url?: string | null;
+  publishedOn?: string | null;
+  via?: string | null;
+  groupLabel?: string | null;
+  note?: string | null;
+};
+
+export function prepareStorySource(input: StorySourceInput): StorySourceRecord {
+  return {
+    id: idOrNew(input.id, 'source id'),
     storyId: requiredText(input.storyId, 'storyId'),
     outlet: requiredText(input.outlet, 'outlet'),
     title: optionalText(input.title),
@@ -205,6 +215,13 @@ export async function createStorySource(
     groupLabel: optionalText(input.groupLabel),
     note: optionalText(input.note),
   };
+}
+
+export async function createStorySource(
+  pool: Pool,
+  input: StorySourceInput,
+): Promise<StorySourceRecord> {
+  const record = prepareStorySource(input);
   await pool.query(
     `INSERT INTO story_sources
        (id, story_id, outlet, title, url, published_on, via, group_label, note)
@@ -220,7 +237,9 @@ export async function createStorySource(
       record.groupLabel,
       record.note,
     ],
-  );
+  ).catch((error: unknown) => {
+    throw storeErrorFrom(error);
+  });
   return record;
 }
 
@@ -258,12 +277,17 @@ export async function readStorySource(pool: Pool, id: string): Promise<StorySour
   };
 }
 
-export async function createStoryDate(
-  pool: Pool,
-  input: { storyId: string; startsOn: string; endsOn?: string | null; label: string },
-): Promise<StoryDateRecord> {
+export type StoryDateInput = {
+  id?: string | null;
+  storyId: string;
+  startsOn: string;
+  endsOn?: string | null;
+  label: string;
+};
+
+export function prepareStoryDate(input: StoryDateInput): StoryDateRecord {
   const record: StoryDateRecord = {
-    id: randomUUID(),
+    id: idOrNew(input.id, 'date id'),
     storyId: requiredText(input.storyId, 'storyId'),
     startsOn: asCalendarDate(input.startsOn, 'startsOn'),
     endsOn: optionalCalendarDate(input.endsOn, 'endsOn'),
@@ -272,10 +296,17 @@ export async function createStoryDate(
   if (record.endsOn !== null && record.endsOn < record.startsOn) {
     throw new DashboardStoreError('endsOn is before startsOn');
   }
+  return record;
+}
+
+export async function createStoryDate(pool: Pool, input: StoryDateInput): Promise<StoryDateRecord> {
+  const record = prepareStoryDate(input);
   await pool.query(
     'INSERT INTO story_dates (id, story_id, starts_on, ends_on, label) VALUES ($1, $2, $3, $4, $5)',
     [record.id, record.storyId, record.startsOn, record.endsOn, record.label],
-  );
+  ).catch((error: unknown) => {
+    throw storeErrorFrom(error);
+  });
   return record;
 }
 
@@ -304,18 +335,34 @@ export async function readStoryDate(pool: Pool, id: string): Promise<StoryDateRe
   };
 }
 
-export async function createStoryPanel(
-  pool: Pool,
-  input: { storyId: string; kind: string; title: string; payload: JsonObject; sort?: number },
-): Promise<StoryPanelRecord> {
+export type StoryPanelInput = {
+  id?: string | null;
+  storyId: string;
+  kind: string;
+  title: string;
+  payload: JsonObject;
+  sort?: number;
+};
+
+/** Check a panel, including its payload's shape for its kind (NEWS-228). */
+export function prepareStoryPanel(input: StoryPanelInput): StoryPanelRecord {
   const record: StoryPanelRecord = {
-    id: randomUUID(),
+    id: idOrNew(input.id, 'panel id'),
     storyId: requiredText(input.storyId, 'storyId'),
     kind: requiredText(input.kind, 'kind'),
     title: requiredText(input.title, 'title'),
     payload: asJsonObject(input.payload, 'payload'),
     sort: asInteger(input.sort ?? 0, 'sort'),
   };
+  checkPanelPayload(record.kind, record.payload);
+  return record;
+}
+
+export async function createStoryPanel(
+  pool: Pool,
+  input: StoryPanelInput,
+): Promise<StoryPanelRecord> {
+  const record = prepareStoryPanel(input);
   await pool.query(
     `INSERT INTO story_panels (id, story_id, kind, title, payload, sort)
      VALUES ($1, $2, $3, $4, $5::jsonb, $6)`,
@@ -327,7 +374,9 @@ export async function createStoryPanel(
       JSON.stringify(record.payload),
       record.sort,
     ],
-  );
+  ).catch((error: unknown) => {
+    throw storeErrorFrom(error);
+  });
   return record;
 }
 
@@ -358,10 +407,11 @@ export async function readStoryPanel(pool: Pool, id: string): Promise<StoryPanel
 }
 
 /** Relate one story to another, with a one-line reason. The link has a direction. */
-export async function createStoryLink(
-  pool: Pool,
-  input: { fromStoryId: string; toStoryId: string; note: string },
-): Promise<StoryLinkRecord> {
+export function prepareStoryLink(input: {
+  fromStoryId: string;
+  toStoryId: string;
+  note: string;
+}): StoryLinkRecord {
   const record: StoryLinkRecord = {
     fromStoryId: requiredText(input.fromStoryId, 'fromStoryId'),
     toStoryId: requiredText(input.toStoryId, 'toStoryId'),
@@ -370,10 +420,20 @@ export async function createStoryLink(
   if (record.fromStoryId === record.toStoryId) {
     throw new DashboardStoreError('a story cannot link to itself');
   }
+  return record;
+}
+
+export async function createStoryLink(
+  pool: Pool,
+  input: { fromStoryId: string; toStoryId: string; note: string },
+): Promise<StoryLinkRecord> {
+  const record = prepareStoryLink(input);
   await pool.query(
     'INSERT INTO story_links (from_story_id, to_story_id, note) VALUES ($1, $2, $3)',
     [record.fromStoryId, record.toStoryId, record.note],
-  );
+  ).catch((error: unknown) => {
+    throw storeErrorFrom(error);
+  });
   return record;
 }
 

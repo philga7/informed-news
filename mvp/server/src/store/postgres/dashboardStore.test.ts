@@ -329,11 +329,19 @@ test('create and read a Morning item', async (t) => {
 test('a Morning item can carry structured data', async (t) => {
   const pool = store(t);
   const data = {
-    grid: [
-      { day: 'Mon', high: 54, low: 41, sky: 'rain' },
-      { day: 'Tue', high: 49, low: 37, sky: null },
-    ],
     unit: 'F',
+    issuedAt: '2026-11-16T11:32:00.000Z',
+    days: ['2026-11-16', '2026-11-17'],
+    locations: [
+      {
+        name: 'Jefferson',
+        now: { temp: 52, conditions: 'clear', rainChancePct: 7 },
+        days: [
+          { high: 54, low: 41 },
+          { high: 49, low: 37 },
+        ],
+      },
+    ],
   };
   const created = await createMorningItem(pool, {
     kind: 'weather',
@@ -485,4 +493,124 @@ test('set, replace and read the CFP footer for a day', async (t) => {
     setCfpDayNote(pool, { day: `${day}T00:00:00Z`, stillWorking: null, dropped: null }),
     /day must be a date \(YYYY-MM-DD\)/,
   );
+});
+
+test('NEWS-228: an entry may have no body; a cited source fills in its URL and outlet', async (t) => {
+  const pool = store(t);
+  const story = await hub(pool);
+  const withUrl = await createStorySource(pool, {
+    storyId: story.id,
+    outlet: 'Axios',
+    url: 'https://example.com/axios',
+  });
+  const noUrl = await createStorySource(pool, { storyId: story.id, outlet: 'Pool report' });
+
+  const created = await createStoryEntry(pool, {
+    ...ENTRY,
+    body: undefined,
+    storyId: story.id,
+    sources: [
+      { sourceId: withUrl.id },
+      { sourceId: noUrl.id },
+      { sourceId: withUrl.id, url: 'https://example.com/other', label: 'Axios PM' },
+      { url: 'https://example.com/wire', label: 'Wire' },
+    ],
+  });
+  const read = await readStoryEntry(pool, created.id);
+  assert.equal(read?.body, null);
+  assert.deepEqual(
+    read?.sources.map(({ url, label, sourceId }) => ({ url, label, sourceId })),
+    [
+      { url: 'https://example.com/axios', label: 'Axios', sourceId: withUrl.id },
+      { url: null, label: 'Pool report', sourceId: noUrl.id },
+      { url: 'https://example.com/other', label: 'Axios PM', sourceId: withUrl.id },
+      { url: 'https://example.com/wire', label: 'Wire', sourceId: null },
+    ],
+  );
+  assert.deepEqual(read, created);
+
+  const blank = await createStoryEntry(pool, { ...ENTRY, body: '  ', storyId: story.id });
+  assert.equal(blank.body, null);
+
+  for (const source of [{ label: 'Wire' }, { url: 'https://example.com/x' }]) {
+    await assert.rejects(
+      createStoryEntry(pool, { ...ENTRY, storyId: story.id, sources: [source] }),
+      /source (url|label) is required/,
+    );
+  }
+});
+
+test('NEWS-228: creates take a caller id, and a second create with that id is a conflict', async (t) => {
+  const pool = store(t);
+  const suffix = Math.random().toString(36).slice(2);
+  const story = await createStory(pool, {
+    id: `grok:story:${suffix}`,
+    role: 'hub',
+    hubId: null,
+    title: 'Hub',
+    status: 'active',
+  });
+  assert.equal(story.id, `grok:story:${suffix}`);
+  assert.equal((await readStory(pool, story.id))?.title, 'Hub');
+
+  const entry = await createStoryEntry(pool, { ...ENTRY, id: `grok:entry:${suffix}`, storyId: story.id });
+  const morning = await createMorningItem(pool, {
+    id: `grok:morning:${suffix}`,
+    kind: 'bluf',
+    body: 'One line.',
+    link: null,
+    postedAt: '2026-11-23T11:00:00Z',
+  });
+  const cfp = await createCfpRoundupItem(pool, {
+    id: `grok:cfp:${suffix}`,
+    roundupAt: '2026-11-23T21:00:00Z',
+    title: 'Iran strikes',
+    url: null,
+  });
+  const breaking = await createBreakingItem(pool, {
+    id: `grok:breaking:${suffix}`,
+    occurredAt: '2026-11-23T21:00:00Z',
+    headline: 'Ruling',
+    label: 'official_ruling',
+  });
+
+  const again: Array<() => Promise<unknown>> = [
+    () => createStory(pool, { id: story.id, role: 'hub', hubId: null, title: 'Hub', status: 'active' }),
+    () => createStoryEntry(pool, { ...ENTRY, id: entry.id, storyId: story.id }),
+    () => createMorningItem(pool, { id: morning.id, kind: 'bluf', body: 'x', link: null, postedAt: '2026-11-23T11:00:00Z' }),
+    () => createCfpRoundupItem(pool, { id: cfp.id, roundupAt: '2026-11-23T21:00:00Z', title: 'x', url: null }),
+    () => createBreakingItem(pool, { id: breaking.id, occurredAt: '2026-11-23T21:00:00Z', headline: 'x', label: 'official' }),
+  ];
+  for (const create of again) {
+    await assert.rejects(create(), (error: unknown) => {
+      assert.ok(error instanceof DashboardStoreError);
+      assert.equal(error.reason, 'conflict');
+      return true;
+    });
+  }
+  await assert.rejects(
+    createStory(pool, { id: 'has space', role: 'hub', hubId: null, title: 'x', status: 'active' }),
+    /id must be 1 to 200/,
+  );
+});
+
+test('NEWS-228: a missing story is a store error with reason missing, not a raw foreign-key error', async (t) => {
+  const pool = store(t);
+  for (const create of [
+    () => createStoryEntry(pool, { ...ENTRY, storyId: 'no-such-story' }),
+    () => createStory(pool, { role: 'branch', hubId: 'no-such-hub', title: 'B', status: 'active' }),
+    () =>
+      createBreakingItem(pool, {
+        occurredAt: '2026-11-23T21:00:00Z',
+        headline: 'x',
+        label: 'official',
+        storyId: 'no-such-story',
+      }),
+  ]) {
+    await assert.rejects(create(), (error: unknown) => {
+      assert.ok(error instanceof DashboardStoreError);
+      assert.equal(error.reason, 'missing');
+      return true;
+    });
+  }
 });

@@ -18,6 +18,7 @@ const UNIQUE_VIOLATION = '23505';
  */
 const SCHEMA_HASHES: Record<number, string> = {
   3: 'a778c356de493885838be3361ba9f8c6dd9a2d096f87f707deb453166413dbe6',
+  4: 'af7544be5666dc9d8c82f7e03d9c5793e11ae23199d25ae01677d49403868eb9',
 };
 
 function schemaSql(): string {

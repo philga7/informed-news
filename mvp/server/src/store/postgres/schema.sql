@@ -300,3 +300,25 @@ CREATE TABLE IF NOT EXISTS dashboard_schema_version (
   id boolean PRIMARY KEY DEFAULT true CHECK (id),
   version integer NOT NULL
 );
+
+-- Schema v4 (NEWS-228): the ingest contract. An update may carry no body (its
+-- headline and change bullets say what changed), and a citation that points at
+-- a story_sources row takes that row's URL, which may be empty. A citation with
+-- no row still needs its own URL.
+ALTER TABLE story_entries ALTER COLUMN body DROP NOT NULL;
+
+ALTER TABLE story_entry_sources ALTER COLUMN url DROP NOT NULL;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'story_entry_sources_url_or_source'
+      AND conrelid = 'story_entry_sources'::regclass
+  ) THEN
+    ALTER TABLE story_entry_sources
+      ADD CONSTRAINT story_entry_sources_url_or_source
+      CHECK (url IS NOT NULL OR source_id IS NOT NULL);
+  END IF;
+END
+$$;

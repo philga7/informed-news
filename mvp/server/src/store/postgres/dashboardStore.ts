@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { checkMorningData } from './jsonShapes.js';
 import { readFileSync } from 'node:fs';
 import { Pool, type PoolClient } from 'pg';
 import {
@@ -6,9 +7,11 @@ import {
   asCalendarDate,
   asInstant,
   asJsonObject,
+  idOrNew,
   inTransaction,
   optionalInstant,
   pgErrorCode,
+  storeErrorFrom,
   optionalText,
   requiredText,
   utcMidnight,
@@ -86,7 +89,8 @@ export type StoryInput = {
 
 export type EntrySourceRecord = {
   id: string;
-  url: string;
+  /** Empty only when the cited story source row has no URL. */
+  url: string | null;
   label: string;
   /** The story_sources row this citation points at, when there is one. */
   sourceId: string | null;
@@ -102,7 +106,8 @@ export type StoryEntryRecord = {
   precision: EntryPrecision;
   headline: string;
   label: EntryLabel;
-  body: string;
+  /** Optional since NEWS-228: the headline and change bullets carry an update. */
+  body: string | null;
   changes: string[];
   sources: EntrySourceRecord[];
 };
@@ -119,9 +124,13 @@ export type StoryEntryInput = {
   precision: EntryPrecision;
   headline: string;
   label: EntryLabel;
-  body: string;
+  body?: string | null;
   changes?: string[];
-  sources: Array<{ url: string; label: string; sourceId?: string | null }>;
+  /**
+   * A citation with a `sourceId` may leave out `url` and `label`: they are
+   * copied from that story source row (its URL and its outlet).
+   */
+  sources: Array<{ url?: string | null; label?: string | null; sourceId?: string | null }>;
 };
 
 export type MorningItemRecord = {
@@ -189,13 +198,13 @@ type EntryRow = {
   occurred_precision: string;
   headline: string;
   label: string;
-  body: string;
+  body: string | null;
   changes: string[];
 };
 
 type SourceRow = {
   id: string;
-  url: string;
+  url: string | null;
   label: string;
   source_id: string | null;
 };
@@ -252,12 +261,13 @@ const FOREIGN_KEY_VIOLATION = '23503';
 
 /**
  * The version schema.sql brings a database to. NEWS-224 was 1, schema v2
- * (NEWS-240) was 2, accounts and read markers (NEWS-254) are 3. Bump it in the
+ * (NEWS-240) was 2, accounts and read markers (NEWS-254) were 3, and the ingest
+ * contract (NEWS-228) is 4. Bump it in the
  * same change as any edit to schema.sql: a database whose version row is
  * current runs nothing, so an edit without a bump never reaches it. A test
  * pins the file's hash to this number.
  */
-export const DASHBOARD_SCHEMA_VERSION = 3;
+export const DASHBOARD_SCHEMA_VERSION = 4;
 
 /**
  * The version a database records, or 0 when it has no version row yet (an
@@ -309,14 +319,23 @@ const STORY_COLUMNS = `id, role, hub_id, title, status, now_summary, now_updated
   last_checked_at, next_check_at, unchanged_note, earlier_summary, sources_note, thread_url,
   owner_user_id`;
 
-export async function createStory(pool: Pool, input: StoryInput): Promise<StoryRecord> {
+/** A pool, or one client inside a transaction: both can run a query. */
+export type Queryable = Pool | PoolClient;
+
+/**
+ * Check a story input and build its record. `id` is the caller's id when one
+ * is given (NEWS-228), otherwise a new one. Writes nothing.
+ */
+export function prepareStory(input: StoryInput & { id?: string | null }): StoryRecord {
   const title = requiredText(input.title, 'title');
   const role = storyRole(input.role);
   const status = storyStatus(input.status);
   let hubId: string | null;
   switch (role) {
     case 'hub':
-      if (input.hubId !== null) throw new DashboardStoreError('a hub has no hub');
+      if (input.hubId !== null && input.hubId !== undefined) {
+        throw new DashboardStoreError('a hub has no hub');
+      }
       hubId = null;
       break;
     case 'branch': {
@@ -331,7 +350,7 @@ export async function createStory(pool: Pool, input: StoryInput): Promise<StoryR
     }
   }
   const record: StoryRecord = {
-    id: randomUUID(),
+    id: idOrNew(input.id, 'id'),
     role,
     hubId,
     title,
@@ -350,53 +369,84 @@ export async function createStory(pool: Pool, input: StoryInput): Promise<StoryR
   if (record.role === 'branch' && record.ownerUserId !== null) {
     throw new DashboardStoreError('a branch cannot be private yet');
   }
-  await inTransaction(pool, async (client) => {
-    if (record.hubId !== null) {
-      // Lock the hub so it cannot change between this check and the insert.
-      const hub = await client.query<{ owner_user_id: string | null }>(
-        'SELECT owner_user_id FROM stories WHERE id = $1 FOR SHARE',
-        [record.hubId],
-      );
-      if (hub.rows[0]?.owner_user_id != null) {
-        throw new DashboardStoreError('a branch cannot sit under a private hub yet');
-      }
+  return record;
+}
+
+/**
+ * The private-story rules that need the database, checked inside the write's
+ * transaction: a branch cannot sit under a private hub, and a hub that has
+ * branches cannot be private. The hub row is locked so it cannot change
+ * between this check and the write.
+ */
+export async function checkPrivateStoryRules(client: PoolClient, record: StoryRecord): Promise<void> {
+  if (record.hubId !== null) {
+    const hub = await client.query<{ owner_user_id: string | null }>(
+      'SELECT owner_user_id FROM stories WHERE id = $1 FOR SHARE',
+      [record.hubId],
+    );
+    if (hub.rows[0]?.owner_user_id != null) {
+      throw new DashboardStoreError('a branch cannot sit under a private hub yet');
     }
+  }
+  if (record.role === 'hub' && record.ownerUserId !== null) {
+    const branches = await client.query('SELECT 1 FROM stories WHERE hub_id = $1 LIMIT 1', [
+      record.id,
+    ]);
+    if (branches.rowCount !== 0) {
+      throw new DashboardStoreError('a hub that has branches cannot be private yet');
+    }
+  }
+}
+
+export async function createStory(
+  pool: Pool,
+  input: StoryInput & { id?: string | null },
+): Promise<StoryRecord> {
+  const record = prepareStory(input);
+  await inTransaction(pool, async (client) => {
+    await checkPrivateStoryRules(client, record);
     await insertStory(client, record);
   }).catch((error: unknown) => {
     if (pgErrorCode(error) === FOREIGN_KEY_VIOLATION) {
-      throw new DashboardStoreError('story refers to a missing hub or owner', { cause: error });
+      throw new DashboardStoreError('story refers to a missing hub or owner', {
+        cause: error,
+        reason: 'missing',
+      });
     }
-    throw error;
+    throw storeErrorFrom(error);
   });
   return record;
 }
 
-async function insertStory(client: PoolClient, record: StoryRecord): Promise<void> {
-  await client.query(
-    `INSERT INTO stories (${STORY_COLUMNS})
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
-    [
-      record.id,
-      record.role,
-      record.hubId,
-      record.title,
-      record.status,
-      record.nowSummary,
-      record.nowUpdatedAt,
-      record.cadence,
-      record.lastCheckedAt,
-      record.nextCheckAt,
-      record.unchangedNote,
-      record.earlierSummary,
-      record.sourcesNote,
-      record.threadUrl,
-      record.ownerUserId,
-    ],
-  );
+export const STORY_INSERT_SQL = `INSERT INTO stories (${STORY_COLUMNS})
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`;
+
+export function storyParams(record: StoryRecord): unknown[] {
+  return [
+    record.id,
+    record.role,
+    record.hubId,
+    record.title,
+    record.status,
+    record.nowSummary,
+    record.nowUpdatedAt,
+    record.cadence,
+    record.lastCheckedAt,
+    record.nextCheckAt,
+    record.unchangedNote,
+    record.earlierSummary,
+    record.sourcesNote,
+    record.threadUrl,
+    record.ownerUserId,
+  ];
 }
 
-export async function readStory(pool: Pool, id: string): Promise<StoryRecord | null> {
-  const result = await pool.query<StoryRow>(
+async function insertStory(client: PoolClient, record: StoryRecord): Promise<void> {
+  await client.query(STORY_INSERT_SQL, storyParams(record));
+}
+
+export async function readStory(db: Queryable, id: string): Promise<StoryRecord | null> {
+  const result = await db.query<StoryRow>(
     `SELECT ${STORY_COLUMNS} FROM stories WHERE id = $1`,
     [id],
   );
@@ -434,13 +484,16 @@ function entryMoment(value: string, precision: EntryPrecision, label: string): s
   }
 }
 
-export async function createStoryEntry(
-  pool: Pool,
-  input: StoryEntryInput,
-): Promise<StoryEntryRecord> {
+/** A checked entry, before cited sources are filled in from their rows. */
+export type EntryDraft = Omit<StoryEntryRecord, 'sources'> & {
+  sources: Array<{ url: string | null; label: string | null; sourceId: string | null }>;
+};
+
+/** Check an entry input. Writes nothing and reads nothing. */
+export function prepareEntry(input: StoryEntryInput & { id?: string | null }): EntryDraft {
   const storyId = requiredText(input.storyId, 'storyId');
   const headline = requiredText(input.headline, 'headline');
-  const body = requiredText(input.body, 'body');
+  const body = optionalText(input.body);
   const label = entryLabel(input.label);
   const precision = entryPrecision(input.precision);
   const occurredAt = entryMoment(input.occurredAt, precision, 'occurredAt');
@@ -452,39 +505,20 @@ export async function createStoryEntry(
     throw new DashboardStoreError('occurredUntil is before occurredAt');
   }
   const changes = (input.changes ?? []).map((change) => requiredText(change, 'change'));
-  const sources: EntrySourceRecord[] = input.sources.map((source) => ({
-    id: randomUUID(),
-    url: requiredText(source.url, 'source url'),
-    label: requiredText(source.label, 'source label'),
-    sourceId: optionalText(source.sourceId),
-  }));
-  const id = randomUUID();
-  await inTransaction(pool, async (client) => {
-    await client.query(
-      `INSERT INTO story_entries
-         (id, story_id, occurred_at, occurred_until, occurred_precision, headline, label, body, changes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-      [id, storyId, occurredAt, occurredUntil, precision, headline, label, body, changes],
-    );
-    for (const [position, source] of sources.entries()) {
-      if (source.sourceId !== null) {
-        const cited = await client.query<{ story_id: string }>(
-          'SELECT story_id FROM story_sources WHERE id = $1',
-          [source.sourceId],
-        );
-        if (cited.rows[0]?.story_id !== storyId) {
-          throw new DashboardStoreError('an entry can only cite a source from its own story');
-        }
-      }
-      await client.query(
-        `INSERT INTO story_entry_sources (id, entry_id, url, label, source_id, position)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
-        [source.id, id, source.url, source.label, source.sourceId, position],
-      );
+  const sources = input.sources.map((source) => {
+    const sourceId = optionalText(source.sourceId);
+    if (sourceId === null) {
+      // A citation with no story source row carries its own URL and label.
+      return {
+        url: requiredText(source.url ?? '', 'source url'),
+        label: requiredText(source.label ?? '', 'source label'),
+        sourceId,
+      };
     }
+    return { url: optionalText(source.url), label: optionalText(source.label), sourceId };
   });
   return {
-    id,
+    id: idOrNew(input.id, 'id'),
     storyId,
     occurredAt,
     occurredUntil,
@@ -497,15 +531,81 @@ export async function createStoryEntry(
   };
 }
 
-export async function readStoryEntry(pool: Pool, id: string): Promise<StoryEntryRecord | null> {
-  const entry = await pool.query<EntryRow>(
+/**
+ * Write a checked entry and its citations inside the caller's transaction. A
+ * citation that points at a story source row and leaves out its URL or label
+ * takes them from that row: the URL (which may be empty) and the outlet.
+ */
+export async function insertEntry(client: PoolClient, draft: EntryDraft): Promise<StoryEntryRecord> {
+  await client.query(
+    `INSERT INTO story_entries
+       (id, story_id, occurred_at, occurred_until, occurred_precision, headline, label, body, changes)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+    [
+      draft.id,
+      draft.storyId,
+      draft.occurredAt,
+      draft.occurredUntil,
+      draft.precision,
+      draft.headline,
+      draft.label,
+      draft.body,
+      draft.changes,
+    ],
+  );
+  const sources: EntrySourceRecord[] = [];
+  for (const [position, source] of draft.sources.entries()) {
+    let url = source.url;
+    let label = source.label;
+    if (source.sourceId !== null) {
+      const cited = await client.query<{ story_id: string; url: string | null; outlet: string }>(
+        'SELECT story_id, url, outlet FROM story_sources WHERE id = $1',
+        [source.sourceId],
+      );
+      const row = cited.rows[0];
+      if (row?.story_id !== draft.storyId) {
+        throw new DashboardStoreError('an entry can only cite a source from its own story', {
+          reason: row === undefined ? 'missing' : 'invalid',
+        });
+      }
+      url ??= row.url;
+      label ??= row.outlet;
+    }
+    const record: EntrySourceRecord = {
+      id: randomUUID(),
+      url,
+      label: label ?? '',
+      sourceId: source.sourceId,
+    };
+    await client.query(
+      `INSERT INTO story_entry_sources (id, entry_id, url, label, source_id, position)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [record.id, draft.id, record.url, record.label, record.sourceId, position],
+    );
+    sources.push(record);
+  }
+  return { ...draft, sources };
+}
+
+export async function createStoryEntry(
+  pool: Pool,
+  input: StoryEntryInput & { id?: string | null },
+): Promise<StoryEntryRecord> {
+  const draft = prepareEntry(input);
+  return inTransaction(pool, (client) => insertEntry(client, draft)).catch((error: unknown) => {
+    throw storeErrorFrom(error);
+  });
+}
+
+export async function readStoryEntry(db: Queryable, id: string): Promise<StoryEntryRecord | null> {
+  const entry = await db.query<EntryRow>(
     `SELECT id, story_id, occurred_at, occurred_until, occurred_precision, headline, label, body, changes
      FROM story_entries WHERE id = $1`,
     [id],
   );
   const row = entry.rows[0];
   if (!row) return null;
-  const sources = await pool.query<SourceRow>(
+  const sources = await db.query<SourceRow>(
     'SELECT id, url, label, source_id FROM story_entry_sources WHERE entry_id = $1 ORDER BY position, id',
     [id],
   );
@@ -528,32 +628,58 @@ export async function readStoryEntry(pool: Pool, id: string): Promise<StoryEntry
   };
 }
 
-export async function createMorningItem(
-  pool: Pool,
-  input: {
-    kind: MorningKind;
-    body: string;
-    link: string | null;
-    postedAt: string;
-    data?: JsonObject | null;
-  },
-): Promise<MorningItemRecord> {
+export type MorningItemInput = {
+  id?: string | null;
+  kind: MorningKind;
+  body: string;
+  link: string | null;
+  postedAt: string;
+  data?: JsonObject | null;
+};
+
+/** Check a Morning item, including the shape of its data for its kind. */
+export function prepareMorningItem(input: MorningItemInput): MorningItemRecord {
   const kind = morningKind(input.kind);
-  const body = requiredText(input.body, 'body');
-  const postedAt = asInstant(input.postedAt, 'postedAt');
-  const link = input.link === null ? null : requiredText(input.link, 'link');
   const data =
     input.data === null || input.data === undefined ? null : asJsonObject(input.data, 'data');
-  const id = randomUUID();
-  await pool.query(
-    'INSERT INTO morning_items (id, kind, body, link, posted_at, data) VALUES ($1, $2, $3, $4, $5, $6::jsonb)',
-    [id, kind, body, link, postedAt, data === null ? null : JSON.stringify(data)],
-  );
-  return { id, kind, body, link, postedAt, data };
+  checkMorningData(kind, data);
+  return {
+    id: idOrNew(input.id, 'id'),
+    kind,
+    body: requiredText(input.body, 'body'),
+    link: input.link === null || input.link === undefined ? null : requiredText(input.link, 'link'),
+    postedAt: asInstant(input.postedAt, 'postedAt'),
+    data,
+  };
 }
 
-export async function readMorningItem(pool: Pool, id: string): Promise<MorningItemRecord | null> {
-  const result = await pool.query<MorningRow>(
+export async function insertMorningItem(db: Queryable, record: MorningItemRecord): Promise<void> {
+  await db.query(
+    'INSERT INTO morning_items (id, kind, body, link, posted_at, data) VALUES ($1, $2, $3, $4, $5, $6::jsonb)',
+    [
+      record.id,
+      record.kind,
+      record.body,
+      record.link,
+      record.postedAt,
+      record.data === null ? null : JSON.stringify(record.data),
+    ],
+  );
+}
+
+export async function createMorningItem(
+  pool: Pool,
+  input: MorningItemInput,
+): Promise<MorningItemRecord> {
+  const record = prepareMorningItem(input);
+  await insertMorningItem(pool, record).catch((error: unknown) => {
+    throw storeErrorFrom(error);
+  });
+  return record;
+}
+
+export async function readMorningItem(db: Queryable, id: string): Promise<MorningItemRecord | null> {
+  const result = await db.query<MorningRow>(
     'SELECT id, kind, body, link, posted_at, data FROM morning_items WHERE id = $1',
     [id],
   );
@@ -569,27 +695,33 @@ export async function readMorningItem(pool: Pool, id: string): Promise<MorningIt
   };
 }
 
-export async function createCfpRoundupItem(
-  pool: Pool,
-  input: {
-    roundupAt: string;
-    title: string;
-    url: string | null;
-    topic?: string | null;
-    sourceName?: string | null;
-    status?: CfpStatus | null;
-  },
-): Promise<CfpRoundupItemRecord> {
-  const record: CfpRoundupItemRecord = {
-    id: randomUUID(),
+export type CfpRoundupItemInput = {
+  id?: string | null;
+  roundupAt: string;
+  title: string;
+  url: string | null;
+  topic?: string | null;
+  sourceName?: string | null;
+  status?: CfpStatus | null;
+};
+
+export function prepareCfpRoundupItem(input: CfpRoundupItemInput): CfpRoundupItemRecord {
+  return {
+    id: idOrNew(input.id, 'id'),
     roundupAt: asInstant(input.roundupAt, 'roundupAt'),
     title: requiredText(input.title, 'title'),
-    url: input.url === null ? null : requiredText(input.url, 'url'),
+    url: input.url === null || input.url === undefined ? null : requiredText(input.url, 'url'),
     topic: optionalText(input.topic),
     sourceName: optionalText(input.sourceName),
     status: input.status === null || input.status === undefined ? null : cfpStatus(input.status),
   };
-  await pool.query(
+}
+
+export async function insertCfpRoundupItem(
+  db: Queryable,
+  record: CfpRoundupItemRecord,
+): Promise<void> {
+  await db.query(
     `INSERT INTO cfp_roundup_items (id, roundup_at, title, url, topic, source_name, status)
      VALUES ($1, $2, $3, $4, $5, $6, $7)`,
     [
@@ -602,14 +734,24 @@ export async function createCfpRoundupItem(
       record.status,
     ],
   );
+}
+
+export async function createCfpRoundupItem(
+  pool: Pool,
+  input: CfpRoundupItemInput,
+): Promise<CfpRoundupItemRecord> {
+  const record = prepareCfpRoundupItem(input);
+  await insertCfpRoundupItem(pool, record).catch((error: unknown) => {
+    throw storeErrorFrom(error);
+  });
   return record;
 }
 
 export async function readCfpRoundupItem(
-  pool: Pool,
+  db: Queryable,
   id: string,
 ): Promise<CfpRoundupItemRecord | null> {
-  const result = await pool.query<CfpRow>(
+  const result = await db.query<CfpRow>(
     'SELECT id, roundup_at, title, url, topic, source_name, status FROM cfp_roundup_items WHERE id = $1',
     [id],
   );
@@ -626,25 +768,21 @@ export async function readCfpRoundupItem(
   };
 }
 
-/**
- * A Breaking item may point at a story, and at one entry of that story, so a
- * ping can open the story at that entry.
- */
-export async function createBreakingItem(
-  pool: Pool,
-  input: {
-    occurredAt: string;
-    headline: string;
-    label: BreakingLabel;
-    sourceName?: string | null;
-    via?: string | null;
-    url?: string | null;
-    storyId?: string | null;
-    entryId?: string | null;
-  },
-): Promise<BreakingItemRecord> {
+export type BreakingItemInput = {
+  id?: string | null;
+  occurredAt: string;
+  headline: string;
+  label: BreakingLabel;
+  sourceName?: string | null;
+  via?: string | null;
+  url?: string | null;
+  storyId?: string | null;
+  entryId?: string | null;
+};
+
+export function prepareBreakingItem(input: BreakingItemInput): BreakingItemRecord {
   const record: BreakingItemRecord = {
-    id: randomUUID(),
+    id: idOrNew(input.id, 'id'),
     occurredAt: asInstant(input.occurredAt, 'occurredAt'),
     headline: requiredText(input.headline, 'headline'),
     label: entryLabel(input.label),
@@ -657,41 +795,66 @@ export async function createBreakingItem(
   if (record.entryId !== null && record.storyId === null) {
     throw new DashboardStoreError('a Breaking item with an entry must name its story');
   }
-  await inTransaction(pool, async (client) => {
-    if (record.entryId !== null) {
-      const entry = await client.query<{ story_id: string }>(
-        'SELECT story_id FROM story_entries WHERE id = $1',
-        [record.entryId],
-      );
-      if (entry.rows[0]?.story_id !== record.storyId) {
-        throw new DashboardStoreError('a Breaking item can only point at an entry of its own story');
-      }
-    }
-    await client.query(
-      `INSERT INTO breaking_items
-         (id, occurred_at, headline, label, source_name, via, url, story_id, entry_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-      [
-        record.id,
-        record.occurredAt,
-        record.headline,
-        record.label,
-        record.sourceName,
-        record.via,
-        record.url,
-        record.storyId,
-        record.entryId,
-      ],
+  return record;
+}
+
+/**
+ * Write a checked Breaking item inside the caller's transaction. It may point
+ * at a story, and at one entry of that story, so a ping can open the story at
+ * that entry. A private story is accepted; who sees the item is the UI's rule.
+ */
+export async function insertBreakingItem(
+  client: PoolClient,
+  record: BreakingItemRecord,
+): Promise<void> {
+  if (record.entryId !== null) {
+    const entry = await client.query<{ story_id: string }>(
+      'SELECT story_id FROM story_entries WHERE id = $1',
+      [record.entryId],
     );
-  });
+    const row = entry.rows[0];
+    if (row?.story_id !== record.storyId) {
+      throw new DashboardStoreError('a Breaking item can only point at an entry of its own story', {
+        reason: row === undefined ? 'missing' : 'invalid',
+      });
+    }
+  }
+  await client.query(
+    `INSERT INTO breaking_items
+       (id, occurred_at, headline, label, source_name, via, url, story_id, entry_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+    [
+      record.id,
+      record.occurredAt,
+      record.headline,
+      record.label,
+      record.sourceName,
+      record.via,
+      record.url,
+      record.storyId,
+      record.entryId,
+    ],
+  );
+}
+
+export async function createBreakingItem(
+  pool: Pool,
+  input: BreakingItemInput,
+): Promise<BreakingItemRecord> {
+  const record = prepareBreakingItem(input);
+  await inTransaction(pool, (client) => insertBreakingItem(client, record)).catch(
+    (error: unknown) => {
+      throw storeErrorFrom(error);
+    },
+  );
   return record;
 }
 
 export async function readBreakingItem(
-  pool: Pool,
+  db: Queryable,
   id: string,
 ): Promise<BreakingItemRecord | null> {
-  const result = await pool.query<BreakingRow>(
+  const result = await db.query<BreakingRow>(
     `SELECT id, occurred_at, headline, label, source_name, via, url, story_id, entry_id
      FROM breaking_items WHERE id = $1`,
     [id],
@@ -711,28 +874,47 @@ export async function readBreakingItem(
   };
 }
 
+export function prepareCfpDayNote(input: {
+  day: string;
+  stillWorking: string | null;
+  dropped: string | null;
+}): CfpDayNoteRecord {
+  return {
+    day: asCalendarDate(input.day, 'day'),
+    stillWorking: optionalText(input.stillWorking),
+    dropped: optionalText(input.dropped),
+  };
+}
+
+/**
+ * The CFP footer for one day. Setting a day again replaces its note. Returns
+ * whether a row was written: false when the day already held the same note.
+ */
+export async function writeCfpDayNote(db: Queryable, record: CfpDayNoteRecord): Promise<boolean> {
+  const result = await db.query(
+    `INSERT INTO cfp_day_notes (day, still_working, dropped) VALUES ($1, $2, $3)
+     ON CONFLICT (day) DO UPDATE
+       SET still_working = EXCLUDED.still_working, dropped = EXCLUDED.dropped
+       WHERE (cfp_day_notes.still_working, cfp_day_notes.dropped)
+         IS DISTINCT FROM (EXCLUDED.still_working, EXCLUDED.dropped)`,
+    [record.day, record.stillWorking, record.dropped],
+  );
+  return result.rowCount === 1;
+}
+
 /** The CFP footer for one day. Setting a day again replaces its note. */
 export async function setCfpDayNote(
   pool: Pool,
   input: { day: string; stillWorking: string | null; dropped: string | null },
 ): Promise<CfpDayNoteRecord> {
-  const record: CfpDayNoteRecord = {
-    day: asCalendarDate(input.day, 'day'),
-    stillWorking: optionalText(input.stillWorking),
-    dropped: optionalText(input.dropped),
-  };
-  await pool.query(
-    `INSERT INTO cfp_day_notes (day, still_working, dropped) VALUES ($1, $2, $3)
-     ON CONFLICT (day) DO UPDATE
-       SET still_working = EXCLUDED.still_working, dropped = EXCLUDED.dropped`,
-    [record.day, record.stillWorking, record.dropped],
-  );
+  const record = prepareCfpDayNote(input);
+  await writeCfpDayNote(pool, record);
   return record;
 }
 
-export async function readCfpDayNote(pool: Pool, day: string): Promise<CfpDayNoteRecord | null> {
+export async function readCfpDayNote(db: Queryable, day: string): Promise<CfpDayNoteRecord | null> {
   const wanted = asCalendarDate(day, 'day');
-  const result = await pool.query<CfpDayNoteRow>(
+  const result = await db.query<CfpDayNoteRow>(
     'SELECT day::text AS day, still_working, dropped FROM cfp_day_notes WHERE day = $1',
     [wanted],
   );
