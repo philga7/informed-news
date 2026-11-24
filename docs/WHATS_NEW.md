@@ -10,6 +10,8 @@ This is not the release log. Releases are recorded in `CHANGELOG.md` by semantic
 
 **No user-visible change.** Two real Iran stories are now saved as test data, so the new dashboard can be tested and built against real content. Nothing loads them into the app. The Brief is unchanged.
 
+**No user-visible change.** The plan for the sample stories the new dashboard is built against is written down. The Brief is unchanged.
+
 **No user-visible change.** The last open choices about following, hiding, and private stories on the new dashboard are written down. The Brief is unchanged.
 
 **No user-visible change.** Grok Bot can now send stories, story updates, Breaking items, CFP items, and Morning items to the server, which keeps them for the new dashboard. Nothing shows them yet. The Brief is unchanged.
