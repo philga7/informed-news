@@ -1,10 +1,15 @@
 # Ingest contract
 
-How Grok Bot (or any bot holding the token) posts to the site. One route takes every kind of item: stories, story updates (entries), Breaking items, CFP items, the CFP footer, and Morning items. The same route serves the one-time backfill of tracked stories and the ongoing posts. Decided in [DECISIONS.md](DECISIONS.md) (2026-11-16 ingest contract, 2026-11-23 NEWS-228). The code is in `mvp/server/src/ingest/` and `mvp/server/src/store/postgres/ingestStore.ts`.
+How an agent posts to the site. An agent is any program given a token, such as a bot. Grok Bot is the first agent, and the contract is not tied to it. One route takes every kind of item: stories, story updates (entries), Breaking items, CFP items, the CFP footer, and Morning items. The same route serves moving a story into the site (see [Moving a story](#moving-a-story)) and the ongoing posts. Decided in [DECISIONS.md](DECISIONS.md) (2026-11-16 ingest contract, 2026-11-23 NEWS-228, 2026-11-24 NEWS-262). The code is in `mvp/server/src/ingest/` and `mvp/server/src/store/postgres/ingestStore.ts`.
+
+Users do not use this route. They read and write through session routes in the site, which share the same store and field rules (built with the UI steps in [ROADMAP.md](ROADMAP.md#ui-build-sequence-2026-11-16)).
+
+This is version 1 of the contract. A breaking change would come at a new path, `/api/v2/ingest`, and this path keeps working.
 
 ## Setup
 
-- Set `INGEST_TOKEN` in the env file (`mvp/.env`): a random string of at least 32 characters, for example `openssl rand -hex 32`. It is separate from user sign-in and is never logged.
+- Set `INGEST_TOKEN` in the env file (`mvp/.env`): a random string of at least 32 characters, for example `openssl rand -hex 32`. It is separate from user sign-in and is never logged. Today this one token is the one agent's token. Giving each agent its own token is decided and not built yet (see [Decided, not built yet](#decided-not-built-yet)).
+- The site is reachable only over Tailscale, so an agent must be on the tailnet to post.
 - The Postgres settings must be in the env file too. The route applies the dashboard schema on first use.
 - With no token, or a token shorter than 32 characters, every request answers **503**. With no database, a request with the right token answers **503** (a wrong token still answers **401**). The rest of the server runs as before.
 
@@ -39,7 +44,7 @@ Errors never contain SQL text.
 
 ## Ids and retries
 
-Every item carries its own `id`: 1 to 200 letters, digits, `.`, `_`, `:` or `-`, for example `grok:story:musk-spacex`. Ids are the bot's. The site never makes one for a posted item.
+Every item carries its own `id`: 1 to 200 letters, digits, `.`, `_`, `:` or `-`, for example `grok:story:musk-spacex`. Ids are the agent's. The site never makes one for an item an agent posts. (The site makes the ids for what users write in the site.)
 
 - **Story:** created, or its own fields are replaced by the new post. Its role and hub cannot change.
 - **Entry, Breaking item, CFP item, Morning item:** fixed once stored. Sending the same id again with the same content changes nothing. Different content is a 409. To correct one, post a new item with a new id.
@@ -193,7 +198,29 @@ A story post with `ownerUserId` is private to that user. The id must be an exist
 
 A private story cannot have branches. A branch cannot be private, a branch cannot sit under a private hub, and a hub that has branches cannot be made private. Each of these is a 422. This is settled ([DECISIONS.md](DECISIONS.md#2026-11-23--the-per-user-answers-branches-admin-visibility-following-and-who-builds-the-controls-news-260)).
 
-Grok Bot, and Phil as its operator, can read every private story back through `GET /api/ingest/story/<id>`. In the site, the admin (the account named by `OPERATOR_EMAIL`) sees every private story, whoever wrote it, including the ones Grok Bot writes. Any other user sees only their own.
+Today's single token can read every private story back through `GET /api/ingest/story/<id>`. Once each agent has its own token, an agent reads back the private stories it wrote. In the site, the admin (the account named by `OPERATOR_EMAIL`) sees every private story, whoever wrote it, including the ones Grok Bot writes. Any other user sees only their own.
+
+## Moving a story
+
+A story moves from Grok Bot's page into the site one story at a time, and only when Phil is ready to track it in the site. Until then, the page stays the source for that story.
+
+1. The agent writes the page's content in this contract's JSON itself. The site never reads the page.
+2. It posts the story, then the page's whole timeline as entries, each with a stable id, in batches.
+3. It reads the story back to check what the site holds.
+4. From then on, the agent posts new updates to the site and stops updating the page. Marking the page as moved is done on the agent's side.
+
+The site keeps no "moved" flag: a story that is in the site has moved. Posting a page's data as a fixture, to check the contract or build the UI against, is not a move.
+
+## Decided, not built yet
+
+Decided in [DECISIONS.md](DECISIONS.md#2026-11-24--agent-contract-user-api-deletes-moving-stories-and-hosting-news-262). None of this works yet; each part comes with its own ticket ([ROADMAP.md](ROADMAP.md#ui-build-sequence-2026-11-16) rows 5a to 5c).
+
+- **One token per agent.** Each agent gets its own token, which can be turned off on its own, and every row records who wrote it (`written_by`). `INGEST_TOKEN` is then removed, and the token Grok Bot holds is re-issued as its own.
+- **A list read.** The stories an agent may see (every shared story, plus the private ones it wrote), each with its status, last-checked and next-check times, and its latest entry, in pages.
+- **Corrections.** A correction is a new entry that may name, in `corrects`, an entry of the same story. Until then, post a new entry with a new id, as above.
+- **Soft removes.** An agent may remove an item it wrote, with a reason. The stored item is kept; readers see "Removed on <date>: <reason>" in its place. An agent never edits a fixed item or removes another writer's item.
+- **Hard deletes** are made only by the admin, for the reasons listed in the decision, and never through this contract.
+- **A published JSON Schema** of this contract, generated from `parse.ts`.
 
 ## Examples
 
