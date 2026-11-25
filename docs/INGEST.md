@@ -213,7 +213,7 @@ The site keeps no "moved" flag: a story that is in the site has moved. Posting a
 
 ## Decided, not built yet
 
-Decided in [DECISIONS.md](DECISIONS.md#2026-11-24--agent-contract-user-api-deletes-moving-stories-and-hosting-news-262). None of this works yet; each part comes with its own ticket ([ROADMAP.md](ROADMAP.md#ui-build-sequence-2026-11-16) rows 5a to 5c).
+Decided in [DECISIONS.md](DECISIONS.md#2026-11-24--agent-contract-user-api-deletes-moving-stories-and-hosting-news-262). None of this works yet. Each part comes with its own ticket: [ROADMAP.md](ROADMAP.md#ui-build-sequence-2026-11-16) rows 5a to 5c, and the JSON Schema as a follow-up outside the sequence.
 
 - **One token per agent.** Each agent gets its own token, which can be turned off on its own, and every row records who wrote it (`written_by`). `INGEST_TOKEN` is then removed, and the token Grok Bot holds is re-issued as its own.
 - **A list read.** The stories an agent may see (every shared story, plus the private ones it wrote), each with its status, last-checked and next-check times, and its latest entry, in pages.
