@@ -6,6 +6,10 @@ Each ship-loop pull request adds an entry for what is true at merge for that rea
 
 This is not the release log. Releases are recorded in `CHANGELOG.md` by semantic-release. Do not hand-edit `CHANGELOG.md` to mirror these notes.
 
+## 2026-11-24
+
+**No user-visible change.** The plan for how bots and readers will add and change stories, when anything is deleted, and how a story moves into the site is written down. The Brief is unchanged.
+
 ## 2026-11-23
 
 **No user-visible change.** Two real Iran stories are now saved as test data, so the new dashboard can be tested and built against real content. Nothing loads them into the app. The Brief is unchanged.
