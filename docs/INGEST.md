@@ -218,7 +218,7 @@ Decided in [DECISIONS.md](DECISIONS.md#2026-11-24--agent-contract-user-api-delet
 - **One token per agent.** Each agent gets its own token, which can be turned off on its own, and every row records who wrote it (`written_by`). `INGEST_TOKEN` is then removed, and the token Grok Bot holds is re-issued as its own.
 - **A list read.** The stories an agent may see (every shared story, plus the private ones it wrote), each with its status, last-checked and next-check times, and its latest entry, in pages.
 - **Corrections.** A correction is a new entry that may name, in `corrects`, an entry of the same story. Until then, post a new entry with a new id, as above.
-- **Soft removes.** An agent may remove an item it wrote, a story included, with a reason. The stored item is kept; readers see "Removed on <date>: <reason>" in its place, and a removed story drops out of readers' lists. An agent never edits a fixed item or removes another writer's item.
+- **Soft removes.** An agent may remove an item it wrote, a story included (a story is the agent's that created it, even after the admin edits it), with a reason. The stored item is kept; readers see "Removed on <date>: <reason>" in its place, and a removed story drops out of readers' lists. An agent never edits a fixed item or removes another writer's item.
 - **Hard deletes** are made only by the admin, for the reasons listed in the decision, and never through this contract.
 - **A published JSON Schema** of this contract, generated from `parse.ts`.
 
