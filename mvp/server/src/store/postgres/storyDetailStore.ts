@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
 import { checkPanelPayload } from './jsonShapes.js';
+import { writerParams, type Writer } from './writer.js';
 import {
   DashboardStoreError,
   asCalendarDate,
@@ -90,11 +91,17 @@ export async function readCategory(pool: Pool, id: string): Promise<CategoryReco
 /** Put a story in a category. A story can sit in several. Repeating it changes nothing. */
 export async function addStoryCategory(
   pool: Pool,
+  writer: Writer,
   input: { storyId: string; categoryId: string },
 ): Promise<void> {
   await pool.query(
-    'INSERT INTO story_categories (story_id, category_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
-    [requiredText(input.storyId, 'storyId'), requiredText(input.categoryId, 'categoryId')],
+    `INSERT INTO story_categories (story_id, category_id, written_by_agent_id, written_by_user_id)
+     VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING`,
+    [
+      requiredText(input.storyId, 'storyId'),
+      requiredText(input.categoryId, 'categoryId'),
+      ...writerParams(writer),
+    ],
   );
 }
 
@@ -125,15 +132,15 @@ export function prepareStoryTag(input: { storyId: string; slug: string; name: st
 
 export async function createStoryTag(
   pool: Pool,
+  writer: Writer,
   input: { storyId: string; slug: string; name: string },
 ): Promise<StoryTagRecord> {
   const record = prepareStoryTag(input);
-  await pool.query('INSERT INTO story_tags (id, story_id, slug, name) VALUES ($1, $2, $3, $4)', [
-    record.id,
-    record.storyId,
-    record.slug,
-    record.name,
-  ]);
+  await pool.query(
+    `INSERT INTO story_tags (id, story_id, slug, name, written_by_agent_id, written_by_user_id)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
+    [record.id, record.storyId, record.slug, record.name, ...writerParams(writer)],
+  );
   return record;
 }
 
@@ -219,13 +226,15 @@ export function prepareStorySource(input: StorySourceInput): StorySourceRecord {
 
 export async function createStorySource(
   pool: Pool,
+  writer: Writer,
   input: StorySourceInput,
 ): Promise<StorySourceRecord> {
   const record = prepareStorySource(input);
   await pool.query(
     `INSERT INTO story_sources
-       (id, story_id, outlet, title, url, published_on, via, group_label, note)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+       (id, story_id, outlet, title, url, published_on, via, group_label, note,
+        written_by_agent_id, written_by_user_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
     [
       record.id,
       record.storyId,
@@ -236,6 +245,7 @@ export async function createStorySource(
       record.via,
       record.groupLabel,
       record.note,
+      ...writerParams(writer),
     ],
   ).catch((error: unknown) => {
     throw storeErrorFrom(error);
@@ -299,11 +309,16 @@ export function prepareStoryDate(input: StoryDateInput): StoryDateRecord {
   return record;
 }
 
-export async function createStoryDate(pool: Pool, input: StoryDateInput): Promise<StoryDateRecord> {
+export async function createStoryDate(
+  pool: Pool,
+  writer: Writer,
+  input: StoryDateInput,
+): Promise<StoryDateRecord> {
   const record = prepareStoryDate(input);
   await pool.query(
-    'INSERT INTO story_dates (id, story_id, starts_on, ends_on, label) VALUES ($1, $2, $3, $4, $5)',
-    [record.id, record.storyId, record.startsOn, record.endsOn, record.label],
+    `INSERT INTO story_dates (id, story_id, starts_on, ends_on, label, written_by_agent_id, written_by_user_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+    [record.id, record.storyId, record.startsOn, record.endsOn, record.label, ...writerParams(writer)],
   ).catch((error: unknown) => {
     throw storeErrorFrom(error);
   });
@@ -360,12 +375,13 @@ export function prepareStoryPanel(input: StoryPanelInput): StoryPanelRecord {
 
 export async function createStoryPanel(
   pool: Pool,
+  writer: Writer,
   input: StoryPanelInput,
 ): Promise<StoryPanelRecord> {
   const record = prepareStoryPanel(input);
   await pool.query(
-    `INSERT INTO story_panels (id, story_id, kind, title, payload, sort)
-     VALUES ($1, $2, $3, $4, $5::jsonb, $6)`,
+    `INSERT INTO story_panels (id, story_id, kind, title, payload, sort, written_by_agent_id, written_by_user_id)
+     VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8)`,
     [
       record.id,
       record.storyId,
@@ -373,6 +389,7 @@ export async function createStoryPanel(
       record.title,
       JSON.stringify(record.payload),
       record.sort,
+      ...writerParams(writer),
     ],
   ).catch((error: unknown) => {
     throw storeErrorFrom(error);
@@ -425,12 +442,14 @@ export function prepareStoryLink(input: {
 
 export async function createStoryLink(
   pool: Pool,
+  writer: Writer,
   input: { fromStoryId: string; toStoryId: string; note: string },
 ): Promise<StoryLinkRecord> {
   const record = prepareStoryLink(input);
   await pool.query(
-    'INSERT INTO story_links (from_story_id, to_story_id, note) VALUES ($1, $2, $3)',
-    [record.fromStoryId, record.toStoryId, record.note],
+    `INSERT INTO story_links (from_story_id, to_story_id, note, written_by_agent_id, written_by_user_id)
+     VALUES ($1, $2, $3, $4, $5)`,
+    [record.fromStoryId, record.toStoryId, record.note, ...writerParams(writer)],
   ).catch((error: unknown) => {
     throw storeErrorFrom(error);
   });

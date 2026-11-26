@@ -59,6 +59,7 @@ import {
   type StorySourceRecord,
   type StoryTagRecord,
 } from './storyDetailStore.js';
+import { writerName, writerParams, type Writer, type WriterName } from './writer.js';
 
 /**
  * Retry-safe writes for the ingest contract (NEWS-228). Every post carries its
@@ -71,6 +72,12 @@ import {
  *   written: the same id with the same content changes nothing, and with
  *   different content it is a conflict.
  * - A CFP footer note is keyed by its day, and a new note replaces the old.
+ *
+ * Every put records its writer (NEWS-263) on each row it writes or changes.
+ * A row that a post leaves as it was keeps the writer it had, so the same
+ * fixed item posted again by another agent is `unchanged` and keeps its
+ * first writer. A story keeps its creator; its last writer moves whenever a
+ * post changes it or one of its nested rows.
  */
 
 export type PutOutcome = 'created' | 'updated' | 'unchanged';
@@ -95,6 +102,48 @@ export type EntryPost = StoryEntryInput & {
 };
 
 const UNIQUE_VIOLATION = '23505';
+
+/** A changed nested row takes the post's writer; an unchanged one keeps its own. */
+const WRITER_FROM_EXCLUDED =
+  'written_by_agent_id = EXCLUDED.written_by_agent_id, written_by_user_id = EXCLUDED.written_by_user_id';
+
+type WriterValues = [string | null, string | null];
+
+type StoryGuardRow = {
+  role: string;
+  hub_id: string | null;
+  owner_user_id: string | null;
+  created_by_agent_id: string | null;
+  created_by_user_id: string | null;
+};
+
+const STORY_GUARD_SQL =
+  'SELECT role, hub_id, owner_user_id, created_by_agent_id, created_by_user_id FROM stories WHERE id = $1';
+
+function createdBy(row: StoryGuardRow, writer: Writer): boolean {
+  const [agentId, userId] = writerParams(writer);
+  return agentId !== null ? row.created_by_agent_id === agentId : row.created_by_user_id === userId;
+}
+
+/**
+ * A private story belongs to the agent that created it (NEWS-263): any other
+ * writer is refused. A story with no creator (written before agents and not
+ * claimed) has no one it belongs to, so a private one is refused for all.
+ */
+function privateToAnother(row: StoryGuardRow, writer: Writer): boolean {
+  return row.owner_user_id !== null && !createdBy(row, writer);
+}
+
+/**
+ * An entry or Breaking item may point only at a story its writer may see. A
+ * private story of another agent gets the answer a missing story gets.
+ */
+async function checkStoryVisible(db: Queryable, storyId: string, writer: Writer): Promise<void> {
+  const row = (await db.query<StoryGuardRow>(STORY_GUARD_SQL, [storyId])).rows[0];
+  if (row !== undefined && privateToAnother(row, writer)) {
+    throw new DashboardStoreError(`storyId ${storyId} does not exist`, { reason: 'missing' });
+  }
+}
 
 function conflict(message: string): DashboardStoreError {
   return new DashboardStoreError(message, { reason: 'conflict' });
@@ -150,7 +199,7 @@ const STORY_UPSERT_SQL = `${STORY_INSERT_SQL}
     IS DISTINCT FROM (${STORY_UPDATABLE.map((c) => `EXCLUDED.${c}`).join(', ')})
   RETURNING (xmax = 0) AS inserted`;
 
-export async function putStory(pool: Pool, post: StoryPost): Promise<PutResult> {
+export async function putStory(pool: Pool, writer: Writer, post: StoryPost): Promise<PutResult> {
   const id = asId(post.id, 'id');
   const record = prepareStory({ ...post, id, hubId: post.hubId ?? null });
   const sources = (post.sources ?? []).map((source) =>
@@ -178,26 +227,33 @@ export async function putStory(pool: Pool, post: StoryPost): Promise<PutResult> 
 
   try {
     return await inTransaction(pool, async (client) => {
-      const existing = await client.query<{ role: string; hub_id: string | null }>(
-        'SELECT role, hub_id FROM stories WHERE id = $1 FOR UPDATE',
-        [id],
-      );
+      const existing = await client.query<StoryGuardRow>(`${STORY_GUARD_SQL} FOR UPDATE`, [id]);
       const before = existing.rows[0];
+      // Another agent's private story: the id is taken, and nothing else is said about it.
+      if (before && privateToAnother(before, writer)) throw conflict(`story id ${id} is taken`);
       if (before && (before.role !== record.role || before.hub_id !== record.hubId)) {
         throw conflict("a story's role and hub cannot change");
       }
+      // Who can see a story is its creator's call: another agent may re-post a shared story,
+      // but not make it private, move it to another owner, or share it.
+      if (before && before.owner_user_id !== record.ownerUserId && !createdBy(before, writer)) {
+        throw conflict("only the story's creator can change who can see it");
+      }
       await checkPrivateStoryRules(client, record);
-      const story = await client.query<{ inserted: boolean }>(STORY_UPSERT_SQL, storyParams(record));
+      const story = await client.query<{ inserted: boolean }>(STORY_UPSERT_SQL, storyParams(record, writer));
       let writes = story.rowCount ?? 0;
       const created = story.rows[0]?.inserted === true;
       if (!created) {
         // A first post that raced another first post of the same id finds the
         // row only now: check its role and hub again against what is stored.
-        const stored = await client.query<{ role: string; hub_id: string | null }>(
-          'SELECT role, hub_id FROM stories WHERE id = $1',
-          [id],
-        );
+        const stored = await client.query<StoryGuardRow>(STORY_GUARD_SQL, [id]);
         const row = stored.rows[0];
+        // Our update has already landed on that row, so its owner can no longer be
+        // compared: refuse when another writer created it, and the retry is checked
+        // against the stored row like any re-post.
+        if (before === undefined && row && !createdBy(row, writer)) {
+          throw conflict(`story id ${id} was just created by another writer; retry`);
+        }
         if (row && (row.role !== record.role || row.hub_id !== record.hubId)) {
           throw conflict("a story's role and hub cannot change");
         }
@@ -209,35 +265,55 @@ export async function putStory(pool: Pool, post: StoryPost): Promise<PutResult> 
         ['story_panels', panels.map((row) => row.id)],
       ] as const;
       for (const [table, ids] of nested) await ownNestedIds(client, table, id, ids);
-      for (const source of sources) writes += await upsertSource(client, source);
-      for (const date of dates) writes += await upsertDate(client, date);
-      for (const panel of panels) writes += await upsertPanel(client, panel);
+      const by = writerParams(writer);
+      for (const source of sources) writes += await upsertSource(client, source, by);
+      for (const date of dates) writes += await upsertDate(client, date, by);
+      for (const panel of panels) writes += await upsertPanel(client, panel, by);
       // The upserts only touch rows of this story; a row another story wrote
       // in the meantime is caught here.
       for (const [table, ids] of nested) await ownNestedIds(client, table, id, ids);
       for (const tag of tags) {
         writes += await changed(
           client,
-          `INSERT INTO story_tags (id, story_id, slug, name) VALUES ($1, $2, $3, $4)
-           ON CONFLICT (story_id, slug) DO UPDATE SET name = EXCLUDED.name
+          `INSERT INTO story_tags (id, story_id, slug, name, written_by_agent_id, written_by_user_id)
+           VALUES ($1, $2, $3, $4, $5, $6)
+           ON CONFLICT (story_id, slug) DO UPDATE SET name = EXCLUDED.name,
+             ${WRITER_FROM_EXCLUDED}
            WHERE story_tags.name IS DISTINCT FROM EXCLUDED.name`,
-          [tag.id, tag.storyId, tag.slug, tag.name],
+          [tag.id, tag.storyId, tag.slug, tag.name, ...by],
         );
       }
       for (const categoryId of categoryIds) {
         writes += await changed(
           client,
-          'INSERT INTO story_categories (story_id, category_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
-          [id, categoryId],
+          `INSERT INTO story_categories (story_id, category_id, written_by_agent_id, written_by_user_id)
+           VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING`,
+          [id, categoryId, ...by],
         );
       }
       for (const link of links) {
         writes += await changed(
           client,
-          `INSERT INTO story_links (from_story_id, to_story_id, note) VALUES ($1, $2, $3)
-           ON CONFLICT (from_story_id, to_story_id) DO UPDATE SET note = EXCLUDED.note
+          `INSERT INTO story_links (from_story_id, to_story_id, note, written_by_agent_id, written_by_user_id)
+           VALUES ($1, $2, $3, $4, $5)
+           ON CONFLICT (from_story_id, to_story_id) DO UPDATE SET note = EXCLUDED.note,
+             ${WRITER_FROM_EXCLUDED}
            WHERE story_links.note IS DISTINCT FROM EXCLUDED.note`,
-          [link.fromStoryId, link.toStoryId, link.note],
+          [link.fromStoryId, link.toStoryId, link.note, ...by],
+        );
+      }
+      if (!created && writes > 0) {
+        const stored = (await client.query<StoryGuardRow>(STORY_GUARD_SQL, [id])).rows[0];
+        if (stored && stored.created_by_agent_id === null && stored.created_by_user_id === null) {
+          // Written before agents and not claimed: nothing is changed until the operator claims it.
+          throw conflict(
+            `story ${id} was written before agents and is not claimed; the operator claims it with npm run agents`,
+          );
+        }
+        // The story or one of its nested rows changed: this writer is its last writer.
+        await client.query(
+          'UPDATE stories SET written_by_agent_id = $2, written_by_user_id = $3 WHERE id = $1',
+          [id, ...by],
         );
       }
       return { id, outcome: created ? 'created' : writes > 0 ? 'updated' : 'unchanged' };
@@ -247,46 +323,49 @@ export async function putStory(pool: Pool, post: StoryPost): Promise<PutResult> 
   }
 }
 
-async function upsertSource(client: PoolClient, row: StorySourceRecord): Promise<number> {
+async function upsertSource(client: PoolClient, row: StorySourceRecord, by: WriterValues): Promise<number> {
   return changed(
     client,
-    `INSERT INTO story_sources (id, story_id, outlet, title, url, published_on, via, group_label, note)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    `INSERT INTO story_sources
+       (id, story_id, outlet, title, url, published_on, via, group_label, note, written_by_agent_id, written_by_user_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
      ON CONFLICT (id) DO UPDATE SET outlet = EXCLUDED.outlet, title = EXCLUDED.title,
        url = EXCLUDED.url, published_on = EXCLUDED.published_on, via = EXCLUDED.via,
-       group_label = EXCLUDED.group_label, note = EXCLUDED.note
+       group_label = EXCLUDED.group_label, note = EXCLUDED.note, ${WRITER_FROM_EXCLUDED}
      WHERE story_sources.story_id = EXCLUDED.story_id
        AND (story_sources.outlet, story_sources.title, story_sources.url, story_sources.published_on,
             story_sources.via, story_sources.group_label, story_sources.note)
        IS DISTINCT FROM (EXCLUDED.outlet, EXCLUDED.title, EXCLUDED.url, EXCLUDED.published_on,
             EXCLUDED.via, EXCLUDED.group_label, EXCLUDED.note)`,
-    [row.id, row.storyId, row.outlet, row.title, row.url, row.publishedOn, row.via, row.groupLabel, row.note],
+    [row.id, row.storyId, row.outlet, row.title, row.url, row.publishedOn, row.via, row.groupLabel, row.note, ...by],
   );
 }
 
-async function upsertDate(client: PoolClient, row: StoryDateRecord): Promise<number> {
+async function upsertDate(client: PoolClient, row: StoryDateRecord, by: WriterValues): Promise<number> {
   return changed(
     client,
-    `INSERT INTO story_dates (id, story_id, starts_on, ends_on, label) VALUES ($1, $2, $3, $4, $5)
+    `INSERT INTO story_dates (id, story_id, starts_on, ends_on, label, written_by_agent_id, written_by_user_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
      ON CONFLICT (id) DO UPDATE SET starts_on = EXCLUDED.starts_on, ends_on = EXCLUDED.ends_on,
-       label = EXCLUDED.label
+       label = EXCLUDED.label, ${WRITER_FROM_EXCLUDED}
      WHERE story_dates.story_id = EXCLUDED.story_id
        AND (story_dates.starts_on, story_dates.ends_on, story_dates.label)
        IS DISTINCT FROM (EXCLUDED.starts_on, EXCLUDED.ends_on, EXCLUDED.label)`,
-    [row.id, row.storyId, row.startsOn, row.endsOn, row.label],
+    [row.id, row.storyId, row.startsOn, row.endsOn, row.label, ...by],
   );
 }
 
-async function upsertPanel(client: PoolClient, row: StoryPanelRecord): Promise<number> {
+async function upsertPanel(client: PoolClient, row: StoryPanelRecord, by: WriterValues): Promise<number> {
   return changed(
     client,
-    `INSERT INTO story_panels (id, story_id, kind, title, payload, sort) VALUES ($1, $2, $3, $4, $5::jsonb, $6)
+    `INSERT INTO story_panels (id, story_id, kind, title, payload, sort, written_by_agent_id, written_by_user_id)
+     VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8)
      ON CONFLICT (id) DO UPDATE SET kind = EXCLUDED.kind, title = EXCLUDED.title,
-       payload = EXCLUDED.payload, sort = EXCLUDED.sort
+       payload = EXCLUDED.payload, sort = EXCLUDED.sort, ${WRITER_FROM_EXCLUDED}
      WHERE story_panels.story_id = EXCLUDED.story_id
        AND (story_panels.kind, story_panels.title, story_panels.payload, story_panels.sort)
        IS DISTINCT FROM (EXCLUDED.kind, EXCLUDED.title, EXCLUDED.payload, EXCLUDED.sort)`,
-    [row.id, row.storyId, row.kind, row.title, JSON.stringify(row.payload), row.sort],
+    [row.id, row.storyId, row.kind, row.title, JSON.stringify(row.payload), row.sort, ...by],
   );
 }
 
@@ -350,13 +429,14 @@ async function entryTagSlugs(db: Queryable, entryId: string): Promise<string[]> 
   return result.rows.map((row) => row.slug);
 }
 
-export async function putEntry(pool: Pool, post: EntryPost): Promise<PutResult> {
+export async function putEntry(pool: Pool, writer: Writer, post: EntryPost): Promise<PutResult> {
   const id = asId(post.id, 'id');
   const draft = prepareEntry({ ...post, id });
   const tags = (post.tags ?? []).map((tag) => prepareStoryTag({ ...tag, storyId: draft.storyId }));
   noRepeats(tags.map((tag) => tag.slug), 'tag');
   const slugs = tags.map((tag) => tag.slug);
   let storedSlugs: string[] = [];
+  await checkStoryVisible(pool, draft.storyId, writer);
   return putFixed(
     pool,
     id,
@@ -367,19 +447,20 @@ export async function putEntry(pool: Pool, post: EntryPost): Promise<PutResult> 
     },
     (stored) => sameEntry(draft, slugs, stored, storedSlugs),
     async (client) => {
-      await insertEntry(client, draft);
-      for (const tag of tags) await tagEntry(client, id, tag);
+      await insertEntry(client, draft, writer);
+      for (const tag of tags) await tagEntry(client, id, tag, writer);
     },
     'entry',
   );
 }
 
 /** Tag an entry, creating the tag on its story when the slug is new. A known slug keeps its name. */
-async function tagEntry(client: PoolClient, entryId: string, tag: StoryTagRecord): Promise<void> {
+async function tagEntry(client: PoolClient, entryId: string, tag: StoryTagRecord, writer: Writer): Promise<void> {
   await client.query(
-    `INSERT INTO story_tags (id, story_id, slug, name) VALUES ($1, $2, $3, $4)
+    `INSERT INTO story_tags (id, story_id, slug, name, written_by_agent_id, written_by_user_id)
+     VALUES ($1, $2, $3, $4, $5, $6)
      ON CONFLICT (story_id, slug) DO NOTHING`,
-    [tag.id, tag.storyId, tag.slug, tag.name],
+    [tag.id, tag.storyId, tag.slug, tag.name, ...writerParams(writer)],
   );
   await client.query(
     `INSERT INTO entry_tags (entry_id, tag_id)
@@ -389,38 +470,51 @@ async function tagEntry(client: PoolClient, entryId: string, tag: StoryTagRecord
   );
 }
 
-export async function putMorningItem(pool: Pool, post: MorningItemInput & { id: string }): Promise<PutResult> {
+export async function putMorningItem(
+  pool: Pool,
+  writer: Writer,
+  post: MorningItemInput & { id: string },
+): Promise<PutResult> {
   const record = prepareMorningItem({ ...post, id: asId(post.id, 'id') });
   return putFixed<MorningItemRecord>(
     pool,
     record.id,
     (db) => readMorningItem(db, record.id),
     (stored) => isDeepStrictEqual(stored, record),
-    (client) => insertMorningItem(client, record),
+    (client) => insertMorningItem(client, record, writer),
     'Morning item',
   );
 }
 
-export async function putCfpItem(pool: Pool, post: CfpRoundupItemInput & { id: string }): Promise<PutResult> {
+export async function putCfpItem(
+  pool: Pool,
+  writer: Writer,
+  post: CfpRoundupItemInput & { id: string },
+): Promise<PutResult> {
   const record = prepareCfpRoundupItem({ ...post, id: asId(post.id, 'id') });
   return putFixed<CfpRoundupItemRecord>(
     pool,
     record.id,
     (db) => readCfpRoundupItem(db, record.id),
     (stored) => isDeepStrictEqual(stored, record),
-    (client) => insertCfpRoundupItem(client, record),
+    (client) => insertCfpRoundupItem(client, record, writer),
     'CFP item',
   );
 }
 
-export async function putBreakingItem(pool: Pool, post: BreakingItemInput & { id: string }): Promise<PutResult> {
+export async function putBreakingItem(
+  pool: Pool,
+  writer: Writer,
+  post: BreakingItemInput & { id: string },
+): Promise<PutResult> {
   const record = prepareBreakingItem({ ...post, id: asId(post.id, 'id') });
+  if (record.storyId !== null) await checkStoryVisible(pool, record.storyId, writer);
   return putFixed<BreakingItemRecord>(
     pool,
     record.id,
     (db) => readBreakingItem(db, record.id),
     (stored) => isDeepStrictEqual(stored, record),
-    (client) => insertBreakingItem(client, record),
+    (client) => insertBreakingItem(client, record, writer),
     'Breaking item',
   );
 }
@@ -428,13 +522,14 @@ export async function putBreakingItem(pool: Pool, post: BreakingItemInput & { id
 /** The CFP footer for one day. Its id is the day; a new note replaces the old. */
 export async function putCfpDayNote(
   pool: Pool,
+  writer: Writer,
   post: { day: string; stillWorking: string | null; dropped: string | null },
 ): Promise<PutResult> {
   const record = prepareCfpDayNote(post);
   try {
     return await inTransaction(pool, async (client) => {
       const before = await client.query('SELECT 1 FROM cfp_day_notes WHERE day = $1 FOR UPDATE', [record.day]);
-      const wrote = await writeCfpDayNote(client, record);
+      const wrote = await writeCfpDayNote(client, record, writer);
       const outcome: PutOutcome = before.rowCount === 0 ? 'created' : wrote ? 'updated' : 'unchanged';
       return { id: record.day, outcome };
     });
@@ -443,7 +538,7 @@ export async function putCfpDayNote(
   }
 }
 
-/** A story as Grok Bot sent it: its fields and every nested row it has. */
+/** A story as an agent sent it: its fields and every nested row it has. */
 export type IngestedStory = StoryRecord & {
   sources: StorySourceRecord[];
   tags: Array<{ slug: string; name: string }>;
@@ -531,27 +626,110 @@ async function readIngestedStory(pool: Pool, id: string): Promise<IngestedStory 
 export const INGEST_KINDS = ['story', 'entry', 'breaking', 'cfp_item', 'cfp_day_note', 'morning'] as const;
 export type IngestKind = (typeof INGEST_KINDS)[number];
 
-/** What the store holds for one posted item, for Grok Bot's read-back. Null when there is none. */
-export async function readIngested(pool: Pool, kind: IngestKind, id: string): Promise<unknown> {
+/** The agent asking for a read-back (NEWS-263). */
+export type IngestReader = { agentId: string };
+
+type WriterRow = { written_by_agent_id: string | null; written_by_user_id: string | null };
+
+const WRITTEN_KEYS = {
+  story_entries: 'id',
+  breaking_items: 'id',
+  cfp_roundup_items: 'id',
+  morning_items: 'id',
+  cfp_day_notes: 'day',
+} as const;
+
+async function writtenBy(pool: Pool, table: keyof typeof WRITTEN_KEYS, key: string): Promise<WriterName> {
+  const result = await pool.query<WriterRow>(
+    `SELECT written_by_agent_id, written_by_user_id FROM ${table} WHERE ${WRITTEN_KEYS[table]} = $1`,
+    [key],
+  );
+  const row = result.rows[0];
+  return row ? writerName(row.written_by_agent_id, row.written_by_user_id) : null;
+}
+
+type StoryAccessRow = WriterRow & {
+  owner_user_id: string | null;
+  created_by_agent_id: string | null;
+  created_by_user_id: string | null;
+};
+
+async function storyAccess(pool: Pool, storyId: string): Promise<StoryAccessRow | null> {
+  const result = await pool.query<StoryAccessRow>(
+    `SELECT owner_user_id, created_by_agent_id, created_by_user_id, written_by_agent_id, written_by_user_id
+     FROM stories WHERE id = $1`,
+    [storyId],
+  );
+  return result.rows[0] ?? null;
+}
+
+/**
+ * A private story, and what hangs on it, reads back only for the agent that
+ * created the story (NEWS-263). A story written before agents existed has no
+ * creator, so no agent reads it back until the operator claims it.
+ */
+function hiddenFrom(reader: IngestReader, story: StoryAccessRow | null): boolean {
+  return story !== null && story.owner_user_id !== null && story.created_by_agent_id !== reader.agentId;
+}
+
+/**
+ * What the store holds for one posted item, for an agent's read-back, with who
+ * wrote it (`writtenBy`, and a story's `createdBy`). Null when there is none,
+ * or when the reader may not see it: another agent gets the same answer as
+ * for an id that does not exist.
+ */
+export async function readIngested(
+  pool: Pool,
+  kind: IngestKind,
+  id: string,
+  reader: IngestReader,
+): Promise<unknown> {
   switch (kind) {
-    case 'story':
-      return readIngestedStory(pool, id);
+    case 'story': {
+      const access = await storyAccess(pool, id);
+      if (access === null || hiddenFrom(reader, access)) return null;
+      const story = await readIngestedStory(pool, id);
+      if (story === null) return null;
+      return {
+        ...story,
+        createdBy: writerName(access.created_by_agent_id, access.created_by_user_id),
+        writtenBy: writerName(access.written_by_agent_id, access.written_by_user_id),
+      };
+    }
     case 'entry': {
       const entry = await readStoryEntry(pool, id);
-      return entry === null ? null : { ...entry, tags: await entryTagSlugs(pool, id) };
+      if (entry === null || hiddenFrom(reader, await storyAccess(pool, entry.storyId))) return null;
+      return {
+        ...entry,
+        tags: await entryTagSlugs(pool, id),
+        writtenBy: await writtenBy(pool, 'story_entries', id),
+      };
     }
-    case 'breaking':
-      return readBreakingItem(pool, id);
-    case 'cfp_item':
-      return readCfpRoundupItem(pool, id);
-    case 'cfp_day_note':
-      return /^\d{4}-\d{2}-\d{2}$/.test(id) ? readCfpDayNote(pool, id) : null;
+    case 'breaking': {
+      const item = await readBreakingItem(pool, id);
+      if (item === null) return null;
+      const by = await writtenBy(pool, 'breaking_items', id);
+      const ownItem = by !== null && 'agent' in by && by.agent === reader.agentId;
+      if (item.storyId !== null && !ownItem && hiddenFrom(reader, await storyAccess(pool, item.storyId))) {
+        return null;
+      }
+      return { ...item, writtenBy: by };
+    }
+    case 'cfp_item': {
+      const item = await readCfpRoundupItem(pool, id);
+      return item === null ? null : { ...item, writtenBy: await writtenBy(pool, 'cfp_roundup_items', id) };
+    }
+    case 'cfp_day_note': {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(id)) return null;
+      const note = await readCfpDayNote(pool, id);
+      return note === null ? null : { ...note, writtenBy: await writtenBy(pool, 'cfp_day_notes', note.day) };
+    }
     case 'morning': {
       // The post names the card `card`; the read-back says the same (NEWS-272).
       const item = await readMorningItem(pool, id);
       if (item === null) return null;
       const { kind: card, ...rest } = item;
-      return { ...rest, card };
+      return { ...rest, card, writtenBy: await writtenBy(pool, 'morning_items', id) };
     }
     default: {
       const unexpected: never = kind;

@@ -19,12 +19,13 @@ import {
   readUser,
   setUserPasswordHash,
 } from './userStore.js';
-import { testPool } from '../../testing/dashboardTestDb.js';
+import { ensureTestAgent, TEST_WRITER, testPool } from '../../testing/dashboardTestDb.js';
 
 before(async () => {
   const pool = testPool(process.env.INFORMED_NEWS_TEST_DATABASE_URL);
   try {
     await ensureDashboardSchema(pool);
+    await ensureTestAgent(pool);
   } finally {
     await pool.end();
   }
@@ -46,7 +47,7 @@ function user(pool: Pool, name = 'reader') {
 }
 
 function hub(pool: Pool, ownerUserId: string | null = null) {
-  return createStory(pool, {
+  return createStory(pool, TEST_WRITER, {
     role: 'hub',
     hubId: null,
     title: 'Hub',
@@ -147,7 +148,7 @@ test('a hub can be private to a user, and a story with no owner is shared', asyn
   const mine = await hub(pool, owner.id);
   assert.equal(mine.ownerUserId, owner.id);
   assert.deepEqual(await readStory(pool, mine.id), mine);
-  const shared = await createStory(pool, {
+  const shared = await createStory(pool, TEST_WRITER, {
     role: 'hub',
     hubId: null,
     title: 'Shared',
@@ -163,7 +164,7 @@ test('a private branch and a branch under a private hub are refused for now', as
   const sharedHub = await hub(pool);
   const privateHub = await hub(pool, owner.id);
   await assert.rejects(
-    createStory(pool, {
+    createStory(pool, TEST_WRITER, {
       role: 'branch',
       hubId: sharedHub.id,
       title: 'Branch',
@@ -173,7 +174,7 @@ test('a private branch and a branch under a private hub are refused for now', as
     /a branch cannot be private yet/,
   );
   await assert.rejects(
-    createStory(pool, {
+    createStory(pool, TEST_WRITER, {
       role: 'branch',
       hubId: privateHub.id,
       title: 'Branch',
@@ -181,7 +182,7 @@ test('a private branch and a branch under a private hub are refused for now', as
     }),
     /a branch cannot sit under a private hub yet/,
   );
-  const branch = await createStory(pool, {
+  const branch = await createStory(pool, TEST_WRITER, {
     role: 'branch',
     hubId: sharedHub.id,
     title: 'Branch',

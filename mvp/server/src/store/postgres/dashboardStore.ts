@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { checkMorningData } from './jsonShapes.js';
+import { writerParams, type Writer } from './writer.js';
 import { readFileSync } from 'node:fs';
 import { Pool, type PoolClient } from 'pg';
 import {
@@ -261,13 +262,13 @@ const FOREIGN_KEY_VIOLATION = '23503';
 
 /**
  * The version schema.sql brings a database to. NEWS-224 was 1, schema v2
- * (NEWS-240) was 2, accounts and read markers (NEWS-254) were 3, and the ingest
- * contract (NEWS-228) is 4. Bump it in the
+ * (NEWS-240) was 2, accounts and read markers (NEWS-254) were 3, the ingest
+ * contract (NEWS-228) was 4, and agents with written_by (NEWS-263) are 5. Bump it in the
  * same change as any edit to schema.sql: a database whose version row is
  * current runs nothing, so an edit without a bump never reaches it. A test
  * pins the file's hash to this number.
  */
-export const DASHBOARD_SCHEMA_VERSION = 4;
+export const DASHBOARD_SCHEMA_VERSION = 5;
 
 /**
  * The version a database records, or 0 when it has no version row yet (an
@@ -400,12 +401,13 @@ export async function checkPrivateStoryRules(client: PoolClient, record: StoryRe
 
 export async function createStory(
   pool: Pool,
+  writer: Writer,
   input: StoryInput & { id?: string | null },
 ): Promise<StoryRecord> {
   const record = prepareStory(input);
   await inTransaction(pool, async (client) => {
     await checkPrivateStoryRules(client, record);
-    await insertStory(client, record);
+    await insertStory(client, record, writer);
   }).catch((error: unknown) => {
     if (pgErrorCode(error) === FOREIGN_KEY_VIOLATION) {
       throw new DashboardStoreError('story refers to a missing hub or owner', {
@@ -418,10 +420,15 @@ export async function createStory(
   return record;
 }
 
-export const STORY_INSERT_SQL = `INSERT INTO stories (${STORY_COLUMNS})
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`;
+/**
+ * A new story records its writer as both its creator and its last writer
+ * (NEWS-263). An upsert's update leaves the creator as it was.
+ */
+export const STORY_INSERT_SQL = `INSERT INTO stories (${STORY_COLUMNS},
+       created_by_agent_id, created_by_user_id, written_by_agent_id, written_by_user_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $16, $17)`;
 
-export function storyParams(record: StoryRecord): unknown[] {
+export function storyParams(record: StoryRecord, writer: Writer): unknown[] {
   return [
     record.id,
     record.role,
@@ -438,11 +445,12 @@ export function storyParams(record: StoryRecord): unknown[] {
     record.sourcesNote,
     record.threadUrl,
     record.ownerUserId,
+    ...writerParams(writer),
   ];
 }
 
-async function insertStory(client: PoolClient, record: StoryRecord): Promise<void> {
-  await client.query(STORY_INSERT_SQL, storyParams(record));
+async function insertStory(client: PoolClient, record: StoryRecord, writer: Writer): Promise<void> {
+  await client.query(STORY_INSERT_SQL, storyParams(record, writer));
 }
 
 export async function readStory(db: Queryable, id: string): Promise<StoryRecord | null> {
@@ -536,11 +544,16 @@ export function prepareEntry(input: StoryEntryInput & { id?: string | null }): E
  * citation that points at a story source row and leaves out its URL or label
  * takes them from that row: the URL (which may be empty) and the outlet.
  */
-export async function insertEntry(client: PoolClient, draft: EntryDraft): Promise<StoryEntryRecord> {
+export async function insertEntry(
+  client: PoolClient,
+  draft: EntryDraft,
+  writer: Writer,
+): Promise<StoryEntryRecord> {
   await client.query(
     `INSERT INTO story_entries
-       (id, story_id, occurred_at, occurred_until, occurred_precision, headline, label, body, changes)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+       (id, story_id, occurred_at, occurred_until, occurred_precision, headline, label, body, changes,
+        written_by_agent_id, written_by_user_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
     [
       draft.id,
       draft.storyId,
@@ -551,6 +564,7 @@ export async function insertEntry(client: PoolClient, draft: EntryDraft): Promis
       draft.label,
       draft.body,
       draft.changes,
+      ...writerParams(writer),
     ],
   );
   const sources: EntrySourceRecord[] = [];
@@ -592,10 +606,11 @@ export async function insertEntry(client: PoolClient, draft: EntryDraft): Promis
 
 export async function createStoryEntry(
   pool: Pool,
+  writer: Writer,
   input: StoryEntryInput & { id?: string | null },
 ): Promise<StoryEntryRecord> {
   const draft = prepareEntry(input);
-  return inTransaction(pool, (client) => insertEntry(client, draft)).catch((error: unknown) => {
+  return inTransaction(pool, (client) => insertEntry(client, draft, writer)).catch((error: unknown) => {
     throw storeErrorFrom(error);
   });
 }
@@ -656,9 +671,14 @@ export function prepareMorningItem(input: MorningItemInput): MorningItemRecord {
   };
 }
 
-export async function insertMorningItem(db: Queryable, record: MorningItemRecord): Promise<void> {
+export async function insertMorningItem(
+  db: Queryable,
+  record: MorningItemRecord,
+  writer: Writer,
+): Promise<void> {
   await db.query(
-    'INSERT INTO morning_items (id, kind, body, link, posted_at, data) VALUES ($1, $2, $3, $4, $5, $6::jsonb)',
+    `INSERT INTO morning_items (id, kind, body, link, posted_at, data, written_by_agent_id, written_by_user_id)
+     VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8)`,
     [
       record.id,
       record.kind,
@@ -666,16 +686,18 @@ export async function insertMorningItem(db: Queryable, record: MorningItemRecord
       record.link,
       record.postedAt,
       record.data === null ? null : JSON.stringify(record.data),
+      ...writerParams(writer),
     ],
   );
 }
 
 export async function createMorningItem(
   pool: Pool,
+  writer: Writer,
   input: MorningItemInput,
 ): Promise<MorningItemRecord> {
   const record = prepareMorningItem(input);
-  await insertMorningItem(pool, record).catch((error: unknown) => {
+  await insertMorningItem(pool, record, writer).catch((error: unknown) => {
     throw storeErrorFrom(error);
   });
   return record;
@@ -723,10 +745,12 @@ export function prepareCfpRoundupItem(input: CfpRoundupItemInput): CfpRoundupIte
 export async function insertCfpRoundupItem(
   db: Queryable,
   record: CfpRoundupItemRecord,
+  writer: Writer,
 ): Promise<void> {
   await db.query(
-    `INSERT INTO cfp_roundup_items (id, roundup_at, title, url, topic, source_name, status)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+    `INSERT INTO cfp_roundup_items
+       (id, roundup_at, title, url, topic, source_name, status, written_by_agent_id, written_by_user_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
     [
       record.id,
       record.roundupAt,
@@ -735,16 +759,18 @@ export async function insertCfpRoundupItem(
       record.topic,
       record.sourceName,
       record.status,
+      ...writerParams(writer),
     ],
   );
 }
 
 export async function createCfpRoundupItem(
   pool: Pool,
+  writer: Writer,
   input: CfpRoundupItemInput,
 ): Promise<CfpRoundupItemRecord> {
   const record = prepareCfpRoundupItem(input);
-  await insertCfpRoundupItem(pool, record).catch((error: unknown) => {
+  await insertCfpRoundupItem(pool, record, writer).catch((error: unknown) => {
     throw storeErrorFrom(error);
   });
   return record;
@@ -809,6 +835,7 @@ export function prepareBreakingItem(input: BreakingItemInput): BreakingItemRecor
 export async function insertBreakingItem(
   client: PoolClient,
   record: BreakingItemRecord,
+  writer: Writer,
 ): Promise<void> {
   if (record.entryId !== null) {
     const entry = await client.query<{ story_id: string }>(
@@ -827,8 +854,9 @@ export async function insertBreakingItem(
   }
   await client.query(
     `INSERT INTO breaking_items
-       (id, occurred_at, headline, label, source_name, via, url, story_id, entry_id)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+       (id, occurred_at, headline, label, source_name, via, url, story_id, entry_id,
+        written_by_agent_id, written_by_user_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
     [
       record.id,
       record.occurredAt,
@@ -839,16 +867,18 @@ export async function insertBreakingItem(
       record.url,
       record.storyId,
       record.entryId,
+      ...writerParams(writer),
     ],
   );
 }
 
 export async function createBreakingItem(
   pool: Pool,
+  writer: Writer,
   input: BreakingItemInput,
 ): Promise<BreakingItemRecord> {
   const record = prepareBreakingItem(input);
-  await inTransaction(pool, (client) => insertBreakingItem(client, record)).catch(
+  await inTransaction(pool, (client) => insertBreakingItem(client, record, writer)).catch(
     (error: unknown) => {
       throw storeErrorFrom(error);
     },
@@ -896,14 +926,22 @@ export function prepareCfpDayNote(input: {
  * The CFP footer for one day. Setting a day again replaces its note. Returns
  * whether a row was written: false when the day already held the same note.
  */
-export async function writeCfpDayNote(db: Queryable, record: CfpDayNoteRecord): Promise<boolean> {
+export async function writeCfpDayNote(
+  db: Queryable,
+  record: CfpDayNoteRecord,
+  writer: Writer,
+): Promise<boolean> {
+  // The writer changes only with the note: the same note again keeps its writer.
   const result = await db.query(
-    `INSERT INTO cfp_day_notes (day, still_working, dropped) VALUES ($1, $2, $3)
+    `INSERT INTO cfp_day_notes (day, still_working, dropped, written_by_agent_id, written_by_user_id)
+     VALUES ($1, $2, $3, $4, $5)
      ON CONFLICT (day) DO UPDATE
-       SET still_working = EXCLUDED.still_working, dropped = EXCLUDED.dropped
+       SET still_working = EXCLUDED.still_working, dropped = EXCLUDED.dropped,
+           written_by_agent_id = EXCLUDED.written_by_agent_id,
+           written_by_user_id = EXCLUDED.written_by_user_id
        WHERE (cfp_day_notes.still_working, cfp_day_notes.dropped)
          IS DISTINCT FROM (EXCLUDED.still_working, EXCLUDED.dropped)`,
-    [record.day, record.stillWorking, record.dropped],
+    [record.day, record.stillWorking, record.dropped, ...writerParams(writer)],
   );
   return result.rowCount === 1;
 }
@@ -911,10 +949,11 @@ export async function writeCfpDayNote(db: Queryable, record: CfpDayNoteRecord): 
 /** The CFP footer for one day. Setting a day again replaces its note. */
 export async function setCfpDayNote(
   pool: Pool,
+  writer: Writer,
   input: { day: string; stillWorking: string | null; dropped: string | null },
 ): Promise<CfpDayNoteRecord> {
   const record = prepareCfpDayNote(input);
-  await writeCfpDayNote(pool, record);
+  await writeCfpDayNote(pool, record, writer);
   return record;
 }
 

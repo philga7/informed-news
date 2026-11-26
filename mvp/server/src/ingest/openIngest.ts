@@ -5,17 +5,15 @@ import { pgErrorCode } from '../store/postgres/storeSupport.js';
 
 type Log = (message: string) => void;
 
-/** A shorter token is refused as too easy to guess. */
-export const INGEST_TOKEN_MIN_LENGTH = 32;
 const CONNECT_TIMEOUT_MS = 3_000;
 
 /**
- * What the ingest route needs (NEWS-228). `token` is null when INGEST_TOKEN is
- * unset or too short; `pool` is null when the env file does not configure
- * Postgres. The route answers 503 in either case, and the server still starts.
+ * What the ingest route needs. `pool` is null when the env file does not
+ * configure Postgres; the route then answers 503, and the server still starts.
+ * Each agent signs in with its own token, looked up in the `agents` table
+ * (NEWS-263), so there is no token in the env file.
  */
 export type IngestConfig = {
-  token: string | null;
   pool: Pool | null;
   /** Applies the dashboard schema once. A failure is retried on the next call. */
   ready: () => Promise<void>;
@@ -29,35 +27,27 @@ export function openIngest(
   const warn = options.warn ?? ((message) => console.error(message));
   const createPool = options.createPool ?? ((config: PoolConfig) => new PgPool(config));
 
-  const raw = env.INGEST_TOKEN?.trim() ?? '';
-  let token: string | null = null;
-  if (raw === '') {
-    log('Ingest off: INGEST_TOKEN is not set');
-  } else if (raw.length < INGEST_TOKEN_MIN_LENGTH) {
-    warn(`Ingest off: INGEST_TOKEN must be at least ${INGEST_TOKEN_MIN_LENGTH} characters`);
-  } else {
-    token = raw;
+  // Retired by NEWS-263. Its value is never read or logged; agents have their own tokens now.
+  if (env.INGEST_TOKEN?.trim()) {
+    warn('INGEST_TOKEN is set but no longer used: remove it from the env file. Agents use their own tokens (npm run agents).');
   }
 
   let pool: Pool | null = null;
-  if (token !== null) {
-    try {
-      pool = openDashboardPool(env, (config) =>
-        createPool({ ...config, connectionTimeoutMillis: CONNECT_TIMEOUT_MS }),
-      );
-      // An idle client that loses its connection emits 'error'; unhandled, it would crash the server.
-      // Only the error's code is logged: a driver message can carry values.
-      pool.on('error', (err) => warn(`Ingest Postgres pool error (${pgErrorCode(err) ?? err.name})`));
-      log('Ingest on');
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      log(`Ingest off (${message})`);
-    }
+  try {
+    pool = openDashboardPool(env, (config) =>
+      createPool({ ...config, connectionTimeoutMillis: CONNECT_TIMEOUT_MS }),
+    );
+    // An idle client that loses its connection emits 'error'; unhandled, it would crash the server.
+    // Only the error's code is logged: a driver message can carry values.
+    pool.on('error', (err) => warn(`Ingest Postgres pool error (${pgErrorCode(err) ?? err.name})`));
+    log('Ingest on');
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    log(`Ingest off (${message})`);
   }
 
   let applied: Promise<void> | null = null;
   return {
-    token,
     pool,
     ready: () => {
       if (pool === null) return Promise.reject(new Error('no database'));

@@ -1,16 +1,18 @@
-import { createHash, timingSafeEqual } from 'node:crypto';
 import express, { Router, type ErrorRequestHandler, type Request, type RequestHandler } from 'express';
 import type { Pool } from 'pg';
+import { findAgentByTokenHash } from '../store/postgres/agentStore.js';
 import { readIngested } from '../store/postgres/ingestStore.js';
 import { DashboardStoreError, pgErrorCode } from '../store/postgres/storeSupport.js';
+import type { Writer } from '../store/postgres/writer.js';
+import { hashAgentToken, looksLikeAgentToken, sameTokenHash } from './agentToken.js';
 import type { IngestConfig } from './openIngest.js';
 import { IngestInputError, LIMITS, isIngestKind, parseItem, type ParsedItem } from './parse.js';
 
 /**
- * The ingest contract (NEWS-228): one authenticated route for everything
- * Grok Bot posts, and a read-back. Mounted at /api/ingest ahead of the JSON
- * parser and the session guard: a bot signs in with its token, never a
- * session. The contract is documented in docs/INGEST.md.
+ * The ingest contract (NEWS-228): one authenticated route for everything an
+ * agent posts, and a read-back. Mounted at /api/ingest ahead of the JSON
+ * parser and the session guard: an agent signs in with its own token, never a
+ * session (NEWS-263). The contract is documented in docs/INGEST.md.
  */
 
 type Logger = (message: string) => void;
@@ -26,10 +28,6 @@ type ItemResult = {
 };
 
 const STATUS_BY_REASON = { invalid: 422, missing: 422, conflict: 409 } as const;
-
-function digest(value: string): Buffer {
-  return createHash('sha256').update(value, 'utf8').digest();
-}
 
 function bearer(req: Request): string | null {
   const header = req.get('authorization') ?? '';
@@ -83,11 +81,16 @@ function parseOrFail(value: unknown, warn: Logger): ParsedItem | ItemResult {
   }
 }
 
-async function runParsed(pool: Pool, parsed: ParsedItem | ItemResult, warn: Logger): Promise<ItemResult> {
+async function runParsed(
+  pool: Pool,
+  writer: Writer,
+  parsed: ParsedItem | ItemResult,
+  warn: Logger,
+): Promise<ItemResult> {
   if (!('put' in parsed)) return parsed;
   const named = { kind: parsed.kind, id: parsed.id };
   try {
-    const result = await parsed.put(pool);
+    const result = await parsed.put(pool, writer);
     return { ...named, id: result.id, status: result.outcome === 'created' ? 201 : 200, outcome: result.outcome };
   } catch (error) {
     return { ...named, ...failure(error, warn, `${parsed.kind} put`) };
@@ -100,23 +103,44 @@ export function createIngestRouter(
 ): Router {
   const warn = options.warn ?? ((message) => console.error(message));
   const router = Router();
-  const expected = config?.token ? digest(config.token) : null;
+  const refuse: (res: express.Response) => void = (res) => {
+    res.status(401).set('WWW-Authenticate', 'Bearer').json({ error: 'a valid ingest token is required' });
+  };
 
-  const guard: RequestHandler = (req, res, next) => {
-    if (expected === null) {
-      res.status(503).json({ error: 'ingest is not configured (INGEST_TOKEN)', reason: 'unavailable' });
-      return;
-    }
+  // A missing or malformed token is refused before anything else, without a
+  // database call. Agents are looked up once the schema is ready.
+  const tokenShape: RequestHandler = (req, res, next) => {
     const given = bearer(req);
-    if (given === null || !timingSafeEqual(digest(given), expected)) {
-      res.status(401).set('WWW-Authenticate', 'Bearer').json({ error: 'a valid ingest token is required' });
+    if (given === null || !looksLikeAgentToken(given)) {
+      refuse(res);
       return;
     }
     if (!config?.pool) {
       res.status(503).json({ error: 'ingest has no database configured', reason: 'unavailable' });
       return;
     }
+    res.locals.ingestTokenHash = hashAgentToken(given);
     next();
+  };
+
+  // The token is looked up by its hash, and the stored hash compared in
+  // constant time. An unknown token and a disabled agent get the same 401.
+  const agent: RequestHandler = (_req, res, next) => {
+    const hash = res.locals.ingestTokenHash as string;
+    findAgentByTokenHash(config?.pool as Pool, hash).then(
+      (found) => {
+        if (found === null || !found.enabled || !sameTokenHash(found.tokenHash, hash)) {
+          refuse(res);
+          return;
+        }
+        res.locals.ingestAgentId = found.id;
+        next();
+      },
+      (error: unknown) => {
+        const { status, ...rest } = failure(error, warn, 'token lookup');
+        res.status(status).json(rest);
+      },
+    );
   };
 
   const schemaReady: RequestHandler = (_req, res, next) => {
@@ -131,19 +155,21 @@ export function createIngestRouter(
 
   // The token is checked before the body is read, so an unauthenticated caller
   // cannot make the server parse a large body.
-  router.use(guard);
-  router.use(express.json({ limit: '1mb' }));
+  router.use(tokenShape);
   router.use(schemaReady);
+  router.use(agent);
+  router.use(express.json({ limit: '1mb' }));
 
   router.post('/', async (req, res) => {
     const pool = config?.pool as Pool;
+    const writer: Writer = { agentId: res.locals.ingestAgentId as string };
     const body: unknown = req.body;
     const batch =
       typeof body === 'object' && body !== null && !Array.isArray(body) && 'items' in body
         ? (body as { items: unknown }).items
         : undefined;
     if (batch === undefined) {
-      const result = await runParsed(pool, parseOrFail(body, warn), warn);
+      const result = await runParsed(pool, writer, parseOrFail(body, warn), warn);
       const { status, ...rest } = result;
       res.status(status).json(rest);
       return;
@@ -169,7 +195,7 @@ export function createIngestRouter(
     // In order, each in its own transaction: an entry can follow its story in one batch.
     const results: ItemResult[] = [];
     for (const [index, item] of parsed.entries()) {
-      results.push({ index, ...(await runParsed(pool, item, warn)) });
+      results.push({ index, ...(await runParsed(pool, writer, item, warn)) });
     }
     res.status(200).json({ results });
   });
@@ -181,7 +207,9 @@ export function createIngestRouter(
       return;
     }
     try {
-      const found = await readIngested(config?.pool as Pool, kind, id ?? '');
+      const found = await readIngested(config?.pool as Pool, kind, id ?? '', {
+        agentId: res.locals.ingestAgentId as string,
+      });
       if (found === null) {
         res.status(404).json({ error: `no ${kind} with this id` });
         return;

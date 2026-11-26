@@ -27,7 +27,7 @@ const ENTRY = (id: string, body: string | null) =>
   `INSERT INTO story_entries (id, story_id, occurred_at, occurred_precision, headline, label, body)
    VALUES ('${id}', 's1', '2026-11-23T00:00:00Z', 'day', 'Headline', 'reported', ${body === null ? 'NULL' : `'${body}'`})`;
 
-test('v4 applies over a v3 database with rows, keeps them, and records version 4', async (t) => {
+test('v4 applies over a v3 database with rows, keeps them, and records the current version', async (t) => {
   const pool = await scratch(t);
   await pool.query(v3Sql());
   await pool.query('INSERT INTO dashboard_schema_version (version) VALUES (3)');
@@ -40,9 +40,8 @@ test('v4 applies over a v3 database with rows, keeps them, and records version 4
 
   await ensureDashboardSchema(pool);
 
-  assert.equal(DASHBOARD_SCHEMA_VERSION, 4);
   const version = await pool.query<{ version: number }>('SELECT version FROM dashboard_schema_version');
-  assert.deepEqual(version.rows, [{ version: 4 }]);
+  assert.deepEqual(version.rows, [{ version: DASHBOARD_SCHEMA_VERSION }]);
   const kept = await pool.query<{ body: string }>(`SELECT body FROM story_entries WHERE id = 'e1'`);
   assert.deepEqual(kept.rows, [{ body: 'Kept body' }]);
   await ensureDashboardSchema(pool);
