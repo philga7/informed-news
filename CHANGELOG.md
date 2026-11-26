@@ -1,3 +1,9 @@
+## [0.48.0](https://github.com/philga7/informed-news/compare/v0.47.0...v0.48.0) (2026-11-26)
+
+### Features
+
+* **NEWS-225, NEWS-219, NEWS-223:** add the dashboard home shell with follow, hide, and refresh status ([#305](https://github.com/philga7/informed-news/issues/305)) ([3c6b09d](https://github.com/philga7/informed-news/commit/3c6b09d89348ac328921ecbda3754a96230b6532))
+
 ## [0.47.0](https://github.com/philga7/informed-news/compare/v0.46.1...v0.47.0) (2026-11-26)
 
 ### Features
