@@ -6,12 +6,12 @@ Binding choices for Informed News. Newest first. When one of these changes, upda
 
 **Decision:** Grok Bot exports its own pages and posts in the contract's JSON ([INGEST.md](INGEST.md), and [2026-11-24](#2026-11-24--agent-contract-user-api-deletes-moving-stories-and-hosting-news-262)). Its export brief of 2026-11-25 maps every Status, Strength, Tag and confidence value found on its 31 Developing Pages to the eight labels, following Phil's evidence standard (Oct 25). Phil approved that mapping on 2026-11-25 with one fix (Official assessment and Official attribution map to `on_record`, or `working` when unverified, not `official`), and answered the brief's open questions about the Morning cards the same day. The tables below are the mapping of record. Nothing here changes code, the schema, or the contract.
 
-Rows marked **Δ** differ from, or add to, the table in [2026-11-16 — Status labels are a fixed list](#2026-11-16--status-labels-are-a-fixed-list-news-238). Labels are written in the stored lowercase form. Emoji and trailing source notes on a page value are ignored.
+In the first two tables, rows marked **Δ** differ from, or add to, the table in [2026-11-16 — Status labels are a fixed list](#2026-11-16--status-labels-are-a-fixed-list-news-238). Labels are written in the stored lowercase form. Emoji and trailing source notes on a page value are ignored. The Story status table is new in full except for its Developing and Working (branch) values.
 
 The rules behind the tables:
 
 - **Unconfirmed** maps to `single_outlet` when one outlet has it, `working` when some evidence exists but is not verified, and `claim_no_evidence_shown` only when no supporting evidence is shown.
-- **Debunked** maps to `official` only, with the refuting record linked in the entry's `sources`, and the headline says the claim was refuted. An outlet's or fact-checker's verdict alone, or a denial by the party involved, is not a refutation: the claim is labeled by its own basis, and the headline does not say "refuted". A court dismissal on procedure (standing, timing, jurisdiction) is never a refutation. Polls never confirm or refute a count.
+- **Debunked** maps to the label of the record that refutes it, with that record linked in the entry's `sources`, and the headline says the claim was refuted: `official` for an official record or filing, and `official_ruling` when a court or official body decided it on the merits. It is never `reported` or `single_outlet`. An outlet's or fact-checker's verdict alone, or a denial by the party involved, is not a refutation: the claim is labeled by its own basis, and the headline does not say "refuted". A court dismissal on procedure (standing, timing, jurisdiction) is never a refutation. Polls never confirm or refute a count.
 - **Inferring a label.** A label is inferred whenever it is not a straight lookup of a value on that row: a timeline row with no tag, a "Confirmed" whose basis has to be read from the sources, or an Unconfirmed that has to be split three ways. When two labels fit, the weaker one is used (`working` over `reported`, `single_outlet` over `reported`, and `claim_no_evidence_shown` only when nothing supporting is shown). A label the page's evidence does not support is never used. Every inferred label is flagged in the export's sidecar notes, since the JSON carries no flag.
 
 **Claims tracker `Status` and 5W1H `Strength` values:**
@@ -28,7 +28,7 @@ The rules behind the tables:
 | Confirmed, with context or caveat; `Arithmetic confirmed` | the label for what confirms it, with the caveat kept in the text | Δ |
 | Partly confirmed, Confirmed in part, Partly documented | `working` | Δ |
 | Working, Working (single-outlet package) | `working` | |
-| Reported | `reported` if two or more outlets, else `single_outlet` | |
+| Reported, Reported record | `reported` if two or more outlets, else `single_outlet` | |
 | Reported and assessed, Assessed | `working` | Δ |
 | Unconfirmed, with one outlet | `single_outlet` | |
 | Unconfirmed, with some evidence that isn't verified (`Unconfirmed (clip only)`, an excerpt, an official claim not yet checked) | `working` | Δ |
@@ -48,7 +48,7 @@ The rules behind the tables:
 | Charged | `official` (the charging document); the conduct stays an allegation in the text | Δ |
 | Denied by AG, `government claims`, `critic claim` with quotes | `on_record` | Δ |
 | `critic claim` with no quotes or evidence | `claim_no_evidence_shown` | Δ |
-| Debunked, Refuted, Not holding up, Not borne out, `Debunked as prediction`, with the refuting record linked | `official`; the headline says the claim was refuted | Δ |
+| Debunked, Refuted, Not holding up, Not borne out, `Debunked as prediction`, with the refuting record linked | `official`, or `official_ruling` when a court or official body decided it on the merits; the headline says the claim was refuted | Δ |
 | Debunked (and the rest of that row) where the refutation is an outlet or fact-checker verdict only | not a refutation: label by the claim's own basis | Δ |
 | Inaccurate wording, Misstated, Imprecise, Misattributed | the label for what the correction rests on (`official` for a record, `reported` for two or more outlets, `single_outlet` for one); the headline names the error | Δ |
 | `vendor-attributed` (security vendor names an actor) | `working` | Δ |
@@ -96,13 +96,13 @@ This supersedes these rows of the "Mapping from the values on Grok Bot's static 
 - **Confirmed** ("Official, On record, or Reported, by what confirms it"): confirmation by one outlet only is `single_outlet`, and the other Confirmed variants map as in the first table above.
 - **Reported, Reported record** ("Reported"): `reported` only when two or more outlets have it; one outlet is `single_outlet`.
 - **Unconfirmed** ("Single outlet if one outlet reports it; otherwise Claim · no evidence shown"): unverified evidence is now `working`, and `claim_no_evidence_shown` is only for no supporting evidence shown.
-- **Debunked** ("Label by the basis of the refutation (Official or Reported)"): `official` only, with the refuting record linked. A Reported refutation (an outlet's or fact-checker's verdict) is not a refutation.
+- **Debunked** ("Label by the basis of the refutation (Official or Reported)"): `official`, or `official_ruling` for a decision on the merits, with the refuting record linked. A Reported refutation (an outlet's or fact-checker's verdict) is not a refutation.
 
 The **Official allegation** row is extended, not superseded: `on_record` with the caveat kept stands, and an unverified official allegation, assessment or attribution is `working`.
 
 **Why:** The 2026-11-16 table was written from a sample of page values. The export brief read every value on all 31 pages, and some of them did not fit that table. One mapping of record means every export labels the same page value the same way, and Claude can check an export's labels against the repo rather than a brief outside it. Phil's evidence standard sets the direction of each change: a single outlet is never `reported`, and a refutation has to rest on a record, not a verdict. Taking the weaker label when inferring keeps a label from claiming more than the page shows, which fits the rule in [AGENTS.md](../AGENTS.md) that the product shows status and evidence, not verdicts. The Morning answers settle who writes each card and which source the Weather grid uses, so a fixture and a live post come from the same place.
 
-**What it rules out:** A Debunked label (still); calling a claim refuted on an outlet's or fact-checker's verdict, a denial, a procedural dismissal or a poll; `reported` for a single outlet; `official` for an official assessment or attribution; a label the page's evidence does not support; an inferred label left unflagged in the sidecar notes; entries for page values that are not labels (Analysis, Commentary, Dormant, Retired and the like); a CFP `confirmed` status before NEWS-270 ships; dropping a Market quote's `value`; a Weather grid from any source but ECMWF; an export that sends both a `note` and an `alert` for one location; and any code, schema or contract change in this change.
+**What it rules out:** A Debunked label (still); a refutation labeled `reported` or `single_outlet`; calling a claim refuted on an outlet's or fact-checker's verdict, a denial, a procedural dismissal or a poll; `reported` for a single outlet; `official` for an official assessment or attribution; a label the page's evidence does not support; an inferred label left unflagged in the sidecar notes; entries for page values that are not labels (Analysis, Commentary, Dormant, Retired and the like); a CFP `confirmed` status before NEWS-270 ships; dropping a Market quote's `value`; a Weather grid from any source but ECMWF; an export that sends both a `note` and an `alert` for one location; and any code, schema or contract change in this change.
 
 ## 2026-11-24 — Agent contract, user API, deletes, moving stories, and hosting (NEWS-262)
 

@@ -170,14 +170,13 @@ A Breaking item may point at a private story. Users other than its owner and the
         { "high": 50, "low": 39 },
         { "high": 53, "low": 27 }
       ],
-      "note": "Fri night 35, patchy frost (NWS)",
       "alert": "Freeze Watch: lows to 29, 2-8 AM Sat"
     }
   ]
 }
 ```
 
-`unit` is `F` or `C`. `days` holds 1 to 10 dates, and each location has one high and low per day, in the same order. There are 1 to 12 locations. `now`, `alertsAt`, `note` and `alert` are optional.
+`unit` is `F` or `C`. `days` holds 1 to 10 dates, and each location has one high and low per day, in the same order. There are 1 to 12 locations. `now`, `alertsAt`, `note` and `alert` are optional. The card shows `alert` in amber in the place of `note`, so Grok Bot's export sends at most one of the two per location ([DECISIONS.md](DECISIONS.md#2026-11-25--label-mapping-for-every-page-value-and-the-morning-export-answers-news-269)); the contract accepts both.
 
 **Market** `data`: `{ "quotes": [ { "label": "S&P", "value": 7520.93, "changePct": -0.38 } ], "notes": ["Needs attention: SPG, RSI 79.6, trim candidate."] }`. There are 1 to 20 quotes, `changePct` is optional, and there are up to 6 notes.
 
