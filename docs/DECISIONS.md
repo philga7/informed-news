@@ -2,6 +2,109 @@
 
 Binding choices for Informed News. Newest first. When one of these changes, update this file in the same change as [ROADMAP.md](ROADMAP.md) and Jira. What the product does now, in plain language, is [PRODUCT_SPEC.md](PRODUCT_SPEC.md). Pipeline detail remains in [NEWS-84](https://informedcrew.atlassian.net/browse/NEWS-84), [TRIAGE.md](TRIAGE.md), and [BRIEF.md](BRIEF.md). The target is [VISION.md](VISION.md).
 
+## 2026-11-25 — Label mapping for every page value, and the Morning export answers (NEWS-269)
+
+**Decision:** Grok Bot exports its own pages and posts in the contract's JSON ([INGEST.md](INGEST.md), and [2026-11-24](#2026-11-24--agent-contract-user-api-deletes-moving-stories-and-hosting-news-262)). Its export brief of 2026-11-25 maps every Status, Strength, Tag and confidence value found on its 31 Developing Pages to the eight labels, following Phil's evidence standard (Oct 25). Phil approved that mapping on 2026-11-25 with two changes: Official assessment and Official attribution map to `on_record`, or `working` when unverified, not `official`; and Debunked maps by the record that refutes it (`official`, or `official_ruling` for a decision on the merits), not to `official` only. He also answered the brief's open questions about the Morning cards the same day. The tables below are the mapping of record. Nothing here changes code, the schema, or the contract.
+
+In the first two tables, rows marked **Δ** map to a label the table in [2026-11-16 — Status labels are a fixed list](#2026-11-16--status-labels-are-a-fixed-list-news-238) did not give that value, or cover a value it did not map. A row that only names more page values for a mapping that table already had is not marked. Labels are written in the stored lowercase form. Emoji and trailing source notes on a page value are ignored. The Story status table is new in full except for its Developing and Working (branch) values.
+
+The rules behind the tables:
+
+- **Unconfirmed** maps to `single_outlet` when one outlet has it, `working` when some evidence exists but is not verified, and `claim_no_evidence_shown` only when no supporting evidence is shown.
+- **Debunked** maps to the label of the record that refutes it, with that record linked in the entry's `sources`, and the headline says the claim was refuted: `official` for an official record or filing, and `official_ruling` when a court or official body decided it on the merits. It is never `reported` or `single_outlet`. An outlet's or fact-checker's verdict alone, or a denial by the party involved, is not a refutation: the claim is labeled by its own basis, and the headline does not say "refuted". A court dismissal on procedure (standing, timing, jurisdiction) is never a refutation. Polls never confirm or refute a count.
+- **Inferring a label.** A label is inferred whenever it is not a straight lookup of a value on that row: a timeline row with no tag, a "Confirmed" whose basis has to be read from the sources, or an Unconfirmed that has to be split three ways. When two labels fit, the weaker one is used (`working` over `reported`, `single_outlet` over `reported`, and `claim_no_evidence_shown` only when nothing supporting is shown). A label the page's evidence does not support is never used. Every inferred label is flagged in the export's sidecar notes, since the JSON carries no flag.
+
+**Claims tracker `Status` and 5W1H `Strength` values:**
+
+| Page value (and variants) | Maps to | Δ |
+|---|---|---|
+| Confirmed, backed by a court order or ruling | `official_ruling` | Δ |
+| Confirmed, backed by an official record, filing, docket, release, Federal Register, 8-K, House Clerk or roll call, official text | `official` | |
+| Confirmed, backed by the person's own words (transcript, X post, Truth Social, video, victim disclosure, company or newsroom statement) | `on_record` | |
+| Confirmed, backed by two or more outlets with separate sourcing (AP and Reuters, wire and mainstream) | `reported` | |
+| Confirmed, backed by one outlet only (`Confirmed (NBC)`, `Confirmed (wire)`, `confirmed (single outlet…)`) | `single_outlet` | Δ |
+| Confirmed as statement(s), as a letter, as a poll result; `Statements confirmed` | `on_record` (the statement is confirmed, not its content) | Δ |
+| Confirmed as order (an order that is not a court ruling; a court order is the first row); `Confirmed charge` | `official` (keep "conduct is an allegation" in the text) | Δ |
+| Confirmed, with context or caveat; `Arithmetic confirmed` | the label for what confirms it, with the caveat kept in the text | Δ |
+| Partly confirmed, Confirmed in part, Partly documented | `working` | Δ |
+| Working, Working (single-outlet package) | `working` | |
+| Reported, Reported record | `reported` if two or more outlets, else `single_outlet` | Δ |
+| Reported and assessed, Assessed | `working` | Δ |
+| Unconfirmed, with one outlet | `single_outlet` | |
+| Unconfirmed, with some evidence that isn't verified (`Unconfirmed (clip only)`, an excerpt, an official claim not yet checked) | `working` | Δ |
+| Unconfirmed, with no supporting evidence shown; `Unconfirmed / rhetoric`; `Unconfirmed; contrary legal record` | `claim_no_evidence_shown` | Δ |
+| Partisan claim, Partisan framing, `Partisan claim. No supporting evidence shown.` | `claim_no_evidence_shown`; `claim_no_new_evidence` when it repeats an earlier claim with nothing new | |
+| Partisan legal claim, Contested legal view, Legal opinion, `legal analysis` (one firm or blog) | `on_record` if a named person or firm said it; else `claim_no_evidence_shown` | Δ |
+| Speculation, Advocacy only | `claim_no_evidence_shown` | Δ |
+| Proposal, not a fact claim | `on_record` (the person proposed it) | Δ |
+| Official allegation | `on_record`, with the caveat kept in the text | |
+| Official allegation, unverified; Official claim (Working as to delivery) | `working` | Δ |
+| Official assessment, Official attribution | `on_record`, or `working` when unverified (the same as an official allegation) | Δ |
+| Official finding | `official_ruling` | |
+| Documented fact | `official` | |
+| Allegation; no evidence public yet; `No supporting evidence shown of …`; Not shown | `claim_no_evidence_shown` | Δ |
+| Stated motives / positions / aims (contested, both contested, contested by Pentagon); Motives contested | `on_record`; the dispute goes in the text | Δ |
+| Contested, `Contested motive; act itself Confirmed` | `working` | |
+| Charged | `official` (the charging document); the conduct stays an allegation in the text | Δ |
+| Denied by AG, `government claims`, `critic claim` with quotes | `on_record` | Δ |
+| `critic claim` with no quotes or evidence | `claim_no_evidence_shown` | Δ |
+| Debunked, Refuted, Not holding up, Not borne out, `Debunked as prediction`, with the refuting record linked | `official`, or `official_ruling` when a court or official body decided it on the merits; the headline says the claim was refuted | Δ |
+| Debunked (and the rest of that row) where the refutation is an outlet or fact-checker verdict only | not a refutation: label by the claim's own basis | Δ |
+| Inaccurate wording, Misstated, Imprecise, Misattributed | the label for what the correction rests on (`official` for a record, `reported` for two or more outlets, `single_outlet` for one); the headline names the error | Δ |
+| `vendor-attributed` (security vendor names an actor) | `working` | Δ |
+| Dormant, Clarify, Retired, `resolved: stale lead`, `consistent_with_precedent` | not a label: no entry | Δ |
+
+**Timeline `Tag` values and story-file `confidence` values** (a `Reported` or `Reported record` tag maps as in the first table, and the Single source / Partly reported row below also applies to those values as a Strength):
+
+| Page value | Maps to | Δ |
+|---|---|---|
+| Court order, Court order independently reported | `official_ruling` | |
+| Official; Official statement or briefing (wire, reported, via major outlets); Official data or market data; Official video posted; Official listing; Official, local; Official (settlement terms); Tracker; Congressional; Court record, filing or docket; County or House record; DOJ statement | `official` | |
+| Official, and working status check (any "and working status check" variant) | `working` | Δ |
+| Working status check | `working` | |
+| Truth Social, Video, Self-reported, `post confirmed via X API`, `Her account; no … readout shown`, Settlement terms as released by one party | `on_record` | |
+| Wire, Major outlet, Independent reporting, Trade press | `reported` if two or more outlets, else `single_outlet` | Δ |
+| Single source, Single-source, Partly reported, Unnamed sources, Anonymous sources via X post, Trade press unnamed execs | `single_outlet`; `reported` only if two or more outlets have it separately | Δ |
+| Partisan, forum | `claim_no_evidence_shown` | |
+| No filing or release | `claim_no_evidence_shown` | Δ |
+| Analysis, Independent analysis of official data, Commentary, Historical | not an update: no entry (Historical: label by the record it rests on, if exported) | Δ |
+| Rumor | `claim_no_evidence_shown` | |
+
+**Story status** (the page's `Status` badge):
+
+| Page value | Story `status` |
+|---|---|
+| Developing; Working (branch) | `developing` ("weekly checks" and the like go in `cadence`) |
+| Active; Active, slow; Active / Developing; Post-election: counting, certification, recounts | `active` |
+| Developing: referred to committee (stalled); Dormant | `stalled` |
+| Waiting on a set date (Fed meeting; `Cert granted; argument Dec 2, 2026`) | `waiting` |
+| Retired; Lifted … recovery underway (closed) | not moved; ask Phil |
+
+**CFP status:** `(working)` is `working` and `(unconfirmed)` is `unconfirmed`. `(confirmed)` becomes `confirmed` once [NEWS-270](https://informedcrew.atlassian.net/browse/NEWS-270) adds that status; until then the export leaves `status` out for a confirmed item.
+
+**Breaking:** a Breaking post's flag is already one of the eight (`Official ruling` is `official_ruling`, and so on). If it is not, the tables above apply.
+
+**The Morning export answers:**
+
+- **BLUF** is written last each morning by informed-news Bot, from the other three cards and Breaking. Until it is, fixtures keep the mock BLUF, flagged `mock value` in the export's sidecar notes (the JSON has no field for it).
+- **OSINT** is one combined card, as the mockup shows. Its line is written by the intel desk bot.
+- **Weather:** the grid (highs, lows, rain chance) comes from ECMWF, the source the mockup's card names. The post's NWS wording stays in `body`, which the card does not show. The card shows a location's `alert` (an NWS watch, warning or advisory) in amber, in the place where a `note` would go, so an export sends at most one of the two per location. The contract still accepts both.
+- **Market:** a quote's `value` stays required, so the export sends the real value. The card shows only what the mockup shows: S&P with value and change, Nasdaq with change only, and VIX with value only.
+
+This supersedes these rows of the "Mapping from the values on Grok Bot's static pages" table in [2026-11-16 — Status labels are a fixed list](#2026-11-16--status-labels-are-a-fixed-list-news-238). That entry stays as the record of what was written then, and its other rows, label list, meanings and tones stand.
+
+- **Confirmed** ("Official, On record, or Reported, by what confirms it"): confirmation by one outlet only is `single_outlet`, and the other Confirmed variants map as in the first table above.
+- **Reported, Reported record** ("Reported"): `reported` only when two or more outlets have it; one outlet is `single_outlet`.
+- **Partly reported, single-source** ("Single outlet"): still `single_outlet`, but `reported` when two or more outlets have it separately.
+- **Unconfirmed** ("Single outlet if one outlet reports it; otherwise Claim · no evidence shown"): unverified evidence is now `working`, and `claim_no_evidence_shown` is only for no supporting evidence shown.
+- **Debunked** ("Label by the basis of the refutation (Official or Reported)"): `official`, or `official_ruling` for a decision on the merits, with the refuting record linked. A Reported refutation (an outlet's or fact-checker's verdict) is not a refutation.
+
+The **Official allegation** row is extended, not superseded: `on_record` with the caveat kept stands, and an unverified official allegation, assessment or attribution is `working`.
+
+**Why:** The 2026-11-16 table was written from a sample of page values. The export brief read every value on all 31 pages, and some of them did not fit that table. One mapping of record means every export labels the same page value the same way, and Claude can check an export's labels against the repo rather than a brief outside it. Phil's evidence standard sets the direction of each change: a single outlet is never `reported`, and a refutation has to rest on a record, not a verdict. Taking the weaker label when inferring keeps a label from claiming more than the page shows, which fits the rule in [AGENTS.md](../AGENTS.md) that the product shows status and evidence, not verdicts. The Morning answers settle who writes each card and which source the Weather grid uses, so a fixture and a live post come from the same place.
+
+**What it rules out:** A Debunked label (still); a refutation labeled `reported` or `single_outlet`; calling a claim refuted on an outlet's or fact-checker's verdict, a denial, a procedural dismissal or a poll; `reported` for a single outlet; `official` for an official assessment or attribution; a label the page's evidence does not support; an inferred label left unflagged in the sidecar notes; entries for page values that are not labels (Analysis, Commentary, Dormant, Retired and the like); a CFP `confirmed` status before NEWS-270 ships; dropping a Market quote's `value`; a Weather grid from any source but ECMWF; an export that sends both a `note` and an `alert` for one location; and any code, schema or contract change in this change.
+
 ## 2026-11-24 — Agent contract, user API, deletes, moving stories, and hosting (NEWS-262)
 
 **Decision:** Phil set this direction on 2026-11-24, after the first seed fixtures shipped, and took every recommended answer to its open questions the same day. Nothing here changes code, the schema, or the contract as built. The parts marked as a follow-up are built by their own tickets ([ROADMAP.md](ROADMAP.md#ui-build-sequence-2026-11-16) rows 5a, 5b, and 5c, plus two tickets outside the sequence).
