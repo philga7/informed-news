@@ -1,3 +1,9 @@
+## [0.46.1](https://github.com/philga7/informed-news/compare/v0.46.0...v0.46.1) (2026-11-26)
+
+### Bug Fixes
+
+* **NEWS-272, NEWS-273:** ingest read-back card field and 422 missing error text ([#302](https://github.com/philga7/informed-news/issues/302)) ([8467759](https://github.com/philga7/informed-news/commit/8467759d59d7abe3632142998159268dc9cb421e)), closes [#301](https://github.com/philga7/informed-news/issues/301)
+
 ## [0.46.0](https://github.com/philga7/informed-news/compare/v0.45.0...v0.46.0) (2026-11-24)
 
 ### Features
