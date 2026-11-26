@@ -36,7 +36,7 @@ No additional product routes yet. The Developing desk (Epic I, [NEWS-57](https:/
 
 ## SPA ownership (NEWS-170)
 
-The shell is a second UI beside Kite, served on the same port when `WEB_BUILD_DIR` is set (the Docker image and the hermetic stack). `/` and `/latest/…` are the shell Brief. `/shell` stays the placeholder. Kite keeps every other view. `npm run dev` leaves `WEB_BUILD_DIR` unset, so local vite still serves Kite at `/`. Map ([NEWS-35](https://informedcrew.atlassian.net/browse/NEWS-35)) and Signals ([NEWS-34](https://informedcrew.atlassian.net/browse/NEWS-34)) stay on hold: no route, no tab, no shell link. The [NEWS-42](https://informedcrew.atlassian.net/browse/NEWS-42) guardrail still stands: no empty tabs.
+The shell is a second UI beside Kite, served on the same port when `WEB_BUILD_DIR` is set (the Docker image and the hermetic stack). `/` and `/latest/…` are the shell Brief. `/shell` is the dashboard. Kite keeps every other view. `npm run dev` leaves `WEB_BUILD_DIR` unset, so local vite still serves Kite at `/`. Map ([NEWS-35](https://informedcrew.atlassian.net/browse/NEWS-35)) and Signals ([NEWS-34](https://informedcrew.atlassian.net/browse/NEWS-34)) stay on hold: no route, no tab, no shell link. The [NEWS-42](https://informedcrew.atlassian.net/browse/NEWS-42) guardrail still stands: no empty tabs.
 
 Express answers `/api/*`, `/health`, and `/healthz` itself. A path in the "Owned by the shell now" table goes to the shell when `WEB_BUILD_DIR` is set. Every path not in that table stays on Kite, including `/about`, `/transparency`, `/topics`, `/feedback`, `/filtered`, `/contribute`, dated batch paths, and the `/radar` redirect. The shell's client files are served under `/shell/_app`, not Kite's `/_app`.
 
@@ -46,7 +46,7 @@ Express answers `/api/*`, `/health`, and `/healthz` itself. A path in the "Owned
 |------|---------|--------|
 | `/` | **Brief** | Shell Brief when the image or the hermetic stack is served. An empty store still shows the fixture story list (one sample story, “Owned brief fixture — CFP sample…”), plus the status line and, when signed in, Refresh. It has no topic sections. Single-page mode is this shell’s plain list. Topic sections sit under **Your topics**. Cards link to articles. Opening a card loads a full story when needed (“Loading full story…”, then timeline, perspectives, pull quote, and **Updated:** when present). **Mark as read** and **Mark all as read** are remembered for the next refresh. The bar shows last and next refresh. Keyboard and filters match, including a blurred shared story whose title stays plain text. |
 | `/latest` and `/latest/…` | Shared Brief URLs | Same shell as `/`, including a shared article such as `/latest/world/1`. |
-| `/shell` | Shell home | Placeholder. Not the Brief. Links back to the Brief at `/` and to `/shell/deep`. |
+| `/shell` | Dashboard | Not the Brief. Home and Topics. Developing stories, Morning cards, and the refresh line. |
 | `/shell/deep` | Deep link | Reloading this address returns this page. Proves a shell link survives a reload. |
 
 `/shell` does not match a longer prefix such as `/shellish`. A path under `/shell/` that the shell does not know is still the shell's (its own not-found), not a Kite page.
@@ -64,7 +64,7 @@ Every path not in the "Owned by the shell now" table stays on Kite, including `/
 | (d) | A nav test that no Map or Signals route or tab exists, [NEWS-195](https://informedcrew.atlassian.net/browse/NEWS-195). **Done**. Phil squash-merged PR #237 as `4664366`. Issue 236 is closed. The guard is on `main`. NEWS-194 does not change the guard. [NEWS-170](https://informedcrew.atlassian.net/browse/NEWS-170) stays In Progress. | (a) |
 | (e) | Remove the Kite Brief view: [NEWS-202](https://informedcrew.atlassian.net/browse/NEWS-202) removes the Kite Brief routes, then [NEWS-203](https://informedcrew.atlassian.net/browse/NEWS-203) is Kite Brief cleanup, after (b) passes the same end-to-end suite and Phil sees (b). Paused until the UI build is sequenced. | (b) |
 
-The shell talks only to the one API. This placeholder does not call it. There is no second data path.
+The shell talks only to the one API. The dashboard reads that API. There is no second data path.
 
 ## Explicit non-goals for this shell
 

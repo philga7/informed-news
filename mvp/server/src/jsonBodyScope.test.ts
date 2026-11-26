@@ -48,6 +48,7 @@ test('JSON bodies are parsed only for /api', async () => {
 
   const refreshRunner: RefreshRunner = {
     isRunning: () => false,
+    runningSince: () => null,
     run: async (): Promise<never> => {
       runCalls += 1;
       throw new Error('unexpected refresh');

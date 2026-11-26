@@ -54,6 +54,8 @@ export type RefreshRunner = {
   /** Rejects only when fetching fails (e.g. CFP); joined calls share that outcome. */
   run(trigger: RefreshTrigger, options?: FetchAllOptions): Promise<RefreshResult>;
   isRunning(): boolean;
+  /** ISO start of the in-flight run; null when idle. */
+  runningSince(): string | null;
 };
 
 function errorMessage(err: unknown): string {
@@ -81,6 +83,7 @@ export function createRefreshRunner(deps: RefreshRunnerDeps = {}): RefreshRunner
   const log = deps.log ?? ((message: string) => console.error(message));
 
   let inFlight: Promise<RefreshResult> | null = null;
+  let inFlightStartedAt: string | null = null;
 
   /** Meta write failures are logged; they never fail a refresh. */
   const recordRun = async (run: RefreshRun): Promise<void> => {
@@ -99,6 +102,7 @@ export function createRefreshRunner(deps: RefreshRunnerDeps = {}): RefreshRunner
     options: FetchAllOptions | undefined,
   ): Promise<RefreshResult> => {
     const startedAt = now().toISOString();
+    inFlightStartedAt = startedAt;
 
     let fetch: FetchAllResult;
     try {
@@ -165,12 +169,16 @@ export function createRefreshRunner(deps: RefreshRunnerDeps = {}): RefreshRunner
       }
       const promise = runOnce(trigger, options).finally(() => {
         inFlight = null;
+        inFlightStartedAt = null;
       });
       inFlight = promise;
       return promise;
     },
     isRunning() {
       return inFlight !== null;
+    },
+    runningSince() {
+      return inFlightStartedAt;
     },
   };
 }

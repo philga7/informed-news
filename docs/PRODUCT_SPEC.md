@@ -18,7 +18,7 @@ Topics is the sign-in screen. The password field is labeled “MVP password.” 
 
 Other pages that need a sign-in say **Log in on Topics** and link to Topics.
 
-Accounts are invite-only, one email and password each. The operator makes them with the `npm run users` script; there is no sign-up page. There is no screen yet for signing in with an email: the sign-in request takes one (`POST /api/login` with an email and password), and the Topics form still sends only the password. When the operator's account is named in the server settings, the Topics password signs in as that account. Each account's place on the new dashboard (how far it has read each story, CFP, and Weather, and what it follows or hides) is kept on the account. Nothing shows it yet.
+Accounts are invite-only, one email and password each. The operator makes them with the `npm run users` script; there is no sign-up page. There is no screen yet for signing in with an email: the sign-in request takes one (`POST /api/login` with an email and password), and the Topics form still sends only the password. When the operator's account is named in the server settings, the Topics password signs in as that account. Each account's place on the dashboard (how far it has read each story, CFP, and Weather, and what it follows or hides) is kept on the account. The dashboard at `/shell` shows the stories and what you follow or hide. How far you have read shows there when a place is already stored. There is no control yet that moves that place forward.
 
 **Scenario:** Given an account exists, when you sign in with its email and the right password, then you are signed in as that account. The email is matched in any case.
 
@@ -27,6 +27,30 @@ Accounts are invite-only, one email and password each. The operator makes them w
 **Scenario:** Given the operator disables your account, or sets a new password for it, while you are signed in, when you next do something that needs a sign-in, then you are signed out.
 
 **Scenario:** Given the server has no database, when you sign in with an email, then it says accounts are not set up, and the Topics password works as before.
+
+## Dashboard
+
+The dashboard is at `/shell`. The home page stays the Brief at `/`. The dashboard is dark, with dividers rather than boxes. The dashboard nav is Home and Topics.
+
+Signed in, you see how many trackers have news (each story with new entries, then Weather when it has news), then Breaking, Developing stories, Morning, CFP, and My topics. Breaking, CFP, and My topics say they are not on this page yet.
+
+Developing lists the shared stories you have not hidden, plus your own private stories. The operator's account also sees every private story, and those rows are marked Private. A sign-in that is not tied to an account sees shared stories only. A branch is its own row and says which story it is part of. Category chips include every category, even one with no stories, and choosing one filters the list. Stories you have already read, with nothing newer, sit under Quiet and say how far you had read. Until a read place is stored, every entry counts as new and nothing is Quiet.
+
+With an account, each row offers Follow and Hide. Following records that you follow the story and leaves it in the list. Choosing Following again stops following. Hiding removes it. The foot of the list says how many are hidden, and you can show those titles and unhide one. A sign-in with no account has neither control.
+
+Morning has four cards: BLUF, Weather, Market, and OSINT. A card with nothing says nothing yet. A card from an earlier day says it is the latest on file and names that day. Weather shows a location's alert in amber where a note would go. Market shows the S&P value and change, the Nasdaq change, the VIX value, and the notes.
+
+The header uses the same refresh line as the Brief. While a refresh is running it says so, including after you reload, and when the run ends it says whether the last fetch succeeded or failed, in your local time.
+
+**Scenario:** Given you are signed out, when you open `/shell`, then it asks you to sign in on Topics and does not list stories.
+
+**Scenario:** Given you are signed in and the database is unavailable, when you open `/shell`, then the page says data unavailable and the blocks are empty.
+
+**Scenario:** Given you are signed in and nothing has been posted, when you open `/shell`, then each filled block says nothing yet, and Breaking, CFP, and My topics say they are not on this page yet.
+
+**Scenario:** Given you have an account and a shared story is in the list, when you choose Hide, then that story leaves the list and the foot counts it as hidden. Choosing Follow on another story leaves that story in the list.
+
+**Scenario:** Given you are signed in with no account, when you look at a story row, then there is no Follow or Hide.
 
 ## Topics
 
@@ -233,7 +257,7 @@ Signed out, there is no **Refresh** control. The status line shows the app versi
 
 Signed in and the provider keys are off: **Refresh** is disabled and the page says `Provider keys off`. It does not start a fetch.
 
-Signed in and the keys are on: one click starts one fetch, and the button stays disabled until that fetch finishes. The status line says whether the keys are on and shows the last fetch time and result (`Last fetch succeeded`, `Last fetch failed`, or `No fetch yet`). **Refresh** reloads the Brief, including the Filtered list when Filtered or All is showing. While a refresh is running the button says “Refreshing…” and is disabled. A refresh can take minutes. If the connection drops while the server is still refreshing, the button keeps saying “Refreshing…”, the page checks every few seconds, and the Brief reloads when the run ends. The page says “Refresh failed. Try again.” only when the run itself failed, or when the refresh never started. That line sits with Refresh, including on an empty Brief.
+Signed in and the keys are on: one click starts one fetch, and the button stays disabled until that fetch finishes. The status line says whether the keys are on and shows the last fetch time and result (`Last fetch succeeded`, `Last fetch failed`, or `No fetch yet`), with the time in your local time. **Refresh** reloads the Brief, including the Filtered list when Filtered or All is showing. While a refresh is running the button says “Refreshing…” and is disabled, and the status line says “Refreshing since” that local time, including after you reload the page. A refresh can take minutes. If the connection drops while the server is still refreshing, the button keeps saying “Refreshing…”, the page checks every few seconds, and the Brief reloads when the run ends. The page says “Refresh failed. Try again.” only when the run itself failed, or when the refresh never started. That line sits with Refresh, including on an empty Brief.
 
 The empty Brief (no stories saved yet) shows the same status line and, when signed in, the same button.
 
@@ -255,7 +279,7 @@ The bar also says, in plain language, when a search source failed, when stories 
 
 **Scenario:** Given a refresh run failed on the server, or could not start and nothing is running, when the page finds out, then it says “Refresh failed. Try again.” next to Refresh, including on an empty Brief.
 
-**Scenario:** Given a refresh is already running, when you look at Refresh, then the button says “Refreshing…” and stays disabled, the page checks until that fetch finishes, then the status line shows the result, and a click does not start a second fetch.
+**Scenario:** Given a refresh is already running, when you look at Refresh, then the button says “Refreshing…” and stays disabled, the status line says “Refreshing since” your local time, the page checks until that fetch finishes, then the status line shows the result in your local time, and a click does not start a second fetch.
 
 **Scenario:** Given stories have been saved and you open the Brief on the shell at `/`, when the page loads, then Approved is selected and you see topic sections, not the Filtered list.
 
@@ -334,15 +358,15 @@ The footer also links to Topics. The old Radar link is gone.
 
 ## Shell
 
-The Brief at `/` is the shell. `/shell` is still a placeholder, not that Brief. It links back to the Brief at `/`. It has no Map tab and no Signals tab. A deeper page at `/shell/deep` stays on that page when you reload it.
+The Brief at `/` is the shell. `/shell` is the dashboard, not that Brief. It has no Map tab and no Signals tab. A deeper page at `/shell/deep` stays on that page when you reload it.
 
-**Scenario:** Given you open `/shell`, when the page loads, then you see the placeholder and a link to the Brief at `/`, and you do not see a Map or Signals tab.
+**Scenario:** Given you open `/shell` while signed in, when the page loads, then you see the dashboard, and you do not see a Map or Signals tab.
 
 **Scenario:** Given you open `/shell/deep`, when you reload, then you are still on that shell page.
 
 ## Posts from Grok Bot
 
-Grok Bot sends the new dashboard's content to the server: stories, story updates, Breaking items, CFP items and the CFP footer, and the Morning cards. Grok Bot is the first of the bots (agents) that may post. Each agent signs in with a token of its own, not a user account. The operator adds agents, turns one off, or gives one a new token with the `npm run agents` script, and each token is shown once. The server records which agent wrote each item. Sending the same item twice changes nothing. A story can be private to one user; only the agent that created it can read it back. The server keeps what it receives; nothing shows it yet. The contract is in [INGEST.md](INGEST.md).
+Grok Bot sends the new dashboard's content to the server: stories, story updates, Breaking items, CFP items and the CFP footer, and the Morning cards. Grok Bot is the first of the bots (agents) that may post. Each agent signs in with a token of its own, not a user account. The operator adds agents, turns one off, or gives one a new token with the `npm run agents` script, and each token is shown once. The server records which agent wrote each item. Sending the same item twice changes nothing. A story can be private to one user; only the agent that created it can read it back. The server keeps what it receives. The dashboard at `/shell` shows the stories and the Morning cards; Breaking and CFP are not shown yet. The contract is in [INGEST.md](INGEST.md).
 
 **Scenario:** Given Grok Bot has its own token, when it posts a story and then posts it again unchanged, then the story is stored once, the second post reports nothing changed, and the story is recorded as written by Grok Bot.
 

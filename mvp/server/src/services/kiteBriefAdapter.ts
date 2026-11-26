@@ -937,6 +937,8 @@ export type BriefOverview = {
     nextAt: string | null;
     intervalHours: number | null;
     running: boolean;
+    /** ISO start of the in-flight run; null when idle. */
+    runningSince: string | null;
   };
   notices: string[];
   sections: Array<{
@@ -976,6 +978,8 @@ export function buildBriefOverview(input: {
   meta: StoreMeta;
   intervalHours: number | null;
   running: boolean;
+  /** Omitted means null, including for callers that predate the field. */
+  runningSince?: string | null;
   degraded?: readonly BriefDegradedStore[];
   /** Defaults to current key presence on the running app. */
   providers?: ProviderConfig;
@@ -996,6 +1000,7 @@ export function buildBriefOverview(input: {
       nextAt: nextRefreshAt(lastSuccess, input.intervalHours),
       intervalHours: input.intervalHours,
       running: input.running,
+      runningSince: input.runningSince ?? null,
     },
     notices,
     sections: (input.brief?.sections ?? []).map((section) => ({

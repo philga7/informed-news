@@ -39,7 +39,7 @@ Set `REFRESH_INTERVAL_HOURS=off` when you need the server up without spending re
 | Path | Role |
 |---|---|
 | `apps/kite/` | Kite UI (SvelteKit). Owns the pages other than the shell Brief. `npm run dev` still serves it at `/` |
-| `apps/web/` | Shell Brief at `/` and `/latest/…` when the image is served. `/shell` stays the placeholder. Unit tests live there. Kite still owns the other pages. `npm run dev` is still Kite plus the server |
+| `apps/web/` | Shell Brief at `/` and `/latest/…` when the image is served. `/shell` is the dashboard. Unit tests live there. Kite still owns the other pages. `npm run dev` is still Kite plus the server |
 | `mvp/server/` | Express API + pipeline |
 | `mvp/data/` | Runtime JSON (never commit) |
 | `mvp/.env` | Secrets (never commit); see `mvp/.env.example` |

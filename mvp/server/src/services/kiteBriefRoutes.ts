@@ -58,6 +58,8 @@ export type CreateKiteBriefRouterDeps = {
   now?: () => Date;
   /** Default: the process refresh runner */
   isRefreshRunning?: () => boolean;
+  /** In-flight run start, or null when idle. Default: the process refresh runner. */
+  refreshRunningSince?: () => string | null;
   /** Read for `REFRESH_INTERVAL_HOURS`; default `process.env` */
   env?: NodeJS.ProcessEnv;
 };
@@ -106,6 +108,8 @@ export function createKiteBriefRouter(
   const readEnrichments = deps.readClusterEnrichments ?? readClusterEnrichments;
   const now = deps.now ?? (() => new Date());
   const isRefreshRunning = deps.isRefreshRunning ?? (() => getRefreshRunner().isRunning());
+  const refreshRunningSince =
+    deps.refreshRunningSince ?? (() => getRefreshRunner().runningSince());
   const router = Router();
 
   async function loadOwnedBrief(at: Date): Promise<OwnedBrief> {
@@ -310,6 +314,7 @@ export function createKiteBriefRouter(
         meta,
         intervalHours: resolveRefreshIntervalHours(env),
         running: isRefreshRunning(),
+        runningSince: refreshRunningSince(),
         degraded: owned.fixture ? [] : owned.degraded,
         providers: currentProviderConfig(env),
       });

@@ -2,6 +2,31 @@
 
 Binding choices for Informed News. Newest first. When one of these changes, update this file in the same change as [ROADMAP.md](ROADMAP.md) and Jira. What the product does now, in plain language, is [PRODUCT_SPEC.md](PRODUCT_SPEC.md). Pipeline detail remains in [NEWS-84](https://informedcrew.atlassian.net/browse/NEWS-84), [TRIAGE.md](TRIAGE.md), and [BRIEF.md](BRIEF.md). The target is [VISION.md](VISION.md).
 
+## 2026-11-26 — Dashboard home: who sees what, and the refresh line (NEWS-225)
+
+**Decision:** Phil confirmed the rewritten NEWS-225 and took every answer below on 2026-11-26. The dashboard is the home shell at `/shell`. `/` stays the topic Brief. `npm run dev` does not change.
+
+- A signed-in session with no account is not the admin. The dashboard read returns the shared stories only. Follow and hide answer 403 `needs an account`. With no database those routes answer 503, the same as the read.
+- Follow and hide record the session's user, the story, the state, and the time. They record no writer. One state per story, so hide replaces follow. `PUT /api/stories/:id/follow-state` with `follow` or `hide` returns that state and its time. `DELETE` clears it, including when there was no row. Any other state is refused. A story this reader cannot see, and a missing story, answer 404 with the same words. A hidden story can still be cleared.
+- `GET /api/dashboard` returns the developing rows, the quiet rows, the hidden titles, every category with its count, the trackers, and the latest item for each Morning card or nothing. A row carries its status, the latest entry and whether that entry is a time or a day, how many entries are new, how far the reader has read, its categories, whether they follow it, the hub title for a branch, and whether it is private. Newest entry first. The reader turns an older card's time into "latest on file" in their own zone.
+- No database: 503, and the page says data unavailable. Nothing posted: 200, and each filled block says nothing yet. Signed out: the page asks them to sign in on Topics.
+- Breaking, CFP, and My topics keep their headings and say they are not on this page yet, in the 12 Nov order: trackers, Breaking, Developing, Morning, CFP, My topics.
+- With no read place stored, every entry counts as new, nothing is Quiet, and there is no "read up to" line. A story with no entries stays in the main list and is not a tracker. A stored read place is honored: newer entries are the count, and a story with nothing newer is Quiet. Opening a story without a read place does not count as having read it. There is no route here that sets a read place.
+- The trackers line lists each visible story that has new entries, then Weather when its latest item is newer than the reader's weather place, or when they have none. The count is how many of those there are. CFP is not in the line. The chips are not links.
+- Each developing and quiet row ends in Follow and Hide. After a follow it reads Following, and choosing Following again clears the follow. Hide drops the row. The foot counts the hidden titles and can show them, each with Unhide. No account: no pair and no foot.
+- The nav is Home and Topics. Home goes to `/shell`. Topics goes to `/topics`. Stories and Sources are not shown. The Brief keeps its own header apart from the shared status line.
+- Category chips list every category, zeros included, in stored order. A story in two categories counts in both. All has no number. The choice filters the main list and Quiet in the browser.
+- The shared status line is the pipeline refresh from the Brief overview, on the shell header and on the Brief. While a refresh runs, including after a reload, it says "Refreshing since" the local time. When the run ends it says the last fetch succeeded or failed, in local time, and the full timestamp stays on the time element. The Brief also keeps the version and the keys line. The shell header does not. The mockup's content clock (stories updated, CFP, weather alerts, next) is not this step.
+- Market figures match the labels S&P, Nasdaq, and VIX. The card shows the S&P value and change, the Nasdaq change, the VIX value, and the notes. A missing label is skipped. No other quote is shown.
+- A branch is its own row, with the hub it is part of and a Branch mark beside its status. Hiding a hub does not hide its branches. Titles are not links. A private story is marked Private for its owner and for the admin.
+- Every clock on this page uses the reader's local zone, plus a relative age on a timed entry. A day-precision entry shows its UTC date and no clock. The weather card does not show its body. An alert shows in amber and that location's note does not. A note alone shows in the normal color. BLUF is its text. OSINT is its text plus the Watch line when there is one. A card with nothing keeps its heading and says nothing yet.
+- The admin is the account whose email matches `OPERATOR_EMAIL`, ignoring case. No user id means not admin.
+- On the same day, after the first review, Phil pulled the Round 2 visual styling into this step: dark page, dividers rather than boxes, chips, cards, and the amber weather alert. The Brief at `/` is not restyled beyond the shared status line.
+
+**Why:** Phil decided on 2026-11-26, before the home shell was built. The ticket text was from 13 Nov, before the sequence, the accounts, and the Morning cards. These answers are what the shell shows and what the two user routes do. The refresh line stays the pipeline status the Brief already loads, so one component can sit on both pages. The mockup's content clock mixes in CFP, which is a later step.
+
+**What it rules out:** Building the shell at `/`, changing `npm run dev`, a schema change, a route that sets a read place, CFP on the trackers line, topic follow, Stories or Sources in the nav, the mockup's content clock, and treating a sign-in with no account as the admin.
+
 ## 2026-11-26 — One token per agent, and who wrote each row (NEWS-263)
 
 **Decision:** Phil took every recommended answer on 2026-11-26 for [ROADMAP.md](ROADMAP.md#ui-build-sequence-2026-11-16) row 5a, which builds the "one token per agent" part of the [2026-11-24 entry](#2026-11-24--agent-contract-user-api-deletes-moving-stories-and-hosting-news-262). How to use it is in [INGEST.md](INGEST.md#agents).

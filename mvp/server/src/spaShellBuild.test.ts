@@ -36,6 +36,7 @@ async function startServer(app: { listen: (...args: any[]) => Server }): Promise
 function makeRefreshRunner(): RefreshRunner {
   return {
     isRunning: () => false,
+    runningSince: () => null,
     run: async (): Promise<never> => {
       throw new Error('unexpected refresh');
     },
@@ -84,17 +85,30 @@ test('built shell serves /shell and /shell/deep; GET / stays the JSON message', 
     const shell = await fetch(`${baseUrl}/shell`);
     assert.equal(shell.status, 200);
     const shellHtml = await shell.text();
-    assert.ok(shellHtml.includes('<h1>Informed News</h1>'));
+    assert.ok(shellHtml.includes('<h1>Informed News</h1>'), 'expected the Informed News heading');
+    assert.ok(shellHtml.includes('informed-news'), 'expected the informed-news brand');
     const shellLinks = anchors(shellHtml);
     assert.ok(
-      shellLinks.some((link) => link.href === '/' && link.text === 'Brief'),
-      'expected a Brief link to /',
+      shellLinks.some((link) => link.href === '/shell' && link.text === 'Home'),
+      'expected a Home link to /shell',
     );
     assert.ok(
-      shellLinks.some((link) => link.href === '/shell/deep'),
-      'expected a link to /shell/deep',
+      shellLinks.some((link) => link.href === '/topics' && link.text === 'Topics'),
+      'expected a Topics link to /topics',
     );
-    assert.deepEqual(titles(shellHtml), ['Informed News shell']);
+    assert.equal(
+      shellLinks.some((link) => link.text === 'Brief'),
+      false,
+      'built /shell has no Brief link',
+    );
+    assert.equal(
+      shellLinks.some((link) => link.href === '/shell/deep' || link.text === 'Deep link'),
+      false,
+      'built /shell has no /shell/deep link',
+    );
+    assert.equal(shellHtml.includes('Developing stories'), false);
+    assert.equal(shellHtml.includes('>Breaking<'), false);
+    assert.deepEqual(titles(shellHtml), ['Informed News']);
 
     const deep = await fetch(`${baseUrl}/shell/deep`);
     assert.equal(deep.status, 200);

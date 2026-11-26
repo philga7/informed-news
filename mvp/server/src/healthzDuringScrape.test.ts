@@ -43,6 +43,7 @@ async function maxHealthLatencyDuring(
   const api = createApp({
     refreshRunner: {
       isRunning: () => false,
+      runningSince: () => null,
       run: async (): Promise<never> => {
         throw new Error('unused');
       },

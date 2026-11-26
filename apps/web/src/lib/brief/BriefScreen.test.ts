@@ -41,6 +41,7 @@ type Overview = {
 		lastSuccess: { completedAt: string } | null;
 		nextAt: string | null;
 		running?: boolean;
+		runningSince?: string | null;
 		last?: { ok: boolean; startedAt: string; completedAt: string; error: string | null } | null;
 	};
 	signedIn?: boolean;
@@ -1207,6 +1208,17 @@ const GRID_SECTION = [
 ];
 const LAST_COMPLETED_AT = '2026-11-12T03:04:05.000Z';
 
+function expectLocalFetchTime(iso: string): void {
+	const time = screen.getByTestId('brief-status').querySelector('time');
+	const instant = new Date(iso);
+	expect(time).toHaveAttribute('datetime', iso);
+	expect(time).toHaveAttribute('title', instant.toLocaleString());
+	expect(time).toHaveTextContent(
+		instant.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }),
+	);
+	expect(time?.textContent?.trim()).not.toBe(iso);
+}
+
 describe('BriefScreen status banner and Refresh control', () => {
 	afterEach(() => {
 		vi.useRealTimers();
@@ -1290,10 +1302,7 @@ describe('BriefScreen status banner and Refresh control', () => {
 		expect(screen.getByText('Keys on')).toBeVisible();
 		await fireEvent.click(screen.getByRole('button', { name: /^Refresh$/ }));
 		expect(await screen.findByText(label)).toBeVisible();
-		expect(screen.getByTestId('brief-status').querySelector('time')).toHaveAttribute(
-			'datetime',
-			LAST_COMPLETED_AT,
-		);
+		expectLocalFetchTime(LAST_COMPLETED_AT);
 		const posts = fetchPosts(mock);
 		expect(posts).toHaveLength(1);
 		const init = posts[0]?.[1] as RequestInit;
@@ -1436,10 +1445,7 @@ describe('BriefScreen status banner and Refresh control', () => {
 				finished = true;
 				await vi.advanceTimersByTimeAsync(REFRESH_POLL_MS);
 				expect(await screen.findByText(label)).toBeVisible();
-				expect(screen.getByTestId('brief-status').querySelector('time')).toHaveAttribute(
-					'datetime',
-					LAST_COMPLETED_AT,
-				);
+				expectLocalFetchTime(LAST_COMPLETED_AT);
 				expect(screen.queryByText('Refresh failed. Try again.')).not.toBeInTheDocument();
 				expect(fetchPosts(mock)).toHaveLength(0);
 			} finally {
@@ -1457,8 +1463,52 @@ describe('BriefScreen status banner and Refresh control', () => {
 		render(BriefScreen);
 		const banner = await screen.findByTestId('brief-status');
 		expect(banner).toHaveTextContent('Version 0.41.0');
+		expect(banner).toHaveTextContent('Keys on');
+		expect(screen.getByText('No fetch yet')).toBeVisible();
 		expect(screen.getByRole('button', { name: /^Refresh$/ })).toBeEnabled();
 		expect(screen.queryByRole('heading', { name: 'Your topics', level: 2 })).not.toBeInTheDocument();
+		mock.restore();
+	});
+
+	it('shows Version and the keys line beside Refreshing since, and a click does not POST', async () => {
+		const since = '2026-11-12T15:04:00.000Z';
+		let posts = 0;
+		const mock = install({
+			stories: [story({ informed_summary_status: 'ok' })],
+			onFetch: () => {
+				posts += 1;
+				return jsonResponse(200, { ok: true });
+			},
+			brief: overview({
+				sections: GRID_SECTION,
+				quiet: [],
+				refresh: {
+					lastSuccess: null,
+					nextAt: null,
+					running: true,
+					runningSince: since,
+					last: null,
+				},
+			}),
+		});
+		render(BriefScreen);
+		const banner = await screen.findByTestId('brief-status');
+		expect(banner).toHaveTextContent('Version 0.41.0');
+		expect(banner).toHaveTextContent('Keys on');
+		expect(screen.getByText('Refreshing since')).toBeVisible();
+		const time = banner.querySelector('time');
+		const instant = new Date(since);
+		expect(time).toHaveAttribute('datetime', since);
+		expect(time).toHaveAttribute('title', instant.toLocaleString());
+		expect(time).toHaveTextContent(
+			instant.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }),
+		);
+		expect(time?.textContent?.trim()).not.toBe(since);
+		const button = screen.getByRole('button', { name: 'Refreshing…' });
+		expect(button).toBeDisabled();
+		await fireEvent.click(button);
+		await tick();
+		expect(posts).toBe(0);
 		mock.restore();
 	});
 

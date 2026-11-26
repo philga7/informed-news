@@ -54,6 +54,8 @@ export type BriefStatus = {
 	keysOn: boolean;
 	/** True while `refresh.running` is exactly `true`. */
 	running: boolean;
+	/** `refresh.runningSince` when it is a string; otherwise null. */
+	runningSince: string | null;
 	/** `refresh.last.completedAt` when it is a string; otherwise null. */
 	lastFetchAt: string | null;
 	/** `refresh.last.ok` when it is a boolean; otherwise null. */
@@ -255,6 +257,7 @@ export function parseBriefStatus(body: unknown): BriefStatus | null {
 		signedIn: body.signedIn === true,
 		keysOn: body.keysOn === true,
 		running: refresh?.running === true,
+		runningSince: refresh && typeof refresh.runningSince === 'string' ? refresh.runningSince : null,
 		lastFetchAt: last && typeof last.completedAt === 'string' ? last.completedAt : null,
 		lastFetchOk: last && typeof last.ok === 'boolean' ? last.ok : null,
 	};
