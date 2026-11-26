@@ -36,7 +36,7 @@ Signed in, you see how many trackers have news (each story with new entries, the
 
 Developing lists the shared stories you have not hidden, plus your own private stories. The operator's account also sees every private story, and those rows are marked Private. A sign-in that is not tied to an account sees shared stories only. A branch is its own row and says which story it is part of. Category chips include every category, even one with no stories, and choosing one filters the list. Stories you have already read, with nothing newer, sit under Quiet and say how far you had read. Until a read place is stored, every entry counts as new and nothing is Quiet.
 
-With an account, each row offers Follow and Hide. Following records that you follow the story and leaves it in the list. Hiding removes it. The foot of the list says how many are hidden, and you can show those titles and unhide one. A sign-in with no account has neither control.
+With an account, each row offers Follow and Hide. Following records that you follow the story and leaves it in the list. Choosing Following again stops following. Hiding removes it. The foot of the list says how many are hidden, and you can show those titles and unhide one. A sign-in with no account has neither control.
 
 Morning has four cards: BLUF, Weather, Market, and OSINT. A card with nothing says nothing yet. A card from an earlier day says it is the latest on file and names that day. Weather shows a location's alert in amber where a note would go. Market shows the S&P value and change, the Nasdaq change, the VIX value, and the notes.
 
