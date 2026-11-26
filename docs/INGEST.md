@@ -79,7 +79,7 @@ Every row an agent posts records the agent as its writer: the story and each of 
 
 - A post that changes nothing keeps the writer the row had. The same entry, Breaking, CFP or Morning item posted again by another agent is `unchanged`, and still names its first writer.
 - A story keeps the agent that created it (`createdBy`). Its `writtenBy` is the last agent whose post changed it or one of its nested rows. Each nested row keeps the agent that last changed it.
-- Another agent may re-post a shared story today. Only the agent that created a story may soft-remove it, once soft removes are built ([Decided, not built yet](#decided-not-built-yet)). A private story is only its creator's (see [Private stories](#private-stories)).
+- Another agent may re-post a shared story today, but not change who can see it: a re-post by an agent that did not create the story and that sets, changes or clears `ownerUserId` answers **409**. Only the agent that created a story may soft-remove it, once soft removes are built ([Decided, not built yet](#decided-not-built-yet)). A private story is only its creator's (see [Private stories](#private-stories)).
 - A story written before agents and not claimed can be posted unchanged, and entries and other items can point at it, but a post that would change it, its own fields or a nested row, answers **409** until the operator claims it (see [Agents](#agents)).
 
 ## Times

@@ -234,6 +234,11 @@ export async function putStory(pool: Pool, writer: Writer, post: StoryPost): Pro
       if (before && (before.role !== record.role || before.hub_id !== record.hubId)) {
         throw conflict("a story's role and hub cannot change");
       }
+      // Who can see a story is its creator's call: another agent may re-post a shared story,
+      // but not make it private, move it to another owner, or share it.
+      if (before && before.owner_user_id !== record.ownerUserId && !createdBy(before, writer)) {
+        throw conflict("only the story's creator can change who can see it");
+      }
       await checkPrivateStoryRules(client, record);
       const story = await client.query<{ inserted: boolean }>(STORY_UPSERT_SQL, storyParams(record, writer));
       let writes = story.rowCount ?? 0;
@@ -243,7 +248,12 @@ export async function putStory(pool: Pool, writer: Writer, post: StoryPost): Pro
         // row only now: check its role and hub again against what is stored.
         const stored = await client.query<StoryGuardRow>(STORY_GUARD_SQL, [id]);
         const row = stored.rows[0];
-        if (row && privateToAnother(row, writer)) throw conflict(`story id ${id} is taken`);
+        // Our update has already landed on that row, so its owner can no longer be
+        // compared: refuse when another writer created it, and the retry is checked
+        // against the stored row like any re-post.
+        if (before === undefined && row && !createdBy(row, writer)) {
+          throw conflict(`story id ${id} was just created by another writer; retry`);
+        }
         if (row && (row.role !== record.role || row.hub_id !== record.hubId)) {
           throw conflict("a story's role and hub cannot change");
         }

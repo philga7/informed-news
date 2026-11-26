@@ -398,6 +398,31 @@ test('a batch runs in order with a result per item, and one bad item does not st
   }
 });
 
+test("only a story's creator can change who can see it; another agent may still re-post its other fields", async (t) => {
+  const post = await serve(t, config());
+  const other = await newAgent();
+  const owner = await createUser(pool, { email: `${randomUUID()}@example.com`, passwordHash: 'h', displayName: 'O' });
+  const hub = story(uid('story'));
+  assert.equal((await post('/api/ingest', { json: hub })).status, 201);
+
+  const privately = await post('/api/ingest', { json: { ...hub, ownerUserId: owner.id }, token: other.token });
+  assert.equal(privately.status, 409);
+  assert.deepEqual(await privately.json(), {
+    kind: 'story',
+    id: hub.id,
+    error: "only the story's creator can change who can see it",
+    reason: 'conflict',
+  });
+  const stored = await pool.query(`SELECT owner_user_id FROM stories WHERE id = $1`, [hub.id]);
+  assert.deepEqual(stored.rows, [{ owner_user_id: null }]);
+
+  // Other fields: answer 7 stands.
+  assert.equal((await post('/api/ingest', { json: { ...hub, status: 'stalled' }, token: other.token })).status, 200);
+  // The creator may make it private, and share it again.
+  assert.equal((await post('/api/ingest', { json: { ...hub, ownerUserId: owner.id } })).status, 200);
+  assert.equal((await post('/api/ingest', { json: hub })).status, 200);
+});
+
 test('mounted in the app: no session needed, ahead of the 100 KB /api parser, up to 1 MB', async (t) => {
   const post = await serve(t, config(), { whole: true });
   // Without the token the app's own session guard is not what answers.

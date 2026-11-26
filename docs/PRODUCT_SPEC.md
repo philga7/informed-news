@@ -354,7 +354,7 @@ Grok Bot sends the new dashboard's content to the server: stories, story updates
 
 **Scenario:** Given Grok Bot posted a private story, when another agent asks to read it back, then it is told there is no such story, and Grok Bot can still read it back.
 
-**Scenario:** Given Grok Bot posted a private story, when another agent posts the same story id, or an update about it, then it is refused and the story is unchanged.
+**Scenario:** Given Grok Bot posted a private story, when another agent posts the same story id, or an update about it, then it is refused and the story is unchanged. Likewise, only the agent that created a shared story can make it private.
 
 **Scenario:** Given the server has no database set up, when Grok Bot posts, then it is told the service is unavailable, and the rest of the site works as before.
 
