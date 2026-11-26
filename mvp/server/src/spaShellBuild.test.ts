@@ -85,6 +85,7 @@ test('built shell serves /shell and /shell/deep; GET / stays the JSON message', 
     const shell = await fetch(`${baseUrl}/shell`);
     assert.equal(shell.status, 200);
     const shellHtml = await shell.text();
+    assert.ok(shellHtml.includes('<h1>Informed News</h1>'), 'expected the Informed News heading');
     assert.ok(shellHtml.includes('informed-news'), 'expected the informed-news brand');
     const shellLinks = anchors(shellHtml);
     assert.ok(

@@ -375,6 +375,7 @@ describe('DashboardHome', () => {
 
 		render(DashboardHome);
 
+		expect(screen.getByRole('heading', { level: 1, name: 'Informed News' })).toBeVisible();
 		expect(screen.getByText('informed-news')).toBeVisible();
 		expect(screen.getByRole('link', { name: 'Home' })).toHaveAttribute('href', '/shell');
 		expect(screen.getByRole('link', { name: 'Topics' })).toHaveAttribute('href', '/topics');

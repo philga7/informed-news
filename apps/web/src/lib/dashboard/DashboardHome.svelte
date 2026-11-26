@@ -198,6 +198,7 @@
 </script>
 
 <header>
+	<h1>Informed News</h1>
 	<p>informed-news</p>
 	<nav>
 		<a href="/shell">Home</a>
