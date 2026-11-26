@@ -4,7 +4,7 @@ Binding choices for Informed News. Newest first. When one of these changes, upda
 
 ## 2026-11-25 — Label mapping for every page value, and the Morning export answers (NEWS-269)
 
-**Decision:** Grok Bot exports its own pages and posts in the contract's JSON ([INGEST.md](INGEST.md), and [2026-11-24](#2026-11-24--agent-contract-user-api-deletes-moving-stories-and-hosting-news-262)). Its export brief of 2026-11-25 maps every Status, Strength, Tag and confidence value found on its 31 Developing Pages to the eight labels, following Phil's evidence standard (Oct 25). Phil approved that mapping on 2026-11-25 with one fix (Official assessment and Official attribution map to `on_record`, or `working` when unverified, not `official`), and answered the brief's open questions about the Morning cards the same day. The tables below are the mapping of record. Nothing here changes code, the schema, or the contract.
+**Decision:** Grok Bot exports its own pages and posts in the contract's JSON ([INGEST.md](INGEST.md), and [2026-11-24](#2026-11-24--agent-contract-user-api-deletes-moving-stories-and-hosting-news-262)). Its export brief of 2026-11-25 maps every Status, Strength, Tag and confidence value found on its 31 Developing Pages to the eight labels, following Phil's evidence standard (Oct 25). Phil approved that mapping on 2026-11-25 with two changes: Official assessment and Official attribution map to `on_record`, or `working` when unverified, not `official`; and Debunked maps by the record that refutes it (`official`, or `official_ruling` for a decision on the merits), not to `official` only. He also answered the brief's open questions about the Morning cards the same day. The tables below are the mapping of record. Nothing here changes code, the schema, or the contract.
 
 In the first two tables, rows marked **Δ** map to a label the table in [2026-11-16 — Status labels are a fixed list](#2026-11-16--status-labels-are-a-fixed-list-news-238) did not give that value, or cover a value it did not map. A row that only names more page values for a mapping that table already had is not marked. Labels are written in the stored lowercase form. Emoji and trailing source notes on a page value are ignored. The Story status table is new in full except for its Developing and Working (branch) values.
 
@@ -64,7 +64,7 @@ The rules behind the tables:
 | Working status check | `working` | |
 | Truth Social, Video, Self-reported, `post confirmed via X API`, `Her account; no … readout shown`, Settlement terms as released by one party | `on_record` | |
 | Wire, Major outlet, Independent reporting, Trade press | `reported` if two or more outlets, else `single_outlet` | Δ |
-| Single source, Single-source, Partly reported, Unnamed sources, Anonymous sources via X post, Trade press unnamed execs | `single_outlet`; `reported` only if two or more outlets have it separately | |
+| Single source, Single-source, Partly reported, Unnamed sources, Anonymous sources via X post, Trade press unnamed execs | `single_outlet`; `reported` only if two or more outlets have it separately | Δ |
 | Partisan, forum | `claim_no_evidence_shown` | |
 | No filing or release | `claim_no_evidence_shown` | Δ |
 | Analysis, Independent analysis of official data, Commentary, Historical | not an update: no entry (Historical: label by the record it rests on, if exported) | Δ |
@@ -95,6 +95,7 @@ This supersedes these rows of the "Mapping from the values on Grok Bot's static 
 
 - **Confirmed** ("Official, On record, or Reported, by what confirms it"): confirmation by one outlet only is `single_outlet`, and the other Confirmed variants map as in the first table above.
 - **Reported, Reported record** ("Reported"): `reported` only when two or more outlets have it; one outlet is `single_outlet`.
+- **Partly reported, single-source** ("Single outlet"): still `single_outlet`, but `reported` when two or more outlets have it separately.
 - **Unconfirmed** ("Single outlet if one outlet reports it; otherwise Claim · no evidence shown"): unverified evidence is now `working`, and `claim_no_evidence_shown` is only for no supporting evidence shown.
 - **Debunked** ("Label by the basis of the refutation (Official or Reported)"): `official`, or `official_ruling` for a decision on the merits, with the refuting record linked. A Reported refutation (an outlet's or fact-checker's verdict) is not a refutation.
 
