@@ -377,6 +377,39 @@ test('run: a throwing summaries dep does not fail the run', async () => {
   assert.equal(h.meta.refresh!.last!.ok, true);
 });
 
+test('runningSince() is null, then the in-flight startedAt, then null after the run resolves', async () => {
+  const gate = deferred<FetchAllResult>();
+  const h = harness({
+    fetchAll: async () => gate.promise,
+  });
+  const runner = createRefreshRunner(h.deps);
+
+  assert.equal(runner.runningSince(), null);
+  const pending = runner.run('manual');
+  assert.equal(runner.isRunning(), true);
+  assert.equal(runner.runningSince(), '2026-09-30T12:00:00.000Z');
+  gate.resolve(fetchResult());
+  const result = await pending;
+  assert.equal(result.startedAt, '2026-09-30T12:00:00.000Z');
+  assert.equal(runner.runningSince(), null);
+  assert.equal(runner.isRunning(), false);
+});
+
+test('runningSince() is cleared when the fetch throws', async () => {
+  const gate = deferred<FetchAllResult>();
+  const h = harness({
+    fetchAll: async () => gate.promise,
+  });
+  const runner = createRefreshRunner(h.deps);
+
+  const pending = runner.run('manual');
+  assert.equal(runner.runningSince(), '2026-09-30T12:00:00.000Z');
+  gate.reject(new Error('CFP down'));
+  await assert.rejects(pending, /CFP down/);
+  assert.equal(runner.runningSince(), null);
+  assert.equal(runner.isRunning(), false);
+});
+
 test('run: a throwing full-story generator is captured after summaries', async () => {
   const h = harness({
     generateFullStories: async () => {

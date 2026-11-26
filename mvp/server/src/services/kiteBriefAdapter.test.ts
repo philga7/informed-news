@@ -988,6 +988,7 @@ test('buildBriefOverview: sections with More split, quiet, notices, nextAt, runn
       nextAt: '2026-09-30T11:30:00.000Z',
       intervalHours: 2.5,
       running: true,
+      runningSince: null,
     },
     notices: ['SearXNG unavailable', 'Last refresh failed: CFP down'],
     sections: [
@@ -1029,6 +1030,27 @@ test('buildBriefOverview: sections with More split, quiet, notices, nextAt, runn
     'Read history unavailable (brief-seen.json unreadable)',
     'Saved summaries unavailable (brief-summaries.json unreadable)',
   ]);
+});
+
+test('buildBriefOverview: refresh.runningSince is the input when set, and null when omitted', () => {
+  const meta: StoreMeta = { lastFetchAt: null, lastError: null };
+  const since = '2026-09-30T12:00:00.000Z';
+  const withSince = buildBriefOverview({
+    brief: null,
+    meta,
+    intervalHours: null,
+    running: true,
+    runningSince: since,
+  });
+  assert.equal(withSince.refresh.runningSince, since);
+
+  const omitted = buildBriefOverview({
+    brief: null,
+    meta,
+    intervalHours: 3,
+    running: false,
+  });
+  assert.equal(omitted.refresh.runningSince, null);
 });
 
 test('buildBriefOverview: filteredOut from the last triage run; null when skipped or none', () => {

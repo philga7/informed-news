@@ -52,7 +52,13 @@ const accounts = openAccounts(process.env);
 
 const ingest = openIngest(process.env);
 
-const app = createApp({ kiteHandler, shellHandler, accounts, ingest });
+const app = createApp({
+  kiteHandler,
+  shellHandler,
+  accounts,
+  ingest,
+  operatorEmail: process.env.OPERATOR_EMAIL,
+});
 
 app.listen(port, '0.0.0.0', () => {
   console.log(`MVP server listening on http://localhost:${port}`);

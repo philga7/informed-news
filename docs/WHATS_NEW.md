@@ -8,6 +8,8 @@ This is not the release log. Releases are recorded in `CHANGELOG.md` by semantic
 
 ## 2026-11-26
 
+The dashboard is at `/shell`. Signed in, you see which stories have news, the developing stories, and the morning cards (a short brief, weather, the market figures, and a watch line). You can follow a story or hide it. Hiding takes it off your list, and you can show the hidden titles and put one back. The home page is still the Brief. While a refresh is running, the Brief says so, including after you reload, and the last fetch time is in your local time.
+
 **No user-visible change.** Each bot that sends stories to the server now has a token of its own, which can be turned off or replaced without touching the others, and the server records which bot wrote each story, update and item. The Brief is unchanged.
 
 ## 2026-11-25

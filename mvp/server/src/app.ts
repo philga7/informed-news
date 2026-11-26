@@ -83,6 +83,7 @@ import { shellOwnsPath } from './serveShell.js';
 import type { FeedbackSnapshot, FeedbackTopicSnapshot, TrackedEntry } from './store/index.js';
 import type { TrackedClaimEntry } from './store/index.js';
 import type { Article } from './types/article.js';
+import { createDashboardRouter } from './dashboard/dashboardRoutes.js';
 import { createIngestRouter } from './ingest/ingestRoutes.js';
 import type { IngestConfig } from './ingest/openIngest.js';
 
@@ -159,6 +160,8 @@ export type CreateAppDeps = {
   accounts?: Accounts;
   /** The ingest contract's token and database (NEWS-228). Missing means the route answers 503. */
   ingest?: IngestConfig;
+  /** Case-insensitive admin email for the dashboard (NEWS-225). index.ts passes OPERATOR_EMAIL. */
+  operatorEmail?: string;
 };
 
 const SEEN_IDS_MAX = 100;
@@ -401,10 +404,12 @@ export function createApp(deps: CreateAppDeps = {}): Express {
       readBriefMembership: readMembership,
       now,
       isRefreshRunning: () => refreshRunner.isRunning(),
+      refreshRunningSince: () => refreshRunner.runningSince(),
     }),
   );
 
   app.use('/api', requireApiSession(deps.accounts));
+  app.use('/api', createDashboardRouter({ ingest: deps.ingest, operatorEmail: deps.operatorEmail }));
   app.use('/api', createAuthRouter(deps.accounts));
 
   /**

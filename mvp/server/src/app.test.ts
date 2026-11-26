@@ -976,6 +976,7 @@ test('POST /api/fetch runs the refresh runner (manual) and returns refresh + bri
   const calls: Array<{ trigger: string; options: unknown }> = [];
   const refreshRunner: RefreshRunner = {
     isRunning: () => false,
+    runningSince: () => null,
     run: async (trigger, options) => {
       calls.push({ trigger, options });
       return {
@@ -1035,6 +1036,7 @@ test('POST /api/fetch returns 500 when the refresh fails (CFP)', async () => {
 
   const refreshRunner: RefreshRunner = {
     isRunning: () => false,
+    runningSince: () => null,
     run: async () => {
       throw new Error('CFP feed unreachable');
     },
@@ -3425,6 +3427,7 @@ test('GET /api/brief/overview: sections with More split, quiet, notices, nextAt,
     {
       env: { REFRESH_INTERVAL_HOURS: '2', TYPESAFE_API_KEY: 'k', OLLAMA_API_KEY: 'k' },
       isRefreshRunning: () => true,
+      refreshRunningSince: () => '2026-09-30T10:15:00.000Z',
     },
   );
   try {
@@ -3441,6 +3444,7 @@ test('GET /api/brief/overview: sections with More split, quiet, notices, nextAt,
         nextAt: '2026-09-30T11:30:00.000Z',
         intervalHours: 2,
         running: true,
+        runningSince: '2026-09-30T10:15:00.000Z',
       },
       notices: ['Google News partly failed'],
       sections: [

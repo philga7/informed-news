@@ -50,11 +50,9 @@
 		readSinglePage,
 		readStoryCount,
 		REFRESH_ERROR,
-		REFRESH_LABEL,
 		REFRESH_LOGIN,
 		REFRESH_POLL_MAX_MS,
 		REFRESH_POLL_MS,
-		REFRESHING_LABEL,
 		settleRefresh,
 		sharedHrefVisit,
 		storyIndexFromPath,
@@ -63,6 +61,7 @@
 		type FilteredVerdictItem,
 		type SeedTopic,
 	} from './briefClient';
+	import FetchStatus from '$lib/dashboard/FetchStatus.svelte';
 	import FilteredVerdictList from './FilteredVerdictList.svelte';
 	import {
 		createGgDetector,
@@ -958,22 +957,14 @@
 			<p>Version {status.version}</p>
 			{#if status.signedIn}
 				<p>{status.keysOn ? 'Keys on' : 'Provider keys off'}</p>
-				{#if status.lastFetchAt && status.lastFetchOk !== null}
-					<p>
-						<span>{status.lastFetchOk ? 'Last fetch succeeded' : 'Last fetch failed'}</span>
-						<time datetime={status.lastFetchAt}>{status.lastFetchAt}</time>
-					</p>
-				{:else}
-					<p>No fetch yet</p>
-				{/if}
-				<button
-					type="button"
-					disabled={refreshing || status.running || !status.keysOn}
-					aria-busy={refreshing || status.running}
-					onclick={refreshBrief}
-				>
-					{refreshing || status.running ? REFRESHING_LABEL : REFRESH_LABEL}
-				</button>
+				<FetchStatus
+					running={refreshing || status.running}
+					runningSince={status.runningSince}
+					lastFetchAt={status.lastFetchAt}
+					lastFetchOk={status.lastFetchOk}
+					keysOn={status.keysOn}
+					onRefresh={refreshBrief}
+				/>
 				{#if refreshMessage === REFRESH_LOGIN}
 					<p role="alert"><a href="/topics">{REFRESH_LOGIN}</a></p>
 				{:else if refreshMessage}

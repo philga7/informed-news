@@ -44,6 +44,7 @@ describe('parseBriefStatus', () => {
 			signedIn: true,
 			keysOn: true,
 			running: false,
+			runningSince: null,
 			lastFetchAt: null,
 			lastFetchOk: null,
 		});
@@ -55,9 +56,20 @@ describe('parseBriefStatus', () => {
 			signedIn: false,
 			keysOn: false,
 			running: false,
+			runningSince: null,
 			lastFetchAt: null,
 			lastFetchOk: null,
 		});
+	});
+
+	it('keeps refresh.runningSince when it is a string, and null when it is missing', () => {
+		const since = '2026-11-12T15:04:00.000Z';
+		expect(
+			parseBriefStatus({
+				refresh: { running: true, runningSince: since },
+			})?.runningSince,
+		).toBe(since);
+		expect(parseBriefStatus({ refresh: { running: true } })?.runningSince).toBeNull();
 	});
 
 	it('keeps completedAt and ok false for a last failed run', () => {
@@ -113,6 +125,7 @@ describe('loadBrief status', () => {
 			signedIn: true,
 			keysOn: false,
 			running: false,
+			runningSince: null,
 			lastFetchAt: FAILED_AT,
 			lastFetchOk: false,
 		});

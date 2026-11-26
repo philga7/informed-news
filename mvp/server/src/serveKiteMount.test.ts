@@ -30,6 +30,7 @@ async function startServer(app: { listen: (...args: any[]) => Server }): Promise
 function makeRefreshRunner(): RefreshRunner {
   return {
     isRunning: () => false,
+    runningSince: () => null,
     run: async (): Promise<never> => {
       throw new Error('unexpected refresh');
     },
