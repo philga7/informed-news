@@ -10,7 +10,7 @@ When the image is served, `/` is the shell Brief (`apps/web`) and Kite still own
 | Layer | Path | Role |
 |-------|------|------|
 | UI | `apps/kite` | SvelteKit. Default `npm run dev` still serves Kite at `/` |
-| Shell | `apps/web` | Brief at `/` and `/latest/…` when the image is served. `/shell` stays the placeholder. Kite still owns the other pages. `npm run dev` is still Kite plus the server |
+| Shell | `apps/web` | Brief at `/` and `/latest/…` when the image is served. `/shell` is the dashboard. Kite still owns the other pages. `npm run dev` is still Kite plus the server |
 | API | `mvp/server` | Express: auth, fetch, classify, articles |
 | Data | `mvp/data/*.json` | Flat-file article + meta store (gitignored) |
 | Archived UI | `_legacy/mvp-web` | Former React feed — not on the product path |

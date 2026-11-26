@@ -358,15 +358,15 @@ The footer also links to Topics. The old Radar link is gone.
 
 ## Shell
 
-The Brief at `/` is the shell. `/shell` is still a placeholder, not that Brief. It links back to the Brief at `/`. It has no Map tab and no Signals tab. A deeper page at `/shell/deep` stays on that page when you reload it.
+The Brief at `/` is the shell. `/shell` is the dashboard, not that Brief. It has no Map tab and no Signals tab. A deeper page at `/shell/deep` stays on that page when you reload it.
 
-**Scenario:** Given you open `/shell`, when the page loads, then you see the placeholder and a link to the Brief at `/`, and you do not see a Map or Signals tab.
+**Scenario:** Given you open `/shell` while signed in, when the page loads, then you see the dashboard, and you do not see a Map or Signals tab.
 
 **Scenario:** Given you open `/shell/deep`, when you reload, then you are still on that shell page.
 
 ## Posts from Grok Bot
 
-Grok Bot sends the new dashboard's content to the server: stories, story updates, Breaking items, CFP items and the CFP footer, and the Morning cards. Grok Bot is the first of the bots (agents) that may post. Each agent signs in with a token of its own, not a user account. The operator adds agents, turns one off, or gives one a new token with the `npm run agents` script, and each token is shown once. The server records which agent wrote each item. Sending the same item twice changes nothing. A story can be private to one user; only the agent that created it can read it back. The server keeps what it receives; nothing shows it yet. The contract is in [INGEST.md](INGEST.md).
+Grok Bot sends the new dashboard's content to the server: stories, story updates, Breaking items, CFP items and the CFP footer, and the Morning cards. Grok Bot is the first of the bots (agents) that may post. Each agent signs in with a token of its own, not a user account. The operator adds agents, turns one off, or gives one a new token with the `npm run agents` script, and each token is shown once. The server records which agent wrote each item. Sending the same item twice changes nothing. A story can be private to one user; only the agent that created it can read it back. The server keeps what it receives. The dashboard at `/shell` shows it. The contract is in [INGEST.md](INGEST.md).
 
 **Scenario:** Given Grok Bot has its own token, when it posts a story and then posts it again unchanged, then the story is stored once, the second post reports nothing changed, and the story is recorded as written by Grok Bot.
 
