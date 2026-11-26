@@ -546,8 +546,13 @@ export async function readIngested(pool: Pool, kind: IngestKind, id: string): Pr
       return readCfpRoundupItem(pool, id);
     case 'cfp_day_note':
       return /^\d{4}-\d{2}-\d{2}$/.test(id) ? readCfpDayNote(pool, id) : null;
-    case 'morning':
-      return readMorningItem(pool, id);
+    case 'morning': {
+      // The post names the card `card`; the read-back says the same (NEWS-272).
+      const item = await readMorningItem(pool, id);
+      if (item === null) return null;
+      const { kind: card, ...rest } = item;
+      return { ...rest, card };
+    }
     default: {
       const unexpected: never = kind;
       throw new DashboardStoreError(`unexpected kind ${String(unexpected)}`);

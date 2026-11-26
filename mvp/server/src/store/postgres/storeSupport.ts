@@ -23,6 +23,27 @@ const UNIQUE_VIOLATION = '23505';
 /** Other integrity and data errors: NOT NULL, CHECK, bad text for a type. */
 const INVALID_CODES = new Set(['23502', '23514', '23P01']);
 
+/** `story_id` becomes `storyId`, the name the post uses. */
+function fieldName(column: string): string {
+  return column.replace(/_([a-z])/g, (_all, letter: string) => letter.toUpperCase());
+}
+
+/**
+ * The message for a missing reference (NEWS-273): the field and the id that
+ * was not found, such as `storyId qa:none does not exist`. Postgres words the
+ * detail as `Key (story_id)=(qa:none) is not present in table "stories".`;
+ * only the column and the value are used, so no constraint or table name
+ * reaches the caller.
+ */
+function missingReference(error: unknown): string {
+  const detail =
+    typeof error === 'object' && error !== null && 'detail' in error && typeof error.detail === 'string'
+      ? error.detail
+      : '';
+  const found = /^Key \((\w+)\)=\((.*)\) is not present in table /s.exec(detail);
+  return found ? `${fieldName(found[1] as string)} ${found[2] as string} does not exist` : 'refers to a row that does not exist';
+}
+
 /**
  * One mapping from Postgres errors to store errors (NEWS-228). A missing
  * reference is `missing`, a duplicate key is `conflict`, and a broken rule
@@ -39,7 +60,7 @@ export function storeErrorFrom(error: unknown): unknown {
       ? ` (${error.constraint})`
       : '';
   if (code === FOREIGN_KEY_VIOLATION) {
-    return new DashboardStoreError(`refers to a row that does not exist${constraint}`, {
+    return new DashboardStoreError(missingReference(error), {
       cause: error,
       reason: 'missing',
     });

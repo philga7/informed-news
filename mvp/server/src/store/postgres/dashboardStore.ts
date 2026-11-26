@@ -564,9 +564,12 @@ export async function insertEntry(client: PoolClient, draft: EntryDraft): Promis
       );
       const row = cited.rows[0];
       if (row?.story_id !== draft.storyId) {
-        throw new DashboardStoreError('an entry can only cite a source from its own story', {
-          reason: row === undefined ? 'missing' : 'invalid',
-        });
+        throw new DashboardStoreError(
+          row === undefined
+            ? `sourceId ${source.sourceId} does not exist`
+            : 'an entry can only cite a source from its own story',
+          { reason: row === undefined ? 'missing' : 'invalid' },
+        );
       }
       url ??= row.url;
       label ??= row.outlet;
@@ -814,9 +817,12 @@ export async function insertBreakingItem(
     );
     const row = entry.rows[0];
     if (row?.story_id !== record.storyId) {
-      throw new DashboardStoreError('a Breaking item can only point at an entry of its own story', {
-        reason: row === undefined ? 'missing' : 'invalid',
-      });
+      throw new DashboardStoreError(
+        row === undefined
+          ? `entryId ${record.entryId} does not exist`
+          : 'a Breaking item can only point at an entry of its own story',
+        { reason: row === undefined ? 'missing' : 'invalid' },
+      );
     }
   }
   await client.query(
