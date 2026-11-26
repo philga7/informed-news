@@ -30,7 +30,7 @@ Accounts are invite-only, one email and password each. The operator makes them w
 
 ## Dashboard
 
-The dashboard is at `/shell`. The home page stays the Brief at `/`. The dashboard nav is Home and Topics.
+The dashboard is at `/shell`. The home page stays the Brief at `/`. The dashboard is dark, with dividers rather than boxes. The dashboard nav is Home and Topics.
 
 Signed in, you see how many trackers have news (each story with new entries, then Weather when it has news), then Breaking, Developing stories, Morning, CFP, and My topics. Breaking, CFP, and My topics say they are not on this page yet.
 

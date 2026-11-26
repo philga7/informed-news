@@ -296,6 +296,7 @@
 	const views = $derived(viewsFor(morning, new Date()));
 </script>
 
+<div class="row">
 {#each views as view (view.title)}
 	<section>
 		<h3>{view.title}</h3>
@@ -369,9 +370,63 @@
 		{/if}
 	</section>
 {/each}
+</div>
 
 <style>
+	.row {
+		display: grid;
+		grid-template-columns: repeat(4, minmax(0, 1fr));
+	}
+
+	section {
+		min-width: 0;
+		padding: 0 0.9rem;
+		border-left: 1px solid #2c3038;
+	}
+
+	section:first-child {
+		padding-left: 0;
+		border-left: 0;
+	}
+
+	h3 {
+		margin: 0 0 0.45rem;
+		font-size: 0.72rem;
+		font-weight: 600;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: #9c978c;
+	}
+
+	p {
+		margin: 0.2rem 0;
+	}
+
+	table {
+		border-collapse: collapse;
+		font-size: 0.8rem;
+		color: #d9d4c8;
+	}
+
+	th,
+	td {
+		padding: 0.15rem 0.35rem 0.15rem 0;
+		font-weight: 500;
+		text-align: left;
+	}
+
 	[data-tone='alert'] {
 		color: #c4841d;
+	}
+
+	@media (max-width: 52rem) {
+		.row {
+			grid-template-columns: 1fr 1fr;
+		}
+
+		section:nth-child(odd) {
+			padding-left: 0;
+			border-left: 0;
+		}
 	}
 </style>

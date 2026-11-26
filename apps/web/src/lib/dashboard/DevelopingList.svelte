@@ -227,35 +227,35 @@
 {#snippet storyRow(row: DashboardStory)}
 	{@const line = entryLine(row, Date.now())}
 	<article aria-labelledby={rowDomId(row.id)}>
-		<p>
+		<p class="kicker">
 			<span>{statusWord(row.status)}</span>
 			{#if row.role === 'branch'}
 				<span>Branch</span>
 			{/if}
-			{#if row.hubTitle !== null}
-				<span>part of {row.hubTitle}</span>
-			{/if}
 			{#if row.newCount > 0}
-				<span>+{row.newCount} new</span>
+				<span class="count">+{row.newCount} new</span>
 			{/if}
 		</p>
-		<p id={rowDomId(row.id)}>{row.title}</p>
+		<p class="title" id={rowDomId(row.id)}>{row.title}</p>
 		{#if row.private}
-			<p>Private</p>
+			<p class="meta">Private</p>
+		{/if}
+		{#if row.hubTitle !== null}
+			<p class="part">part of {row.hubTitle}</p>
 		{/if}
 		{#if row.nowSummary !== null}
-			<p>{row.nowSummary}</p>
+			<p class="now">{row.nowSummary}</p>
 		{/if}
 		{#if line?.kind === 'time'}
-			<p>{line.clock} {line.relative}</p>
+			<p class="meta">{line.clock} {line.relative}</p>
 		{:else if line?.kind === 'day'}
-			<p>{line.label}</p>
+			<p class="meta">{line.label}</p>
 		{/if}
 		{#if row.readUpTo !== null}
-			<p>{readUpToLine(row.readUpTo)}</p>
+			<p class="meta">{readUpToLine(row.readUpTo)}</p>
 		{/if}
 		{#if hasAccount}
-			<p>
+			<p class="actions">
 				<button type="button" onclick={() => onFollow(row)}>{followWord(row)}</button>
 				<span> · </span>
 				<button type="button" onclick={() => onHide(row)}>Hide</button>
@@ -267,7 +267,7 @@
 {#if empty}
 	<p>nothing yet</p>
 {:else}
-	<div role="group" aria-label="Categories">
+	<div class="chips" role="group" aria-label="Categories">
 		<button
 			type="button"
 			aria-pressed={selectedCategoryId === null ? 'true' : 'false'}
@@ -289,7 +289,7 @@
 		{@render storyRow(row)}
 	{/each}
 	{#if quietShown.length > 0}
-		<h3>Quiet</h3>
+		<h3 class="quiet">Quiet</h3>
 		{#each quietShown as row (row.id)}
 			{@render storyRow(row)}
 		{/each}
@@ -297,7 +297,7 @@
 {/if}
 
 {#if hasAccount && hidden.length >= 1}
-	<p>{hidden.length} hidden · <button type="button" onclick={() => (hiddenOpen = true)}>show</button></p>
+	<p class="foot">{hidden.length} hidden · <button type="button" onclick={() => (hiddenOpen = true)}>show</button></p>
 	{#if hiddenOpen}
 		<ul>
 			{#each hidden as item (item.id)}
@@ -309,3 +309,124 @@
 		</ul>
 	{/if}
 {/if}
+
+<style>
+	.chips {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.4rem;
+		margin: 0 0 0.4rem;
+	}
+
+	.chips button,
+	.actions button,
+	.foot button,
+	li button {
+		font: inherit;
+		color: inherit;
+		background: transparent;
+		cursor: pointer;
+	}
+
+	.chips button {
+		border: 1px solid #3c414b;
+		border-radius: 999px;
+		padding: 0.15rem 0.65rem;
+		font-size: 0.8rem;
+		color: #d9d4c8;
+	}
+
+	.chips button[aria-pressed='true'] {
+		background: #e6e2d8;
+		border-color: #e6e2d8;
+		color: #14161a;
+	}
+
+	article {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) auto;
+		column-gap: 1rem;
+		padding: 0.85rem 0;
+		border-top: 1px solid #2c3038;
+	}
+
+	.kicker,
+	.title,
+	.meta,
+	.part,
+	.now,
+	.actions {
+		margin: 0;
+	}
+
+	.kicker {
+		grid-column: 1;
+		font-size: 0.72rem;
+		font-weight: 600;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		color: #9c978c;
+	}
+
+	.count {
+		color: #e6e2d8;
+	}
+
+	.title {
+		grid-column: 1;
+		font-size: 1.05rem;
+	}
+
+	.part,
+	.now,
+	.meta {
+		grid-column: 1;
+		color: #b7b2a6;
+	}
+
+	.now {
+		color: #e6e2d8;
+	}
+
+	.actions {
+		grid-column: 2;
+		grid-row: 1 / span 5;
+		align-self: start;
+		color: #d9d4c8;
+		font-size: 0.85rem;
+	}
+
+	.actions button,
+	.foot button,
+	li button {
+		border: 0;
+		padding: 0;
+	}
+
+	.quiet {
+		margin: 1.1rem 0 0;
+		font-size: 0.72rem;
+		font-weight: 600;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: #9c978c;
+	}
+
+	.foot {
+		color: #9c978c;
+	}
+
+	ul {
+		margin: 0.4rem 0 0;
+		padding: 0;
+		list-style: none;
+	}
+
+	li {
+		display: flex;
+		justify-content: space-between;
+		gap: 1rem;
+		padding: 0.45rem 0;
+		border-top: 1px solid #2c3038;
+	}
+</style>

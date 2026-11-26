@@ -21,6 +21,7 @@ Binding choices for Informed News. Newest first. When one of these changes, upda
 - A branch is its own row, with the hub it is part of and a Branch mark beside its status. Hiding a hub does not hide its branches. Titles are not links. A private story is marked Private for its owner and for the admin.
 - Every clock on this page uses the reader's local zone, plus a relative age on a timed entry. A day-precision entry shows its UTC date and no clock. The weather card does not show its body. An alert shows in amber and that location's note does not. A note alone shows in the normal color. BLUF is its text. OSINT is its text plus the Watch line when there is one. A card with nothing keeps its heading and says nothing yet.
 - The admin is the account whose email matches `OPERATOR_EMAIL`, ignoring case. No user id means not admin.
+- On the same day, after the first review, Phil pulled the Round 2 visual styling into this step: dark page, dividers rather than boxes, chips, cards, and the amber weather alert. The Brief at `/` is not restyled beyond the shared status line.
 
 **Why:** Phil decided on 2026-11-26, before the home shell was built. The ticket text was from 13 Nov, before the sequence, the accounts, and the Morning cards. These answers are what the shell shows and what the two user routes do. The refresh line stays the pipeline status the Brief already loads, so one component can sit on both pages. The mockup's content clock mixes in CFP, which is a later step.
 

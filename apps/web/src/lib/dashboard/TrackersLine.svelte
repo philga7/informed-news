@@ -23,8 +23,8 @@
 	let { trackers }: Props = $props();
 </script>
 
-<div>
-	<p>{trackerSentence(trackers)}</p>
+<div class="line">
+	<p class="count">{trackerSentence(trackers)}</p>
 	{#if trackers.stories.length > 0 || trackers.weather !== null}
 		<ul style="display: flex; flex-wrap: wrap; gap: 0.75rem; list-style: none; margin: 0; padding: 0;">
 			{#each trackers.stories as story (story.id)}
@@ -36,3 +36,22 @@
 		</ul>
 	{/if}
 </div>
+
+<style>
+	.line {
+		padding: 0.9rem 0 0.2rem;
+	}
+
+	.count {
+		margin: 0 0 0.45rem;
+		font-size: 0.95rem;
+	}
+
+	li {
+		border: 1px solid #3c414b;
+		border-radius: 999px;
+		padding: 0.15rem 0.65rem;
+		font-size: 0.8rem;
+		color: #d9d4c8;
+	}
+</style>

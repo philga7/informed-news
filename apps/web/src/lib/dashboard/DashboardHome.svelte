@@ -197,56 +197,170 @@
 	});
 </script>
 
-<header>
-	<h1>Informed News</h1>
-	<p>informed-news</p>
-	<nav>
-		<a href="/shell">Home</a>
-		<a href="/topics">Topics</a>
-	</nav>
-	{#if view.kind === 'ready' && view.status}
-		<FetchStatus
-			running={refreshing || view.status.running}
-			runningSince={view.status.runningSince}
-			lastFetchAt={view.status.lastFetchAt}
-			lastFetchOk={view.status.lastFetchOk}
-			keysOn={view.status.keysOn}
-			onRefresh={refreshPipeline}
-		/>
-	{/if}
-</header>
+<div class="dash">
+	<header>
+		<div class="brand">
+			<h1>Informed News</h1>
+			<p>informed-news</p>
+		</div>
+		<nav>
+			<a href="/shell" aria-current="page">Home</a>
+			<a href="/topics">Topics</a>
+		</nav>
+		{#if view.kind === 'ready' && view.status}
+			<div class="status">
+				<FetchStatus
+					running={refreshing || view.status.running}
+					runningSince={view.status.runningSince}
+					lastFetchAt={view.status.lastFetchAt}
+					lastFetchOk={view.status.lastFetchOk}
+					keysOn={view.status.keysOn}
+					onRefresh={refreshPipeline}
+				/>
+			</div>
+		{/if}
+	</header>
 
-{#if view.kind === 'signed-out'}
-	<p><a href="/topics">Sign in to see the dashboard</a></p>
-{:else if view.kind === 'unavailable'}
-	<p>data unavailable</p>
-{:else if view.kind === 'ready'}
-	<TrackersLine trackers={view.dashboard.trackers} />
-	<section>
-		<h2>Breaking</h2>
-		<p>Not on this page yet</p>
-	</section>
-	<section>
-		<h2>Developing stories</h2>
-		<DevelopingList
-			developing={view.dashboard.developing}
-			quiet={view.dashboard.quiet}
-			categories={view.dashboard.categories}
-			hidden={view.dashboard.hidden}
-			hasAccount={view.hasAccount}
-			onReload={load}
-		/>
-	</section>
-	<section>
-		<h2>Morning</h2>
-		<MorningCards morning={view.dashboard.morning} />
-	</section>
-	<section>
-		<h2>CFP</h2>
-		<p>Not on this page yet</p>
-	</section>
-	<section>
-		<h2>My topics</h2>
-		<p>Not on this page yet</p>
-	</section>
-{/if}
+	{#if view.kind === 'signed-out'}
+		<p class="notice"><a href="/topics">Sign in to see the dashboard</a></p>
+	{:else if view.kind === 'unavailable'}
+		<p class="notice">data unavailable</p>
+	{:else if view.kind === 'ready'}
+		<TrackersLine trackers={view.dashboard.trackers} />
+		<section>
+			<h2>Breaking</h2>
+			<p class="empty">Not on this page yet</p>
+		</section>
+		<section>
+			<h2>Developing stories</h2>
+			<DevelopingList
+				developing={view.dashboard.developing}
+				quiet={view.dashboard.quiet}
+				categories={view.dashboard.categories}
+				hidden={view.dashboard.hidden}
+				hasAccount={view.hasAccount}
+				onReload={load}
+			/>
+		</section>
+		<section>
+			<h2>Morning</h2>
+			<MorningCards morning={view.dashboard.morning} />
+		</section>
+		<section>
+			<h2>CFP</h2>
+			<p class="empty">Not on this page yet</p>
+		</section>
+		<section>
+			<h2>My topics</h2>
+			<p class="empty">Not on this page yet</p>
+		</section>
+	{/if}
+</div>
+
+<style>
+	.dash {
+		min-height: 100vh;
+		box-sizing: border-box;
+		background: #14161a;
+		color: #e6e2d8;
+		font-family: system-ui, sans-serif;
+		font-size: 15px;
+		line-height: 1.45;
+		padding: 1.25rem 1.5rem 3rem;
+	}
+
+	header {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.75rem 1.25rem;
+		padding-bottom: 0.85rem;
+		border-bottom: 1px solid #2c3038;
+	}
+
+	.brand {
+		display: flex;
+		align-items: baseline;
+		gap: 0.6rem;
+		margin-right: auto;
+	}
+
+	.brand :global(h1),
+	.brand p {
+		margin: 0;
+		font-size: 1rem;
+		font-weight: 600;
+		letter-spacing: -0.01em;
+	}
+
+	.brand p {
+		color: #9c978c;
+		font-weight: 500;
+	}
+
+	nav {
+		display: flex;
+		gap: 0.9rem;
+	}
+
+	nav a {
+		color: #c8c3b8;
+		text-decoration: none;
+	}
+
+	nav a[aria-current='page'] {
+		color: #f3efe6;
+	}
+
+	.status {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.65rem;
+		color: #b7b2a6;
+		font-size: 0.85rem;
+	}
+
+	.status :global(p) {
+		margin: 0;
+	}
+
+	.status :global(button) {
+		font: inherit;
+		color: #f3efe6;
+		background: transparent;
+		border: 1px solid #3c414b;
+		border-radius: 999px;
+		padding: 0.2rem 0.7rem;
+		cursor: pointer;
+	}
+
+	.status :global(button:disabled) {
+		opacity: 0.45;
+		cursor: default;
+	}
+
+	section {
+		padding: 1.1rem 0 0.2rem;
+		border-top: 1px solid #2c3038;
+	}
+
+	h2 {
+		margin: 0 0 0.7rem;
+		font-size: 0.72rem;
+		font-weight: 600;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: #9c978c;
+	}
+
+	.empty,
+	.notice {
+		margin: 0.4rem 0 1rem;
+		color: #9c978c;
+	}
+
+	.notice a {
+		color: #e6e2d8;
+	}
+</style>
