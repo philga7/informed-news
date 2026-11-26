@@ -43,7 +43,7 @@ test('a caller id is 1 to 200 letters, digits, dot, underscore, colon or hyphen'
   assert.equal(idOrNew('given', 'id'), 'given');
 });
 
-test('Postgres errors map to one store error each, naming the constraint and no SQL', () => {
+test('Postgres errors map to one store error each, naming the field and no SQL', () => {
   const pg = (code: string) =>
     Object.assign(new Error('insert or update on table "x" violates ... SQL text'), {
       code,
@@ -52,7 +52,13 @@ test('Postgres errors map to one store error each, naming the constraint and no 
   const missing = storeErrorFrom(pg('23503'));
   assert.ok(missing instanceof DashboardStoreError);
   assert.equal(missing.reason, 'missing');
-  assert.equal(missing.message, 'refers to a row that does not exist (x_fkey)');
+  assert.equal(missing.message, 'refers to a row that does not exist');
+  const named = storeErrorFrom(
+    Object.assign(pg('23503'), { detail: 'Key (story_id)=(qa:none) is not present in table "stories".' }),
+  );
+  assert.ok(named instanceof DashboardStoreError);
+  assert.equal(named.reason, 'missing');
+  assert.equal(named.message, 'storyId qa:none does not exist');
 
   const duplicate = storeErrorFrom(pg('23505'));
   assert.ok(duplicate instanceof DashboardStoreError);

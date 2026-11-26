@@ -40,7 +40,7 @@ One item answers with its status and `{ "kind", "id", "outcome" }`. A batch alwa
 | 503 | `unavailable` | The database cannot be reached. Retry later |
 | 500 | `error` | Unexpected. The server log has a line without the item's content |
 
-Errors never contain SQL text.
+Errors never contain SQL text, constraint names or table names. A `missing` error names the field and the id it could not find, such as `storyId qa:none does not exist`.
 
 ## Ids and retries
 

@@ -140,6 +140,31 @@ test('a Morning item reads back with its card as `card`, not `kind` (NEWS-272)',
   }
 });
 
+test('a missing reference answers 422 missing and names the field and id, never a constraint (NEWS-273)', async (t) => {
+  const post = await serve(t, config());
+  const hub = story();
+  assert.equal((await post('/api/ingest', { json: hub })).status, 201);
+  const entry = { kind: 'entry', id: uid('entry'), storyId: hub.id, occurredAt: '2026-11-23T18:45:00Z', precision: 'time', headline: 'H', label: 'working' };
+  assert.equal((await post('/api/ingest', { json: entry })).status, 201);
+  const breaking = { kind: 'breaking', occurredAt: '2026-11-23T21:00:00Z', headline: 'Ping', label: 'single_outlet' };
+
+  const cases: Array<[string, string, unknown]> = [
+    ['storyId', 'qa:none', { ...breaking, id: uid('b'), storyId: 'qa:none' }],
+    ['entryId', 'qa:no-entry', { ...breaking, id: uid('b'), storyId: hub.id, entryId: 'qa:no-entry' }],
+    ['storyId', 'qa:none', { ...entry, id: uid('entry'), storyId: 'qa:none' }],
+    ['sourceId', 'qa:no-source', { ...entry, id: uid('entry'), sources: [{ sourceId: 'qa:no-source' }] }],
+    ['hubId', 'qa:no-hub', story(undefined, { role: 'branch', hubId: 'qa:no-hub' })],
+  ];
+  for (const [field, id, json] of cases) {
+    const res = await post('/api/ingest', { json });
+    const body = (await res.json()) as { error: string; reason: string };
+    assert.equal(res.status, 422, body.error);
+    assert.equal(body.reason, 'missing');
+    assert.equal(body.error, `${field} ${id} does not exist`);
+    assert.doesNotMatch(body.error, /_fkey|_id\b|breaking_items|story_entries|stories/);
+  }
+});
+
 test('a refused item answers 409 or 422 with a reason and no SQL text', async (t) => {
   const post = await serve(t, config());
   const item = story();

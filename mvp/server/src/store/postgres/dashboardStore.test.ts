@@ -307,7 +307,9 @@ test('an entry source can point at a source of the same story, and only that sto
         storyId: story.id,
         sources: [{ url: 'https://example.com/b', label: 'Wire', sourceId }],
       }),
-      /an entry can only cite a source from its own story/,
+      sourceId === 'missing-source'
+        ? /sourceId missing-source does not exist/
+        : /an entry can only cite a source from its own story/,
     );
   }
   assert.equal((await entries()).rowCount, before, 'a refused entry leaves nothing behind');
