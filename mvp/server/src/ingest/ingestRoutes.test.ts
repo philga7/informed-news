@@ -120,6 +120,26 @@ test('one item: created 201, then unchanged 200; a story re-post is updated 200'
   assert.equal((await post('/api/ingest/widget/x')).status, 404);
 });
 
+test('a Morning item reads back with its card as `card`, not `kind` (NEWS-272)', async (t) => {
+  const post = await serve(t, config());
+  for (const card of ['bluf', 'weather', 'market', 'osint']) {
+    const data =
+      card === 'weather'
+        ? { unit: 'F', issuedAt: '2026-11-20T06:32:00-05:00', days: ['2026-11-20'], locations: [{ name: 'Dahlonega', days: [{ high: 57, low: 51 }] }] }
+        : card === 'market' ? { quotes: [{ label: 'S&P', value: 7520.93 }] } : undefined;
+    const item = { kind: 'morning', id: uid('m'), card, body: `The ${card} card.`, postedAt: '2026-11-23T11:32:00Z', ...(data ? { data } : {}) };
+    assert.equal((await post('/api/ingest', { json: item })).status, 201, card);
+    const read = (await (await post(`/api/ingest/morning/${encodeURIComponent(item.id)}`)).json()) as {
+      kind: string;
+      item: Record<string, unknown>;
+    };
+    assert.equal(read.kind, 'morning');
+    assert.equal(read.item.card, card);
+    assert.equal('kind' in read.item, false, 'the card name is not under kind');
+    assert.equal(read.item.body, item.body);
+  }
+});
+
 test('a refused item answers 409 or 422 with a reason and no SQL text', async (t) => {
   const post = await serve(t, config());
   const item = story();

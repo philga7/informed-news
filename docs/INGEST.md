@@ -21,7 +21,7 @@ Every request sends `Authorization: Bearer <INGEST_TOKEN>` (the word Bearer in a
 |---|---|
 | `POST /api/ingest` with one item `{ "kind": …, … }` | Stores one item |
 | `POST /api/ingest` with `{ "items": [ … ] }` | Stores 1 to 100 items in order, each in its own transaction. An entry can follow its story in the same batch. One request writes up to 2,000 rows, nested rows included; a larger batch is refused whole with **422** |
-| `GET /api/ingest/<kind>/<id>` | Reads back what the site holds for one item. The CFP footer's id is its day |
+| `GET /api/ingest/<kind>/<id>` | Reads back what the site holds for one item as `{ "kind", "item" }`. The item uses the same field names as the post, so a Morning item's card is `card`. The CFP footer's id is its day |
 
 The body may be up to 1 MB. A larger body answers **413**; send a smaller batch. A body that is not JSON answers **400**, and one that cannot be read (such as an unsupported charset) answers with its own 4xx status.
 

@@ -98,7 +98,7 @@ test('the batch is created, read back, and unchanged on a second post', async (t
 
   for (const posted of ofKind('morning')) {
     const read = await api.get('morning', posted.id);
-    assert.equal(read.kind, posted.card);
+    assert.equal(read.card, posted.card);
     assert.equal(read.body, posted.body);
   }
 
