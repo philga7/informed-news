@@ -24,7 +24,7 @@ The rules behind the tables:
 | Confirmed, backed by two or more outlets with separate sourcing (AP and Reuters, wire and mainstream) | `reported` | |
 | Confirmed, backed by one outlet only (`Confirmed (NBC)`, `Confirmed (wire)`, `confirmed (single outlet…)`) | `single_outlet` | Δ |
 | Confirmed as statement(s), as a letter, as a poll result; `Statements confirmed` | `on_record` (the statement is confirmed, not its content) | Δ |
-| Confirmed as order; `Confirmed charge` | `official` (keep "conduct is an allegation" in the text) | Δ |
+| Confirmed as order (an order that is not a court ruling; a court order is the first row); `Confirmed charge` | `official` (keep "conduct is an allegation" in the text) | Δ |
 | Confirmed, with context or caveat; `Arithmetic confirmed` | the label for what confirms it, with the caveat kept in the text | Δ |
 | Partly confirmed, Confirmed in part, Partly documented | `working` | Δ |
 | Working, Working (single-outlet package) | `working` | |
@@ -54,7 +54,7 @@ The rules behind the tables:
 | `vendor-attributed` (security vendor names an actor) | `working` | Δ |
 | Dormant, Clarify, Retired, `resolved: stale lead`, `consistent_with_precedent` | not a label: no entry | Δ |
 
-**Timeline `Tag` values and story-file `confidence` values** (a `Reported` or `Reported record` tag maps as in the first table):
+**Timeline `Tag` values and story-file `confidence` values** (a `Reported` or `Reported record` tag maps as in the first table, and the Single source / Partly reported row below also applies to those values as a Strength):
 
 | Page value | Maps to | Δ |
 |---|---|---|
@@ -86,7 +86,7 @@ The rules behind the tables:
 
 **The Morning export answers:**
 
-- **BLUF** is written last each morning by informed-news Bot, from the other three cards and Breaking. Until it is, fixtures keep the mock BLUF, flagged as a mock value.
+- **BLUF** is written last each morning by informed-news Bot, from the other three cards and Breaking. Until it is, fixtures keep the mock BLUF, flagged `mock value` in the export's sidecar notes (the JSON has no field for it).
 - **OSINT** is one combined card, as the mockup shows. Its line is written by the intel desk bot.
 - **Weather:** the grid (highs, lows, rain chance) comes from ECMWF, the source the mockup's card names. The post's NWS wording stays in `body`, which the card does not show. The card shows a location's `alert` (an NWS watch, warning or advisory) in amber, in the place where a `note` would go, so an export sends at most one of the two per location. The contract still accepts both.
 - **Market:** a quote's `value` stays required, so the export sends the real value. The card shows only what the mockup shows: S&P with value and change, Nasdaq with change only, and VIX with value only.
