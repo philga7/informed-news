@@ -1,3 +1,9 @@
+## [0.47.0](https://github.com/philga7/informed-news/compare/v0.46.1...v0.47.0) (2026-11-26)
+
+### Features
+
+* **NEWS-263:** one token per agent, with written_by on every row ([#304](https://github.com/philga7/informed-news/issues/304)) ([f131c2a](https://github.com/philga7/informed-news/commit/f131c2aa7dda63927af13db0eb3039c6651e8467))
+
 ## [0.46.1](https://github.com/philga7/informed-news/compare/v0.46.0...v0.46.1) (2026-11-26)
 
 ### Bug Fixes
