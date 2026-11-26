@@ -1,6 +1,6 @@
 # Ingest contract
 
-How an agent posts to the site. An agent is any program given a token, such as a bot. Grok Bot is the first agent, and the contract is not tied to it. One route takes every kind of item: stories, story updates (entries), Breaking items, CFP items, the CFP footer, and Morning items. The same route serves moving a story into the site (see [Moving a story](#moving-a-story)) and the ongoing posts. Decided in [DECISIONS.md](DECISIONS.md) (2026-11-16 ingest contract, 2026-11-23 NEWS-228, 2026-11-24 NEWS-262). The code is in `mvp/server/src/ingest/` and `mvp/server/src/store/postgres/ingestStore.ts`.
+How an agent posts to the site. An agent is any program given a token, such as a bot. Grok Bot is the first agent, and the contract is not tied to it. One route takes every kind of item: stories, story updates (entries), Breaking items, CFP items, the CFP footer, and Morning items. The same route serves moving a story into the site (see [Moving a story](#moving-a-story)) and the ongoing posts. Decided in [DECISIONS.md](DECISIONS.md) (2026-11-16 ingest contract, 2026-11-23 NEWS-228, 2026-11-24 NEWS-262, 2026-11-26 NEWS-263). The code is in `mvp/server/src/ingest/`, `mvp/server/src/store/postgres/ingestStore.ts` and `agentStore.ts`.
 
 Users do not use this route. They read and write through session routes in the site, which share the same store and field rules (built with the UI steps in [ROADMAP.md](ROADMAP.md#ui-build-sequence-2026-11-16)).
 
@@ -8,20 +8,41 @@ This is version 1 of the contract. A breaking change would come at a new path, `
 
 ## Setup
 
-- Set `INGEST_TOKEN` in the env file (`mvp/.env`): a random string of at least 32 characters, for example `openssl rand -hex 32`. It is separate from user sign-in and is never logged. Today this one token is the one agent's token. Giving each agent its own token is decided and not built yet (see [Decided, not built yet](#decided-not-built-yet)).
+- The Postgres settings must be in the env file (`mvp/.env`). The route applies the dashboard schema on first use. With no database, every request with a well-formed token answers **503**, and the rest of the server runs as before.
+- Each agent has its own token, made with the operator command below. A token is separate from user sign-in, is shown once, and is never logged. The site keeps only its SHA-256 hash.
 - The site is reachable only over Tailscale, so an agent must be on the tailnet to post.
-- The Postgres settings must be in the env file too. The route applies the dashboard schema on first use.
-- With no token, or a token shorter than 32 characters, every request answers **503**. With no database, a request with the right token answers **503** (a wrong token still answers **401**). The rest of the server runs as before.
+- `INGEST_TOKEN` is retired. If the env file still sets it, the server ignores it and logs one line saying so; remove it.
+
+### Agents
+
+An agent is added, listed, turned off and given a new token with `npm run agents --prefix mvp/server -- <command>`, run where the server runs with the same env file, like `npm run users` for accounts:
+
+| Command | What it does |
+|---|---|
+| `add --name <name> [--claim-unattributed]` | Adds an agent and prints its token once. Names are unique, whatever their case. `--claim-unattributed` also gives the new agent every row written before agents existed (see below) and prints how many |
+| `list` | Prints each agent's id, name, whether it is enabled, and when it was added. Never the token or its hash |
+| `disable --name <name>` | Turns the agent off: its token answers **401** at once. Its rows keep naming it. There is no command to turn it back on yet |
+| `rotate --name <name>` | Prints a new token once; the old one answers **401** at once. It does not turn a disabled agent back on |
+| `claim --name <name>` | Gives an existing agent every row written before agents existed, as `add --claim-unattributed` does, and prints how many |
+
+### Moving from `INGEST_TOKEN` (once per instance, QA first, then live)
+
+Rows written under `INGEST_TOKEN` have no writer. The first agent claims them, so Grok Bot keeps the stories it already posted, including reading back its private ones.
+
+1. Deploy the release with agents. From then on, posts with the old token answer **401** until step 3; Grok Bot's retries are safe.
+2. Run `npm run agents --prefix mvp/server -- add --name "Grok Bot" --claim-unattributed`. Copy the token it prints.
+3. Put that token in Grok Bot's settings in place of the old one, and check that a post and a read-back work.
+4. Remove `INGEST_TOKEN` from the env file and restart, so the warning line stops.
 
 ## Requests
 
-Every request sends `Authorization: Bearer <INGEST_TOKEN>` (the word Bearer in any case). No session cookie is needed or used. A missing or wrong token answers **401**, and the body is not read.
+Every request sends `Authorization: Bearer <token>`, the agent's own token (the word Bearer in any case). No session cookie is needed or used. A missing, malformed or unknown token, or the token of a disabled agent, answers **401**, and the body is not read.
 
 | Request | What it does |
 |---|---|
 | `POST /api/ingest` with one item `{ "kind": …, … }` | Stores one item |
 | `POST /api/ingest` with `{ "items": [ … ] }` | Stores 1 to 100 items in order, each in its own transaction. An entry can follow its story in the same batch. One request writes up to 2,000 rows, nested rows included; a larger batch is refused whole with **422** |
-| `GET /api/ingest/<kind>/<id>` | Reads back what the site holds for one item as `{ "kind", "item" }`. The item uses the same field names as the post, so a Morning item's card is `card`. The CFP footer's id is its day |
+| `GET /api/ingest/<kind>/<id>` | Reads back what the site holds for one item as `{ "kind", "item" }`. The item uses the same field names as the post, so a Morning item's card is `card`. The CFP footer's id is its day. The item also says who wrote it, in `writtenBy`, and a story who created it, in `createdBy` (see [Who wrote what](#who-wrote-what)). A private story reads back only for the agent that created it (see [Private stories](#private-stories)) |
 
 The body may be up to 1 MB. A larger body answers **413**; send a smaller batch. A body that is not JSON answers **400**, and one that cannot be read (such as an unsupported charset) answers with its own 4xx status.
 
@@ -51,6 +72,15 @@ Every item carries its own `id`: 1 to 200 letters, digits, `.`, `_`, `:` or `-`,
 - **CFP footer:** one per day. A new note for a day replaces the old.
 
 A retry of anything is always safe.
+
+## Who wrote what
+
+Every row an agent posts records the agent as its writer: the story and each of its nested rows, entries, Breaking items, CFP items, the CFP footer, and Morning items. (Users will write through the site's own routes, and their rows record the user.) A read-back shows it as `"writtenBy": { "agent": "<agent id>" }`, or `{ "user": "<user id>" }`. A row written before agents existed and not claimed shows `null`.
+
+- A post that changes nothing keeps the writer the row had. The same entry, Breaking, CFP or Morning item posted again by another agent is `unchanged`, and still names its first writer.
+- A story keeps the agent that created it (`createdBy`). Its `writtenBy` is the last agent whose post changed it or one of its nested rows. Each nested row keeps the agent that last changed it.
+- Another agent may re-post a shared story today. Only the agent that created a story may soft-remove it, once soft removes are built ([Decided, not built yet](#decided-not-built-yet)). A private story is only its creator's (see [Private stories](#private-stories)).
+- A story written before agents and not claimed can be posted unchanged, and entries and other items can point at it, but a post that would change it, its own fields or a nested row, answers **409** until the operator claims it (see [Agents](#agents)).
 
 ## Times
 
@@ -197,7 +227,7 @@ A story post with `ownerUserId` is private to that user. The id must be an exist
 
 A private story cannot have branches. A branch cannot be private, a branch cannot sit under a private hub, and a hub that has branches cannot be made private. Each of these is a 422. This is settled ([DECISIONS.md](DECISIONS.md#2026-11-23--the-per-user-answers-branches-admin-visibility-following-and-who-builds-the-controls-news-260)).
 
-Today's single token can read every private story back through `GET /api/ingest/story/<id>`. Once each agent has its own token, an agent reads back the private stories it wrote. In the site, the admin (the account named by `OPERATOR_EMAIL`) sees every private story, whoever wrote it, including the ones Grok Bot writes. Any other user sees only their own.
+A private story belongs to the agent that created it. Another agent's post of that story id answers **409** (`story id … is taken`) and changes nothing, and its entry or Breaking item that points at the story answers **422** `missing` (`storyId … does not exist`). A private story reads back only for the agent that created it, and so do its entries, whoever posted them. A Breaking item that points at a private story reads back for that agent and for the agent that posted the item (which can differ when the story was made private after the item was posted). Any other agent gets **404**, the same answer as for an id that does not exist. A private story posted before agents existed reads back for no agent until it is claimed (see [Agents](#agents)). In the site, the admin (the account named by `OPERATOR_EMAIL`) sees every private story, whoever wrote it, including the ones Grok Bot writes. Any other user sees only their own.
 
 ## Moving a story
 
@@ -212,10 +242,8 @@ The site keeps no "moved" flag: a story that is in the site has moved. Posting a
 
 ## Decided, not built yet
 
-Decided in [DECISIONS.md](DECISIONS.md#2026-11-24--agent-contract-user-api-deletes-moving-stories-and-hosting-news-262). None of this works yet. Each part comes with its own ticket: [ROADMAP.md](ROADMAP.md#ui-build-sequence-2026-11-16) rows 5a to 5c (NEWS-263 to NEWS-265), and the JSON Schema as a follow-up outside the sequence (NEWS-266).
-
-- **One token per agent.** Each agent gets its own token, which can be turned off on its own, and every row records who wrote it (`written_by`). `INGEST_TOKEN` is then removed, and the token Grok Bot holds is re-issued as its own.
-- **A list read.** The stories an agent may see (every shared story, plus the private ones it wrote), each with its status, last-checked and next-check times, and its latest entry, in pages.
+Decided in [DECISIONS.md](DECISIONS.md#2026-11-24--agent-contract-user-api-deletes-moving-stories-and-hosting-news-262). None of this works yet. Each part comes with its own ticket: [ROADMAP.md](ROADMAP.md#ui-build-sequence-2026-11-16) rows 5b and 5c (NEWS-264, NEWS-265), and the JSON Schema as a follow-up outside the sequence (NEWS-266). One token per agent, row 5a, is built (NEWS-263; see [Agents](#agents)).
+- **A list read.** The stories an agent may see (every shared story, plus the private ones it created), each with its status, last-checked and next-check times, and its latest entry, in pages.
 - **Corrections.** A correction is a new entry that may name, in `corrects`, an entry of the same story. Until then, post a new entry with a new id, as above.
 - **Soft removes.** An agent may remove an item it wrote, a story included (a story is the agent's that created it, even after the admin edits it), with a reason. The stored item is kept; readers see "Removed on <date>: <reason>" in its place, and a removed story drops out of readers' lists. An agent never edits a fixed item or removes another writer's item.
 - **Hard deletes** are made only by the admin, for the reasons listed in the decision, and never through this contract.
@@ -225,7 +253,7 @@ Decided in [DECISIONS.md](DECISIONS.md#2026-11-24--agent-contract-user-api-delet
 
 ```bash
 curl -sS https://<host>/api/ingest \
-  -H "Authorization: Bearer $INGEST_TOKEN" -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer $AGENT_TOKEN" -H 'Content-Type: application/json' \
   -d '{"items":[
     {"kind":"story","id":"grok:story:musk-spacex","role":"hub","title":"Democratic proposals to curb Musk and SpaceX","status":"developing",
      "sources":[{"id":"grok:src:axios-1103","outlet":"Axios","url":"https://example.com/axios"}]},
@@ -235,5 +263,5 @@ curl -sS https://<host>/api/ingest \
      "tags":[{"slug":"probes","name":"#probes"}]}
   ]}'
 
-curl -sS https://<host>/api/ingest/story/grok:story:musk-spacex -H "Authorization: Bearer $INGEST_TOKEN"
+curl -sS https://<host>/api/ingest/story/grok:story:musk-spacex -H "Authorization: Bearer $AGENT_TOKEN"
 ```

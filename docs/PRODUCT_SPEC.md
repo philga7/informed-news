@@ -342,13 +342,19 @@ The Brief at `/` is the shell. `/shell` is still a placeholder, not that Brief. 
 
 ## Posts from Grok Bot
 
-Grok Bot sends the new dashboard's content to the server: stories, story updates, Breaking items, CFP items and the CFP footer, and the Morning cards. It signs in with a token of its own, not a user account. Sending the same item twice changes nothing. A story can be private to one user. The server keeps what it receives; nothing shows it yet. The contract is in [INGEST.md](INGEST.md).
+Grok Bot sends the new dashboard's content to the server: stories, story updates, Breaking items, CFP items and the CFP footer, and the Morning cards. Grok Bot is the first of the bots (agents) that may post. Each agent signs in with a token of its own, not a user account. The operator adds agents, turns one off, or gives one a new token with the `npm run agents` script, and each token is shown once. The server records which agent wrote each item. Sending the same item twice changes nothing. A story can be private to one user; only the agent that created it can read it back. The server keeps what it receives; nothing shows it yet. The contract is in [INGEST.md](INGEST.md).
 
-**Scenario:** Given the token is set, when Grok Bot posts a story and then posts it again unchanged, then the story is stored once and the second post reports nothing changed.
+**Scenario:** Given Grok Bot has its own token, when it posts a story and then posts it again unchanged, then the story is stored once, the second post reports nothing changed, and the story is recorded as written by Grok Bot.
 
 **Scenario:** Given an update is already stored, when Grok Bot posts the same id with a different headline, then it is refused as a conflict, and the stored update is kept.
 
-**Scenario:** Given a post without the token, or with a wrong one, then it is refused and nothing is stored.
+**Scenario:** Given a post without a token, with a wrong one, or with the token of an agent the operator turned off, then it is refused and nothing is stored.
 
-**Scenario:** Given the server has no token or no database set up, when Grok Bot posts, then it is told the service is unavailable, and the rest of the site works as before.
+**Scenario:** Given the operator gives an agent a new token, when the agent posts with its old token, then it is refused, and the new token works at once.
+
+**Scenario:** Given Grok Bot posted a private story, when another agent asks to read it back, then it is told there is no such story, and Grok Bot can still read it back.
+
+**Scenario:** Given Grok Bot posted a private story, when another agent posts the same story id, or an update about it, then it is refused and the story is unchanged.
+
+**Scenario:** Given the server has no database set up, when Grok Bot posts, then it is told the service is unavailable, and the rest of the site works as before.
 

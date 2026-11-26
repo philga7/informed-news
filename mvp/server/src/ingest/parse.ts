@@ -10,6 +10,7 @@ import {
   type IngestKind,
   type PutResult,
 } from '../store/postgres/ingestStore.js';
+import type { Writer } from '../store/postgres/writer.js';
 import type { JsonObject } from '../store/postgres/storeSupport.js';
 import type {
   CfpStatus,
@@ -51,7 +52,8 @@ export type ParsedItem = {
   rows: number;
   /** The id the result reports: the item's id, or the day of a CFP footer note. */
   id: string;
-  put: (pool: Pool) => Promise<PutResult>;
+  /** Stores the item, recording `writer` as who wrote it (NEWS-263). */
+  put: (pool: Pool, writer: Writer) => Promise<PutResult>;
 };
 
 type Fields = Record<string, unknown>;
@@ -203,7 +205,7 @@ function parseStory(r: Reader): ParsedItem {
   const rows =
     1 + post.sources.length + post.tags.length + post.categoryIds.length + post.dates.length +
     post.panels.length + post.links.length;
-  return { kind: 'story', id, rows, put: (pool) => putStory(pool, post) };
+  return { kind: 'story', id, rows, put: (pool, writer) => putStory(pool, writer, post) };
 }
 
 function parseEntry(r: Reader): ParsedItem {
@@ -229,7 +231,7 @@ function parseEntry(r: Reader): ParsedItem {
     tags: tagsOf(r, LIMITS.entryTags),
   };
   const rows = 1 + post.sources.length + post.tags.length;
-  return { kind: 'entry', id, rows, put: (pool) => putEntry(pool, post) };
+  return { kind: 'entry', id, rows, put: (pool, writer) => putEntry(pool, writer, post) };
 }
 
 function parseBreaking(r: Reader): ParsedItem {
@@ -246,7 +248,7 @@ function parseBreaking(r: Reader): ParsedItem {
     storyId: r.optionalText('storyId'),
     entryId: r.optionalText('entryId'),
   };
-  return { kind: 'breaking', id, rows: 1, put: (pool) => putBreakingItem(pool, post) };
+  return { kind: 'breaking', id, rows: 1, put: (pool, writer) => putBreakingItem(pool, writer, post) };
 }
 
 function parseCfpItem(r: Reader): ParsedItem {
@@ -261,13 +263,13 @@ function parseCfpItem(r: Reader): ParsedItem {
     sourceName: r.optionalText('sourceName'),
     status: r.optionalText('status') as CfpStatus | null,
   };
-  return { kind: 'cfp_item', id, rows: 1, put: (pool) => putCfpItem(pool, post) };
+  return { kind: 'cfp_item', id, rows: 1, put: (pool, writer) => putCfpItem(pool, writer, post) };
 }
 
 function parseCfpDayNote(r: Reader): ParsedItem {
   r.only(['kind', 'day', 'stillWorking', 'dropped']);
   const post = { day: r.text('day'), stillWorking: r.optionalText('stillWorking'), dropped: r.optionalText('dropped') };
-  return { kind: 'cfp_day_note', id: post.day, rows: 1, put: (pool) => putCfpDayNote(pool, post) };
+  return { kind: 'cfp_day_note', id: post.day, rows: 1, put: (pool, writer) => putCfpDayNote(pool, writer, post) };
 }
 
 function parseMorning(r: Reader): ParsedItem {
@@ -281,7 +283,7 @@ function parseMorning(r: Reader): ParsedItem {
     postedAt: r.text('postedAt'),
     data: r.object('data'),
   };
-  return { kind: 'morning', id, rows: 1, put: (pool) => putMorningItem(pool, post) };
+  return { kind: 'morning', id, rows: 1, put: (pool, writer) => putMorningItem(pool, writer, post) };
 }
 
 export function isIngestKind(value: unknown): value is IngestKind {

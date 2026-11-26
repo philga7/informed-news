@@ -6,6 +6,10 @@ Each ship-loop pull request adds an entry for what is true at merge for that rea
 
 This is not the release log. Releases are recorded in `CHANGELOG.md` by semantic-release. Do not hand-edit `CHANGELOG.md` to mirror these notes.
 
+## 2026-11-26
+
+**No user-visible change.** Each bot that sends stories to the server now has a token of its own, which can be turned off or replaced without touching the others, and the server records which bot wrote each story, update and item. The Brief is unchanged.
+
 ## 2026-11-25
 
 **No user-visible change.** Which status label each value on Grok Bot's pages becomes, and who writes each Morning card, are written down. The Brief is unchanged.

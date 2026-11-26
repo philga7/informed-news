@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
+import { hashAgentToken } from '../ingest/agentToken.js';
+import type { Writer } from '../store/postgres/writer.js';
 
 /** Test-only helpers for the dashboard store. Not used by app code. */
 
@@ -40,4 +42,18 @@ export async function scratchSchemaPool(connectionString: string | undefined): P
       await admin.end();
     },
   };
+}
+
+/** The agent the store tests write as (NEWS-263). Its token is fixed and test-only. */
+export const TEST_AGENT_ID = 'test-agent';
+export const TEST_AGENT_TOKEN = `inag_${'T'.repeat(43)}`;
+export const TEST_WRITER: Writer = { agentId: TEST_AGENT_ID };
+
+/** Adds the test agent once; every write in the store tests names it. */
+export async function ensureTestAgent(pool: Pool): Promise<void> {
+  await pool.query(
+    `INSERT INTO agents (id, name, token_hash, enabled, created_at) VALUES ($1, 'Test agent', $2, true, now())
+     ON CONFLICT DO NOTHING`,
+    [TEST_AGENT_ID, hashAgentToken(TEST_AGENT_TOKEN)],
+  );
 }

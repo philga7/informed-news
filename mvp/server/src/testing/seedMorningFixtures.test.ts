@@ -5,16 +5,17 @@ import express from 'express';
 import type { Pool } from 'pg';
 import { createIngestRouter } from '../ingest/ingestRoutes.js';
 import { ensureDashboardSchema } from '../store/postgres/dashboardStore.js';
-import { scratchSchemaPool } from './dashboardTestDb.js';
+import { ensureTestAgent, scratchSchemaPool, TEST_AGENT_TOKEN } from './dashboardTestDb.js';
 import { seedCategory, seedFixture, seedMorningFixture } from './seedFixtures.js';
 
-const TOKEN = 'test-ingest-token-0123456789abcdefghij';
+const TOKEN = TEST_AGENT_TOKEN;
 let pool: Pool;
 let drop: () => Promise<void>;
 
 before(async () => {
   ({ pool, drop } = await scratchSchemaPool(process.env.INFORMED_NEWS_TEST_DATABASE_URL));
   await ensureDashboardSchema(pool);
+  await ensureTestAgent(pool);
   await seedCategory(pool);
 });
 
@@ -28,7 +29,7 @@ type Of<K extends Item['kind']> = Extract<Item, { kind: K }>;
 async function serve(t: TestContext) {
   const app = express().use(
     '/api/ingest',
-    createIngestRouter({ token: TOKEN, pool, ready: () => Promise.resolve() }),
+    createIngestRouter({ pool, ready: () => Promise.resolve() }),
   );
   const server = app.listen(0, '127.0.0.1');
   await new Promise((resolve) => server.once('listening', resolve));

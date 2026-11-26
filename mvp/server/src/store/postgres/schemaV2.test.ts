@@ -135,6 +135,7 @@ test('every time column is timestamptz and nothing stores a tone', async (t) => 
   assert.deepEqual(
     times.map((row) => `${row.table_name}.${row.column_name}`).sort(),
     [
+      'agents.created_at',
       'breaking_items.occurred_at',
       'cfp_roundup_items.roundup_at',
       'morning_items.posted_at',

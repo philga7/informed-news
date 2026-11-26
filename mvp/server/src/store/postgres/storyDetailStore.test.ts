@@ -4,7 +4,7 @@ import { before, test, type TestContext } from 'node:test';
 import type { Pool } from 'pg';
 import { createStory, createStoryEntry, ensureDashboardSchema } from './dashboardStore.js';
 import { DashboardStoreError } from './storeSupport.js';
-import { testPool } from '../../testing/dashboardTestDb.js';
+import { ensureTestAgent, TEST_WRITER, testPool } from '../../testing/dashboardTestDb.js';
 import {
   addEntryTag,
   addStoryCategory,
@@ -30,6 +30,7 @@ before(async () => {
   const pool = testPool(process.env.INFORMED_NEWS_TEST_DATABASE_URL);
   try {
     await ensureDashboardSchema(pool);
+    await ensureTestAgent(pool);
   } finally {
     await pool.end();
   }
@@ -42,11 +43,11 @@ function store(t: TestContext): Pool {
 }
 
 function hub(pool: Pool, title = 'Hub') {
-  return createStory(pool, { role: 'hub', hubId: null, title, status: 'developing' });
+  return createStory(pool, TEST_WRITER, { role: 'hub', hubId: null, title, status: 'developing' });
 }
 
 function entry(pool: Pool, storyId: string) {
-  return createStoryEntry(pool, {
+  return createStoryEntry(pool, TEST_WRITER, {
     storyId,
     occurredAt: '2026-11-14T15:04:00Z',
     precision: 'time',
@@ -72,9 +73,9 @@ test('create and read a category, and put a story in several', async (t) => {
 
   const story = await hub(pool);
   assert.deepEqual(await listStoryCategories(pool, story.id), []);
-  await addStoryCategory(pool, { storyId: story.id, categoryId: politics.id });
-  await addStoryCategory(pool, { storyId: story.id, categoryId: courts.id });
-  await addStoryCategory(pool, { storyId: story.id, categoryId: courts.id });
+  await addStoryCategory(pool, TEST_WRITER, { storyId: story.id, categoryId: politics.id });
+  await addStoryCategory(pool, TEST_WRITER, { storyId: story.id, categoryId: courts.id });
+  await addStoryCategory(pool, TEST_WRITER, { storyId: story.id, categoryId: courts.id });
   assert.deepEqual(await listStoryCategories(pool, story.id), [courts, politics]);
 });
 
@@ -89,8 +90,8 @@ test('a category name is used once, and its sort is a whole number', async (t) =
 test('create and read a story tag, and tag an entry with it', async (t) => {
   const pool = store(t);
   const story = await hub(pool);
-  const count = await createStoryTag(pool, { storyId: story.id, slug: 'count', name: 'Count' });
-  const court = await createStoryTag(pool, { storyId: story.id, slug: 'court', name: 'Court' });
+  const count = await createStoryTag(pool, TEST_WRITER, { storyId: story.id, slug: 'count', name: 'Count' });
+  const court = await createStoryTag(pool, TEST_WRITER, { storyId: story.id, slug: 'court', name: 'Court' });
   assert.deepEqual(await readStoryTag(pool, count.id), count);
   assert.equal(await readStoryTag(pool, 'missing-tag'), null);
 
@@ -106,15 +107,15 @@ test('a tag slug is unique within its story and free in another', async (t) => {
   const pool = store(t);
   const story = await hub(pool);
   const other = await hub(pool, 'Other');
-  await createStoryTag(pool, { storyId: story.id, slug: 'count', name: 'Count' });
+  await createStoryTag(pool, TEST_WRITER, { storyId: story.id, slug: 'count', name: 'Count' });
   await assert.rejects(
-    createStoryTag(pool, { storyId: story.id, slug: 'count', name: 'Count again' }),
+    createStoryTag(pool, TEST_WRITER, { storyId: story.id, slug: 'count', name: 'Count again' }),
     { code: UNIQUE_VIOLATION },
   );
-  await createStoryTag(pool, { storyId: other.id, slug: 'count', name: 'Count' });
+  await createStoryTag(pool, TEST_WRITER, { storyId: other.id, slug: 'count', name: 'Count' });
   for (const slug of ['Count', 'two words', '#count', 'count-']) {
     await assert.rejects(
-      createStoryTag(pool, { storyId: story.id, slug, name: 'Count' }),
+      createStoryTag(pool, TEST_WRITER, { storyId: story.id, slug, name: 'Count' }),
       /slug must be lowercase letters, digits and single hyphens/,
     );
   }
@@ -124,7 +125,7 @@ test('an entry cannot carry a tag from another story', async (t) => {
   const pool = store(t);
   const story = await hub(pool);
   const other = await hub(pool, 'Other');
-  const foreign = await createStoryTag(pool, { storyId: other.id, slug: 'count', name: 'Count' });
+  const foreign = await createStoryTag(pool, TEST_WRITER, { storyId: other.id, slug: 'count', name: 'Count' });
   const tagged = await entry(pool, story.id);
   for (const tagId of [foreign.id, 'missing-tag']) {
     await assert.rejects(
@@ -138,7 +139,7 @@ test('an entry cannot carry a tag from another story', async (t) => {
 test('create and read a story source', async (t) => {
   const pool = store(t);
   const story = await hub(pool);
-  const full = await createStorySource(pool, {
+  const full = await createStorySource(pool, TEST_WRITER, {
     storyId: story.id,
     outlet: 'New York Times',
     title: 'Count paused in two counties',
@@ -151,7 +152,7 @@ test('create and read a story source', async (t) => {
   assert.deepEqual(await readStorySource(pool, full.id), full);
   assert.equal(full.publishedOn, '2026-11-05');
 
-  const bare = await createStorySource(pool, { storyId: story.id, outlet: 'County clerk' });
+  const bare = await createStorySource(pool, TEST_WRITER, { storyId: story.id, outlet: 'County clerk' });
   assert.deepEqual(await readStorySource(pool, bare.id), {
     id: bare.id,
     storyId: story.id,
@@ -165,7 +166,7 @@ test('create and read a story source', async (t) => {
   });
   assert.equal(await readStorySource(pool, 'missing-source'), null);
   await assert.rejects(
-    createStorySource(pool, { storyId: story.id, outlet: 'Wire', publishedOn: '11/05/2026' }),
+    createStorySource(pool, TEST_WRITER, { storyId: story.id, outlet: 'Wire', publishedOn: '11/05/2026' }),
     /publishedOn must be a date \(YYYY-MM-DD\)/,
   );
 });
@@ -173,7 +174,7 @@ test('create and read a story source', async (t) => {
 test('create and read a next date, a single day or a range', async (t) => {
   const pool = store(t);
   const story = await hub(pool);
-  const single = await createStoryDate(pool, {
+  const single = await createStoryDate(pool, TEST_WRITER, {
     storyId: story.id,
     startsOn: '2026-12-01',
     label: 'Certification deadline',
@@ -181,7 +182,7 @@ test('create and read a next date, a single day or a range', async (t) => {
   assert.equal(single.endsOn, null);
   assert.deepEqual(await readStoryDate(pool, single.id), single);
 
-  const range = await createStoryDate(pool, {
+  const range = await createStoryDate(pool, TEST_WRITER, {
     storyId: story.id,
     startsOn: '2026-11-17',
     endsOn: '2026-11-18',
@@ -190,7 +191,7 @@ test('create and read a next date, a single day or a range', async (t) => {
   assert.deepEqual(await readStoryDate(pool, range.id), range);
   assert.equal(await readStoryDate(pool, 'missing-date'), null);
   await assert.rejects(
-    createStoryDate(pool, {
+    createStoryDate(pool, TEST_WRITER, {
       storyId: story.id,
       startsOn: '2026-11-18',
       endsOn: '2026-11-17',
@@ -211,7 +212,7 @@ test('create and read a story panel such as Seats', async (t) => {
     threshold: 61,
     note: 'Ten seats undecided',
   };
-  const created = await createStoryPanel(pool, {
+  const created = await createStoryPanel(pool, TEST_WRITER, {
     storyId: story.id,
     kind: 'seats',
     title: 'Seats',
@@ -222,7 +223,7 @@ test('create and read a story panel such as Seats', async (t) => {
   assert.deepEqual((await readStoryPanel(pool, created.id))?.payload, payload);
   assert.equal(await readStoryPanel(pool, 'missing-panel'), null);
   await assert.rejects(
-    createStoryPanel(pool, { storyId: story.id, kind: 'seats', title: 'Seats', payload: [] as never }),
+    createStoryPanel(pool, TEST_WRITER, { storyId: story.id, kind: 'seats', title: 'Seats', payload: [] as never }),
     /payload must be a JSON object/,
   );
 });
@@ -231,7 +232,7 @@ test('create and read a link between two stories, with its reason', async (t) =>
   const pool = store(t);
   const from = await hub(pool, 'From');
   const to = await hub(pool, 'To');
-  const created = await createStoryLink(pool, {
+  const created = await createStoryLink(pool, TEST_WRITER, {
     fromStoryId: from.id,
     toStoryId: to.id,
     note: 'Same court, same judge',
@@ -239,11 +240,11 @@ test('create and read a link between two stories, with its reason', async (t) =>
   assert.deepEqual(await readStoryLink(pool, from.id, to.id), created);
   assert.equal(await readStoryLink(pool, to.id, from.id), null);
   await assert.rejects(
-    createStoryLink(pool, { fromStoryId: from.id, toStoryId: from.id, note: 'Self' }),
+    createStoryLink(pool, TEST_WRITER, { fromStoryId: from.id, toStoryId: from.id, note: 'Self' }),
     /a story cannot link to itself/,
   );
   await assert.rejects(
-    createStoryLink(pool, { fromStoryId: from.id, toStoryId: to.id, note: ' ' }),
+    createStoryLink(pool, TEST_WRITER, { fromStoryId: from.id, toStoryId: to.id, note: ' ' }),
     /note is required/,
   );
 });
@@ -252,13 +253,13 @@ test('NEWS-228: a story source, date or panel created twice with one id is a con
   const pool = store(t);
   const story = await hub(pool);
   const id = `dup:${Math.random().toString(36).slice(2)}`;
-  await createStorySource(pool, { id, storyId: story.id, outlet: 'Wire' });
-  await assert.rejects(createStorySource(pool, { id, storyId: story.id, outlet: 'Wire' }), (error: unknown) => {
+  await createStorySource(pool, TEST_WRITER, { id, storyId: story.id, outlet: 'Wire' });
+  await assert.rejects(createStorySource(pool, TEST_WRITER, { id, storyId: story.id, outlet: 'Wire' }), (error: unknown) => {
     assert.ok(error instanceof DashboardStoreError);
     assert.equal(error.reason, 'conflict');
     return true;
   });
-  await assert.rejects(createStoryDate(pool, { storyId: 'no-such-story', startsOn: '2026-11-27', label: 'Vote' }), (error: unknown) => {
+  await assert.rejects(createStoryDate(pool, TEST_WRITER, { storyId: 'no-such-story', startsOn: '2026-11-27', label: 'Vote' }), (error: unknown) => {
     assert.ok(error instanceof DashboardStoreError);
     assert.equal(error.reason, 'missing');
     return true;

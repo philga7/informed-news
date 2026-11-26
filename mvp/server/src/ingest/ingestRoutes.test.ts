@@ -5,13 +5,15 @@ import { after, before, test, type TestContext } from 'node:test';
 import express from 'express';
 import type { Pool } from 'pg';
 import { createApp } from '../app.js';
+import { addAgent, disableAgent, setAgentTokenHash } from '../store/postgres/agentStore.js';
 import { ensureDashboardSchema } from '../store/postgres/dashboardStore.js';
 import { createUser } from '../store/postgres/userStore.js';
-import { testPool } from '../testing/dashboardTestDb.js';
+import { ensureTestAgent, TEST_AGENT_ID, TEST_AGENT_TOKEN, testPool } from '../testing/dashboardTestDb.js';
+import { generateAgentToken, hashAgentToken } from './agentToken.js';
 import { createIngestRouter } from './ingestRoutes.js';
 import { openIngest, type IngestConfig } from './openIngest.js';
 
-const TOKEN = 'test-ingest-token-0123456789abcdefghij';
+const TOKEN = TEST_AGENT_TOKEN;
 const saved = { SESSION_SECRET: process.env.SESSION_SECRET, MVP_PASSWORD: process.env.MVP_PASSWORD };
 let pool: Pool;
 
@@ -20,7 +22,15 @@ before(async () => {
   process.env.MVP_PASSWORD = 'pw';
   pool = testPool(process.env.INFORMED_NEWS_TEST_DATABASE_URL);
   await ensureDashboardSchema(pool);
+  await ensureTestAgent(pool);
 });
+
+/** A new agent with its own token, as `npm run agents -- add` makes one. */
+async function newAgent(name = `agent ${randomUUID()}`): Promise<{ id: string; token: string }> {
+  const token = generateAgentToken();
+  const { agent } = await addAgent(pool, { name, tokenHash: hashAgentToken(token) });
+  return { id: agent.id, token };
+}
 
 after(async () => {
   await pool.end();
@@ -31,7 +41,7 @@ after(async () => {
 });
 
 function config(over: Partial<IngestConfig> = {}): IngestConfig {
-  return { token: TOKEN, pool, ready: () => Promise.resolve(), ...over };
+  return { pool, ready: () => Promise.resolve(), ...over };
 }
 
 async function serve(
@@ -69,14 +79,19 @@ const story = (id = uid('story'), over: object = {}) => ({
   ...over,
 });
 
-test('no token configured answers 503; a missing or wrong token answers 401 and reads no body', async (t) => {
-  const off = await serve(t, config({ token: null }));
+test('a missing, malformed, unknown or disabled token answers 401 and reads no body; no database answers 503', async (t) => {
+  const off = await serve(t, config({ pool: null }));
   assert.equal((await off('/api/ingest', { json: story() })).status, 503);
+  // A malformed token is refused before the database is needed.
+  assert.equal((await off('/api/ingest', { json: story(), token: 'wrong' })).status, 401);
   const none = await serve(t, undefined);
   assert.equal((await none('/api/ingest', { json: story() })).status, 503);
 
+  const disabled = await newAgent();
+  assert.equal(await disableAgent(pool, disabled.id), true);
   const on = await serve(t, config());
-  for (const token of [null, 'wrong', `${TOKEN}x`, TOKEN.slice(1)]) {
+  const unknown = generateAgentToken();
+  for (const token of [null, 'wrong', `${TOKEN}x`, TOKEN.slice(1), unknown, disabled.token]) {
     const res = await on('/api/ingest', { json: story(), token });
     assert.equal(res.status, 401, String(token));
     assert.equal(res.headers.get('www-authenticate'), 'Bearer');
@@ -85,10 +100,150 @@ test('no token configured answers 503; a missing or wrong token answers 401 and 
   assert.equal(scheme.status, 401);
   // A wrong token with a broken body is still 401: the body is not read before the token check.
   assert.equal((await on('/api/ingest', { json: '{', token: 'wrong' })).status, 401);
+  assert.equal((await on('/api/ingest', { json: '{', token: unknown })).status, 401);
   assert.equal((await on('/api/ingest/story/x', { token: null })).status, 401);
+  assert.equal((await on('/api/ingest/story/x', { token: disabled.token })).status, 401);
 });
 
-test('no database answers 503 after a good token, and a schema that cannot be applied answers 503', async (t) => {
+test('a rotated token works at once and the old one stops; a disabled agent stays off', async (t) => {
+  const post = await serve(t, config());
+  const agent = await newAgent();
+  assert.equal((await post('/api/ingest', { json: story(), token: agent.token })).status, 201);
+  const next = generateAgentToken();
+  assert.equal(await setAgentTokenHash(pool, agent.id, hashAgentToken(next)), true);
+  assert.equal((await post('/api/ingest', { json: story(), token: agent.token })).status, 401);
+  assert.equal((await post('/api/ingest', { json: story(), token: next })).status, 201);
+  await disableAgent(pool, agent.id);
+  assert.equal((await post('/api/ingest', { json: story(), token: next })).status, 401);
+  const after = generateAgentToken();
+  await setAgentTokenHash(pool, agent.id, hashAgentToken(after));
+  assert.equal((await post('/api/ingest', { json: story(), token: after })).status, 401, 'rotating does not re-enable');
+});
+
+test('each agent writes as itself: a story keeps its creator, and its last writer moves on a change', async (t) => {
+  const post = await serve(t, config());
+  const other = await newAgent();
+  const item = story();
+  assert.equal((await post('/api/ingest', { json: item })).status, 201);
+  // The same story again from another agent changes nothing, so the writer stays.
+  assert.equal((await post('/api/ingest', { json: item, token: other.token })).status, 200);
+  const writers = async () =>
+    (
+      await pool.query(
+        `SELECT created_by_agent_id, written_by_agent_id, written_by_user_id FROM stories WHERE id = $1`,
+        [item.id],
+      )
+    ).rows[0];
+  assert.deepEqual(await writers(), {
+    created_by_agent_id: TEST_AGENT_ID,
+    written_by_agent_id: TEST_AGENT_ID,
+    written_by_user_id: null,
+  });
+  assert.equal((await post('/api/ingest', { json: { ...item, status: 'stalled' }, token: other.token })).status, 200);
+  assert.deepEqual(await writers(), {
+    created_by_agent_id: TEST_AGENT_ID,
+    written_by_agent_id: other.id,
+    written_by_user_id: null,
+  });
+  const read = (await (await post(`/api/ingest/story/${encodeURIComponent(item.id)}`)).json()) as {
+    item: { createdBy: unknown; writtenBy: unknown };
+  };
+  assert.deepEqual(read.item.createdBy, { agent: TEST_AGENT_ID });
+  assert.deepEqual(read.item.writtenBy, { agent: other.id });
+
+  const ping = { kind: 'breaking', id: uid('b'), occurredAt: '2026-11-26T09:00:00-05:00', headline: 'Ping', label: 'reported' };
+  assert.equal((await post('/api/ingest', { json: ping, token: other.token })).status, 201);
+  // A fixed item posted again by another agent with the same content is unchanged, and keeps its writer.
+  assert.equal((await post('/api/ingest', { json: ping })).status, 200);
+  const readPing = (await (await post(`/api/ingest/breaking/${encodeURIComponent(ping.id)}`)).json()) as {
+    item: { writtenBy: unknown };
+  };
+  assert.deepEqual(readPing.item.writtenBy, { agent: other.id });
+});
+
+test('a private story, its entries, and a Breaking item about it read back only for the agent that created the story', async (t) => {
+  const get = await serve(t, config());
+  const second = await newAgent();
+  const third = await newAgent();
+  const owner = await createUser(pool, { email: `${randomUUID()}@example.com`, passwordHash: 'h', displayName: 'O' });
+  const hub = story(uid('story'));
+  const entry = (id: string) => ({
+    kind: 'entry',
+    id,
+    storyId: hub.id,
+    precision: 'time',
+    occurredAt: '2026-11-26T08:00:00-05:00',
+    headline: 'Update',
+    label: 'reported',
+  });
+  const ownEntry = entry(uid('e'));
+  const theirEntry = entry(uid('e'));
+  const ping = { kind: 'breaking', id: uid('b'), occurredAt: '2026-11-26T09:00:00-05:00', headline: 'Ping', label: 'reported', storyId: hub.id };
+  // While the story is shared, any agent may post about it.
+  assert.equal((await get('/api/ingest', { json: hub })).status, 201);
+  assert.equal((await get('/api/ingest', { json: ownEntry })).status, 201);
+  assert.equal((await get('/api/ingest', { json: theirEntry, token: second.token })).status, 201);
+  assert.equal((await get('/api/ingest', { json: ping, token: second.token })).status, 201);
+  // Then its creator makes it private.
+  assert.equal((await get('/api/ingest', { json: { ...hub, ownerUserId: owner.id } })).status, 200);
+
+  const at = (kind: string, id: string) => `/api/ingest/${kind}/${encodeURIComponent(id)}`;
+  // The creator reads everything.
+  for (const path of [at('story', hub.id), at('entry', ownEntry.id), at('entry', theirEntry.id), at('breaking', ping.id)]) {
+    assert.equal((await get(path)).status, 200, path);
+  }
+  // Another agent gets the answer an unknown id gets, even for an entry it wrote.
+  for (const path of [at('story', hub.id), at('entry', theirEntry.id)]) {
+    const res = await get(path, { token: second.token });
+    assert.equal(res.status, 404, path);
+    assert.deepEqual(await res.json(), { error: `no ${path.split('/')[3]} with this id` });
+  }
+  // A Breaking item reads back for its own writer too, and for nobody else.
+  assert.equal((await get(at('breaking', ping.id), { token: second.token })).status, 200);
+  assert.equal((await get(at('breaking', ping.id), { token: third.token })).status, 404);
+
+  // Made shared again, the story reads back for every agent.
+  assert.equal((await get('/api/ingest', { json: hub })).status, 200);
+  assert.equal((await get(at('story', hub.id), { token: third.token })).status, 200);
+  assert.equal((await get(at('entry', theirEntry.id), { token: third.token })).status, 200);
+});
+
+test('another agent cannot re-post a private story, or post an entry or Breaking item about it', async (t) => {
+  const post = await serve(t, config());
+  const other = await newAgent();
+  const owner = await createUser(pool, { email: `${randomUUID()}@example.com`, passwordHash: 'h', displayName: 'O' });
+  const hub = story(uid('story'), { ownerUserId: owner.id, nowSummary: 'Secret' });
+  assert.equal((await post('/api/ingest', { json: hub })).status, 201);
+
+  // Clearing the owner would make it shared: refused, and the story is untouched.
+  for (const attempt of [{ ...hub, ownerUserId: null }, hub, { ...hub, title: 'Changed' }]) {
+    const res = await post('/api/ingest', { json: attempt, token: other.token });
+    assert.equal(res.status, 409);
+    assert.deepEqual(await res.json(), { kind: 'story', id: hub.id, error: `story id ${hub.id} is taken`, reason: 'conflict' });
+  }
+  const stored = await pool.query(`SELECT owner_user_id, title, written_by_agent_id FROM stories WHERE id = $1`, [hub.id]);
+  assert.deepEqual(stored.rows, [{ owner_user_id: owner.id, title: hub.title, written_by_agent_id: TEST_AGENT_ID }]);
+  assert.equal((await post(`/api/ingest/story/${encodeURIComponent(hub.id)}`, { token: other.token })).status, 404);
+
+  const entry = { kind: 'entry', id: uid('e'), storyId: hub.id, precision: 'day', occurredAt: '2026-11-26', headline: 'U', label: 'reported' };
+  const ping = { kind: 'breaking', id: uid('b'), occurredAt: '2026-11-26T09:00:00Z', headline: 'P', label: 'reported', storyId: hub.id };
+  for (const item of [entry, ping]) {
+    const res = await post('/api/ingest', { json: item, token: other.token });
+    assert.equal(res.status, 422);
+    assert.deepEqual(await res.json(), {
+      kind: item.kind,
+      id: item.id,
+      error: `storyId ${hub.id} does not exist`,
+      reason: 'missing',
+    });
+  }
+  // The creator still can.
+  assert.equal((await post('/api/ingest', { json: { ...hub, title: 'Changed' } })).status, 200);
+  assert.equal((await post('/api/ingest', { json: entry })).status, 201);
+  assert.equal((await post('/api/ingest', { json: ping })).status, 201);
+});
+
+test('no database answers 503 after a well-formed token, and a schema that cannot be applied answers 503', async (t) => {
   const warnings: string[] = [];
   const noDb = await serve(t, config({ pool: null }));
   assert.equal((await noDb('/api/ingest', { json: story() })).status, 503);
@@ -260,17 +415,21 @@ test('mounted in the app: no session needed, ahead of the 100 KB /api parser, up
   assert.equal((await post('/api/ingest', { json: huge })).status, 413);
 });
 
-test('openIngest: off without a token or with a short one; on with a token and Postgres settings', () => {
+test('openIngest: off without Postgres settings; a leftover INGEST_TOKEN is ignored with a warning that has no value', () => {
   const logs: string[] = [];
-  const opts = { log: (m: string) => logs.push(m), warn: (m: string) => logs.push(m) };
-  assert.equal(openIngest({}, opts).token, null);
-  assert.equal(openIngest({ INGEST_TOKEN: 'short' }, opts).token, null);
-  const noDb = openIngest({ INGEST_TOKEN: TOKEN }, opts);
-  assert.equal(noDb.token, TOKEN);
-  assert.equal(noDb.pool, null);
-  assert.ok(logs.some((m) => m.startsWith('Ingest off: INGEST_TOKEN is not set')));
-  assert.ok(logs.some((m) => m.includes('at least 32 characters')));
-  assert.ok(logs.every((m) => !m.includes(TOKEN)), 'the token is never logged');
+  const warnings: string[] = [];
+  const opts = { log: (m: string) => logs.push(m), warn: (m: string) => warnings.push(m) };
+  const off = openIngest({}, opts);
+  assert.equal(off.pool, null);
+  assert.ok(logs.some((m) => m.startsWith('Ingest off')));
+  assert.deepEqual(warnings, []);
+
+  const old = 'an-old-ingest-token-0123456789abcdefghij';
+  const leftover = openIngest({ INGEST_TOKEN: old }, opts);
+  assert.equal(leftover.pool, null);
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0] ?? '', /^INGEST_TOKEN is set but no longer used/);
+  assert.ok([...logs, ...warnings].every((m) => !m.includes(old)), 'the old token is never logged');
 });
 
 test('review fixes: bearer in any case, null sort, names on a parse failure, the request row cap, other body errors', async (t) => {
@@ -310,14 +469,16 @@ test('review fixes: bearer in any case, null sort, names on a parse failure, the
 });
 
 test('a database that fails during a put answers 503; an unexpected error answers 500 and logs no content', async (t) => {
-  const lost = { connect: async () => { throw Object.assign(new Error('connect ECONNREFUSED 10.0.0.1:5432'), { code: 'ECONNREFUSED' }); } };
+  // The agent is looked up on the real pool; the put then finds the database gone.
+  const query = pool.query.bind(pool);
+  const lost = { query, connect: async () => { throw Object.assign(new Error('connect ECONNREFUSED 10.0.0.1:5432'), { code: 'ECONNREFUSED' }); } };
   const warnings: string[] = [];
   const down = await serve(t, config({ pool: lost as unknown as Pool }), { warnings });
   const res = await down('/api/ingest', { json: story() });
   assert.equal(res.status, 503);
   assert.equal(((await res.json()) as { reason: string }).reason, 'unavailable');
 
-  const odd = { connect: async () => { throw new TypeError('secret-content from the post'); } };
+  const odd = { query, connect: async () => { throw new TypeError('secret-content from the post'); } };
   const broken = await serve(t, config({ pool: odd as unknown as Pool }), { warnings });
   const item = story();
   const failed = await broken('/api/ingest', { json: item });
@@ -326,4 +487,13 @@ test('a database that fails during a put answers 503; an unexpected error answer
   assert.ok(warnings.some((w) => w === 'Ingest: database unreachable during story put'));
   assert.ok(warnings.some((w) => w.startsWith('Ingest: unexpected TypeError (no code) during story put')));
   assert.ok(warnings.every((w) => !w.includes('secret-content') && !w.includes(TOKEN)));
+});
+
+test('a database that fails during the token lookup answers 503', async (t) => {
+  const warnings: string[] = [];
+  const gone = { query: async () => { throw Object.assign(new Error('x'), { code: 'ECONNREFUSED' }); } };
+  const down = await serve(t, config({ pool: gone as unknown as Pool }), { warnings });
+  const res = await down('/api/ingest', { json: story() });
+  assert.equal(res.status, 503);
+  assert.deepEqual(warnings, ['Ingest: database unreachable during token lookup']);
 });

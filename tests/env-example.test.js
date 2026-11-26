@@ -9,6 +9,9 @@ const srcDir = join(root, "mvp/server/src");
 const examplePath = join(root, "mvp/.env.example");
 
 const IGNORED = new Set(["NODE_ENV", "NODE_TEST_CONTEXT"]);
+// Retired names the server reads only to warn that they are set and no longer
+// used. They stay out of .env.example, so nobody sets them again.
+const RETIRED = new Set(["INGEST_TOKEN"]); // NEWS-263: agents have their own tokens
 const ALLOWED_VALUES = [
   /^$/,
   /^change-me/,
@@ -45,6 +48,7 @@ function envNamesInSource() {
     }
   }
   for (const n of IGNORED) names.delete(n);
+  for (const n of RETIRED) names.delete(n);
   return names;
 }
 
@@ -63,6 +67,11 @@ test("mvp/.env.example lists every env var the server reads", () => {
   const keys = parseExample();
   const missing = [...names].filter((n) => !keys.has(n)).sort();
   assert.deepEqual(missing, []);
+});
+
+test("mvp/.env.example does not list retired env vars", () => {
+  const keys = parseExample();
+  assert.deepEqual([...RETIRED].filter((n) => keys.has(n)), []);
 });
 
 test("mvp/.env.example holds placeholder values only", () => {

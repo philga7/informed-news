@@ -322,3 +322,82 @@ BEGIN
   END IF;
 END
 $$;
+
+-- Schema v5 (NEWS-263): one token per agent, and who wrote each row.
+-- Decisions: docs/DECISIONS.md, 2026-11-24 (NEWS-262) and 2026-11-26 (NEWS-263).
+-- An agent's token is stored only as its SHA-256 hash (hex). A disabled agent
+-- stays in the table: its rows keep naming it.
+CREATE TABLE IF NOT EXISTS agents (
+  id text PRIMARY KEY,
+  name text NOT NULL CHECK (btrim(name) <> ''),
+  token_hash text NOT NULL CHECK (token_hash ~ '^[0-9a-f]{64}$'),
+  enabled boolean NOT NULL DEFAULT true,
+  created_at timestamptz NOT NULL
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS agents_name_lower_idx ON agents (lower(name));
+CREATE UNIQUE INDEX IF NOT EXISTS agents_token_hash_idx ON agents (token_hash);
+
+-- written_by: the agent or the user that last changed the row. Rows written
+-- before v5 (under INGEST_TOKEN) have neither, until the operator claims them
+-- for an agent (`npm run agents -- add --claim-unattributed`). The store
+-- always sets one. A story also records who created it, and has a creator
+-- exactly when it has a writer.
+DO $$
+DECLARE
+  t text;
+BEGIN
+  FOREACH t IN ARRAY ARRAY[
+    'stories', 'story_sources', 'story_tags', 'story_dates', 'story_panels',
+    'story_links', 'story_categories', 'story_entries', 'breaking_items',
+    'cfp_roundup_items', 'cfp_day_notes', 'morning_items'
+  ] LOOP
+    EXECUTE format(
+      'ALTER TABLE %I
+         ADD COLUMN IF NOT EXISTS written_by_agent_id text REFERENCES agents (id),
+         ADD COLUMN IF NOT EXISTS written_by_user_id text REFERENCES users (id)',
+      t
+    );
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_constraint
+      WHERE conname = t || '_one_writer' AND conrelid = t::regclass
+    ) THEN
+      EXECUTE format(
+        'ALTER TABLE %I ADD CONSTRAINT %I
+           CHECK (written_by_agent_id IS NULL OR written_by_user_id IS NULL)',
+        t, t || '_one_writer'
+      );
+    END IF;
+  END LOOP;
+END
+$$;
+
+ALTER TABLE stories
+  ADD COLUMN IF NOT EXISTS created_by_agent_id text REFERENCES agents (id),
+  ADD COLUMN IF NOT EXISTS created_by_user_id text REFERENCES users (id);
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'stories_one_creator' AND conrelid = 'stories'::regclass
+  ) THEN
+    ALTER TABLE stories
+      ADD CONSTRAINT stories_one_creator
+      CHECK (created_by_agent_id IS NULL OR created_by_user_id IS NULL);
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'stories_creator_with_writer' AND conrelid = 'stories'::regclass
+  ) THEN
+    ALTER TABLE stories
+      ADD CONSTRAINT stories_creator_with_writer
+      CHECK (
+        (created_by_agent_id IS NULL AND created_by_user_id IS NULL)
+        = (written_by_agent_id IS NULL AND written_by_user_id IS NULL)
+      );
+  END IF;
+END
+$$;
+
+CREATE INDEX IF NOT EXISTS stories_created_by_agent_idx ON stories (created_by_agent_id);
