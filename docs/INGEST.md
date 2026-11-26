@@ -58,7 +58,7 @@ A time must carry its zone. Accepted: `2026-11-23T18:45:00-05:00`, `2026-11-23T1
 
 ## Labels and fixed values
 
-Values are sent in the lowercase form the database stores. The definitions are in [DECISIONS.md](DECISIONS.md) (2026-11-16, "Status labels are a fixed list").
+Values are sent in the lowercase form the database stores. The definitions are in [DECISIONS.md](DECISIONS.md) (2026-11-16, "Status labels are a fixed list"). Which label each value on Grok Bot's pages maps to, for every Status, Strength, Tag and confidence value, is in [DECISIONS.md](DECISIONS.md#2026-11-25--label-mapping-for-every-page-value-and-the-morning-export-answers-news-269) (2026-11-25, NEWS-269), which supersedes part of the 2026-11-16 mapping table.
 
 | Field | Values |
 |---|---|

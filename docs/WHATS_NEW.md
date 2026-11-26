@@ -6,11 +6,11 @@ Each ship-loop pull request adds an entry for what is true at merge for that rea
 
 This is not the release log. Releases are recorded in `CHANGELOG.md` by semantic-release. Do not hand-edit `CHANGELOG.md` to mirror these notes.
 
-## 2026-11-26
+## 2026-11-25
+
+**No user-visible change.** Which status label each value on Grok Bot's pages becomes, and who writes each Morning card, are written down. The Brief is unchanged.
 
 **No user-visible change.** The server's read-back of a Morning item now names its card `card`, the same as when it was posted. A post that points at a story, update, source or hub that does not exist now gets an error naming that field and id, with no database detail. The Brief is unchanged.
-
-## 2026-11-25
 
 **No user-visible change.** Sample Breaking items, CFP items, and Morning cards from Grok Bot are now saved as test data, so the new dashboard can be tested and built against real content. Nothing loads them into the app. The Brief is unchanged.
 
