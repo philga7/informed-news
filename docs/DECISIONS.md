@@ -6,7 +6,7 @@ Binding choices for Informed News. Newest first. When one of these changes, upda
 
 **Decision:** Grok Bot exports its own pages and posts in the contract's JSON ([INGEST.md](INGEST.md), and [2026-11-24](#2026-11-24--agent-contract-user-api-deletes-moving-stories-and-hosting-news-262)). Its export brief of 2026-11-25 maps every Status, Strength, Tag and confidence value found on its 31 Developing Pages to the eight labels, following Phil's evidence standard (Oct 25). Phil approved that mapping on 2026-11-25 with one fix (Official assessment and Official attribution map to `on_record`, or `working` when unverified, not `official`), and answered the brief's open questions about the Morning cards the same day. The tables below are the mapping of record. Nothing here changes code, the schema, or the contract.
 
-In the first two tables, rows marked **Δ** differ from, or add to, the table in [2026-11-16 — Status labels are a fixed list](#2026-11-16--status-labels-are-a-fixed-list-news-238). Labels are written in the stored lowercase form. Emoji and trailing source notes on a page value are ignored. The Story status table is new in full except for its Developing and Working (branch) values.
+In the first two tables, rows marked **Δ** map to a label the table in [2026-11-16 — Status labels are a fixed list](#2026-11-16--status-labels-are-a-fixed-list-news-238) did not give that value, or cover a value it did not map. A row that only names more page values for a mapping that table already had is not marked. Labels are written in the stored lowercase form. Emoji and trailing source notes on a page value are ignored. The Story status table is new in full except for its Developing and Working (branch) values.
 
 The rules behind the tables:
 
@@ -18,7 +18,7 @@ The rules behind the tables:
 
 | Page value (and variants) | Maps to | Δ |
 |---|---|---|
-| Confirmed, backed by a court order or ruling | `official_ruling` | |
+| Confirmed, backed by a court order or ruling | `official_ruling` | Δ |
 | Confirmed, backed by an official record, filing, docket, release, Federal Register, 8-K, House Clerk or roll call, official text | `official` | |
 | Confirmed, backed by the person's own words (transcript, X post, Truth Social, video, victim disclosure, company or newsroom statement) | `on_record` | |
 | Confirmed, backed by two or more outlets with separate sourcing (AP and Reuters, wire and mainstream) | `reported` | |
@@ -28,7 +28,7 @@ The rules behind the tables:
 | Confirmed, with context or caveat; `Arithmetic confirmed` | the label for what confirms it, with the caveat kept in the text | Δ |
 | Partly confirmed, Confirmed in part, Partly documented | `working` | Δ |
 | Working, Working (single-outlet package) | `working` | |
-| Reported, Reported record | `reported` if two or more outlets, else `single_outlet` | |
+| Reported, Reported record | `reported` if two or more outlets, else `single_outlet` | Δ |
 | Reported and assessed, Assessed | `working` | Δ |
 | Unconfirmed, with one outlet | `single_outlet` | |
 | Unconfirmed, with some evidence that isn't verified (`Unconfirmed (clip only)`, an excerpt, an official claim not yet checked) | `working` | Δ |
@@ -54,7 +54,7 @@ The rules behind the tables:
 | `vendor-attributed` (security vendor names an actor) | `working` | Δ |
 | Dormant, Clarify, Retired, `resolved: stale lead`, `consistent_with_precedent` | not a label: no entry | Δ |
 
-**Timeline `Tag` values and story-file `confidence` values:**
+**Timeline `Tag` values and story-file `confidence` values** (a `Reported` or `Reported record` tag maps as in the first table):
 
 | Page value | Maps to | Δ |
 |---|---|---|
