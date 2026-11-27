@@ -1,3 +1,9 @@
+## [0.48.1](https://github.com/philga7/informed-news/compare/v0.48.0...v0.48.1) (2026-11-27)
+
+### Bug Fixes
+
+* **NEWS-276:** make npm run agents work in the container image ([#307](https://github.com/philga7/informed-news/issues/307)) ([d60a711](https://github.com/philga7/informed-news/commit/d60a71184f495f77269a392c2c2eca078e6a79a6)), closes [#306](https://github.com/philga7/informed-news/issues/306)
+
 ## [0.48.0](https://github.com/philga7/informed-news/compare/v0.47.0...v0.48.0) (2026-11-26)
 
 ### Features
