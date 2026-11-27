@@ -6,6 +6,10 @@ Each ship-loop pull request adds an entry for what is true at merge for that rea
 
 This is not the release log. Releases are recorded in `CHANGELOG.md` by semantic-release. Do not hand-edit `CHANGELOG.md` to mirror these notes.
 
+## 2026-11-27
+
+**No user-visible change.** The operator command that manages bot tokens now also runs inside the server's container. The Brief is unchanged.
+
 ## 2026-11-26
 
 The dashboard is at `/shell`, on a dark page with dividers rather than boxes. Signed in, you see which stories have news, the developing stories, and the morning cards (a short brief, weather, the market figures, and a watch line). You can follow a story or hide it. Hiding takes it off your list, and you can show the hidden titles and put one back. The home page is still the Brief. While a refresh is running, the Brief says so, including after you reload, and the last fetch time is in your local time.

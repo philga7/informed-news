@@ -15,7 +15,7 @@ This is version 1 of the contract. A breaking change would come at a new path, `
 
 ### Agents
 
-An agent is added, listed, turned off and given a new token with `npm run agents --prefix mvp/server -- <command>`, run where the server runs with the same env file, like `npm run users` for accounts:
+An agent is added, listed, turned off and given a new token with `npm run agents --prefix mvp/server -- <command>`, run where the server runs with the same env file, like `npm run users` for accounts. In the container image the script runs the compiled `dist/cli/agents.js`, so it needs no `tsx`. In a local checkout run `npm run build --prefix mvp/server` once first, or use `npm run agents:dev --prefix mvp/server -- <command>`, which runs the TypeScript source with no build:
 
 | Command | What it does |
 |---|---|
@@ -30,7 +30,7 @@ An agent is added, listed, turned off and given a new token with `npm run agents
 Rows written under `INGEST_TOKEN` have no writer. The first agent claims them, so Grok Bot keeps the stories it already posted, including reading back its private ones.
 
 1. Deploy the release with agents. From then on, posts with the old token answer **401** until step 3; Grok Bot's retries are safe.
-2. Run `npm run agents --prefix mvp/server -- add --name "Grok Bot" --claim-unattributed`. Copy the token it prints.
+2. Run `npm run agents --prefix mvp/server -- add --name "Grok Bot" --claim-unattributed`. Copy the token it prints. (In a local checkout without a build, use `agents:dev` in place of `agents`.)
 3. Put that token in Grok Bot's settings in place of the old one, and check that a post and a read-back work.
 4. Remove `INGEST_TOKEN` from the env file and restart, so the warning line stops.
 
