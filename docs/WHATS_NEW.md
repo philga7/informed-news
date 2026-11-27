@@ -12,6 +12,8 @@ The dashboard is at `/shell`, on a dark page with dividers rather than boxes. Si
 
 Bot tokens: no user-visible change. Each bot that sends stories to the server now has a token of its own, which can be turned off or replaced without touching the others, and the server records which bot wrote each story, update and item. The Brief is unchanged.
 
+Bot token command: no user-visible change. The operator command that manages bot tokens now also runs inside the server's container. The Brief is unchanged.
+
 ## 2026-11-25
 
 **No user-visible change.** Which status label each value on Grok Bot's pages becomes, and who writes each Morning card, are written down. The Brief is unchanged.
