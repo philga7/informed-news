@@ -299,6 +299,7 @@
 	}
 
 	.read-badge {
+		font-family: var(--font-mono);
 		margin-inline-start: 0.5rem;
 		padding: 0 0.375rem;
 		border: 1px solid #6b7280;
@@ -318,6 +319,7 @@
 	}
 
 	.category-label {
+		font-family: var(--font-mono);
 		font-size: 0.75rem;
 		letter-spacing: 0.04em;
 		text-transform: uppercase;
@@ -351,6 +353,7 @@
 	}
 
 	.meta {
+		font-family: var(--font-mono);
 		display: flex;
 		flex-wrap: wrap;
 		gap: 0.5rem;

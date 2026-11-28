@@ -390,6 +390,7 @@
 	}
 
 	h3 {
+		font-family: var(--font-mono);
 		margin: 0 0 0.45rem;
 		font-size: 0.72rem;
 		font-weight: 600;

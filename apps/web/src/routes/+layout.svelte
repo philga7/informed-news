@@ -1,4 +1,5 @@
 <script lang="ts">
+	import '$lib/fonts.css';
 	import { beforeNavigate } from '$app/navigation';
 	import { shellOwnsPath } from '$lib/brief/shellPaths';
 	import type { LayoutProps } from './$types';

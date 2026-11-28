@@ -1221,7 +1221,7 @@
 		max-width: 40rem;
 		margin: 0 auto;
 		padding: 1rem 1rem 2rem;
-		font-family: system-ui, sans-serif;
+		font-family: var(--font-sans);
 		color: #111827;
 	}
 
@@ -1273,6 +1273,7 @@
 	}
 
 	.section-head span {
+		font-family: var(--font-mono);
 		font-size: 0.7rem;
 		letter-spacing: 0.06em;
 		text-transform: uppercase;

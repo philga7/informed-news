@@ -43,6 +43,7 @@
 	}
 
 	.count {
+		font-family: var(--font-mono);
 		margin: 0 0 0.45rem;
 		font-size: 0.95rem;
 	}
