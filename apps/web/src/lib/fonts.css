@@ -1,0 +1,39 @@
+/* NEWS-283: Geist Sans and Geist Mono, self-hosted (SIL OFL 1.1, see static/shell/fonts/OFL.txt).
+   The server hands only /, /latest… and /shell… to the shell, so URLs live under /shell/fonts/. */
+@font-face {
+	font-family: 'Geist';
+	src: url('/shell/fonts/Geist-Variable.woff2') format('woff2');
+	font-weight: 100 900;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: 'Geist Mono';
+	src: url('/shell/fonts/GeistMono-Variable.woff2') format('woff2');
+	font-weight: 100 900;
+	font-style: normal;
+	font-display: swap;
+}
+
+:root {
+	--font-sans: 'Geist', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+	--font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+body {
+	font-family: var(--font-sans);
+}
+
+h1,
+h2,
+h3,
+h4 {
+	font-family: var(--font-sans);
+}
+
+/* Every control button is mono (NEWS-283). Scoped rules that reset `font: inherit` re-set the family;
+   headline buttons (e.g. .title-button) opt back into sans. */
+button {
+	font-family: var(--font-mono);
+}

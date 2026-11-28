@@ -329,6 +329,7 @@
 	}
 
 	.chips button {
+		font-family: var(--font-mono);
 		border: 1px solid #3c414b;
 		border-radius: 999px;
 		padding: 0.15rem 0.65rem;
@@ -360,6 +361,7 @@
 	}
 
 	.kicker {
+		font-family: var(--font-mono);
 		grid-column: 1;
 		font-size: 0.72rem;
 		font-weight: 600;
@@ -369,6 +371,7 @@
 	}
 
 	.count {
+		font-family: var(--font-mono);
 		color: #e6e2d8;
 	}
 
@@ -382,6 +385,15 @@
 	.meta {
 		grid-column: 1;
 		color: #b7b2a6;
+	}
+
+	.part,
+	.now {
+		font-family: var(--font-sans);
+	}
+
+	.meta {
+		font-family: var(--font-mono);
 	}
 
 	.now {
@@ -399,11 +411,13 @@
 	.actions button,
 	.foot button,
 	li button {
+		font-family: var(--font-mono);
 		border: 0;
 		padding: 0;
 	}
 
 	.quiet {
+		font-family: var(--font-mono);
 		margin: 1.1rem 0 0;
 		font-size: 0.72rem;
 		font-weight: 600;

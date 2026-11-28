@@ -263,7 +263,7 @@
 		box-sizing: border-box;
 		background: #14161a;
 		color: #e6e2d8;
-		font-family: system-ui, sans-serif;
+		font-family: var(--font-sans);
 		font-size: 15px;
 		line-height: 1.45;
 		padding: 1.25rem 1.5rem 3rem;
@@ -327,6 +327,7 @@
 
 	.status :global(button) {
 		font: inherit;
+		font-family: var(--font-mono);
 		color: #f3efe6;
 		background: transparent;
 		border: 1px solid #3c414b;
@@ -346,6 +347,7 @@
 	}
 
 	h2 {
+		font-family: var(--font-mono);
 		margin: 0 0 0.7rem;
 		font-size: 0.72rem;
 		font-weight: 600;

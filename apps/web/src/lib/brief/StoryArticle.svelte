@@ -299,6 +299,7 @@
 	}
 
 	.read-badge {
+		font-family: var(--font-mono);
 		margin-inline-start: 0.5rem;
 		padding: 0 0.375rem;
 		border: 1px solid #6b7280;
@@ -318,6 +319,7 @@
 	}
 
 	.category-label {
+		font-family: var(--font-mono);
 		font-size: 0.75rem;
 		letter-spacing: 0.04em;
 		text-transform: uppercase;
@@ -338,6 +340,7 @@
 	}
 
 	.title-button {
+		font-family: var(--font-sans);
 		background: none;
 		border: 0;
 		padding: 0;
@@ -346,11 +349,13 @@
 	}
 
 	.read-button {
+		font-family: var(--font-mono);
 		flex: none;
 		font-size: 0.75rem;
 	}
 
 	.meta {
+		font-family: var(--font-mono);
 		display: flex;
 		flex-wrap: wrap;
 		gap: 0.5rem;
