@@ -1,3 +1,9 @@
+## [0.49.0](https://github.com/philga7/informed-news/compare/v0.48.1...v0.49.0) (2026-11-28)
+
+### Features
+
+* **NEWS-283:** use Geist Sans and Geist Mono in the shell ([#308](https://github.com/philga7/informed-news/issues/308)) ([d29abf7](https://github.com/philga7/informed-news/commit/d29abf74bbf6897aff2bda326d693a96b38cc2ae))
+
 ## [0.48.1](https://github.com/philga7/informed-news/compare/v0.48.0...v0.48.1) (2026-11-27)
 
 ### Bug Fixes
