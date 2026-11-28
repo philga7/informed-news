@@ -6,7 +6,7 @@ Each ship-loop pull request adds an entry for what is true at merge for that rea
 
 This is not the release log. Releases are recorded in `CHANGELOG.md` by semantic-release. Do not hand-edit `CHANGELOG.md` to mirror these notes.
 
-## 2026-11-28
+## 2026-11-27
 
 The Brief and the dashboard now use the Geist typefaces: Geist Sans for text and headings, and Geist Mono for times, kickers, uppercase labels, counts, badges and buttons. The fonts load from the app itself.
 
