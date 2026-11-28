@@ -364,7 +364,7 @@ The Brief at `/` is the shell. `/shell` is the dashboard, not that Brief. It has
 
 **Scenario:** Given you open `/shell/deep`, when you reload, then you are still on that shell page.
 
-The shell is set in Geist Sans, with Geist Mono for times, kickers, uppercase labels, counts, badges and buttons. The fonts are served from the app itself, not from a font service.
+The shell is set in Geist Sans, with Geist Mono for times, kickers, uppercase labels, counts, badges and every control button (headlines stay sans, as do the "part of" and latest-change lines in developing stories). The fonts are served from the app itself, not from a font service.
 
 **Scenario:** Given you open `/` or `/shell`, when the page loads, then body text and headings are in Geist Sans and times, kickers, uppercase labels, counts, badges and buttons are in Geist Mono, with no request to another site for fonts.
 

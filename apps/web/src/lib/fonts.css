@@ -31,3 +31,9 @@ h3,
 h4 {
 	font-family: var(--font-sans);
 }
+
+/* Every control button is mono (NEWS-283). Scoped rules that reset `font: inherit` re-set the family;
+   headline buttons (e.g. .title-button) opt back into sans. */
+button {
+	font-family: var(--font-mono);
+}

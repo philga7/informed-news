@@ -340,6 +340,7 @@
 	}
 
 	.title-button {
+		font-family: var(--font-sans);
 		background: none;
 		border: 0;
 		padding: 0;
@@ -348,6 +349,7 @@
 	}
 
 	.read-button {
+		font-family: var(--font-mono);
 		flex: none;
 		font-size: 0.75rem;
 	}

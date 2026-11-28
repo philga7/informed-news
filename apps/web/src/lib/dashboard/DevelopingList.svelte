@@ -383,9 +383,17 @@
 	.part,
 	.now,
 	.meta {
-		font-family: var(--font-mono);
 		grid-column: 1;
 		color: #b7b2a6;
+	}
+
+	.part,
+	.now {
+		font-family: var(--font-sans);
+	}
+
+	.meta {
+		font-family: var(--font-mono);
 	}
 
 	.now {
@@ -403,6 +411,7 @@
 	.actions button,
 	.foot button,
 	li button {
+		font-family: var(--font-mono);
 		border: 0;
 		padding: 0;
 	}

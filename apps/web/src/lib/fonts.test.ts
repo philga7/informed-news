@@ -51,20 +51,50 @@ describe('shell fonts (NEWS-283)', () => {
 
 	it('has no shell component declaring bare system-ui', () => {
 		for (const f of svelteFiles(join(webRoot, 'src'))) {
-			expect(read(f), f).not.toMatch(/font-family:[^;]*system-ui/);
+			expect(read(f), f).not.toMatch(/\bfont(-family)?:[^;]*system-ui/);
 		}
 	});
 
-	it('uses the mono token in the shell components that carry times, kickers, labels, counts and badges', () => {
-		for (const f of [
-			'lib/dashboard/DashboardHome.svelte',
-			'lib/dashboard/DevelopingList.svelte',
-			'lib/dashboard/MorningCards.svelte',
-			'lib/dashboard/TrackersLine.svelte',
-			'lib/brief/BriefScreen.svelte',
-			'lib/brief/StoryArticle.svelte',
-		]) {
-			expect(read(join(webRoot, 'src', f)), f).toContain('var(--font-mono)');
+	const sel = (file: string, selector: string): string => {
+		const src = read(join(webRoot, 'src/lib', file));
+		const style = src.slice(src.indexOf('<style'));
+		const esc = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+		const re = new RegExp(`(?:^|[}\\s,])${esc}\\s*(?:,[^{}]*)?\\{([^}]*)\\}`, 'gm');
+		return [...style.matchAll(re)].map((m) => m[1]).join('\n');
+	};
+	const mono = (file: string, selector: string) =>
+		expect(sel(file, selector), `${file} ${selector}`).toMatch(/font-family:\s*var\(--font-mono\)/);
+
+	it('uses mono on kickers, counts, meta, labels, badges and panel headings', () => {
+		mono('dashboard/DevelopingList.svelte', '.kicker');
+		mono('dashboard/DevelopingList.svelte', '.count');
+		mono('dashboard/DevelopingList.svelte', '.meta');
+		mono('dashboard/DevelopingList.svelte', '.quiet');
+		mono('dashboard/TrackersLine.svelte', '.count');
+		mono('dashboard/DashboardHome.svelte', 'h2');
+		mono('dashboard/MorningCards.svelte', 'h3');
+		mono('brief/StoryArticle.svelte', '.read-badge');
+		mono('brief/StoryArticle.svelte', '.category-label');
+		mono('brief/StoryArticle.svelte', '.meta');
+	});
+
+	it('uses mono on every control button, including developing-list row buttons', () => {
+		mono('dashboard/DevelopingList.svelte', '.chips button');
+		mono('dashboard/DevelopingList.svelte', '.actions button');
+		mono('dashboard/DevelopingList.svelte', '.foot button');
+		mono('dashboard/DevelopingList.svelte', 'li button');
+		mono('brief/StoryArticle.svelte', '.read-button');
+		expect(css).toMatch(/(^|\n)button[^{]*\{[^}]*font-family:\s*var\(--font-mono\)/);
+	});
+
+	it('keeps the headline button and developing-story prose in sans', () => {
+		expect(sel('brief/StoryArticle.svelte', '.title-button')).toMatch(/font-family:\s*var\(--font-sans\)/);
+		expect(sel('brief/StoryArticle.svelte', '.title-button')).not.toMatch(/--font-mono/);
+		for (const s of ['.part', '.now']) {
+			const body = sel('dashboard/DevelopingList.svelte', s);
+			expect(body, s).toMatch(/font-family:\s*var\(--font-sans\)/);
 		}
+		expect(sel('dashboard/DevelopingList.svelte', '.part')).not.toMatch(/--font-mono/);
+		expect(sel('dashboard/DevelopingList.svelte', '.now')).not.toMatch(/--font-mono/);
 	});
 });
